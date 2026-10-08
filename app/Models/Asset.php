@@ -15,6 +15,7 @@ class Asset extends Model
         'location_id',
         'parent_id',
         'name',
+        'description',
         'status',
         'manufacturer',
         'model',
@@ -104,6 +105,7 @@ class Asset extends Model
 
         return $query->where(function (Builder $q) use ($term, $like) {
             $q->where('name', 'like', $like)
+                ->orWhere('description', 'like', $like)
                 ->orWhere('manufacturer', 'like', $like)
                 ->orWhere('model', 'like', $like)
                 ->orWhere('serial_number', 'like', $like)

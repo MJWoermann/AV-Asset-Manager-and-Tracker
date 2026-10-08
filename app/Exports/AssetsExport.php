@@ -25,6 +25,7 @@ class AssetsExport implements FromCollection, WithHeadings
 
         return $query->get()->map(fn (Asset $a) => [
             $a->name,
+            $a->description,
             $a->itemType?->name,
             $a->status?->value,
             $a->manufacturer,
@@ -43,7 +44,7 @@ class AssetsExport implements FromCollection, WithHeadings
     public function headings(): array
     {
         return [
-            'Name', 'Item Type', 'Status', 'Manufacturer', 'Model', 'Serial Number',
+            'Name', 'Description', 'Item Type', 'Status', 'Manufacturer', 'Model', 'Serial Number',
             'FMI AST#', 'TP Barcode', 'RIG Tag #', 'Device SN', 'IP Address', 'MAC Address', 'Quantity',
         ];
     }

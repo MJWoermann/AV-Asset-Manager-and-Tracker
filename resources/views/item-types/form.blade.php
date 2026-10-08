@@ -14,6 +14,11 @@
             </div>
             <fieldset>
                 <legend class="text-sm font-semibold mb-2">Custom field sets</legend>
+                <p class="text-xs text-brand-charcoal dark:text-brand-silver mb-2">
+                    Manage sets on the
+                    <a href="{{ route('custom-field-sets.index') }}" class="text-brand">Field sets</a>
+                    page.
+                </p>
                 @foreach($fieldSets as $set)
                     <label class="flex items-start gap-2 text-sm mb-2">
                         <input type="checkbox" name="field_sets[]" value="{{ $set->id }}" class="rounded text-brand mt-0.5"

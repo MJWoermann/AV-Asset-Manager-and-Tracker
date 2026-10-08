@@ -1,24 +1,74 @@
+@php
+    $initialSelections = [];
+    foreach ($columns as $column) {
+        $guess = '';
+        foreach ($fields as $field => $label) {
+            $hay = strtolower($column);
+            if (str_contains($hay, str_replace('_', ' ', $field)) || str_contains($hay, strtolower($label))) {
+                if (! in_array($field, $initialSelections, true)) {
+                    $guess = $field;
+                    break;
+                }
+            }
+        }
+        $initialSelections[$column] = $guess;
+    }
+@endphp
+
 <x-app-layout>
-    <x-slot name="header"><h2 class="font-semibold text-xl">Map columns — {{ $itemType->name }}</h2></x-slot>
+    <x-slot name="header"><h2 class="font-semibold text-xl">Map columns</h2></x-slot>
     <div class="max-w-2xl mx-auto px-4">
-        <form method="POST" action="{{ route('import.process') }}" class="space-y-4 bg-white dark:bg-black border p-4">
+        <form
+            method="POST"
+            action="{{ route('import.prepare') }}"
+            class="space-y-4 bg-white dark:bg-black border p-4"
+            x-data="importMapper(@js(array_values($columns)), @js($initialSelections))"
+        >
             @csrf
+            <p class="text-sm text-gray-600 dark:text-brand-silver">
+                Map each source column to an asset field. Item type and location (level / room / rack) are set here —
+                missing types and locations are created automatically. Each target field may only be used once.
+            </p>
+
+            <div
+                x-show="duplicateWarning"
+                x-cloak
+                class="text-sm text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-2"
+                x-text="duplicateWarning"
+            ></div>
+            <x-input-error :messages="$errors->get('mapping')" class="mt-1" />
+
             @foreach($columns as $column)
-                <div class="grid grid-cols-2 gap-3 items-center text-sm">
-                    <div class="font-mono">{{ $column }}</div>
-                    <select name="mapping[{{ $column }}]" class="rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">Ignore</option>
-                        @foreach($fields as $field => $label)
-                            <option value="{{ $field }}" @selected(str_contains(strtolower($column), str_replace('_', ' ', $field)) || str_contains(strtolower($column), strtolower($label)))>{{ $label }}</option>
-                        @endforeach
-                    </select>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center text-sm">
+                    <div class="font-mono break-all">{{ $column }}</div>
+                    <div>
+                        <select
+                            name="mapping[{{ $column }}]"
+                            class="w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                            x-model="selections[{{ json_encode($column) }}]"
+                            @change="onChange({{ json_encode($column) }})"
+                        >
+                            <option value="">Ignore</option>
+                            @foreach($fields as $field => $label)
+                                <option
+                                    value="{{ $field }}"
+                                    :disabled="isTaken(@js($field), @js($column))"
+                                >{{ $label }}</option>
+                            @endforeach
+                            <option value="{{ $createNewField }}">Create new field (Imported-Field:{{ $column }})</option>
+                        </select>
+                        <x-input-error :messages="$errors->get('mapping.'.$column)" class="mt-1" />
+                    </div>
                 </div>
             @endforeach
-            <label class="inline-flex items-center gap-2 text-sm">
-                <input type="checkbox" name="dry_run" value="1" class="rounded text-brand" checked>
-                Dry run (no writes)
-            </label>
-            <x-primary-button>Process import</x-primary-button>
+
+            <button
+                type="submit"
+                class="inline-flex items-center px-4 py-2 bg-brand-black dark:bg-brand border border-transparent font-semibold text-xs text-white uppercase tracking-widest hover:bg-brand disabled:opacity-50"
+                x-bind:disabled="!!duplicateWarning"
+            >
+                Review duplicates
+            </button>
         </form>
     </div>
 </x-app-layout>

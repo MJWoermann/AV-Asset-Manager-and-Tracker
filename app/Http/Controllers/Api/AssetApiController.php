@@ -33,6 +33,7 @@ class AssetApiController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
             'item_type_id' => ['required', 'exists:item_types,id'],
             'location_id' => ['nullable', 'exists:locations,id'],
             'parent_id' => ['nullable', 'exists:assets,id'],
@@ -59,6 +60,7 @@ class AssetApiController extends Controller
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
             'item_type_id' => ['sometimes', 'exists:item_types,id'],
             'location_id' => ['nullable', 'exists:locations,id'],
             'parent_id' => ['nullable', 'exists:assets,id'],

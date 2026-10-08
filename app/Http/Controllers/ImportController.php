@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Imports\AssetImport;
-use App\Models\ItemType;
+use App\Services\ImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,41 +13,17 @@ use Maatwebsite\Excel\HeadingRowImport;
 
 class ImportController extends Controller
 {
-    /** @var array<string, string> */
-    public const ASSET_FIELDS = [
-        'name' => 'Name',
-        'status' => 'Status',
-        'manufacturer' => 'Manufacturer',
-        'model' => 'Model',
-        'serial_number' => 'Serial Number',
-        'purchase_date' => 'Purchase Date',
-        'warranty_expiry' => 'Warranty Expiry',
-        'supplier' => 'Supplier',
-        'replacement_cost' => 'Replacement Cost',
-        'fmi_ast' => 'FMI AST#',
-        'tp_barcode' => 'TP Barcode',
-        'rig_tag' => 'RIG Tag #',
-        'device_sn' => 'Device SN',
-        'ip_address' => 'IP Address',
-        'mac_address' => 'MAC Address',
-        'test_tag_expiry' => 'Test & Tag Expiry',
-        'quantity' => 'Quantity',
-        'notes' => 'Notes',
-    ];
+    public function __construct(protected ImportService $imports) {}
 
     public function create(): View
     {
-        return view('import.create', [
-            'itemTypes' => ItemType::orderBy('name')->get(),
-            'fields' => self::ASSET_FIELDS,
-        ]);
+        return view('import.create');
     }
 
     public function upload(Request $request): View|RedirectResponse
     {
         $request->validate([
             'file' => ['required', 'file', 'max:25600', 'mimes:csv,xlsx,xls,txt'],
-            'item_type_id' => ['required', 'exists:item_types,id'],
         ]);
 
         $path = $request->file('file')->store('imports');
@@ -56,45 +32,90 @@ class ImportController extends Controller
 
         session([
             'import.path' => $path,
-            'import.item_type_id' => (int) $request->item_type_id,
             'import.columns' => $columns,
         ]);
+        session()->forget(['import.mapping', 'import.prepared']);
 
         return view('import.map', [
             'columns' => $columns,
-            'fields' => self::ASSET_FIELDS,
-            'itemType' => ItemType::findOrFail($request->item_type_id),
+            'fields' => ImportService::ASSET_FIELDS,
+            'createNewField' => ImportService::CREATE_NEW_FIELD,
+        ]);
+    }
+
+    public function prepare(Request $request): View|RedirectResponse
+    {
+        $path = session('import.path');
+        $columns = session('import.columns', []);
+
+        if (! $path || ! Storage::exists($path)) {
+            return redirect()->route('import.create')->withErrors(['file' => 'Import session expired. Upload again.']);
+        }
+
+        $mapping = $this->imports->validateMapping(
+            $request->validate([
+                'mapping' => ['required', 'array'],
+                'mapping.*' => ['nullable', 'string'],
+            ])['mapping']
+        );
+
+        $reader = new AssetImport;
+        Excel::import($reader, Storage::path($path));
+        $prepared = $this->imports->prepareRows($reader->rows, $mapping);
+
+        session([
+            'import.mapping' => $mapping,
+            'import.prepared' => $prepared,
+        ]);
+
+        $duplicates = array_values(array_filter($prepared, fn (array $row) => $row['existing_id'] !== null));
+        $newCount = count($prepared) - count($duplicates);
+
+        return view('import.duplicates', [
+            'duplicates' => $duplicates,
+            'newCount' => $newCount,
+            'totalCount' => count($prepared),
+            'fieldLabels' => ImportService::ASSET_FIELDS,
         ]);
     }
 
     public function process(Request $request): RedirectResponse
     {
         $path = session('import.path');
-        $itemTypeId = session('import.item_type_id');
-        $columns = session('import.columns', []);
+        $prepared = session('import.prepared');
 
-        if (! $path || ! $itemTypeId) {
+        if (! $path || ! is_array($prepared)) {
             return redirect()->route('import.create')->withErrors(['file' => 'Import session expired. Upload again.']);
         }
 
-        $mapping = $request->validate([
-            'mapping' => ['required', 'array'],
-            'mapping.*' => ['nullable', 'string'],
+        $data = $request->validate([
+            'actions' => ['nullable', 'array'],
+            'actions.*' => ['in:update,replace,skip'],
+            'bulk_action' => ['nullable', 'in:update,replace,skip'],
             'dry_run' => ['nullable', 'boolean'],
-        ])['mapping'];
+        ]);
 
         $dryRun = $request->boolean('dry_run');
-        $import = new AssetImport($itemTypeId, $mapping, $columns, $dryRun);
-        Excel::import($import, Storage::path($path));
+        $counts = $this->imports->commit(
+            $prepared,
+            $data['actions'] ?? [],
+            $dryRun,
+            $data['bulk_action'] ?? 'update',
+        );
 
         if (! $dryRun) {
             Storage::delete($path);
-            session()->forget(['import.path', 'import.item_type_id', 'import.columns']);
+            session()->forget(['import.path', 'import.columns', 'import.mapping', 'import.prepared']);
         }
 
-        $message = $dryRun
-            ? "Dry run: {$import->created} would be created, {$import->updated} updated, {$import->skipped} skipped."
-            : "Import complete: {$import->created} created, {$import->updated} updated, {$import->skipped} skipped.";
+        $message = sprintf(
+            '%s: %d created, %d updated, %d replaced, %d skipped.',
+            $dryRun ? 'Dry run' : 'Import complete',
+            $counts['created'],
+            $counts['updated'],
+            $counts['replaced'],
+            $counts['skipped'],
+        );
 
         return redirect()->route('assets.index')->with('status', $message);
     }

@@ -13,6 +13,7 @@
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
+            <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div>{{ $asset->description ?: '—' }}</div></div>
             <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name }}</div></div>
             <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div>{{ $asset->status?->label() }}</div></div>
             <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div>{{ $asset->manufacturer }} {{ $asset->model }}</div></div>

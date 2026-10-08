@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetListController;
+use App\Http\Controllers\CustomFieldSetController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ItemTypeController;
@@ -46,6 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/locations/{location}', [LocationController::class, 'destroy'])->name('locations.destroy');
 
         Route::resource('item-types', ItemTypeController::class)->except(['show', 'destroy']);
+        Route::resource('custom-field-sets', CustomFieldSetController::class)->except(['show']);
 
         Route::get('/lists/create', [AssetListController::class, 'create'])->name('lists.create');
         Route::post('/lists', [AssetListController::class, 'store'])->name('lists.store');
@@ -69,6 +71,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin,inventory_manager')->group(function () {
         Route::get('/import', [ImportController::class, 'create'])->name('import.create');
         Route::post('/import/upload', [ImportController::class, 'upload'])->name('import.upload');
+        Route::post('/import/prepare', [ImportController::class, 'prepare'])->name('import.prepare');
         Route::post('/import/process', [ImportController::class, 'process'])->name('import.process');
         Route::get('/export/assets', [ExportController::class, 'assets'])->name('export.assets');
         Route::get('/export/lists/{list}', [ExportController::class, 'list'])->name('export.list');

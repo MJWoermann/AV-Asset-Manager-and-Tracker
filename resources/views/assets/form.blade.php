@@ -14,14 +14,24 @@
                 <x-input-error :messages="$errors->get('name')" class="mt-1" />
             </div>
 
+            <div>
+                <x-input-label for="description" value="Description" />
+                <textarea id="description" name="description" rows="3" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">{{ old('description', $asset->description) }}</textarea>
+                <x-input-error :messages="$errors->get('description')" class="mt-1" />
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <x-input-label for="item_type_id" value="Item type" />
-                    <select id="item_type_id" name="item_type_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
-                        @foreach($itemTypes as $type)
-                            <option value="{{ $type->id }}" @selected(old('item_type_id', $asset->item_type_id) == $type->id)>{{ $type->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        name="item_type_id"
+                        id="item_type_id"
+                        :options="$itemTypes->map(fn ($type) => ['value' => $type->id, 'label' => $type->name])"
+                        :selected="old('item_type_id', $asset->item_type_id)"
+                        placeholder="Select item type"
+                        required
+                    />
+                    <x-input-error :messages="$errors->get('item_type_id')" class="mt-1" />
                 </div>
                 <div>
                     <x-input-label for="status" value="Status" />
@@ -33,21 +43,25 @@
                 </div>
                 <div>
                     <x-input-label for="location_id" value="Location" />
-                    <select id="location_id" name="location_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">—</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}" @selected(old('location_id', $asset->location_id) == $location->id)>{{ $location->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        name="location_id"
+                        id="location_id"
+                        :options="$locations->map(fn ($location) => ['value' => $location->id, 'label' => $location->name])"
+                        :selected="old('location_id', $asset->location_id)"
+                        nullable
+                    />
+                    <x-input-error :messages="$errors->get('location_id')" class="mt-1" />
                 </div>
                 <div>
                     <x-input-label for="parent_id" value="Parent asset" />
-                    <select id="parent_id" name="parent_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">—</option>
-                        @foreach($parents as $parent)
-                            <option value="{{ $parent->id }}" @selected(old('parent_id', $asset->parent_id) == $parent->id)>{{ $parent->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        name="parent_id"
+                        id="parent_id"
+                        :options="$parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->name])"
+                        :selected="old('parent_id', $asset->parent_id)"
+                        nullable
+                    />
+                    <x-input-error :messages="$errors->get('parent_id')" class="mt-1" />
                 </div>
             </div>
 

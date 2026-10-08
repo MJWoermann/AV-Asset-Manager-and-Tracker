@@ -3,14 +3,9 @@
     <div class="max-w-xl mx-auto px-4">
         <form method="POST" action="{{ route('import.upload') }}" enctype="multipart/form-data" class="space-y-4 bg-white dark:bg-black border p-4">
             @csrf
-            <div>
-                <x-input-label for="item_type_id" value="Item type for imported rows" />
-                <select name="item_type_id" id="item_type_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
-                    @foreach($itemTypes as $type)
-                        <option value="{{ $type->id }}">{{ $type->name }}</option>
-                    @endforeach
-                </select>
-            </div>
+            <p class="text-sm text-gray-600 dark:text-brand-silver">
+                Upload a CSV or Excel file. You will map columns (including item type and location) on the next step.
+            </p>
             <div>
                 <x-input-label for="file" value="CSV or Excel (max 25MB)" />
                 <input type="file" name="file" id="file" accept=".csv,.xlsx,.xls" required class="mt-1 block w-full text-sm">

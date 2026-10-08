@@ -15,6 +15,7 @@
                     @role('admin|inventory_manager')
                         <x-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-nav-link>
                         <x-nav-link :href="route('item-types.index')" :active="request()->routeIs('item-types.*')">Types</x-nav-link>
+                        <x-nav-link :href="route('custom-field-sets.index')" :active="request()->routeIs('custom-field-sets.*')">Field sets</x-nav-link>
                     @endrole
                     @role('admin')
                         <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.*')">Users</x-nav-link>
@@ -62,6 +63,7 @@
             @role('admin|inventory_manager')
                 <x-responsive-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('item-types.index')" :active="request()->routeIs('item-types.*')">Types</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('custom-field-sets.index')" :active="request()->routeIs('custom-field-sets.*')">Field sets</x-responsive-nav-link>
             @endrole
             @role('admin')
                 <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.*')">Users</x-responsive-nav-link>

@@ -92,6 +92,7 @@ class AssetController extends Controller
     {
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
             'item_type_id' => ['required', 'exists:item_types,id'],
             'location_id' => ['nullable', 'exists:locations,id'],
             'parent_id' => ['nullable', 'exists:assets,id'],
