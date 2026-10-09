@@ -313,7 +313,7 @@ Alpine.data('bulkAssets', () => ({
 
     get allPageSelected() {
         const boxes = this.pageCheckboxes();
-        return boxes.length > 0 && boxes.every((id) => this.selected[id]);
+        return boxes.length > 0 && boxes.every((id) => !!this.selected[id]);
     },
 
     pageCheckboxes() {
@@ -322,10 +322,16 @@ Alpine.data('bulkAssets', () => ({
         );
     },
 
+    setSelected(id, checked) {
+        this.selected = { ...this.selected, [id]: !!checked };
+    },
+
     toggleAll(checked) {
+        const next = { ...this.selected };
         this.pageCheckboxes().forEach((id) => {
-            this.selected[id] = checked;
+            next[id] = !!checked;
         });
+        this.selected = next;
     },
 
     clearSelection() {
@@ -384,7 +390,7 @@ Alpine.data('bulkAssets', () => ({
     },
 }));
 
-Alpine.data('barcodeScanner', (scanUrl, initialRecent = []) => ({
+Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = []) => ({
     scanning: false,
     code: '',
     quantity: 1,
@@ -395,12 +401,48 @@ Alpine.data('barcodeScanner', (scanUrl, initialRecent = []) => ({
     busy: false,
     queue: [],
     recent: [],
+    eventItems: [],
+    eventListId: eventListId,
     lastCameraCode: '',
     lastCameraAt: 0,
 
     init() {
-        this.recent = (initialRecent || []).map((entry, index) => this.normalizeEntry(entry, index));
+        this.eventItems = (initialEventItems || []).map((entry, index) => this.normalizeEventItem(entry, index));
+        this.recent = this.loadRecent();
         this.$nextTick(() => this.focusInput());
+    },
+
+    storageKey() {
+        return `av-scan-recent-${this.eventListId ?? 'none'}`;
+    },
+
+    loadRecent() {
+        try {
+            const raw = sessionStorage.getItem(this.storageKey());
+            if (!raw) {
+                return [];
+            }
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+            return parsed.map((entry, index) => this.normalizeEntry(entry, index));
+        } catch (_) {
+            return [];
+        }
+    },
+
+    persistRecent() {
+        try {
+            sessionStorage.setItem(this.storageKey(), JSON.stringify(this.recent));
+        } catch (_) {}
+    },
+
+    resetRecent() {
+        this.recent = [];
+        try {
+            sessionStorage.removeItem(this.storageKey());
+        } catch (_) {}
     },
 
     focusInput() {
@@ -424,6 +466,16 @@ Alpine.data('barcodeScanner', (scanUrl, initialRecent = []) => ({
             warning: entry.warning || null,
             asset,
             time: entry.time ?? new Date().toLocaleTimeString(),
+        };
+    },
+
+    normalizeEventItem(entry, index = 0) {
+        const asset = entry.asset || {};
+        return {
+            id: entry.id ?? `event-${asset.id || index}-${Date.now()}`,
+            quantity: entry.quantity ?? 1,
+            is_child_expand: Boolean(entry.is_child_expand),
+            asset,
         };
     },
 
@@ -566,6 +618,12 @@ Alpine.data('barcodeScanner', (scanUrl, initialRecent = []) => ({
 
             if (entries.length) {
                 this.recent = [...entries, ...this.recent].slice(0, 50);
+                this.persistRecent();
+            }
+
+            if (!data.duplicate && Array.isArray(data.items) && data.items.length > 0) {
+                const added = data.items.map((item, index) => this.normalizeEventItem(item, index));
+                this.eventItems = [...added, ...this.eventItems];
             }
         } catch (e) {
             this.error = 'Scan failed: ' + (e?.message || e);

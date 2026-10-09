@@ -44,4 +44,18 @@ class LocationHierarchyTest extends TestCase
         $response->assertSee(route('assets.index', ['location_id' => $room->id]), false);
         $response->assertDontSee('Parent:');
     }
+
+    public function test_locations_index_alternates_row_shades_for_adjacent_same_type_siblings(): void
+    {
+        $user = User::factory()->create();
+
+        Location::create(['name' => 'Site Alpha', 'type' => LocationType::Site]);
+        Location::create(['name' => 'Site Beta', 'type' => LocationType::Site]);
+
+        $response = $this->actingAs($user)->get(route('locations.index'));
+
+        $response->assertOk();
+        $response->assertSee('bg-brand-silver dark:bg-brand-slate border-l-[3px] border-l-brand-charcoal', false);
+        $response->assertSee('bg-[#dcdcdc] dark:bg-[#3d4043] border-l-[3px] border-l-brand-charcoal', false);
+    }
 }

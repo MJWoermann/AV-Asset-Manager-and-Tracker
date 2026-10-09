@@ -58,8 +58,12 @@ class AssetLocationFilterTest extends TestCase
         $response->assertOk();
         $response->assertSee('In Room Asset');
         $response->assertDontSee('Other Site Asset');
+        $response->assertSee('searchableSelect(', false);
+        $response->assertSee('placeholder="Search…"', false);
         $response->assertSee('name="location_id"', false);
-        $response->assertSee('value="'.$site->id.'"', false);
+        $response->assertSee('id="filter_location_id"', false);
+        $response->assertSee('All locations');
+        $response->assertSee($site->breadcrumb());
     }
 
     public function test_assets_index_exact_location_filter_excludes_siblings(): void

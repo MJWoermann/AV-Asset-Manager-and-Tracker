@@ -45,7 +45,7 @@
                                 type="checkbox"
                                 class="rounded border-brand-charcoal/40"
                                 :checked="allPageSelected"
-                                @change="toggleAll($event.target.checked)"
+                                @click.prevent="toggleAll(!allPageSelected)"
                                 aria-label="Select all assets on this page"
                             >
                         </th>
@@ -67,7 +67,7 @@
                                         class="rounded border-brand-charcoal/40"
                                         data-bulk-asset-id="{{ $item->asset->id }}"
                                         :checked="!!selected[{{ $item->asset->id }}]"
-                                        @change="selected[{{ $item->asset->id }}] = $event.target.checked"
+                                        @change="setSelected({{ $item->asset->id }}, $event.target.checked)"
                                         aria-label="Select {{ $item->asset->name }}"
                                     >
                                 @endif

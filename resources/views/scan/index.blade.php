@@ -28,15 +28,8 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <x-input-label for="location_id" value="Location for next items" />
-                    <select id="location_id" name="location_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">—</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}">{{ $location->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-scan.location-field :locations="$locations" />
+                <x-scan.asset-status-field />
                 <x-primary-button>Start scanning</x-primary-button>
             </form>
         @else
@@ -60,27 +53,16 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <x-input-label for="location_id" value="Location for next items" />
-                    <select id="location_id" name="location_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">—</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}" @selected($session->location_id == $location->id)>{{ $location->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-scan.location-field :locations="$locations" :selected="$session->location_id" />
+                <x-scan.asset-status-field :selected="$session->asset_status" />
                 <x-primary-button>Update lists</x-primary-button>
             </form>
 
             @php
-                $initialRecent = $recentItems->map(fn ($item) => [
+                $initialEventItems = $eventListItems->map(fn ($item) => [
                     'id' => $item->id,
                     'quantity' => $item->quantity,
                     'is_child_expand' => (bool) $item->is_child_expand,
-                    'duplicate' => false,
-                    'inventory_status' => 'unknown',
-                    'warning' => null,
-                    'time' => $item->created_at?->timezone(config('app.timezone'))->format('H:i:s') ?? '',
                     'asset' => [
                         'id' => $item->asset?->id,
                         'name' => $item->asset?->name,
@@ -94,7 +76,7 @@
             @endphp
 
             <div
-                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($initialRecent))"
+                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems))"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
                 <div class="flex gap-2">
@@ -133,9 +115,20 @@
                 </div>
 
                 <div class="space-y-2">
-                    <h3 class="text-sm font-semibold">Added this session</h3>
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold">Added this session</h3>
+                        <button
+                            type="button"
+                            @click="resetRecent"
+                            x-show="recent.length > 0"
+                            x-cloak
+                            class="px-2 py-1 border border-brand-charcoal dark:border-brand-silver text-xs"
+                        >
+                            Reset
+                        </button>
+                    </div>
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="recent.length === 0" x-cloak>No items added yet.</p>
-                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal border border-brand-silver dark:border-brand-charcoal" x-show="recent.length > 0">
+                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal border border-brand-silver dark:border-brand-charcoal max-h-64 overflow-y-auto" x-show="recent.length > 0">
                         <template x-for="entry in recent" :key="entry.key">
                             <li class="px-3 py-2 text-sm flex flex-col gap-0.5" :class="entry.inventory_status === 'not_on_inventory' ? 'bg-amber-50 dark:bg-amber-950/30' : ''">
                                 <div class="flex justify-between gap-2">
@@ -151,6 +144,25 @@
                                     <span x-show="entry.inventory_status === 'not_on_inventory'" class="text-amber-700 dark:text-amber-300">Not on inventory</span>
                                     <span x-show="entry.inventory_status === 'matched'" class="text-brand">On inventory</span>
                                 </div>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold">On event list</h3>
+                        <span class="text-xs text-brand-charcoal dark:text-brand-silver" x-text="eventItems.length + ' item' + (eventItems.length === 1 ? '' : 's')"></span>
+                    </div>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="eventItems.length === 0" x-cloak>No items on this event list yet.</p>
+                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal border border-brand-silver dark:border-brand-charcoal max-h-72 overflow-y-auto" x-show="eventItems.length > 0">
+                        <template x-for="entry in eventItems" :key="'event-' + entry.id">
+                            <li class="px-3 py-1.5 text-sm flex items-baseline justify-between gap-2" :class="entry.is_child_expand ? 'pl-6' : ''">
+                                <span class="truncate" x-text="entry.asset?.name || 'Unknown asset'"></span>
+                                <span class="text-xs text-brand-charcoal dark:text-brand-silver whitespace-nowrap shrink-0">
+                                    <span x-show="entry.asset?.tp_barcode" x-text="entry.asset.tp_barcode"></span>
+                                    <span x-show="!entry.asset?.tp_barcode && entry.asset?.fmi_ast" x-text="entry.asset.fmi_ast"></span>
+                                </span>
                             </li>
                         </template>
                     </ul>

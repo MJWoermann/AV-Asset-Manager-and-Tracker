@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\AssetListItem;
 use App\Models\ScanSession;
@@ -56,41 +57,46 @@ class ScanService
             $inventoryStatus = $this->inventoryStatus($session, $asset);
             $warning = $this->inventoryWarning($inventoryStatus, $asset);
 
+            if (! $duplicate) {
+                $added[] = $this->itemSummary(
+                    $this->addItem($session, $asset, $quantity, false),
+                    $asset
+                );
+
+                if ($asset->isContainer() || $asset->children->isNotEmpty()) {
+                    foreach ($asset->children as $child) {
+                        $exists = AssetListItem::query()
+                            ->where('asset_list_id', $session->event_list_id)
+                            ->where('asset_id', $child->id)
+                            ->exists();
+
+                        if (! $exists) {
+                            $child->loadMissing('itemType');
+                            $added[] = $this->itemSummary(
+                                $this->addItem($session, $child, 1, true),
+                                $child
+                            );
+                        }
+                    }
+                }
+            }
+
+            $this->applySessionAssetUpdates($session, $asset);
+
             if ($duplicate) {
+                $message = "{$asset->name} is already on this event list.";
+                if ($session->asset_status instanceof AssetStatus) {
+                    $message .= ' Status updated to '.$session->asset_status->label().'.';
+                }
+
                 return [
                     'items' => [],
                     'duplicate' => true,
                     'inventory_status' => $inventoryStatus,
                     'warning' => $warning,
-                    'message' => "{$asset->name} is already on this event list.",
-                    'asset' => $this->assetSummary($asset),
+                    'message' => $message,
+                    'asset' => $this->assetSummary($asset->fresh(['itemType'])),
                 ];
-            }
-
-            $added[] = $this->itemSummary(
-                $this->addItem($session, $asset, $quantity, false),
-                $asset
-            );
-
-            if ($asset->isContainer() || $asset->children->isNotEmpty()) {
-                foreach ($asset->children as $child) {
-                    $exists = AssetListItem::query()
-                        ->where('asset_list_id', $session->event_list_id)
-                        ->where('asset_id', $child->id)
-                        ->exists();
-
-                    if (! $exists) {
-                        $child->loadMissing('itemType');
-                        $added[] = $this->itemSummary(
-                            $this->addItem($session, $child, 1, true),
-                            $child
-                        );
-                    }
-                }
-            }
-
-            if ($session->location_id && ! $asset->parent_id) {
-                $asset->update(['location_id' => $session->location_id]);
             }
 
             return [
@@ -101,7 +107,7 @@ class ScanService
                 'message' => count($added) > 1
                     ? "Added {$asset->name} with ".(count($added) - 1).' child asset(s).'
                     : "Added {$asset->name}.",
-                'asset' => $this->assetSummary($asset),
+                'asset' => $this->assetSummary($asset->fresh(['itemType'])),
             ];
         });
     }
@@ -115,6 +121,38 @@ class ScanService
             'is_child_expand' => $isChild,
             'added_by' => $session->user_id,
         ]);
+    }
+
+    /**
+     * Apply scan-session location/status to the scanned asset (and child statuses when set).
+     */
+    protected function applySessionAssetUpdates(ScanSession $session, Asset $asset): void
+    {
+        $attributes = [];
+
+        if ($session->asset_status instanceof AssetStatus) {
+            $attributes['status'] = $session->asset_status;
+        }
+
+        if ($session->location_id && ! $asset->parent_id) {
+            $attributes['location_id'] = $session->location_id;
+        }
+
+        if ($attributes !== []) {
+            $asset->update($attributes);
+        }
+
+        if (! ($session->asset_status instanceof AssetStatus)) {
+            return;
+        }
+
+        if (! $asset->relationLoaded('children')) {
+            $asset->load('children');
+        }
+
+        foreach ($asset->children as $child) {
+            $child->update(['status' => $session->asset_status]);
+        }
     }
 
     protected function inventoryStatus(ScanSession $session, Asset $asset): string

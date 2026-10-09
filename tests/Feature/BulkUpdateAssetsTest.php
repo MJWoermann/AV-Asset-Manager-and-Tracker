@@ -233,6 +233,8 @@ class BulkUpdateAssetsTest extends TestCase
         $response->assertSee('bulkAssets(', false);
         $response->assertSee('Bulk edit');
         $response->assertSee('data-bulk-asset-id', false);
+        $response->assertSee('toggleAll(!allPageSelected)', false);
+        $response->assertSee('setSelected(', false);
     }
 
     public function test_list_show_renders_bulk_controls(): void

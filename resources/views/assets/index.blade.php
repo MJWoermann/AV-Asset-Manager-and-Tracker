@@ -33,12 +33,15 @@
                     <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
                 @endforeach
             </select>
-            <select name="location_id" class="rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                <option value="">All locations</option>
-                @foreach($locations as $location)
-                    <option value="{{ $location->id }}" @selected($locationId === $location->id)>{{ $location->breadcrumb() }}</option>
-                @endforeach
-            </select>
+            <x-searchable-select
+                class="relative min-w-[14rem] sm:w-64"
+                name="location_id"
+                id="filter_location_id"
+                :options="$locations->map(fn ($location) => ['value' => $location->id, 'label' => $location->breadcrumb()])"
+                :selected="$locationId"
+                placeholder="All locations"
+                nullable
+            />
             <button class="px-4 py-2 bg-black text-white dark:bg-brand">Search</button>
         </form>
 
@@ -58,7 +61,7 @@
                                 type="checkbox"
                                 class="rounded border-brand-charcoal/40"
                                 :checked="allPageSelected"
-                                @change="toggleAll($event.target.checked)"
+                                @click.prevent="toggleAll(!allPageSelected)"
                                 aria-label="Select all assets on this page"
                             >
                         </th>
@@ -76,7 +79,7 @@
                                     class="rounded border-brand-charcoal/40"
                                     data-bulk-asset-id="{{ $asset->id }}"
                                     :checked="!!selected[{{ $asset->id }}]"
-                                    @change="selected[{{ $asset->id }}] = $event.target.checked"
+                                    @change="setSelected({{ $asset->id }}, $event.target.checked)"
                                     aria-label="Select {{ $asset->name }}"
                                 >
                             </td>

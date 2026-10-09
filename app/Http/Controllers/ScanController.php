@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AssetStatus;
+use App\Enums\LocationType;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\Location;
@@ -25,20 +27,19 @@ class ScanController extends Controller
             ->latest()
             ->first();
 
-        $recentItems = collect();
+        $eventListItems = collect();
 
         if ($active) {
-            $recentItems = AssetListItem::query()
+            $eventListItems = AssetListItem::query()
                 ->where('asset_list_id', $active->event_list_id)
                 ->with(['asset.itemType'])
                 ->latest('id')
-                ->limit(50)
                 ->get();
         }
 
         return view('scan.index', [
             'session' => $active,
-            'recentItems' => $recentItems,
+            'eventListItems' => $eventListItems,
             'eventLists' => AssetList::where('type', 'event')->orderBy('name')->get(),
             'inventoryLists' => AssetList::where('type', 'inventory')->orderBy('name')->get(),
             'locations' => Location::orderBy('name')->get(),
@@ -126,10 +127,12 @@ class ScanController extends Controller
     }
 
     /**
-     * @return array{event_list_id: int, inventory_list_id: int|null, location_id: int|null}
+     * @return array{event_list_id: int, inventory_list_id: int|null, location_id: int|null, asset_status: string|null}
      */
     protected function validatedSessionLists(Request $request): array
     {
+        $creatingLocation = $request->input('location_id') === '__new__';
+
         $data = $request->validate([
             'event_list_id' => [
                 'required',
@@ -139,11 +142,41 @@ class ScanController extends Controller
                 'nullable',
                 Rule::exists('asset_lists', 'id')->where('type', 'inventory'),
             ],
-            'location_id' => ['nullable', 'exists:locations,id'],
+            'location_id' => $creatingLocation
+                ? ['required', 'in:__new__']
+                : ['nullable', 'exists:locations,id'],
+            'new_location.name' => [
+                Rule::requiredIf($creatingLocation),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'new_location.type' => [
+                Rule::requiredIf($creatingLocation),
+                'nullable',
+                Rule::enum(LocationType::class),
+            ],
+            'new_location.parent_id' => ['nullable', 'exists:locations,id'],
+            'asset_status' => ['nullable', Rule::enum(AssetStatus::class)],
         ]);
 
         $data['inventory_list_id'] = $data['inventory_list_id'] ?? null;
-        $data['location_id'] = $data['location_id'] ?? null;
+        $data['asset_status'] = $data['asset_status'] ?? null;
+
+        if ($creatingLocation) {
+            $location = Location::create([
+                'name' => $data['new_location']['name'],
+                'type' => $data['new_location']['type'],
+                'parent_id' => $data['new_location']['parent_id'] ?? null,
+                'is_portable' => false,
+            ]);
+
+            $data['location_id'] = $location->id;
+        } else {
+            $data['location_id'] = $data['location_id'] ?? null;
+        }
+
+        unset($data['new_location']);
 
         return $data;
     }

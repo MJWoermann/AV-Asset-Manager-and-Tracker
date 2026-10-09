@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AssetStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -12,8 +13,16 @@ class ScanSession extends Model
         'event_list_id',
         'inventory_list_id',
         'location_id',
+        'asset_status',
         'status',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'asset_status' => AssetStatus::class,
+        ];
+    }
 
     public function user(): BelongsTo
     {

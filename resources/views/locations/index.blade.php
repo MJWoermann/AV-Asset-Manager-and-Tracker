@@ -11,9 +11,24 @@
         @if ($locations->isEmpty())
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">No locations yet.</p>
         @else
-            <ul class="bg-white dark:bg-black border text-sm">
+            <ul class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal text-sm overflow-hidden">
+                @php
+                    $previousType = null;
+                    $sameTypeRun = 0;
+                @endphp
                 @foreach ($locations as $location)
-                    @include('locations.partials.node', ['location' => $location])
+                    @php
+                        if ($previousType === $location->type) {
+                            $sameTypeRun++;
+                        } else {
+                            $previousType = $location->type;
+                            $sameTypeRun = 0;
+                        }
+                    @endphp
+                    @include('locations.partials.node', [
+                        'location' => $location,
+                        'alternate' => $sameTypeRun % 2 === 1,
+                    ])
                 @endforeach
             </ul>
         @endif

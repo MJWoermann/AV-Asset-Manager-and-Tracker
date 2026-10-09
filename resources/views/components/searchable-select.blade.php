@@ -26,7 +26,7 @@
 @endphp
 
 <div
-    class="relative mt-1"
+    {{ $attributes->class('relative mt-1') }}
     x-data="searchableSelect(@js($normalized), @js($selected !== null ? (string) $selected : ''), {
         placeholder: @js($placeholder),
         nullable: @js((bool) $nullable),
