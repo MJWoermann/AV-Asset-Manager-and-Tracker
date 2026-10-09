@@ -4,7 +4,7 @@
     </x-slot>
 
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <form method="POST" action="{{ $asset->exists ? route('assets.update', $asset) : route('assets.store') }}" class="space-y-4 bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-4">
+        <form method="POST" action="{{ $asset->exists ? route('assets.update', $asset) : route('assets.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
             @csrf
             @if($asset->exists) @method('PUT') @endif
 

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header"><h2 class="font-semibold text-xl">Import assets</h2></x-slot>
     <div class="max-w-xl mx-auto px-4">
-        <form method="POST" action="{{ route('import.upload') }}" enctype="multipart/form-data" class="space-y-4 bg-white dark:bg-black border p-4">
+        <form method="POST" action="{{ route('import.upload') }}" enctype="multipart/form-data" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             <p class="text-sm text-gray-600 dark:text-brand-silver">
                 Upload a CSV or Excel file. You will map columns (including item type and location) on the next step.

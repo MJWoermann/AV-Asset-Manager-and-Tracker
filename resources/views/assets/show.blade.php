@@ -32,7 +32,7 @@
         </div>
 
         @if($tab === 'history')
-            <div class="overflow-x-auto bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal">
+            <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
                 <table class="min-w-full text-sm">
                     <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                         <tr>
@@ -74,7 +74,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-3 py-6 text-center text-brand-charcoal">No history recorded yet.</td>
+                                <td colspan="4" class="px-3 py-6 text-center text-brand-charcoal dark:text-brand-silver">No history recorded yet.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -82,7 +82,7 @@
             </div>
             <div>{{ $auditLogs->links() }}</div>
         @else
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
                 <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div>{{ $asset->description ?: '—' }}</div></div>
                 <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name }}</div></div>
                 <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div>{{ $asset->status?->label() }}</div></div>
@@ -102,7 +102,7 @@
             @if($asset->customFieldValues->isNotEmpty())
                 <div>
                     <h3 class="font-semibold mb-2">Custom fields</h3>
-                    <div class="bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-4 text-sm space-y-2">
+                    <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm space-y-2">
                         @foreach($asset->customFieldValues as $value)
                             <div class="flex justify-between gap-4 border-b border-brand-silver/50 dark:border-brand-charcoal pb-1">
                                 <span>{{ $value->definition?->name }}</span>
@@ -116,7 +116,7 @@
             @if($asset->children->isNotEmpty())
                 <div>
                     <h3 class="font-semibold mb-2">Child assets</h3>
-                    <ul class="bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal divide-y divide-brand-silver dark:divide-brand-charcoal">
+                    <ul class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal divide-y divide-brand-silver dark:divide-brand-charcoal">
                         @foreach($asset->children as $child)
                             <li class="px-4 py-2 pl-8 text-sm">
                                 <a class="text-brand" href="{{ route('assets.show', $child) }}">{{ $child->name }}</a>

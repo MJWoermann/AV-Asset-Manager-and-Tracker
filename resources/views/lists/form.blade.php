@@ -4,7 +4,7 @@
     </x-slot>
 
     <div class="max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
-        <form method="POST" action="{{ $list->exists ? route('lists.update', $list) : route('lists.store') }}" class="space-y-4 bg-white dark:bg-black border p-4">
+        <form method="POST" action="{{ $list->exists ? route('lists.update', $list) : route('lists.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             @if($list->exists) @method('PUT') @endif
             <div>

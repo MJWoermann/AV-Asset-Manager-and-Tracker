@@ -77,4 +77,13 @@ class UserController extends Controller
 
         return redirect()->route('admin.users.index')->with('status', 'User updated.');
     }
+
+    public function destroy(User $user): RedirectResponse
+    {
+        abort_if($user->hasRole('admin'), 403);
+
+        $user->delete();
+
+        return redirect()->route('admin.users.index')->with('status', 'User deleted.');
+    }
 }

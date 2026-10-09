@@ -2,8 +2,8 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-14">
             <div class="flex items-center gap-6 min-w-0">
-                <a href="{{ route('dashboard') }}" class="font-semibold tracking-tight text-white shrink-0">
-                    <span class="text-brand">AV</span> Assets
+                <a href="{{ route('dashboard') }}" class="shrink-0 inline-flex items-center" aria-label="{{ config('app.name', 'AV Asset Manager') }}">
+                    <img src="{{ asset('favicon.svg') }}" alt="" class="h-8 w-8 rounded-md" width="32" height="32">
                 </a>
                 <div class="hidden sm:flex items-center gap-1 text-sm">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-nav-link>

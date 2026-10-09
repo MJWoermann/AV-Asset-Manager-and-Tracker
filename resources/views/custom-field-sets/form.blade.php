@@ -29,7 +29,7 @@
         <form
             method="POST"
             action="{{ $fieldSet->exists ? route('custom-field-sets.update', $fieldSet) : route('custom-field-sets.store') }}"
-            class="space-y-4 bg-white dark:bg-black border p-4"
+            class="space-y-4 bg-white dark:bg-brand-slate border p-4"
             x-data="customFieldSetForm(@js($initialFields))"
         >
             @csrf

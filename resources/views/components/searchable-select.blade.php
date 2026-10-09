@@ -63,7 +63,7 @@
     <div
         x-show="open"
         x-cloak
-        class="absolute z-20 mt-1 w-full border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-black"
+        class="absolute z-20 mt-1 w-full border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
         id="{{ $id }}-listbox"
         role="listbox"
     >

@@ -30,7 +30,7 @@
     </x-slot>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <form method="POST" action="{{ route('reports.compare.run') }}" class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-black border p-4">
+        <form method="POST" action="{{ route('reports.compare.run') }}" class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             <div>
                 <x-input-label for="scanned_list_id" value="Scanned / event list" />
@@ -74,7 +74,7 @@
                             <span x-text="section.title"></span>
                             (<span x-text="visibleCount(section)"></span>)
                         </h3>
-                        <ul class="bg-white dark:bg-black border divide-y text-sm max-h-80 overflow-y-auto">
+                        <ul class="bg-white dark:bg-brand-slate border divide-y text-sm max-h-80 overflow-y-auto">
                             <template x-for="(row, index) in section.rows" :key="section.key + '-' + index">
                                 <li
                                     class="px-3 py-2"
@@ -90,7 +90,7 @@
                                 </li>
                             </template>
                             <li
-                                class="px-3 py-4 text-brand-charcoal"
+                                class="px-3 py-4 text-brand-charcoal dark:text-brand-silver"
                                 x-show="visibleCount(section) === 0"
                             >None</li>
                         </ul>

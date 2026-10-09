@@ -12,7 +12,7 @@ class LocationController extends Controller
 {
     public function index(): View
     {
-        $locations = Location::with('parent')->orderBy('name')->get();
+        $locations = Location::tree();
 
         return view('locations.index', compact('locations'));
     }

@@ -5,7 +5,7 @@
     </x-slot>
     <div class="max-w-7xl mx-auto px-4 space-y-3">
         @foreach($itemTypes as $type)
-            <div class="bg-white dark:bg-black border p-4 flex justify-between gap-3">
+            <div class="bg-white dark:bg-brand-slate border p-4 flex justify-between gap-3">
                 <div>
                     <div class="font-medium">{{ $type->name }}</div>
                     <div class="text-sm text-brand-charcoal dark:text-brand-silver">{{ $type->fieldSets->pluck('name')->join(', ') ?: 'No field sets' }}</div>

@@ -83,7 +83,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
-        Route::resource('users', UserController::class)->except(['show', 'destroy']);
+        Route::resource('users', UserController::class)->except(['show']);
     });
 });
 

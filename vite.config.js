@@ -10,7 +10,7 @@ export default defineConfig({
         }),
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico'],
+            includeAssets: ['favicon.ico', 'favicon.svg'],
             manifest: {
                 name: 'AV Asset Manager',
                 short_name: 'AV Assets',

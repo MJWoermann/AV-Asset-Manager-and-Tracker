@@ -21,11 +21,16 @@ class AssetController extends Controller
     {
         $term = $request->string('q')->toString() ?: null;
 
+        $locationId = $request->integer('location_id') ?: null;
+
         $assets = Asset::query()
             ->with(['itemType', 'location', 'parent', 'customFieldValues'])
             ->whereNull('parent_id')
             ->search($term)
             ->when($request->status, fn ($query, $status) => $query->where('status', $status))
+            ->when($locationId, function ($query) use ($locationId) {
+                $query->whereIn('location_id', Location::selfAndDescendantIds($locationId));
+            })
             ->orderBySearchRelevance($term)
             ->paginate(50)
             ->withQueryString();
@@ -34,9 +39,10 @@ class AssetController extends Controller
             'assets' => $assets,
             'statuses' => AssetStatus::options(),
             'q' => $term ?? '',
+            'locationId' => $locationId,
             'availableColumns' => AssetTableColumns::definitions(),
             'selectedColumns' => $request->user()->assetTableColumns(),
-            'locations' => Location::orderBy('name')->get(),
+            'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
             'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
             'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
         ]);

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header"><h2 class="font-semibold text-xl">{{ $itemType->exists ? 'Edit type' : 'New type' }}</h2></x-slot>
     <div class="max-w-xl mx-auto px-4">
-        <form method="POST" action="{{ $itemType->exists ? route('item-types.update', $itemType) : route('item-types.store') }}" class="space-y-4 bg-white dark:bg-black border p-4">
+        <form method="POST" action="{{ $itemType->exists ? route('item-types.update', $itemType) : route('item-types.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             @if($itemType->exists) @method('PUT') @endif
             <div>
@@ -23,7 +23,7 @@
                     <label class="flex items-start gap-2 text-sm mb-2">
                         <input type="checkbox" name="field_sets[]" value="{{ $set->id }}" class="rounded text-brand mt-0.5"
                             @checked(collect(old('field_sets', $itemType->fieldSets->pluck('id')))->contains($set->id))>
-                        <span>{{ $set->name }} <span class="text-brand-charcoal">({{ $set->definitions->pluck('name')->join(', ') }})</span></span>
+                        <span>{{ $set->name }} <span class="text-brand-charcoal dark:text-brand-silver">({{ $set->definitions->pluck('name')->join(', ') }})</span></span>
                     </label>
                 @endforeach
             </fieldset>

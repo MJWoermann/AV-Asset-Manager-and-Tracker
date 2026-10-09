@@ -4,7 +4,7 @@
             <a href="{{ route('admin.users.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add user</a></div>
     </x-slot>
     <div class="max-w-7xl mx-auto px-4">
-        <table class="min-w-full text-sm bg-white dark:bg-black border">
+        <table class="min-w-full text-sm bg-white dark:bg-brand-slate border">
             <thead class="bg-brand-silver dark:bg-brand-charcoal text-left"><tr>
                 <th class="px-3 py-2">Name</th><th class="px-3 py-2">Email</th><th class="px-3 py-2">Role</th><th class="px-3 py-2"></th>
             </tr></thead>
@@ -14,7 +14,21 @@
                         <td class="px-3 py-2">{{ $user->name }}</td>
                         <td class="px-3 py-2">{{ $user->email }}</td>
                         <td class="px-3 py-2">{{ $user->roles->pluck('name')->join(', ') }}</td>
-                        <td class="px-3 py-2"><a class="text-brand" href="{{ route('admin.users.edit', $user) }}">Edit</a></td>
+                        <td class="px-3 py-2 space-x-3 whitespace-nowrap">
+                            <a class="text-brand" href="{{ route('admin.users.edit', $user) }}">Edit</a>
+                            @unless($user->hasRole('admin'))
+                                <form
+                                    method="POST"
+                                    action="{{ route('admin.users.destroy', $user) }}"
+                                    class="inline"
+                                    onsubmit='return confirm(@js("Delete {$user->name}? This cannot be undone."))'
+                                >
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-red-600">Delete</button>
+                                </form>
+                            @endunless
+                        </td>
                     </tr>
                 @endforeach
             </tbody>

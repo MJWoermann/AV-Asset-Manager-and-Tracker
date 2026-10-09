@@ -16,7 +16,7 @@
     <div
         x-show="open"
         x-cloak
-        class="absolute z-40 mt-2 end-0 w-64 bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-3 shadow-lg"
+        class="absolute z-40 mt-2 end-0 w-64 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-3 shadow-lg"
         style="display: none;"
     >
         <form method="POST" action="{{ route('preferences.asset-columns') }}" class="space-y-2">

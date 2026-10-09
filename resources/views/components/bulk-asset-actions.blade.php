@@ -14,7 +14,7 @@
 <div
     x-cloak
     x-show="selectedCount > 0"
-    class="sticky top-0 z-20 mb-4 border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-black p-3 shadow-sm"
+    class="sticky top-0 z-20 mb-4 border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-3 shadow-sm"
 >
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <p class="text-sm">
@@ -175,7 +175,7 @@
         aria-modal="true"
     >
         <div class="fixed inset-0 bg-black/50" @click="cancelDelete()"></div>
-        <div class="relative mx-auto max-w-md bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-6 space-y-4">
+        <div class="relative mx-auto max-w-md bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-6 space-y-4">
             <h3 class="text-lg font-semibold">Confirm delete</h3>
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                 Permanently delete

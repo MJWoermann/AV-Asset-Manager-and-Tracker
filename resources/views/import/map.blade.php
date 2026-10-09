@@ -12,7 +12,7 @@
         <form
             method="POST"
             action="{{ route('import.prepare') }}"
-            class="space-y-4 bg-white dark:bg-black border p-4"
+            class="space-y-4 bg-white dark:bg-brand-slate border p-4"
             x-data="importMapper(@js(array_values($columns)), @js($initialSelections), @js($requiredFields))"
             @submit="onSubmit($event)"
         >

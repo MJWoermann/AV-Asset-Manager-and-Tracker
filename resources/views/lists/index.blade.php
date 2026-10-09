@@ -9,7 +9,7 @@
     </x-slot>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="overflow-x-auto bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal">
+        <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                     <tr>

@@ -7,7 +7,7 @@
     </x-slot>
     <div class="max-w-7xl mx-auto px-4 space-y-3">
         @forelse($fieldSets as $set)
-            <div class="bg-white dark:bg-black border p-4 flex justify-between gap-3">
+            <div class="bg-white dark:bg-brand-slate border p-4 flex justify-between gap-3">
                 <div>
                     <div class="font-medium">{{ $set->name }}</div>
                     <div class="text-sm text-brand-charcoal dark:text-brand-silver">
@@ -25,7 +25,7 @@
                 <a href="{{ route('custom-field-sets.edit', $set) }}" class="text-brand text-sm shrink-0">Edit</a>
             </div>
         @empty
-            <div class="bg-white dark:bg-black border p-4 text-sm text-brand-charcoal dark:text-brand-silver">
+            <div class="bg-white dark:bg-brand-slate border p-4 text-sm text-brand-charcoal dark:text-brand-silver">
                 No custom field sets yet.
                 <a href="{{ route('custom-field-sets.create') }}" class="text-brand">Create one</a>
                 to assign on item types.

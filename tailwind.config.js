@@ -22,9 +22,11 @@ export default {
                     charcoal: '#545759',
                     silver: '#f0f0f0',
                     teal: '#005556',
+                    'teal-bright': '#3dcbd4',
                     plum: '#910e6b',
                     'grey-blue': '#9db6c5',
                     gold: '#dcaa0b',
+                    slate: '#2a2c2e',
                 },
             },
             fontFamily: {

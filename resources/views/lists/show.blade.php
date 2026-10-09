@@ -36,7 +36,7 @@
             :current-list="$list"
         />
 
-        <div class="overflow-x-auto bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal">
+        <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                     <tr>
@@ -88,7 +88,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ count($selectedColumns) + 1 }}" class="px-3 py-6 text-center text-brand-charcoal">No items yet.</td>
+                            <td colspan="{{ count($selectedColumns) + 1 }}" class="px-3 py-6 text-center text-brand-charcoal dark:text-brand-silver">No items yet.</td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -33,6 +33,12 @@
                     <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
                 @endforeach
             </select>
+            <select name="location_id" class="rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                <option value="">All locations</option>
+                @foreach($locations as $location)
+                    <option value="{{ $location->id }}" @selected($locationId === $location->id)>{{ $location->breadcrumb() }}</option>
+                @endforeach
+            </select>
             <button class="px-4 py-2 bg-black text-white dark:bg-brand">Search</button>
         </form>
 
@@ -43,7 +49,7 @@
             :lists="$lists"
         />
 
-        <div class="overflow-x-auto bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal">
+        <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                     <tr>
@@ -85,7 +91,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ count($selectedColumns) + 1 }}" class="px-3 py-6 text-center text-brand-charcoal">No assets found.</td>
+                            <td colspan="{{ count($selectedColumns) + 1 }}" class="px-3 py-6 text-center text-brand-charcoal dark:text-brand-silver">No assets found.</td>
                         </tr>
                     @endforelse
                 </tbody>

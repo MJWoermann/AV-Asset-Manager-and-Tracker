@@ -8,19 +8,14 @@
         </div>
     </x-slot>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ul class="bg-white dark:bg-black border divide-y text-sm">
-            @foreach($locations as $location)
-                <li class="px-4 py-2 flex justify-between gap-3">
-                    <div>
-                        <span class="font-medium">{{ $location->name }}</span>
-                        <span class="text-brand-charcoal dark:text-brand-silver"> — {{ $location->type->label() }}@if($location->is_portable) (portable)@endif</span>
-                        @if($location->parent)<div class="text-xs text-brand-charcoal">Parent: {{ $location->parent->name }}</div>@endif
-                    </div>
-                    @role('admin|inventory_manager')
-                        <a href="{{ route('locations.edit', $location) }}" class="text-brand">Edit</a>
-                    @endrole
-                </li>
-            @endforeach
-        </ul>
+        @if ($locations->isEmpty())
+            <p class="text-sm text-brand-charcoal dark:text-brand-silver">No locations yet.</p>
+        @else
+            <ul class="bg-white dark:bg-black border text-sm">
+                @foreach ($locations as $location)
+                    @include('locations.partials.node', ['location' => $location])
+                @endforeach
+            </ul>
+        @endif
     </div>
 </x-app-layout>

@@ -5,7 +5,7 @@
 
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         @unless($session)
-            <form method="POST" action="{{ route('scan.start') }}" class="space-y-4 bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-4">
+            <form method="POST" action="{{ route('scan.start') }}" class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
                 @csrf
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                     Choose the event list to add scanned items to, and optionally an inventory list to check against.
@@ -40,7 +40,7 @@
                 <x-primary-button>Start scanning</x-primary-button>
             </form>
         @else
-            <form method="POST" action="{{ route('scan.lists', $session) }}" class="space-y-4 bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-4">
+            <form method="POST" action="{{ route('scan.lists', $session) }}" class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
                 @csrf
                 @method('PATCH')
                 <div>
@@ -95,7 +95,7 @@
 
             <div
                 x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($initialRecent))"
-                class="space-y-4 bg-white dark:bg-black border border-brand-silver dark:border-brand-charcoal p-4"
+                class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
                 <div class="flex gap-2">
                     <button type="button" @click="startCamera" x-show="!scanning" class="px-4 py-2 bg-brand text-white text-sm">Start camera</button>

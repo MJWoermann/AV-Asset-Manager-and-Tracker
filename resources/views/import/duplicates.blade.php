@@ -4,7 +4,7 @@
         <form method="POST" action="{{ route('import.process') }}" class="space-y-4">
             @csrf
 
-            <div class="bg-white dark:bg-black border p-4 space-y-2 text-sm">
+            <div class="bg-white dark:bg-brand-slate border p-4 space-y-2 text-sm">
                 <p>
                     Prepared <span class="font-semibold">{{ $totalCount }}</span> rows:
                     <span class="font-semibold">{{ $newCount }}</span> new,
@@ -19,7 +19,7 @@
             </div>
 
             @if(count($duplicates))
-                <div class="bg-white dark:bg-black border p-4 space-y-3">
+                <div class="bg-white dark:bg-brand-slate border p-4 space-y-3">
                     <div class="flex flex-wrap items-end gap-3">
                         <div>
                             <x-input-label for="bulk_action" value="Bulk action for all duplicates" />
@@ -98,12 +98,12 @@
                     </div>
                 </div>
             @else
-                <div class="bg-white dark:bg-black border p-4 text-sm">
+                <div class="bg-white dark:bg-brand-slate border p-4 text-sm">
                     No duplicates found. All prepared rows will be created as new assets.
                 </div>
             @endif
 
-            <div class="bg-white dark:bg-black border p-4 space-y-3">
+            <div class="bg-white dark:bg-brand-slate border p-4 space-y-3">
                 <label class="inline-flex items-center gap-2 text-sm">
                     <input type="checkbox" name="dry_run" value="1" class="rounded text-brand" checked>
                     Dry run (no writes)
