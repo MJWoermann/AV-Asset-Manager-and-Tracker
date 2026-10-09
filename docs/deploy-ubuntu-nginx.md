@@ -162,6 +162,20 @@ sudo ufw enable
 
 Always run migrations after pulling code. Skipping `migrate` will break asset list pages once the app expects `users.preferences`.
 
+One-shot update (recommended):
+
+```bash
+sudo bash /var/www/av-asset-manager/scripts/update.sh
+```
+
+That script pulls the latest code, installs PHP/JS deps, builds assets, runs `migrate --force`, rebuilds config/route/view caches, fixes `storage` / `bootstrap/cache` / SQLite permissions, and reloads PHP-FPM. Override defaults if needed:
+
+```bash
+sudo WEB_USER=www-data PHP_FPM_SERVICE=php8.5-fpm bash /var/www/av-asset-manager/scripts/update.sh
+```
+
+Manual equivalent:
+
 ```bash
 cd /var/www/av-asset-manager
 git pull
@@ -177,11 +191,13 @@ sudo chmod 664 /var/www/av-asset-manager/database/database.sqlite
 sudo systemctl reload php8.5-fpm
 ```
 
-If you are expereiencing errors with php artisan you can fix your ownership permissions with this script
+If you are experiencing errors with `php artisan`, reset ownership so your deploy user can write, then re-run the update script (it restores `www-data` on writable paths):
+
 ```bash
 cd /var/www/av-asset-manager
 sudo chown -R $USER:$USER .
 chmod -R 755 .
+sudo bash scripts/update.sh
 ```
 
 ### Schema notes (additive)

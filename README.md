@@ -45,7 +45,7 @@ php artisan optimize:clear   # or config/route/view cache in production — see 
 
 `php artisan migrate` applies additive schema changes such as `users.preferences` (JSON, nullable). Existing users keep working with default columns until they customise them. Asset History uses existing `audit_logs` rows; no backfill is required.
 
-Production upgrade steps: [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md) §7 Updates.
+Production upgrade (one command): `sudo bash scripts/update.sh` — see [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md) §7 Updates.
 
 ## Production (Ubuntu + Nginx)
 
