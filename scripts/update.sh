@@ -35,13 +35,22 @@ run_as_deploy() {
 }
 
 echo "==> Enabling maintenance mode"
-run_as_deploy php artisan down --retry=60 || true
+# Run as root (this script requires sudo). Deploy-user artisan cannot always
+# write storage/framework after those dirs are chowned to www-data.
+php artisan down --retry=60 || true
 
 cleanup() {
+  # Always leave the site up — a leftover maintenance.php is a permanent 503
+  # with nothing in nginx error.log. Trap EXIT/INT/TERM so Ctrl+C or a mid-
+  # script failure still clears maintenance mode.
   echo "==> Disabling maintenance mode"
-  run_as_deploy php artisan up || true
+  if ! php artisan up; then
+    echo "Warning: php artisan up failed; removing maintenance files directly." >&2
+  fi
+  rm -f "${APP_ROOT}/storage/framework/down" \
+    "${APP_ROOT}/storage/framework/maintenance.php"
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM HUP
 
 echo "==> git pull"
 run_as_deploy git pull --ff-only
