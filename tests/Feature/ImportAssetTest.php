@@ -13,6 +13,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ImportAssetTest extends TestCase
@@ -50,6 +51,7 @@ class ImportAssetTest extends TestCase
             ->post(route('import.upload'), ['file' => $csv]);
 
         $response->assertOk();
+        $response->assertSee('Description');
         $response->assertSee('Item Type');
         $response->assertSee('Location: Level');
         $response->assertSee('Location: Room');
@@ -74,6 +76,85 @@ class ImportAssetTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors();
+    }
+
+    public function test_subsequent_upload_prefers_previous_column_mappings(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+
+        $first = UploadedFile::fake()->createWithContent('first.csv', implode("\n", [
+            'Asset Title,Category,Weird Col',
+            'Mic,Audio Equipment,Keep',
+        ]));
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $first]);
+        $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Asset Title' => 'name',
+                'Category' => 'item_type',
+                'Weird Col' => ImportService::CREATE_NEW_FIELD,
+            ],
+        ])->assertOk();
+
+        $second = UploadedFile::fake()->createWithContent('second.csv', implode("\n", [
+            'asset title,category,weird col,Notes',
+            'Desk,Audio Equipment,X,Hello',
+        ]));
+
+        $response = $this->actingAs($user)->post(route('import.upload'), ['file' => $second]);
+        $response->assertOk();
+        $response->assertSee('Suggestions include mappings from your previous import', false);
+
+        /** @var array<string, string> $suggestions */
+        $suggestions = $response->viewData('suggestedMappings');
+        $byNormalized = [];
+        foreach ($suggestions as $column => $field) {
+            $byNormalized[Str::slug(Str::lower($column), '_')] = $field;
+        }
+
+        $this->assertSame('name', $byNormalized['asset_title'] ?? null);
+        $this->assertSame('item_type', $byNormalized['category'] ?? null);
+        $this->assertSame(ImportService::CREATE_NEW_FIELD, $byNormalized['weird_col'] ?? null);
+    }
+
+    public function test_suggest_mappings_prefers_remembered_over_fuzzy_guess(): void
+    {
+        $service = app(ImportService::class);
+
+        $suggestions = $service->suggestMappings(
+            ['Serial Number', 'Name', 'Type'],
+            [
+                'Serial Number' => 'tp_barcode',
+                'Name' => 'name',
+                'Type' => 'item_type',
+            ]
+        );
+
+        $this->assertSame('tp_barcode', $suggestions['Serial Number']);
+        $this->assertSame('name', $suggestions['Name']);
+        $this->assertSame('item_type', $suggestions['Type']);
+    }
+
+    public function test_prepare_lists_all_missing_required_mappings(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', "ColA,ColB\nA,B\n");
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+
+        $response = $this->actingAs($user)->from(route('import.create'))->post(route('import.prepare'), [
+            'mapping' => [
+                'ColA' => '',
+                'ColB' => '',
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('mapping');
+        $messages = session('errors')->get('mapping');
+        $this->assertContains('Map a column to Name before importing.', $messages);
+        $this->assertContains('Map a column to Item Type before importing.', $messages);
     }
 
     public function test_import_creates_missing_item_types_locations_and_imported_fields(): void

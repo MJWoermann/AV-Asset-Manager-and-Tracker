@@ -33,4 +33,7 @@ Response includes `token`. Revoke with `DELETE /api/auth/token` (authenticated).
 
 Rate limits: token endpoint 10/min; scan 60/min.
 
-Audit history is not exposed for mutation via API.
+## Web-only features (not on this API)
+
+- **Asset table columns** — per-user column visibility is stored in `users.preferences` and edited in the web UI (`PATCH /preferences/asset-columns`). API asset payloads always include full model fields.
+- **Asset History tab** — read-only audit trail in the web UI (`/assets/{id}?tab=history`). Audit logs remain append-only; they are not exposed for mutation via API.

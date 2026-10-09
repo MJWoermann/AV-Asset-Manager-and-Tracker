@@ -93,7 +93,7 @@
                         :aria-selected="(option.value === value).toString()"
                         @click="select(option)"
                         @mouseenter="highlight = index"
-                        x-text="option.label"
+                        x-html="highlightedLabel(option.label)"
                     ></button>
                 </li>
             </template>

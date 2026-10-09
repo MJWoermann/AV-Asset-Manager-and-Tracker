@@ -11,10 +11,12 @@ class AssetApiController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $q = $request->string('q')->toString() ?: null;
+
         $assets = Asset::query()
             ->with(['itemType:id,name,slug', 'location:id,name'])
-            ->search($request->string('q')->toString() ?: null)
-            ->orderBy('name')
+            ->search($q)
+            ->orderBySearchRelevance($q)
             ->paginate(min($request->integer('per_page', 50), 100));
 
         return response()->json($assets);
@@ -41,7 +43,6 @@ class AssetApiController extends Controller
             'fmi_ast' => ['nullable', 'string'],
             'tp_barcode' => ['nullable', 'string'],
             'rig_tag' => ['nullable', 'string'],
-            'device_sn' => ['nullable', 'string'],
             'ip_address' => ['nullable', 'string'],
             'mac_address' => ['nullable', 'string'],
             'manufacturer' => ['nullable', 'string'],
@@ -68,7 +69,6 @@ class AssetApiController extends Controller
             'fmi_ast' => ['nullable', 'string'],
             'tp_barcode' => ['nullable', 'string'],
             'rig_tag' => ['nullable', 'string'],
-            'device_sn' => ['nullable', 'string'],
             'ip_address' => ['nullable', 'string'],
             'mac_address' => ['nullable', 'string'],
             'manufacturer' => ['nullable', 'string'],

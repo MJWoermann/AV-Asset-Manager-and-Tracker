@@ -34,7 +34,6 @@ class AssetsExport implements FromCollection, WithHeadings
             $a->fmi_ast,
             $a->tp_barcode,
             $a->rig_tag,
-            $a->device_sn,
             $a->ip_address,
             $a->mac_address,
             $a->quantity,
@@ -45,7 +44,7 @@ class AssetsExport implements FromCollection, WithHeadings
     {
         return [
             'Name', 'Description', 'Item Type', 'Status', 'Manufacturer', 'Model', 'Serial Number',
-            'FMI AST#', 'TP Barcode', 'RIG Tag #', 'Device SN', 'IP Address', 'MAC Address', 'Quantity',
+            'FMI AST#', 'TP Barcode', 'RIG Tag #', 'IP Address', 'MAC Address', 'Quantity',
         ];
     }
 }

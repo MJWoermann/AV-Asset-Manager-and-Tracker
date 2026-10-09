@@ -11,6 +11,7 @@ use App\Models\CustomFieldSet;
 use App\Models\ItemType;
 use App\Models\Location;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -39,6 +40,7 @@ class ImportService
     /** @var array<string, string> */
     public const ASSET_FIELDS = [
         'name' => 'Name',
+        'description' => 'Description',
         'item_type' => 'Item Type',
         'location_level' => 'Location: Level',
         'location_room' => 'Location: Room',
@@ -54,7 +56,6 @@ class ImportService
         'fmi_ast' => 'FMI AST#',
         'tp_barcode' => 'TP Barcode',
         'rig_tag' => 'RIG Tag #',
-        'device_sn' => 'Device SN',
         'ip_address' => 'IP Address',
         'mac_address' => 'MAC Address',
         'test_tag_expiry' => 'Test & Tag Expiry',
@@ -97,19 +98,162 @@ class ImportService
             $cleaned[(string) $column] = $field;
         }
 
+        $missing = [];
         if (! in_array('name', $cleaned, true)) {
-            throw ValidationException::withMessages([
-                'mapping' => 'Map a column to Name before importing.',
-            ]);
+            $missing[] = 'Map a column to Name before importing.';
         }
-
         if (! in_array('item_type', $cleaned, true)) {
+            $missing[] = 'Map a column to Item Type before importing.';
+        }
+        if ($missing !== []) {
             throw ValidationException::withMessages([
-                'mapping' => 'Map a column to Item Type before importing.',
+                'mapping' => $missing,
             ]);
         }
 
         return $cleaned;
+    }
+
+    /**
+     * Persist a confirmed mapping so later uploads can reuse column → field choices.
+     *
+     * @param  array<string, string>  $mapping
+     */
+    public function rememberMapping(array $mapping, ?int $userId = null): void
+    {
+        session(['import.learned_mapping' => $mapping]);
+
+        if ($userId) {
+            Cache::forever($this->learnedMappingCacheKey($userId), $mapping);
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function recalledMapping(?int $userId = null): array
+    {
+        $fromSession = session('import.learned_mapping');
+        if (is_array($fromSession) && $fromSession !== []) {
+            return $fromSession;
+        }
+
+        if ($userId) {
+            $fromCache = Cache::get($this->learnedMappingCacheKey($userId), []);
+
+            return is_array($fromCache) ? $fromCache : [];
+        }
+
+        return [];
+    }
+
+    /**
+     * Suggest mappings for spreadsheet columns, preferring previously used mappings.
+     *
+     * @param  list<string|null>  $columns
+     * @param  array<string, string>  $previous
+     * @return array<string, string>
+     */
+    public function suggestMappings(array $columns, array $previous = []): array
+    {
+        $columns = array_values(array_filter(array_map(
+            fn ($column) => is_string($column) ? $column : (string) $column,
+            $columns
+        ), fn (string $column) => $column !== ''));
+
+        $suggestions = array_fill_keys($columns, '');
+        $usedFields = [];
+
+        $previousByNormalized = [];
+        foreach ($previous as $column => $field) {
+            if (! is_string($field) || $field === '') {
+                continue;
+            }
+            $previousByNormalized[$this->normalizeColumnName((string) $column)] = $field;
+        }
+
+        foreach ($columns as $column) {
+            $field = $previousByNormalized[$this->normalizeColumnName($column)] ?? null;
+            if (! $this->isAssignableSuggestion($field, $usedFields)) {
+                continue;
+            }
+
+            $suggestions[$column] = $field;
+            if ($field !== self::CREATE_NEW_FIELD) {
+                $usedFields[$field] = true;
+            }
+        }
+
+        foreach ($columns as $column) {
+            if ($suggestions[$column] !== '') {
+                continue;
+            }
+
+            $guess = $this->fuzzyGuessField($column, $usedFields);
+            if ($guess === null) {
+                continue;
+            }
+
+            $suggestions[$column] = $guess;
+            if ($guess !== self::CREATE_NEW_FIELD) {
+                $usedFields[$guess] = true;
+            }
+        }
+
+        return $suggestions;
+    }
+
+    protected function learnedMappingCacheKey(int $userId): string
+    {
+        return 'import.learned_mapping.'.$userId;
+    }
+
+    protected function normalizeColumnName(string $column): string
+    {
+        return Str::slug(Str::lower(trim($column)), '_');
+    }
+
+    /**
+     * @param  array<string, bool>  $usedFields
+     */
+    protected function isAssignableSuggestion(?string $field, array $usedFields): bool
+    {
+        if ($field === null || $field === '') {
+            return false;
+        }
+
+        if ($field === self::CREATE_NEW_FIELD) {
+            return true;
+        }
+
+        if (! array_key_exists($field, self::ASSET_FIELDS)) {
+            return false;
+        }
+
+        return ! isset($usedFields[$field]);
+    }
+
+    /**
+     * @param  array<string, bool>  $usedFields
+     */
+    protected function fuzzyGuessField(string $column, array $usedFields): ?string
+    {
+        $hay = Str::lower($column);
+
+        foreach (self::ASSET_FIELDS as $field => $label) {
+            if (isset($usedFields[$field])) {
+                continue;
+            }
+
+            if (
+                str_contains($hay, str_replace('_', ' ', $field))
+                || str_contains($hay, Str::lower($label))
+            ) {
+                return $field;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -320,6 +464,7 @@ class ImportService
         $blank = [
             'location_id' => null,
             'parent_id' => null,
+            'description' => null,
             'manufacturer' => null,
             'model' => null,
             'serial_number' => null,
@@ -330,7 +475,6 @@ class ImportService
             'fmi_ast' => null,
             'tp_barcode' => null,
             'rig_tag' => null,
-            'device_sn' => null,
             'ip_address' => null,
             'mac_address' => null,
             'test_tag_expiry' => null,

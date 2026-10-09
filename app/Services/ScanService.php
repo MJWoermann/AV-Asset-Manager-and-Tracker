@@ -17,7 +17,14 @@ class ScanService
     /**
      * Resolve barcode/search code to asset and add to event list (expanding children for racks).
      *
-     * @return array{items: array<int, AssetListItem>, duplicate: bool, inventory_status: string, message: string}
+     * @return array{
+     *     items: array<int, array<string, mixed>>,
+     *     duplicate: bool,
+     *     inventory_status: string,
+     *     warning: string|null,
+     *     message: string,
+     *     asset: array<string, mixed>
+     * }
      */
     public function scanCode(ScanSession $session, string $code, int $quantity = 1): array
     {
@@ -28,7 +35,11 @@ class ScanService
         $asset = Asset::query()->findByIdentifier($code)->with(['children', 'itemType'])->first();
 
         if (! $asset) {
-            $asset = Asset::query()->search($code)->with(['children', 'itemType'])->first();
+            $asset = Asset::query()
+                ->search($code)
+                ->orderBySearchRelevance($code)
+                ->with(['children', 'itemType'])
+                ->first();
         }
 
         if (! $asset) {
@@ -42,17 +53,24 @@ class ScanService
                 ->where('asset_id', $asset->id)
                 ->exists();
 
+            $inventoryStatus = $this->inventoryStatus($session, $asset);
+            $warning = $this->inventoryWarning($inventoryStatus, $asset);
+
             if ($duplicate) {
                 return [
                     'items' => [],
                     'duplicate' => true,
-                    'inventory_status' => $this->inventoryStatus($session, $asset),
+                    'inventory_status' => $inventoryStatus,
+                    'warning' => $warning,
                     'message' => "{$asset->name} is already on this event list.",
-                    'asset' => $asset,
+                    'asset' => $this->assetSummary($asset),
                 ];
             }
 
-            $added[] = $this->addItem($session, $asset, $quantity, false);
+            $added[] = $this->itemSummary(
+                $this->addItem($session, $asset, $quantity, false),
+                $asset
+            );
 
             if ($asset->isContainer() || $asset->children->isNotEmpty()) {
                 foreach ($asset->children as $child) {
@@ -62,7 +80,11 @@ class ScanService
                         ->exists();
 
                     if (! $exists) {
-                        $added[] = $this->addItem($session, $child, 1, true);
+                        $child->loadMissing('itemType');
+                        $added[] = $this->itemSummary(
+                            $this->addItem($session, $child, 1, true),
+                            $child
+                        );
                     }
                 }
             }
@@ -74,11 +96,12 @@ class ScanService
             return [
                 'items' => $added,
                 'duplicate' => false,
-                'inventory_status' => $this->inventoryStatus($session, $asset),
+                'inventory_status' => $inventoryStatus,
+                'warning' => $warning,
                 'message' => count($added) > 1
                     ? "Added {$asset->name} with ".(count($added) - 1).' child asset(s).'
                     : "Added {$asset->name}.",
-                'asset' => $asset,
+                'asset' => $this->assetSummary($asset),
             ];
         });
     }
@@ -106,5 +129,43 @@ class ScanService
             ->exists();
 
         return $onInventory ? 'matched' : 'not_on_inventory';
+    }
+
+    protected function inventoryWarning(string $inventoryStatus, Asset $asset): ?string
+    {
+        if ($inventoryStatus !== 'not_on_inventory') {
+            return null;
+        }
+
+        return "{$asset->name} is in the asset register but not on the selected inventory list. It was still added to the event list.";
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function assetSummary(Asset $asset): array
+    {
+        return [
+            'id' => $asset->id,
+            'name' => $asset->name,
+            'tp_barcode' => $asset->tp_barcode,
+            'fmi_ast' => $asset->fmi_ast,
+            'rig_tag' => $asset->rig_tag,
+            'serial_number' => $asset->serial_number,
+            'item_type' => $asset->itemType?->name,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function itemSummary(AssetListItem $item, Asset $asset): array
+    {
+        return [
+            'id' => $item->id,
+            'quantity' => $item->quantity,
+            'is_child_expand' => $item->is_child_expand,
+            'asset' => $this->assetSummary($asset),
+        ];
     }
 }

@@ -36,10 +36,15 @@ class ImportController extends Controller
         ]);
         session()->forget(['import.mapping', 'import.prepared']);
 
+        $previous = $this->imports->recalledMapping($request->user()?->id);
+        $suggestedMappings = $this->imports->suggestMappings($columns, $previous);
+
         return view('import.map', [
             'columns' => $columns,
             'fields' => ImportService::ASSET_FIELDS,
             'createNewField' => ImportService::CREATE_NEW_FIELD,
+            'suggestedMappings' => $suggestedMappings,
+            'usedRememberedMappings' => $previous !== [],
         ]);
     }
 
@@ -62,6 +67,8 @@ class ImportController extends Controller
         $reader = new AssetImport;
         Excel::import($reader, Storage::path($path));
         $prepared = $this->imports->prepareRows($reader->rows, $mapping);
+
+        $this->imports->rememberMapping($mapping, $request->user()?->id);
 
         session([
             'import.mapping' => $mapping,

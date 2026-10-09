@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetList;
+use App\Models\AssetListItem;
 use App\Models\Location;
 use App\Models\ScanSession;
 use App\Services\ScanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ScanController extends Controller
@@ -22,8 +25,20 @@ class ScanController extends Controller
             ->latest()
             ->first();
 
+        $recentItems = collect();
+
+        if ($active) {
+            $recentItems = AssetListItem::query()
+                ->where('asset_list_id', $active->event_list_id)
+                ->with(['asset.itemType'])
+                ->latest('id')
+                ->limit(50)
+                ->get();
+        }
+
         return view('scan.index', [
             'session' => $active,
+            'recentItems' => $recentItems,
             'eventLists' => AssetList::where('type', 'event')->orderBy('name')->get(),
             'inventoryLists' => AssetList::where('type', 'inventory')->orderBy('name')->get(),
             'locations' => Location::orderBy('name')->get(),
@@ -32,11 +47,7 @@ class ScanController extends Controller
 
     public function start(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'event_list_id' => ['required', 'exists:asset_lists,id'],
-            'inventory_list_id' => ['nullable', 'exists:asset_lists,id'],
-            'location_id' => ['nullable', 'exists:locations,id'],
-        ]);
+        $data = $this->validatedSessionLists($request);
 
         ScanSession::query()
             ->where('user_id', $request->user()->id)
@@ -49,6 +60,21 @@ class ScanController extends Controller
         ]);
 
         return redirect()->route('scan.index')->with('status', 'Scan session started.');
+    }
+
+    public function updateLists(Request $request, ScanSession $scan): RedirectResponse
+    {
+        abort_unless($scan->user_id === $request->user()->id, 403);
+
+        if (! $scan->isActive()) {
+            return redirect()->route('scan.index')->withErrors([
+                'event_list_id' => 'Scan session is closed.',
+            ]);
+        }
+
+        $scan->update($this->validatedSessionLists($request));
+
+        return redirect()->route('scan.index')->with('status', 'Scan lists updated.');
     }
 
     public function updateLocation(Request $request, ScanSession $scan): RedirectResponse
@@ -74,7 +100,7 @@ class ScanController extends Controller
 
         try {
             $result = $scanService->scanCode($scan, $data['code'], $data['quantity'] ?? 1);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             if ($request->expectsJson()) {
                 return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
             }
@@ -97,5 +123,28 @@ class ScanController extends Controller
         $scan->update(['status' => 'closed']);
 
         return redirect()->route('lists.show', $scan->event_list_id)->with('status', 'Scan session closed.');
+    }
+
+    /**
+     * @return array{event_list_id: int, inventory_list_id: int|null, location_id: int|null}
+     */
+    protected function validatedSessionLists(Request $request): array
+    {
+        $data = $request->validate([
+            'event_list_id' => [
+                'required',
+                Rule::exists('asset_lists', 'id')->where('type', 'event'),
+            ],
+            'inventory_list_id' => [
+                'nullable',
+                Rule::exists('asset_lists', 'id')->where('type', 'inventory'),
+            ],
+            'location_id' => ['nullable', 'exists:locations,id'],
+        ]);
+
+        $data['inventory_list_id'] = $data['inventory_list_id'] ?? null;
+        $data['location_id'] = $data['location_id'] ?? null;
+
+        return $data;
     }
 }

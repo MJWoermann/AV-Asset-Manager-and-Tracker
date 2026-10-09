@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AssetStatus;
+use App\Http\Requests\BulkUpdateAssetsRequest;
 use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
+use App\Models\AssetList;
 use App\Models\ItemType;
 use App\Models\Location;
+use App\Services\BulkAssetUpdateService;
+use App\Support\AssetTableColumns;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,20 +19,60 @@ class AssetController extends Controller
 {
     public function index(Request $request): View
     {
+        $term = $request->string('q')->toString() ?: null;
+
         $assets = Asset::query()
-            ->with(['itemType', 'location', 'parent'])
+            ->with(['itemType', 'location', 'parent', 'customFieldValues'])
             ->whereNull('parent_id')
-            ->search($request->string('q')->toString() ?: null)
-            ->when($request->status, fn ($q, $status) => $q->where('status', $status))
-            ->orderBy('name')
+            ->search($term)
+            ->when($request->status, fn ($query, $status) => $query->where('status', $status))
+            ->orderBySearchRelevance($term)
             ->paginate(50)
             ->withQueryString();
 
         return view('assets.index', [
             'assets' => $assets,
             'statuses' => AssetStatus::options(),
-            'q' => $request->string('q')->toString(),
+            'q' => $term ?? '',
+            'availableColumns' => AssetTableColumns::definitions(),
+            'selectedColumns' => $request->user()->assetTableColumns(),
+            'locations' => Location::orderBy('name')->get(),
+            'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
+            'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
         ]);
+    }
+
+    public function bulkUpdate(BulkUpdateAssetsRequest $request, BulkAssetUpdateService $bulkUpdate): RedirectResponse
+    {
+        $result = $bulkUpdate->handle($request->bulkPayload(), (int) $request->user()->id);
+
+        return back()->with('status', $this->bulkStatusMessage($result));
+    }
+
+    /**
+     * @param  array{updated: int, deleted: int, added_to_list: int, removed_from_list: int}  $result
+     */
+    protected function bulkStatusMessage(array $result): string
+    {
+        $parts = [];
+
+        if ($result['deleted'] > 0) {
+            $parts[] = $result['deleted'].' asset'.($result['deleted'] === 1 ? '' : 's').' deleted';
+        }
+
+        if ($result['updated'] > 0) {
+            $parts[] = $result['updated'].' asset'.($result['updated'] === 1 ? '' : 's').' updated';
+        }
+
+        if ($result['added_to_list'] > 0) {
+            $parts[] = $result['added_to_list'].' added to list';
+        }
+
+        if ($result['removed_from_list'] > 0) {
+            $parts[] = $result['removed_from_list'].' removed from list';
+        }
+
+        return $parts === [] ? 'No changes applied.' : implode('. ', $parts).'.';
     }
 
     public function create(): View
@@ -51,11 +95,21 @@ class AssetController extends Controller
         return redirect()->route('assets.show', $asset)->with('status', 'Asset created.');
     }
 
-    public function show(Asset $asset): View
+    public function show(Request $request, Asset $asset): View
     {
         $asset->load(['itemType.fieldSets.definitions', 'location.parent.parent', 'children.itemType', 'customFieldValues.definition', 'parent']);
 
-        return view('assets.show', compact('asset'));
+        $tab = $request->string('tab')->toString() === 'history' ? 'history' : 'details';
+
+        $auditLogs = $tab === 'history'
+            ? $asset->auditLogs()->with('user')->paginate(25)->withQueryString()
+            : null;
+
+        return view('assets.show', [
+            'asset' => $asset,
+            'tab' => $tab,
+            'auditLogs' => $auditLogs,
+        ]);
     }
 
     public function edit(Asset $asset): View
@@ -107,7 +161,6 @@ class AssetController extends Controller
             'fmi_ast' => ['nullable', 'string', 'max:255'],
             'tp_barcode' => ['nullable', 'string', 'max:255'],
             'rig_tag' => ['nullable', 'string', 'max:255'],
-            'device_sn' => ['nullable', 'string', 'max:255'],
             'ip_address' => ['nullable', 'string', 'max:45'],
             'mac_address' => ['nullable', 'string', 'max:32'],
             'test_tag_expiry' => ['nullable', 'date'],

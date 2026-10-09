@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\AssetColumnPreferenceController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetListController;
 use App\Http\Controllers\CustomFieldSetController;
@@ -27,10 +28,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::patch('/preferences/asset-columns', [AssetColumnPreferenceController::class, 'update'])
+        ->name('preferences.asset-columns');
 
     Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
     Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.create');
     Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::post('/assets/bulk-update', [AssetController::class, 'bulkUpdate'])->name('assets.bulk-update');
     Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
     Route::get('/assets/{asset}/edit', [AssetController::class, 'edit'])->name('assets.edit');
     Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
@@ -61,6 +65,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/scan', [ScanController::class, 'index'])->name('scan.index');
     Route::post('/scan/start', [ScanController::class, 'start'])->name('scan.start');
+    Route::patch('/scan/{scan}/lists', [ScanController::class, 'updateLists'])->name('scan.lists');
     Route::patch('/scan/{scan}/location', [ScanController::class, 'updateLocation'])->name('scan.location');
     Route::post('/scan/{scan}', [ScanController::class, 'scan'])->name('scan.scan');
     Route::post('/scan/{scan}/close', [ScanController::class, 'close'])->name('scan.close');

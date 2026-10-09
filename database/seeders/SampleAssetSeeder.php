@@ -45,7 +45,7 @@ class SampleAssetSeeder extends Seeder
                 'fmi_ast' => 'FMI-LX-001',
                 'ip_address' => '10.10.5.21',
                 'mac_address' => '00:1A:2B:3C:4D:01',
-                'device_sn' => 'SN-LX-001',
+                'serial_number' => 'SN-LX-001',
             ],
             [
                 'tp_barcode' => 'LX-2002',
@@ -54,7 +54,7 @@ class SampleAssetSeeder extends Seeder
                 'fmi_ast' => 'FMI-LX-002',
                 'ip_address' => '10.10.5.22',
                 'mac_address' => '00:1A:2B:3C:4D:02',
-                'device_sn' => 'SN-LX-002',
+                'serial_number' => 'SN-LX-002',
             ],
         ];
 
@@ -82,7 +82,7 @@ class SampleAssetSeeder extends Seeder
                     'manufacturer' => 'Yamaha',
                     'model' => 'QL1',
                     'fmi_ast' => 'FMI-AU-001',
-                    'device_sn' => 'SN-AU-001',
+                    'serial_number' => 'SN-AU-001',
                     'ip_address' => '10.10.5.50',
                 ]
             );

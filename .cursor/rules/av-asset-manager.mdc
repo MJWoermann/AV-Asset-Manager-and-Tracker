@@ -10,7 +10,8 @@ alwaysApply: true
 - Stack: Laravel + Blade + Alpine + Tailwind + Sanctum + Spatie Permission + MariaDB (SQLite OK locally).
 - TP brand colours via Tailwind `brand-*` tokens (`#00adb7`, black, white, charcoal). Minimal UI; mobile-first.
 - Roles: `admin`, `inventory_manager`, `scanner`. Enforce with middleware/policies on mutating routes.
-- Audit logs are immutable — never add update/delete endpoints or Eloquent updates for `AuditLog`.
+- Audit logs are immutable — never add update/delete endpoints or Eloquent updates for `AuditLog`. Asset History is a read-only UI over `audit_logs`.
+- Per-user asset table columns live in `users.preferences` (`asset_table_columns`); shared across Assets index and list browse views.
 - Phase 1 is online-only PWA. Do not add offline IndexedDB sync, Guest QR, RU visualiser, SSO, or maintenance galleries unless explicitly requested.
 - Prefer services (`ScanService`, `ListComparisonService`) for stocktake logic. Keep controllers thin.
 - No secrets in commits. Validate uploads (xlsx/csv/jpg/png/pdf/docx, 25MB).

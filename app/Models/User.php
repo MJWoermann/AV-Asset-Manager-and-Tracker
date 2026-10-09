@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AssetTableColumns;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'theme'])]
+#[Fillable(['name', 'email', 'password', 'theme', 'preferences'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -23,11 +24,22 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'preferences' => 'array',
         ];
     }
 
     public function prefersDarkMode(): bool
     {
         return $this->theme === 'dark';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function assetTableColumns(): array
+    {
+        $selected = ($this->preferences ?? [])[AssetTableColumns::PREFERENCE_KEY] ?? null;
+
+        return AssetTableColumns::resolve(is_array($selected) ? $selected : null);
     }
 }

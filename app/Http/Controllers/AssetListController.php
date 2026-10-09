@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AssetStatus;
+use App\Models\Asset;
 use App\Models\AssetList;
+use App\Models\Location;
+use App\Support\AssetTableColumns;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -34,10 +38,10 @@ class AssetListController extends Controller
         return redirect()->route('lists.show', $list)->with('status', 'List created.');
     }
 
-    public function show(AssetList $list): View
+    public function show(Request $request, AssetList $list): View
     {
         $items = $list->items()
-            ->with(['asset.itemType', 'asset.parent'])
+            ->with(['asset.itemType', 'asset.location', 'asset.parent'])
             ->join('assets', 'assets.id', '=', 'asset_list_items.asset_id')
             ->orderByRaw('COALESCE(assets.parent_id, assets.id)')
             ->orderBy('assets.parent_id')
@@ -45,7 +49,16 @@ class AssetListController extends Controller
             ->select('asset_list_items.*')
             ->paginate(50);
 
-        return view('lists.show', compact('list', 'items'));
+        return view('lists.show', [
+            'list' => $list,
+            'items' => $items,
+            'availableColumns' => AssetTableColumns::definitions(),
+            'selectedColumns' => $request->user()->assetTableColumns(),
+            'statuses' => AssetStatus::options(),
+            'locations' => Location::orderBy('name')->get(),
+            'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
+            'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
+        ]);
     }
 
     public function edit(AssetList $list): View

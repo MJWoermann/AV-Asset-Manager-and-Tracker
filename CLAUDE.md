@@ -26,7 +26,8 @@ Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset manage
 | Inventory list | Source/expected stock table |
 | Event list | Scanned/usage table (stocktake event) |
 | Scan session | Active user session scanning into an event list, optionally compared to an inventory list |
-| Audit log | Immutable append-only change history |
+| Audit log | Immutable append-only change history (asset show → History tab) |
+| User preferences | JSON on `users.preferences`; currently `asset_table_columns` for shared Assets/list table columns |
 
 ## Hard rules
 
@@ -60,6 +61,8 @@ php artisan app:install --email=admin@example.com --password=secret123
 npm install && npm run build
 php artisan serve
 ```
+
+`app:install` runs `migrate` + seeders. For an existing local DB after `git pull`, run `php artisan migrate` (and rebuild front-end assets) so `users.preferences` and UI for Columns / History are available. See README “Upgrading an existing install”.
 
 ## Roles
 

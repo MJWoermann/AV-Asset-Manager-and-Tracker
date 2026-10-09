@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Str;
 
 /**
  * Immutable audit record. Do not update or delete.
@@ -40,6 +41,39 @@ class AuditLog extends Model
     public function auditable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function changedAttributeKeys(): array
+    {
+        $keys = array_unique(array_merge(
+            array_keys($this->old_values ?? []),
+            array_keys($this->new_values ?? [])
+        ));
+
+        return array_values(array_filter(
+            $keys,
+            fn (string $key) => ! in_array($key, ['id', 'created_at', 'updated_at', 'password', 'remember_token'], true)
+        ));
+    }
+
+    public function formatValue(mixed $value, int $limit = 60): string
+    {
+        if ($value === null) {
+            return '—';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_scalar($value)) {
+            return Str::limit((string) $value, $limit);
+        }
+
+        return Str::limit((string) json_encode($value), $limit);
     }
 
     public function update(array $attributes = [], array $options = []): bool

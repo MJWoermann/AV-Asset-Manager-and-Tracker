@@ -98,5 +98,6 @@ class AssetDescriptionTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Quiet Name');
+        $response->assertSee('<mark class="bg-brand/30 text-inherit rounded-sm px-0.5">UniquePhraseForSearch</mark>', false);
     }
 }

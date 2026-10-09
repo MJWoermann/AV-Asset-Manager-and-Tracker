@@ -74,7 +74,6 @@
                     'fmi_ast' => 'FMI AST#',
                     'tp_barcode' => 'TP Barcode',
                     'rig_tag' => 'RIG Tag #',
-                    'device_sn' => 'Device SN',
                     'ip_address' => 'IP Address',
                     'mac_address' => 'MAC Address',
                 ] as $field => $label)

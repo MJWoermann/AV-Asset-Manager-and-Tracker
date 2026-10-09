@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Enums\AssetStatus;
+use App\Support\AssetSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Asset extends Model
 {
@@ -27,7 +29,6 @@ class Asset extends Model
         'fmi_ast',
         'tp_barcode',
         'rig_tag',
-        'device_sn',
         'ip_address',
         'mac_address',
         'test_tag_expiry',
@@ -88,6 +89,11 @@ class Asset extends Model
         return $this->hasMany(AssetCustomFieldValue::class);
     }
 
+    public function auditLogs(): MorphMany
+    {
+        return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');
+    }
+
     public function isContainer(): bool
     {
         $slug = $this->itemType?->slug;
@@ -97,28 +103,12 @@ class Asset extends Model
 
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
-        if (! $term) {
-            return $query;
-        }
+        return AssetSearch::constrain($query, $term);
+    }
 
-        $like = '%'.$term.'%';
-
-        return $query->where(function (Builder $q) use ($term, $like) {
-            $q->where('name', 'like', $like)
-                ->orWhere('description', 'like', $like)
-                ->orWhere('manufacturer', 'like', $like)
-                ->orWhere('model', 'like', $like)
-                ->orWhere('serial_number', 'like', $like)
-                ->orWhere('fmi_ast', $term)
-                ->orWhere('tp_barcode', $term)
-                ->orWhere('rig_tag', $term)
-                ->orWhere('device_sn', $term)
-                ->orWhere('ip_address', $term)
-                ->orWhere('mac_address', $term)
-                ->orWhere('supplier', 'like', $like)
-                ->orWhere('notes', 'like', $like)
-                ->orWhereHas('customFieldValues', fn (Builder $cf) => $cf->where('value', 'like', $like));
-        });
+    public function scopeOrderBySearchRelevance(Builder $query, ?string $term): Builder
+    {
+        return AssetSearch::orderByRelevance($query, $term);
     }
 
     public function scopeFindByIdentifier(Builder $query, string $code): Builder
@@ -127,7 +117,6 @@ class Asset extends Model
             $q->where('fmi_ast', $code)
                 ->orWhere('tp_barcode', $code)
                 ->orWhere('rig_tag', $code)
-                ->orWhere('device_sn', $code)
                 ->orWhere('serial_number', $code)
                 ->orWhere('mac_address', $code);
         });

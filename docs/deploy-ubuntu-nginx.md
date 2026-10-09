@@ -1,14 +1,14 @@
-# Deploy AV Asset Manager on Ubuntu 24.04 LTS (LEMP)
+# Deploy AV Asset Manager on Ubuntu 26.04 LTS (LEMP)
 
-This guide installs Nginx, PHP 8.3-FPM, MariaDB, and the application on a dedicated host for LAN users.
+This guide installs Nginx, PHP 8.5-FPM, MariaDB, and the application on a dedicated host for LAN users.
 
 ## 1. System packages
 
 ```bash
 sudo apt update
 sudo apt install -y nginx mariadb-server composer git unzip curl \
-  php8.3-fpm php8.3-cli php8.3-mysql php8.3-xml php8.3-mbstring \
-  php8.3-curl php8.3-zip php8.3-gd php8.3-bcmath php8.3-intl
+  php8.5-fpm php8.5-cli php8.5-mysql php8.5-xml php8.5-mbstring \
+  php8.5-curl php8.5-zip php8.5-gd php8.5-bcmath php8.5-intl
 
 # Node 20 LTS (for building frontend assets)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -68,15 +68,22 @@ FILESYSTEM_DISK=local
 ```bash
 npm ci
 npm run build
+# Runs migrations (incl. users.preferences), seeds, and creates the first admin
 php artisan app:install --email=admin@your.org --password='ChooseAStrongPassword'
 php artisan storage:link
 sudo chown -R www-data:www-data storage bootstrap/cache
 sudo chmod -R ug+rwx storage bootstrap/cache
 ```
 
+First-time install needs no extra environment variables for per-user asset table columns or the asset **History** tab. Column choices are stored in `users.preferences` after each user saves them in the UI; History reads the existing append-only `audit_logs` table.
+
 ## 4. Nginx site
 
 Create `/etc/nginx/sites-available/av-asset-manager`:
+```bash
+cd /var/www/av-asset-manager/
+sudo cp nginx.example /etc/nginx/sites-available/av-asset-manager
+```
 
 ```nginx
 server {
@@ -103,7 +110,7 @@ server {
     error_page 404 /index.php;
 
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
         fastcgi_hide_header X-Powered-By;
@@ -119,16 +126,17 @@ Enable and reload:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/av-asset-manager /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
-sudo systemctl enable nginx php8.3-fpm mariadb
+sudo systemctl enable nginx php8.5-fpm mariadb
 ```
 
 Optional TLS: use Certbot (`sudo apt install certbot python3-certbot-nginx`) if the host has a public DNS name.
 
 ## 5. PHP-FPM tuning (20 concurrent users)
 
-In `/etc/php/8.3/fpm/pool.d/www.conf` consider:
+In `/etc/php/8.5/fpm/pool.d/www.conf` consider:
 
 ```ini
 pm = dynamic
@@ -139,7 +147,7 @@ pm.max_spare_servers = 16
 ```
 
 ```bash
-sudo systemctl restart php8.3-fpm
+sudo systemctl restart php8.5-fpm
 ```
 
 ## 6. Firewall (LAN only example)
@@ -152,6 +160,8 @@ sudo ufw enable
 
 ## 7. Updates
 
+Always run migrations after pulling code. Skipping `migrate` will break asset list pages once the app expects `users.preferences`.
+
 ```bash
 cd /var/www/av-asset-manager
 git pull
@@ -161,8 +171,30 @@ php artisan migrate --force
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
-sudo systemctl reload php8.3-fpm
+sudo chown -R www-data:www-data /var/www/av-asset-manager/database
+sudo chmod 775 /var/www/av-asset-manager/database
+sudo chmod 664 /var/www/av-asset-manager/database/database.sqlite
+sudo systemctl reload php8.5-fpm
 ```
+
+If you are expereiencing errors with php artisan you can fix your ownership permissions with this script
+```bash
+cd /var/www/av-asset-manager
+sudo chown -R $USER:$USER .
+chmod -R 755 .
+```
+
+### Schema notes (additive)
+
+| Migration concern | Effect on existing installs |
+|-------------------|-----------------------------|
+| `users.preferences` (JSON, nullable) | Added by migrate. Null means default asset table columns. No data backfill. |
+| Asset **History** tab | Uses existing `audit_logs` morph records. No new tables or seeders. |
+| Frontend (Columns picker, History tab) | Served after `npm run build`. Clear view cache as above if Blade looks stale. |
+
+Optional: after migrate, re-apply audit hardening from §2 if you recreate DB grants.
+
+Do **not** grant `UPDATE`/`DELETE` on `audit_logs` to the app DB user.
 
 ## Security checklist
 
@@ -174,3 +206,4 @@ sudo systemctl reload php8.3-fpm
 - [ ] Uploads limited to 25MB in Nginx and PHP (`upload_max_filesize`, `post_max_size`)
 - [ ] Admin password rotated after first login
 - [ ] Audit logs treated as append-only
+- [ ] Updates always run `php artisan migrate --force` before serving traffic
