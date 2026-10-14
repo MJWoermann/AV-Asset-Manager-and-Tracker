@@ -15,6 +15,7 @@
                     <span class="font-medium text-brand-black dark:text-white">Update</span> merges mapped fields into the existing asset.
                     <span class="font-medium text-brand-black dark:text-white">Replace</span> clears core fields then applies the import.
                     <span class="font-medium text-brand-black dark:text-white">Skip</span> leaves the existing asset unchanged.
+                    <span class="font-medium text-brand-black dark:text-white">Create new (false match)</span> creates a new asset and leaves the matched asset unchanged — use when the compared fields are not unique.
                 </p>
             </div>
 
@@ -32,6 +33,7 @@
                                 <option value="update">Update all</option>
                                 <option value="replace">Replace all</option>
                                 <option value="skip">Skip all</option>
+                                <option value="create">Create all as new (false match)</option>
                             </select>
                         </div>
                         <button
@@ -89,6 +91,7 @@
                                                 <option value="update" selected>Update</option>
                                                 <option value="replace">Replace</option>
                                                 <option value="skip">Skip</option>
+                                                <option value="create">Create new (false match)</option>
                                             </select>
                                         </td>
                                     </tr>

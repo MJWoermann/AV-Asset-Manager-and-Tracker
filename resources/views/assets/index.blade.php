@@ -42,6 +42,15 @@
                 placeholder="All locations"
                 nullable
             />
+            <x-searchable-select
+                class="relative min-w-[12rem] sm:w-56"
+                name="item_type_id"
+                id="filter_item_type_id"
+                :options="$itemTypes->map(fn ($itemType) => ['value' => $itemType->id, 'label' => $itemType->name])"
+                :selected="$itemTypeId"
+                placeholder="All item types"
+                nullable
+            />
             <button class="px-4 py-2 bg-black text-white dark:bg-brand">Search</button>
         </form>
 

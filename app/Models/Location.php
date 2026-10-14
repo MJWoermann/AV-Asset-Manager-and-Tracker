@@ -14,6 +14,7 @@ class Location extends Model
     protected $fillable = [
         'parent_id',
         'name',
+        'room_code',
         'type',
         'is_portable',
         'floorplan_path',

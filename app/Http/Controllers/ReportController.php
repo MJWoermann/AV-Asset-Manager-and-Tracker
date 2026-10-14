@@ -8,6 +8,7 @@ use App\Services\ListComparisonService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -37,21 +38,17 @@ class ReportController extends Controller
         $result = $comparison->compare($source, $target);
 
         if (($data['export'] ?? null) === 'pdf') {
-            $filename = 'comparison-'.$source->id.'-vs-'.$target->id.'.pdf';
-
             return Pdf::loadView('reports.compare-pdf', [
                 'result' => $result,
                 'source' => $source,
                 'target' => $target,
-            ])->download($filename);
+            ])->download($this->comparisonExportFilename($source, $target, 'pdf'));
         }
 
         if (! empty($data['export'])) {
-            $filename = 'comparison-'.$source->id.'-vs-'.$target->id.'.'.$data['export'];
-
             return Excel::download(
                 new ComparisonReportExport($result, $source, $target),
-                $filename
+                $this->comparisonExportFilename($source, $target, $data['export'])
             );
         }
 
@@ -61,5 +58,13 @@ class ReportController extends Controller
             'source' => $source,
             'target' => $target,
         ]);
+    }
+
+    protected function comparisonExportFilename(AssetList $source, AssetList $target, string $format): string
+    {
+        $scanned = Str::slug($source->name) ?: 'scanned-list';
+        $inventory = Str::slug($target->name) ?: 'inventory-list';
+
+        return 'comparison-'.$scanned.'-vs-'.$inventory.'-'.now()->format('Ymd').'.'.$format;
     }
 }

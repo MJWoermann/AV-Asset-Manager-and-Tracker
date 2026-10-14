@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Imports\AssetImport;
+use App\Http\Requests\ImportUploadRequest;
 use App\Services\ImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\HeadingRowImport;
 
 class ImportController extends Controller
 {
@@ -20,15 +19,18 @@ class ImportController extends Controller
         return view('import.create');
     }
 
-    public function upload(Request $request): View|RedirectResponse
+    public function upload(ImportUploadRequest $request): View|RedirectResponse
     {
-        $request->validate([
-            'file' => ['required', 'file', 'max:25600', 'mimes:csv,xlsx,xls,txt'],
-        ]);
+        $uploaded = $request->file('file');
+        $path = $uploaded->store('imports');
 
-        $path = $request->file('file')->store('imports');
-        $headings = Excel::toArray(new HeadingRowImport, $request->file('file'));
-        $columns = $headings[0][0] ?? [];
+        try {
+            $columns = $this->imports->readHeadingColumns($uploaded);
+        } catch (ValidationException $e) {
+            Storage::delete($path);
+
+            throw $e;
+        }
 
         session([
             'import.path' => $path,
@@ -64,9 +66,16 @@ class ImportController extends Controller
             ])['mapping']
         );
 
-        $reader = new AssetImport;
-        Excel::import($reader, Storage::path($path));
-        $prepared = $this->imports->prepareRows($reader->rows, $mapping);
+        try {
+            $rows = $this->imports->readRows(Storage::path($path));
+        } catch (ValidationException $e) {
+            Storage::delete($path);
+            session()->forget(['import.path', 'import.columns', 'import.mapping', 'import.prepared']);
+
+            return redirect()->route('import.create')->withErrors($e->errors());
+        }
+
+        $prepared = $this->imports->prepareRows($rows, $mapping);
 
         $this->imports->rememberMapping($mapping, $request->user()?->id);
 
@@ -97,8 +106,8 @@ class ImportController extends Controller
 
         $data = $request->validate([
             'actions' => ['nullable', 'array'],
-            'actions.*' => ['in:update,replace,skip'],
-            'bulk_action' => ['nullable', 'in:update,replace,skip'],
+            'actions.*' => ['in:update,replace,skip,create'],
+            'bulk_action' => ['nullable', 'in:update,replace,skip,create'],
             'dry_run' => ['nullable', 'boolean'],
         ]);
 

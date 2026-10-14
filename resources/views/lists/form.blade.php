@@ -24,5 +24,18 @@
             </div>
             <x-primary-button>Save</x-primary-button>
         </form>
+
+        @if($list->exists)
+            <form
+                method="POST"
+                action="{{ route('lists.destroy', $list) }}"
+                class="mt-6"
+                onsubmit="return confirm('Delete this list? List membership is removed (assets are kept). Event lists also delete related scan sessions. Unknown-scan history may lose its list linkage.')"
+            >
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="text-sm text-red-600">Delete list</button>
+            </form>
+        @endif
     </div>
 </x-app-layout>

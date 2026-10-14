@@ -1,9 +1,17 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 window.Alpine = Alpine;
 window.Html5Qrcode = Html5Qrcode;
+
+const CAMERA_SCAN_FORMATS = [
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.QR_CODE,
+];
+
+const CAMERA_SAME_CODE_DEBOUNCE_MS = 800;
 
 function searchTokens(term) {
     return String(term || '')
@@ -390,7 +398,137 @@ Alpine.data('bulkAssets', () => ({
     },
 }));
 
-Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = []) => ({
+Alpine.data('bulkLocations', () => ({
+    selected: {},
+    panelOpen: false,
+    deleteConfirmOpen: false,
+    pendingDelete: false,
+    pendingMerge: false,
+    fields: {
+        update_parent: false,
+        clear_parent: false,
+    },
+
+    get selectedIds() {
+        return Object.keys(this.selected)
+            .filter((id) => this.selected[id])
+            .map((id) => Number(id));
+    },
+
+    get selectedCount() {
+        return this.selectedIds.length;
+    },
+
+    get allPageSelected() {
+        const boxes = this.pageCheckboxes();
+        return boxes.length > 0 && boxes.every((id) => !!this.selected[id]);
+    },
+
+    pageCheckboxes() {
+        return [...this.$el.querySelectorAll('[data-bulk-location-id]')].map((el) =>
+            Number(el.getAttribute('data-bulk-location-id'))
+        );
+    },
+
+    setSelected(id, checked) {
+        this.selected = { ...this.selected, [id]: !!checked };
+    },
+
+    toggleAll(checked) {
+        const next = { ...this.selected };
+        this.pageCheckboxes().forEach((id) => {
+            next[id] = !!checked;
+        });
+        this.selected = next;
+    },
+
+    selectDuplicateNames(names) {
+        const normalized = new Set(
+            (names || []).map((name) => String(name).trim().toLowerCase())
+        );
+        const next = {};
+        [...this.$el.querySelectorAll('[data-bulk-location-id]')].forEach((el) => {
+            const name = (el.getAttribute('data-bulk-location-name') || '').trim().toLowerCase();
+            if (normalized.has(name)) {
+                next[Number(el.getAttribute('data-bulk-location-id'))] = true;
+            }
+        });
+        this.selected = next;
+        this.panelOpen = true;
+    },
+
+    clearSelection() {
+        this.selected = {};
+        this.panelOpen = false;
+        this.deleteConfirmOpen = false;
+        this.pendingDelete = false;
+        this.pendingMerge = false;
+    },
+
+    openDeleteConfirm() {
+        if (this.selectedCount === 0) {
+            return;
+        }
+        this.pendingDelete = false;
+        this.pendingMerge = false;
+        this.deleteConfirmOpen = true;
+    },
+
+    cancelDelete() {
+        this.deleteConfirmOpen = false;
+        this.pendingDelete = false;
+    },
+
+    confirmDelete() {
+        this.pendingDelete = true;
+        this.pendingMerge = false;
+        this.deleteConfirmOpen = false;
+        this.$nextTick(() => {
+            const form = this.$refs.bulkForm;
+            if (!form) {
+                return;
+            }
+
+            let confirmInput = form.querySelector('input[name="confirm_delete"]');
+            if (!confirmInput) {
+                confirmInput = document.createElement('input');
+                confirmInput.type = 'hidden';
+                confirmInput.name = 'confirm_delete';
+                form.appendChild(confirmInput);
+            }
+            confirmInput.value = '1';
+
+            form.requestSubmit();
+        });
+    },
+
+    submitMerge() {
+        if (this.selectedCount < 2) {
+            return;
+        }
+
+        this.pendingMerge = true;
+        this.pendingDelete = false;
+        this.$nextTick(() => {
+            this.$refs.bulkForm?.requestSubmit();
+        });
+    },
+
+    prepareSubmit(event) {
+        if (this.pendingDelete || this.pendingMerge) {
+            return true;
+        }
+
+        if (this.selectedCount === 0) {
+            event.preventDefault();
+            return false;
+        }
+
+        return true;
+    },
+}));
+
+Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = []) => ({
     scanning: false,
     code: '',
     quantity: 1,
@@ -403,12 +541,32 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     recent: [],
     eventItems: [],
     eventListId: eventListId,
+    noteUrlTemplate,
+    serverUnknowns: [],
     lastCameraCode: '',
     lastCameraAt: 0,
 
     init() {
         this.eventItems = (initialEventItems || []).map((entry, index) => this.normalizeEventItem(entry, index));
-        this.recent = this.loadRecent();
+        this.serverUnknowns = (initialUnknownScans || []).map((scan, index) =>
+            this.normalizeEntry(
+                {
+                    id: `unknown-${scan.id}`,
+                    unknown: true,
+                    inventory_status: 'unknown_asset',
+                    unknown_scan: scan,
+                    time: scan.time || new Date().toLocaleTimeString(),
+                },
+                index
+            )
+        );
+        const stored = this.loadRecent();
+        const unknownIds = new Set(this.serverUnknowns.map((entry) => entry.unknown_scan?.id).filter(Boolean));
+        const storedWithoutDupUnknowns = stored.filter(
+            (entry) => !entry.unknown || !unknownIds.has(entry.unknown_scan?.id)
+        );
+        this.recent = [...this.serverUnknowns, ...storedWithoutDupUnknowns].slice(0, 50);
+        this.persistRecent();
         this.$nextTick(() => this.focusInput());
     },
 
@@ -439,10 +597,8 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     },
 
     resetRecent() {
-        this.recent = [];
-        try {
-            sessionStorage.removeItem(this.storageKey());
-        } catch (_) {}
+        this.recent = [...this.serverUnknowns];
+        this.persistRecent();
     },
 
     focusInput() {
@@ -456,17 +612,80 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
 
     normalizeEntry(entry, index = 0) {
         const asset = entry.asset || {};
+        const unknownScan = entry.unknown_scan || null;
         return {
-            key: String(entry.id ?? `${asset.id || 'asset'}-${index}-${Date.now()}`),
+            key: String(entry.id ?? `${asset.id || unknownScan?.id || 'asset'}-${index}-${Date.now()}`),
             id: entry.id ?? null,
-            quantity: entry.quantity ?? 1,
+            quantity: entry.quantity ?? unknownScan?.quantity ?? 1,
             is_child_expand: Boolean(entry.is_child_expand),
             duplicate: Boolean(entry.duplicate),
+            unknown: Boolean(entry.unknown),
             inventory_status: entry.inventory_status || 'unknown',
             warning: entry.warning || null,
             asset,
+            unknown_scan: unknownScan,
+            noteDraft: unknownScan?.note || '',
+            editingNote: false,
+            savingNote: false,
             time: entry.time ?? new Date().toLocaleTimeString(),
         };
+    },
+
+    noteUrl(id) {
+        return String(this.noteUrlTemplate || '').replace('__ID__', String(id));
+    },
+
+    toggleNoteEditor(entry) {
+        entry.editingNote = !entry.editingNote;
+        if (entry.editingNote) {
+            entry.noteDraft = entry.unknown_scan?.note || '';
+        }
+    },
+
+    async saveNote(entry) {
+        if (!entry.unknown_scan?.id) {
+            return;
+        }
+
+        entry.savingNote = true;
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        try {
+            const res = await fetch(this.noteUrl(entry.unknown_scan.id), {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': token,
+                    'X-HTTP-Method-Override': 'PATCH',
+                },
+                body: JSON.stringify({ note: entry.noteDraft || null }),
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                this.error =
+                    data.message ||
+                    Object.values(data.errors || {})
+                        .flat()
+                        .join(' ') ||
+                    'Could not save note';
+                return;
+            }
+
+            entry.unknown_scan = data.unknown_scan || {
+                ...entry.unknown_scan,
+                note: entry.noteDraft || null,
+            };
+            entry.editingNote = false;
+            this.message = data.message || 'Note saved.';
+            this.error = '';
+            this.persistRecent();
+        } catch (e) {
+            this.error = 'Could not save note: ' + (e?.message || e);
+        } finally {
+            entry.savingNote = false;
+        }
     },
 
     normalizeEventItem(entry, index = 0) {
@@ -483,14 +702,29 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         this.error = '';
         this.scanning = true;
         await this.$nextTick();
-        this.scanner = new Html5Qrcode('qr-reader');
+        this.scanner = new Html5Qrcode('qr-reader', {
+            formatsToSupport: CAMERA_SCAN_FORMATS,
+            verbose: false,
+        });
         try {
             await this.scanner.start(
                 { facingMode: 'environment' },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
+                {
+                    fps: 15,
+                    disableFlip: true,
+                    qrbox: (viewfinderWidth, viewfinderHeight) => ({
+                        width: Math.floor(viewfinderWidth * 0.9),
+                        height: Math.floor(viewfinderHeight * 0.35),
+                    }),
+                    videoConstraints: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                },
                 async (decoded) => {
                     const now = Date.now();
-                    if (decoded === this.lastCameraCode && now - this.lastCameraAt < 2000) {
+                    if (decoded === this.lastCameraCode && now - this.lastCameraAt < CAMERA_SAME_CODE_DEBOUNCE_MS) {
                         return;
                     }
                     this.lastCameraCode = decoded;
@@ -500,6 +734,13 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                 },
                 () => {}
             );
+
+            try {
+                await this.scanner.applyVideoConstraints({
+                    focusMode: 'continuous',
+                    advanced: [{ zoom: 1.5 }],
+                });
+            } catch (_) {}
         } catch (e) {
             this.error = 'Camera unavailable: ' + (e?.message || e);
             this.scanning = false;
@@ -583,7 +824,21 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
             const stamped = new Date().toLocaleTimeString();
             const entries = [];
 
-            if (Array.isArray(data.items) && data.items.length > 0) {
+            if (data.unknown && data.unknown_scan) {
+                entries.push(
+                    this.normalizeEntry(
+                        {
+                            id: `unknown-${data.unknown_scan.id}`,
+                            quantity,
+                            unknown: true,
+                            inventory_status: data.inventory_status || 'unknown_asset',
+                            unknown_scan: data.unknown_scan,
+                            time: stamped,
+                        },
+                        0
+                    )
+                );
+            } else if (Array.isArray(data.items) && data.items.length > 0) {
                 data.items.forEach((item, index) => {
                     entries.push(
                         this.normalizeEntry(
@@ -621,7 +876,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                 this.persistRecent();
             }
 
-            if (!data.duplicate && Array.isArray(data.items) && data.items.length > 0) {
+            if (!data.duplicate && !data.unknown && Array.isArray(data.items) && data.items.length > 0) {
                 const added = data.items.map((item, index) => this.normalizeEventItem(item, index));
                 this.eventItems = [...added, ...this.eventItems];
             }

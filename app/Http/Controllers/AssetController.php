@@ -9,6 +9,7 @@ use App\Models\AssetCustomFieldValue;
 use App\Models\AssetList;
 use App\Models\ItemType;
 use App\Models\Location;
+use App\Models\UnknownScan;
 use App\Services\BulkAssetUpdateService;
 use App\Support\AssetTableColumns;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,7 @@ class AssetController extends Controller
         $term = $request->string('q')->toString() ?: null;
 
         $locationId = $request->integer('location_id') ?: null;
+        $itemTypeId = $request->integer('item_type_id') ?: null;
 
         $assets = Asset::query()
             ->with(['itemType', 'location', 'parent', 'customFieldValues'])
@@ -31,6 +33,7 @@ class AssetController extends Controller
             ->when($locationId, function ($query) use ($locationId) {
                 $query->whereIn('location_id', Location::selfAndDescendantIds($locationId));
             })
+            ->when($itemTypeId, fn ($query) => $query->where('item_type_id', $itemTypeId))
             ->orderBySearchRelevance($term)
             ->paginate(50)
             ->withQueryString();
@@ -40,9 +43,11 @@ class AssetController extends Controller
             'statuses' => AssetStatus::options(),
             'q' => $term ?? '',
             'locationId' => $locationId,
+            'itemTypeId' => $itemTypeId,
             'availableColumns' => AssetTableColumns::definitions(),
             'selectedColumns' => $request->user()->assetTableColumns(),
             'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
+            'itemTypes' => ItemType::orderBy('name')->get(),
             'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
             'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
         ]);
@@ -81,22 +86,48 @@ class AssetController extends Controller
         return $parts === [] ? 'No changes applied.' : implode('. ', $parts).'.';
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $statusValue = $request->string('status')->toString();
+        $status = array_key_exists($statusValue, AssetStatus::options())
+            ? AssetStatus::from($statusValue)
+            : AssetStatus::Available;
+
+        $asset = new Asset([
+            'status' => $status,
+            'tp_barcode' => $request->string('tp_barcode')->toString() ?: null,
+            'fmi_ast' => $request->string('fmi_ast')->toString() ?: null,
+            'rig_tag' => $request->string('rig_tag')->toString() ?: null,
+            'serial_number' => $request->string('serial_number')->toString() ?: null,
+            'location_id' => $request->integer('location_id') ?: null,
+        ]);
+
         return view('assets.form', [
-            'asset' => new Asset(['status' => AssetStatus::Available]),
+            'asset' => $asset,
             'itemTypes' => ItemType::orderBy('name')->get(),
             'locations' => Location::orderBy('name')->get(),
             'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
             'statuses' => AssetStatus::options(),
+            'unknownScanId' => $request->integer('unknown_scan_id') ?: null,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
+        $unknownScanId = $request->validate([
+            'unknown_scan_id' => ['nullable', 'integer', 'exists:unknown_scans,id'],
+        ])['unknown_scan_id'] ?? null;
+
         $asset = Asset::create($data);
         $this->syncCustomFields($asset, $request);
+
+        if ($unknownScanId) {
+            $unknownScan = UnknownScan::query()->find($unknownScanId);
+            if ($unknownScan && ! $unknownScan->isResolved()) {
+                $unknownScan->markResolved($asset);
+            }
+        }
 
         return redirect()->route('assets.show', $asset)->with('status', 'Asset created.');
     }

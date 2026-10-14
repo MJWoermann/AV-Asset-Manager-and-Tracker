@@ -9,6 +9,7 @@
                 <div>
                     <div class="font-medium">{{ $type->name }}</div>
                     <div class="text-sm text-brand-charcoal dark:text-brand-silver">{{ $type->fieldSets->pluck('name')->join(', ') ?: 'No field sets' }}</div>
+                    <div class="text-xs text-brand-charcoal dark:text-brand-silver mt-1">{{ $type->assets_count }} {{ $type->assets_count === 1 ? 'asset' : 'assets' }}</div>
                 </div>
                 <a href="{{ route('item-types.edit', $type) }}" class="text-brand text-sm">Edit</a>
             </div>

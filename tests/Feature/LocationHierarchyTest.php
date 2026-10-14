@@ -43,6 +43,7 @@ class LocationHierarchyTest extends TestCase
         $response->assertSee(route('assets.index', ['location_id' => $level->id]), false);
         $response->assertSee(route('assets.index', ['location_id' => $room->id]), false);
         $response->assertDontSee('Parent:');
+        $response->assertDontSee('duplicate name', false);
     }
 
     public function test_locations_index_alternates_row_shades_for_adjacent_same_type_siblings(): void

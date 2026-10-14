@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssetStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScanSession extends Model
 {
@@ -42,6 +43,11 @@ class ScanSession extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    public function unknownScans(): HasMany
+    {
+        return $this->hasMany(UnknownScan::class);
     }
 
     public function isActive(): bool

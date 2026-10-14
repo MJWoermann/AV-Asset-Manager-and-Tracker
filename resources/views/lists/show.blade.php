@@ -10,6 +10,16 @@
                 @role('admin|inventory_manager')
                     <a href="{{ route('export.list', [$list, 'format' => 'xlsx']) }}" class="px-3 py-2 border text-sm">Export</a>
                     <a href="{{ route('lists.edit', $list) }}" class="px-3 py-2 border text-sm">Edit</a>
+                    <form
+                        method="POST"
+                        action="{{ route('lists.destroy', $list) }}"
+                        class="inline"
+                        onsubmit="return confirm('Delete this list? List membership is removed (assets are kept). Event lists also delete related scan sessions. Unknown-scan history may lose its list linkage.')"
+                    >
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="px-3 py-2 border text-sm text-red-700">Delete</button>
+                    </form>
                 @endrole
             </div>
         </div>

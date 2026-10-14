@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\AssetListItem;
 use App\Models\ScanSession;
+use App\Models\UnknownScan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -21,10 +22,12 @@ class ScanService
      * @return array{
      *     items: array<int, array<string, mixed>>,
      *     duplicate: bool,
+     *     unknown: bool,
      *     inventory_status: string,
      *     warning: string|null,
      *     message: string,
-     *     asset: array<string, mixed>
+     *     asset: array<string, mixed>|null,
+     *     unknown_scan: array<string, mixed>|null
      * }
      */
     public function scanCode(ScanSession $session, string $code, int $quantity = 1): array
@@ -32,6 +35,8 @@ class ScanService
         if (! $session->isActive()) {
             throw ValidationException::withMessages(['code' => 'Scan session is closed.']);
         }
+
+        $code = trim($code);
 
         $asset = Asset::query()->findByIdentifier($code)->with(['children', 'itemType'])->first();
 
@@ -44,7 +49,7 @@ class ScanService
         }
 
         if (! $asset) {
-            throw ValidationException::withMessages(['code' => 'No asset found for that code.']);
+            return $this->logUnknownScan($session, $code, $quantity);
         }
 
         return DB::transaction(function () use ($session, $asset, $quantity) {
@@ -92,24 +97,92 @@ class ScanService
                 return [
                     'items' => [],
                     'duplicate' => true,
+                    'unknown' => false,
                     'inventory_status' => $inventoryStatus,
                     'warning' => $warning,
                     'message' => $message,
                     'asset' => $this->assetSummary($asset->fresh(['itemType'])),
+                    'unknown_scan' => null,
                 ];
             }
 
             return [
                 'items' => $added,
                 'duplicate' => false,
+                'unknown' => false,
                 'inventory_status' => $inventoryStatus,
                 'warning' => $warning,
                 'message' => count($added) > 1
                     ? "Added {$asset->name} with ".(count($added) - 1).' child asset(s).'
                     : "Added {$asset->name}.",
                 'asset' => $this->assetSummary($asset->fresh(['itemType'])),
+                'unknown_scan' => null,
             ];
         });
+    }
+
+    /**
+     * Persist an unknown barcode for later identification / asset creation.
+     *
+     * @return array{
+     *     items: array<int, array<string, mixed>>,
+     *     duplicate: bool,
+     *     unknown: bool,
+     *     inventory_status: string,
+     *     warning: string|null,
+     *     message: string,
+     *     asset: null,
+     *     unknown_scan: array<string, mixed>
+     * }
+     */
+    protected function logUnknownScan(ScanSession $session, string $code, int $quantity): array
+    {
+        $session->loadMissing('location');
+
+        $unknown = UnknownScan::create([
+            'scanned_code' => $code,
+            'user_id' => $session->user_id,
+            'scan_session_id' => $session->id,
+            'event_list_id' => $session->event_list_id,
+            'inventory_list_id' => $session->inventory_list_id,
+            'location_id' => $session->location_id,
+            'quantity' => $quantity,
+            'asset_status' => $session->asset_status,
+        ]);
+
+        return [
+            'items' => [],
+            'duplicate' => false,
+            'unknown' => true,
+            'inventory_status' => 'unknown_asset',
+            'warning' => null,
+            'message' => "No asset found for \"{$code}\". Logged for follow-up.",
+            'asset' => null,
+            'unknown_scan' => $this->unknownScanSummary($unknown),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function unknownScanSummary(UnknownScan $unknown): array
+    {
+        $unknown->loadMissing('location');
+
+        return [
+            'id' => $unknown->id,
+            'scanned_code' => $unknown->scanned_code,
+            'quantity' => $unknown->quantity,
+            'note' => $unknown->note,
+            'location' => $unknown->location?->name,
+            'resolved' => $unknown->isResolved(),
+            'create_url' => route('assets.create', [
+                'tp_barcode' => $unknown->scanned_code,
+                'location_id' => $unknown->location_id,
+                'unknown_scan_id' => $unknown->id,
+                'status' => $unknown->asset_status?->value,
+            ]),
+        ];
     }
 
     protected function addItem(ScanSession $session, Asset $asset, int $quantity, bool $isChild): AssetListItem

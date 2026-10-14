@@ -14,6 +14,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Maatwebsite\Excel\Exceptions\NoTypeDetectedException;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 class ImportAssetTest extends TestCase
@@ -37,6 +40,101 @@ class ImportAssetTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('Item type for imported rows');
         $response->assertSee('Upload & map columns');
+        $response->assertSee('single worksheet');
+    }
+
+    public function test_upload_rejects_unsupported_file_type_with_clear_message(): void
+    {
+        Storage::fake('local');
+
+        $response = $this->actingAs($this->manager())
+            ->from(route('import.create'))
+            ->post(route('import.upload'), [
+                'file' => UploadedFile::fake()->create('notes.pdf', 100, 'application/pdf'),
+            ]);
+
+        $response->assertRedirect(route('import.create'));
+        $response->assertSessionHasErrors([
+            'file' => 'That file type is not supported. Upload a CSV or Excel file (.csv, .xlsx, or .xls).',
+        ]);
+    }
+
+    public function test_upload_rejects_oversized_file_with_clear_message(): void
+    {
+        Storage::fake('local');
+
+        $response = $this->actingAs($this->manager())
+            ->from(route('import.create'))
+            ->post(route('import.upload'), [
+                'file' => UploadedFile::fake()->create('huge.csv', 25601, 'text/csv'),
+            ]);
+
+        $response->assertRedirect(route('import.create'));
+        $response->assertSessionHasErrors([
+            'file' => 'The file is too large. Maximum size is 25MB.',
+        ]);
+    }
+
+    public function test_upload_rejects_spreadsheet_with_multiple_worksheets(): void
+    {
+        Storage::fake('local');
+        $path = tempnam(sys_get_temp_dir(), 'import');
+        $this->assertNotFalse($path);
+        $xlsxPath = $path.'.xlsx';
+        rename($path, $xlsxPath);
+
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->setTitle('Assets');
+        $spreadsheet->getActiveSheet()->fromArray(['Name', 'Type'], null, 'A1');
+        $second = $spreadsheet->createSheet();
+        $second->setTitle('Extra');
+        $second->fromArray(['Other', 'Cols'], null, 'A1');
+        (new Xlsx($spreadsheet))->save($xlsxPath);
+
+        $file = new UploadedFile(
+            $xlsxPath,
+            'multi.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true,
+        );
+
+        $response = $this->actingAs($this->manager())
+            ->from(route('import.create'))
+            ->post(route('import.upload'), ['file' => $file]);
+
+        @unlink($xlsxPath);
+
+        $response->assertRedirect(route('import.create'));
+        $response->assertSessionHasErrors([
+            'file' => 'Unable to process files with multiple worksheets. Save each sheet as its own CSV or Excel file and import them one at a time.',
+        ]);
+    }
+
+    public function test_upload_rejects_file_without_headings(): void
+    {
+        Storage::fake('local');
+
+        $response = $this->actingAs($this->manager())
+            ->from(route('import.create'))
+            ->post(route('import.upload'), [
+                'file' => UploadedFile::fake()->createWithContent('blank.csv', "\n\n"),
+            ]);
+
+        $response->assertRedirect(route('import.create'));
+        $response->assertSessionHasErrors([
+            'file' => 'Unable to find column headings. Make sure the first row of the file contains column names.',
+        ]);
+    }
+
+    public function test_user_facing_read_error_explains_unrecognised_file_type(): void
+    {
+        $message = app(ImportService::class)->userFacingReadError(new NoTypeDetectedException);
+
+        $this->assertSame(
+            'That file type is not supported or could not be recognised. Upload a CSV or Excel file (.csv, .xlsx, or .xls).',
+            $message,
+        );
     }
 
     public function test_mapping_step_exposes_type_location_and_create_field_options(): void
@@ -208,7 +306,7 @@ class ImportAssetTest extends TestCase
         ]);
     }
 
-    public function test_duplicate_detection_supports_update_replace_and_skip(): void
+    public function test_duplicate_detection_supports_update_replace_skip_and_create(): void
     {
         Storage::fake('local');
         $user = $this->manager();
@@ -237,12 +335,21 @@ class ImportAssetTest extends TestCase
             'tp_barcode' => 'TP-9',
             'notes' => 'untouched',
         ]);
+        $falseMatchMe = Asset::create([
+            'name' => 'Old False Match',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'mac_address' => 'AA:BB:CC:DD:EE:11',
+            'notes' => 'leave-alone',
+            'manufacturer' => 'OldCo',
+        ]);
 
         $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
-            'Name,Type,Serial,FMI,Barcode,Notes,Manufacturer',
-            'New Update,Audio Equipment,DUP-UPDATE,,,Updated notes,NewCo',
-            'New Replace,Audio Equipment,,FMI-1,,Replaced notes,NewCo',
-            'New Skip,Audio Equipment,,,TP-9,Skipped notes,NewCo',
+            'Name,Type,Serial,FMI,Barcode,MAC,Notes,Manufacturer',
+            'New Update,Audio Equipment,DUP-UPDATE,,,,Updated notes,NewCo',
+            'New Replace,Audio Equipment,,FMI-1,,,Replaced notes,NewCo',
+            'New Skip,Audio Equipment,,,TP-9,,Skipped notes,NewCo',
+            'Brand New Asset,Audio Equipment,,,,AA:BB:CC:DD:EE:11,New notes,NewCo',
         ]));
 
         $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
@@ -254,6 +361,7 @@ class ImportAssetTest extends TestCase
                 'Serial' => 'serial_number',
                 'FMI' => 'fmi_ast',
                 'Barcode' => 'tp_barcode',
+                'MAC' => 'mac_address',
                 'Notes' => 'notes',
                 'Manufacturer' => 'manufacturer',
             ],
@@ -261,9 +369,10 @@ class ImportAssetTest extends TestCase
         $prepare->assertOk();
         $prepare->assertSee('Resolve import duplicates');
         $prepare->assertSee('DUP-UPDATE');
+        $prepare->assertSee('Create new (false match)');
 
         $prepared = session('import.prepared');
-        $this->assertCount(3, $prepared);
+        $this->assertCount(4, $prepared);
 
         $actions = [];
         foreach ($prepared as $row) {
@@ -271,6 +380,7 @@ class ImportAssetTest extends TestCase
                 $updateMe->id => 'update',
                 $replaceMe->id => 'replace',
                 $skipMe->id => 'skip',
+                $falseMatchMe->id => 'create',
                 default => 'skip',
             };
         }
@@ -293,6 +403,17 @@ class ImportAssetTest extends TestCase
         $skipMe->refresh();
         $this->assertSame('Old Skip', $skipMe->name);
         $this->assertSame('untouched', $skipMe->notes);
+
+        $falseMatchMe->refresh();
+        $this->assertSame('Old False Match', $falseMatchMe->name);
+        $this->assertSame('leave-alone', $falseMatchMe->notes);
+        $this->assertSame('OldCo', $falseMatchMe->manufacturer);
+
+        $created = Asset::query()->where('name', 'Brand New Asset')->first();
+        $this->assertNotNull($created);
+        $this->assertSame('AA:BB:CC:DD:EE:11', $created->mac_address);
+        $this->assertSame('New notes', $created->notes);
+        $this->assertNotSame($falseMatchMe->id, $created->id);
     }
 
     public function test_service_matches_duplicates_on_mac_and_rig_tag(): void

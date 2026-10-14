@@ -73,17 +73,33 @@
                         'item_type' => $item->asset?->itemType?->name,
                     ],
                 ])->values();
+
+                $initialUnknownScans = $unknownScans->map(fn ($scan) => [
+                    'id' => $scan->id,
+                    'scanned_code' => $scan->scanned_code,
+                    'quantity' => $scan->quantity,
+                    'note' => $scan->note,
+                    'location' => $scan->location?->name,
+                    'resolved' => $scan->isResolved(),
+                    'create_url' => route('assets.create', [
+                        'tp_barcode' => $scan->scanned_code,
+                        'location_id' => $scan->location_id,
+                        'unknown_scan_id' => $scan->id,
+                        'status' => $scan->asset_status?->value,
+                    ]),
+                    'time' => $scan->created_at?->timezone(config('app.timezone'))->format('g:i:s A'),
+                ])->values();
             @endphp
 
             <div
-                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems))"
+                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans))"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
                 <div class="flex gap-2">
                     <button type="button" @click="startCamera" x-show="!scanning" class="px-4 py-2 bg-brand text-white text-sm">Start camera</button>
                     <button type="button" @click="stopCamera" x-show="scanning" x-cloak class="px-4 py-2 bg-black text-white text-sm">Stop camera</button>
                 </div>
-                <div id="qr-reader" class="w-full max-w-sm mx-auto" x-show="scanning" x-cloak></div>
+                <div id="qr-reader" class="w-full max-w-xl mx-auto" x-show="scanning" x-cloak></div>
 
                 <form @submit.prevent="submitCode" class="flex flex-col sm:flex-row gap-2">
                     <input
@@ -117,32 +133,80 @@
                 <div class="space-y-2">
                     <div class="flex items-center justify-between gap-2">
                         <h3 class="text-sm font-semibold">Added this session</h3>
-                        <button
-                            type="button"
-                            @click="resetRecent"
-                            x-show="recent.length > 0"
-                            x-cloak
-                            class="px-2 py-1 border border-brand-charcoal dark:border-brand-silver text-xs"
-                        >
-                            Reset
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <a href="{{ route('reports.unknown-scans') }}" class="text-xs text-brand underline">Unknown scan report</a>
+                            <button
+                                type="button"
+                                @click="resetRecent"
+                                x-show="recent.length > 0"
+                                x-cloak
+                                class="px-2 py-1 border border-brand-charcoal dark:border-brand-silver text-xs"
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="recent.length === 0" x-cloak>No items added yet.</p>
                     <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal border border-brand-silver dark:border-brand-charcoal max-h-64 overflow-y-auto" x-show="recent.length > 0">
                         <template x-for="entry in recent" :key="entry.key">
-                            <li class="px-3 py-2 text-sm flex flex-col gap-0.5" :class="entry.inventory_status === 'not_on_inventory' ? 'bg-amber-50 dark:bg-amber-950/30' : ''">
+                            <li
+                                class="px-3 py-2 text-sm flex flex-col gap-1"
+                                :class="{
+                                    'bg-amber-50 dark:bg-amber-950/30': entry.inventory_status === 'not_on_inventory',
+                                    'bg-red-50 dark:bg-red-950/30': entry.unknown,
+                                }"
+                            >
                                 <div class="flex justify-between gap-2">
-                                    <span class="font-medium" x-text="entry.asset?.name || 'Unknown asset'"></span>
+                                    <span class="font-medium" x-text="entry.unknown ? ('Not in system: ' + (entry.unknown_scan?.scanned_code || '')) : (entry.asset?.name || 'Unknown asset')"></span>
                                     <span class="text-xs text-brand-charcoal dark:text-brand-silver whitespace-nowrap" x-text="entry.time"></span>
                                 </div>
-                                <div class="text-xs text-brand-charcoal dark:text-brand-silver flex flex-wrap gap-x-3 gap-y-0.5">
-                                    <span x-show="entry.asset?.tp_barcode" x-text="'TP: ' + entry.asset.tp_barcode"></span>
-                                    <span x-show="entry.asset?.fmi_ast" x-text="'FMI: ' + entry.asset.fmi_ast"></span>
-                                    <span x-show="entry.asset?.item_type" x-text="entry.asset.item_type"></span>
-                                    <span x-show="entry.is_child_expand">Child</span>
-                                    <span x-show="entry.duplicate" class="text-amber-700 dark:text-amber-300">Already on list</span>
-                                    <span x-show="entry.inventory_status === 'not_on_inventory'" class="text-amber-700 dark:text-amber-300">Not on inventory</span>
-                                    <span x-show="entry.inventory_status === 'matched'" class="text-brand">On inventory</span>
+                                <div class="text-xs text-brand-charcoal dark:text-brand-silver flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                                    <span x-show="!entry.unknown && entry.asset?.tp_barcode" x-text="'TP: ' + entry.asset.tp_barcode"></span>
+                                    <span x-show="!entry.unknown && entry.asset?.fmi_ast" x-text="'FMI: ' + entry.asset.fmi_ast"></span>
+                                    <span x-show="!entry.unknown && entry.asset?.item_type" x-text="entry.asset.item_type"></span>
+                                    <span x-show="!entry.unknown && entry.is_child_expand">Child</span>
+                                    <span x-show="!entry.unknown && entry.duplicate" class="text-amber-700 dark:text-amber-300">Already on list</span>
+                                    <span x-show="!entry.unknown && entry.inventory_status === 'not_on_inventory'" class="text-amber-700 dark:text-amber-300">Not on inventory</span>
+                                    <span x-show="!entry.unknown && entry.inventory_status === 'matched'" class="text-brand">On inventory</span>
+                                    <span x-show="entry.unknown" class="text-red-700 dark:text-red-300">Missing asset</span>
+                                    <span x-show="entry.unknown && entry.unknown_scan?.location" x-text="'Location: ' + entry.unknown_scan.location"></span>
+                                    <span x-show="entry.unknown && entry.unknown_scan?.note" class="truncate max-w-[14rem]" x-text="'Note: ' + entry.unknown_scan.note"></span>
+                                </div>
+                                <div class="flex items-center gap-2" x-show="entry.unknown && entry.unknown_scan" x-cloak>
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center justify-center p-1 border border-brand-charcoal dark:border-brand-silver"
+                                        title="Add note"
+                                        aria-label="Add note"
+                                        @click="toggleNoteEditor(entry)"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                                            <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                                        </svg>
+                                    </button>
+                                    <a
+                                        x-show="!entry.unknown_scan.resolved"
+                                        :href="entry.unknown_scan.create_url"
+                                        class="inline-flex items-center justify-center p-1 border border-brand-charcoal dark:border-brand-silver"
+                                        title="Create asset"
+                                        aria-label="Create asset"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                                            <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                                        </svg>
+                                    </a>
+                                </div>
+                                <div class="space-y-1" x-show="entry.editingNote" x-cloak>
+                                    <textarea
+                                        x-model="entry.noteDraft"
+                                        rows="2"
+                                        class="w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white text-sm"
+                                        placeholder="Note to help identify this item later…"
+                                    ></textarea>
+                                    <div class="flex gap-2">
+                                        <button type="button" class="px-2 py-1 bg-black text-white dark:bg-brand text-xs" @click="saveNote(entry)" :disabled="entry.savingNote">Save note</button>
+                                        <button type="button" class="px-2 py-1 border text-xs" @click="entry.editingNote = false">Cancel</button>
+                                    </div>
                                 </div>
                             </li>
                         </template>

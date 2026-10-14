@@ -7,6 +7,12 @@
         <form method="POST" action="{{ $asset->exists ? route('assets.update', $asset) : route('assets.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
             @csrf
             @if($asset->exists) @method('PUT') @endif
+            @if(! $asset->exists && ! empty($unknownScanId ?? null))
+                <input type="hidden" name="unknown_scan_id" value="{{ $unknownScanId }}">
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver border border-brand-silver dark:border-brand-charcoal px-3 py-2">
+                    Creating from unknown scan. The scanned code is pre-filled — adjust the identifier fields if needed.
+                </p>
+            @endif
 
             <div>
                 <x-input-label for="name" value="Name" />

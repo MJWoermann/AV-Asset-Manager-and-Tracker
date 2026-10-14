@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DeleteItemTypeRequest;
+use App\Models\Asset;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -13,7 +16,7 @@ class ItemTypeController extends Controller
 {
     public function index(): View
     {
-        $itemTypes = ItemType::with('fieldSets')->orderBy('name')->get();
+        $itemTypes = ItemType::with('fieldSets')->withCount('assets')->orderBy('name')->get();
 
         return view('item-types.index', compact('itemTypes'));
     }
@@ -23,6 +26,8 @@ class ItemTypeController extends Controller
         return view('item-types.form', [
             'itemType' => new ItemType,
             'fieldSets' => CustomFieldSet::with('definitions')->orderBy('name')->get(),
+            'replacementTypes' => collect(),
+            'assetCount' => 0,
         ]);
     }
 
@@ -52,6 +57,11 @@ class ItemTypeController extends Controller
         return view('item-types.form', [
             'itemType' => $itemType,
             'fieldSets' => CustomFieldSet::with('definitions')->orderBy('name')->get(),
+            'replacementTypes' => ItemType::query()
+                ->whereKeyNot($itemType->id)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'assetCount' => $itemType->assets()->count(),
         ]);
     }
 
@@ -72,5 +82,21 @@ class ItemTypeController extends Controller
         $itemType->fieldSets()->sync($data['field_sets'] ?? []);
 
         return redirect()->route('item-types.index')->with('status', 'Item type updated.');
+    }
+
+    public function destroy(DeleteItemTypeRequest $request, ItemType $itemType): RedirectResponse
+    {
+        $replacementId = (int) $request->validated('replacement_item_type_id');
+
+        DB::transaction(function () use ($itemType, $replacementId): void {
+            Asset::query()
+                ->where('item_type_id', $itemType->id)
+                ->update(['item_type_id' => $replacementId]);
+
+            $itemType->fieldSets()->detach();
+            $itemType->delete();
+        });
+
+        return redirect()->route('item-types.index')->with('status', 'Item type deleted.');
     }
 }

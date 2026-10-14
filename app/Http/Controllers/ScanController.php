@@ -8,6 +8,7 @@ use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\Location;
 use App\Models\ScanSession;
+use App\Models\UnknownScan;
 use App\Services\ScanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -28,6 +29,7 @@ class ScanController extends Controller
             ->first();
 
         $eventListItems = collect();
+        $unknownScans = collect();
 
         if ($active) {
             $eventListItems = AssetListItem::query()
@@ -35,11 +37,18 @@ class ScanController extends Controller
                 ->with(['asset.itemType'])
                 ->latest('id')
                 ->get();
+
+            $unknownScans = UnknownScan::query()
+                ->where('scan_session_id', $active->id)
+                ->with('location')
+                ->latest('id')
+                ->get();
         }
 
         return view('scan.index', [
             'session' => $active,
             'eventListItems' => $eventListItems,
+            'unknownScans' => $unknownScans,
             'eventLists' => AssetList::where('type', 'event')->orderBy('name')->get(),
             'inventoryLists' => AssetList::where('type', 'inventory')->orderBy('name')->get(),
             'locations' => Location::orderBy('name')->get(),

@@ -8,7 +8,9 @@ use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\ItemType;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ComparisonReportPdfTest extends TestCase
@@ -78,14 +80,18 @@ class ComparisonReportPdfTest extends TestCase
             'added_by' => $user->id,
         ]);
 
+        Carbon::setTestNow('2026-10-14 12:00:00');
+
         $response = $this->actingAs($user)->post(route('reports.compare.run'), [
             'scanned_list_id' => $scannedList->id,
             'inventory_list_id' => $inventoryList->id,
             'export' => 'pdf',
         ]);
 
+        $filename = 'comparison-'.Str::slug($scannedList->name).'-vs-'.Str::slug($inventoryList->name).'-20261014.pdf';
+
         $response->assertOk();
-        $response->assertDownload('comparison-'.$scannedList->id.'-vs-'.$inventoryList->id.'.pdf');
+        $response->assertDownload($filename);
         $this->assertStringStartsWith('%PDF', $response->getContent());
     }
 
@@ -96,7 +102,8 @@ class ComparisonReportPdfTest extends TestCase
         $response = $this->actingAs($user)->get(route('reports.compare'));
 
         $response->assertOk();
-        $response->assertSee('Export PDF', false);
+        $response->assertSee('Export', false);
+        $response->assertSee('PDF', false);
     }
 
     public function test_guest_cannot_download_comparison_report_as_pdf(): void

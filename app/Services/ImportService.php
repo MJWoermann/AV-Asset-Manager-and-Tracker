@@ -4,17 +4,27 @@ namespace App\Services;
 
 use App\Enums\AssetStatus;
 use App\Enums\LocationType;
+use App\Imports\AssetImport;
 use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
 use App\Models\CustomFieldDefinition;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
 use App\Models\Location;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Exceptions\NoSheetsFoundException;
+use Maatwebsite\Excel\Exceptions\NoTypeDetectedException;
+use Maatwebsite\Excel\Exceptions\UnreadableFileException;
+use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\HeadingRowImport;
+use PhpOffice\PhpSpreadsheet\Exception as SpreadsheetException;
+use PhpOffice\PhpSpreadsheet\Reader\Exception as SpreadsheetReaderException;
+use Throwable;
 
 class ImportService
 {
@@ -62,6 +72,110 @@ class ImportService
         'quantity' => 'Quantity',
         'notes' => 'Notes',
     ];
+
+    /**
+     * Read the heading row from an uploaded spreadsheet.
+     *
+     * @return list<string>
+     */
+    public function readHeadingColumns(UploadedFile|string $file): array
+    {
+        try {
+            $sheets = Excel::toArray(new HeadingRowImport, $file);
+        } catch (Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => $this->userFacingReadError($e),
+            ]);
+        }
+
+        if (count($sheets) > 1) {
+            throw ValidationException::withMessages([
+                'file' => 'Unable to process files with multiple worksheets. Save each sheet as its own CSV or Excel file and import them one at a time.',
+            ]);
+        }
+
+        $columns = $sheets[0][0] ?? [];
+        if (! is_array($columns)) {
+            $columns = [];
+        }
+
+        $columns = array_values(array_map(
+            fn ($column) => $column === null ? '' : (string) $column,
+            $columns,
+        ));
+
+        $hasHeading = false;
+        foreach ($columns as $column) {
+            if ($column !== '') {
+                $hasHeading = true;
+                break;
+            }
+        }
+
+        if (! $hasHeading) {
+            throw ValidationException::withMessages([
+                'file' => 'Unable to find column headings. Make sure the first row of the file contains column names.',
+            ]);
+        }
+
+        return $columns;
+    }
+
+    /**
+     * Read spreadsheet data rows using the confirmed column mapping headings.
+     *
+     * @return Collection<int, Collection<string, mixed>>
+     */
+    public function readRows(string $absolutePath): Collection
+    {
+        try {
+            $reader = new AssetImport;
+            Excel::import($reader, $absolutePath);
+
+            return $reader->rows;
+        } catch (Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => $this->userFacingReadError($e),
+            ]);
+        }
+    }
+
+    /**
+     * Map spreadsheet library failures to a short explanation for the user.
+     */
+    public function userFacingReadError(Throwable $e): string
+    {
+        if ($e instanceof NoTypeDetectedException) {
+            return 'That file type is not supported or could not be recognised. Upload a CSV or Excel file (.csv, .xlsx, or .xls).';
+        }
+
+        if ($e instanceof UnreadableFileException) {
+            return 'Unable to read that file. It may be corrupted or password-protected.';
+        }
+
+        if ($e instanceof NoSheetsFoundException) {
+            return 'Unable to find any worksheets in that file.';
+        }
+
+        $message = strtolower($e->getMessage());
+
+        if (str_contains($message, 'password') || str_contains($message, 'encrypt')) {
+            return 'Unable to read password-protected files. Remove the password and try again.';
+        }
+
+        if (
+            $e instanceof SpreadsheetReaderException
+            || $e instanceof SpreadsheetException
+            || str_contains($message, 'zip')
+            || str_contains($message, 'ole')
+            || str_contains($message, 'workbook')
+            || str_contains($message, 'worksheet')
+        ) {
+            return 'Unable to process that spreadsheet. Export a single worksheet as CSV or a simple Excel file and try again.';
+        }
+
+        return 'Unable to process that file. Upload a valid CSV or Excel file with a single worksheet.';
+    }
 
     /**
      * Ensure each target field is mapped from at most one source column.
@@ -362,7 +476,7 @@ class ImportService
 
     /**
      * @param  list<array<string, mixed>>  $prepared
-     * @param  array<int|string, string>  $actions  row index => update|replace|skip
+     * @param  array<int|string, string>  $actions  row index => update|replace|skip|create
      * @return array{created: int, updated: int, replaced: int, skipped: int}
      */
     public function commit(array $prepared, array $actions = [], bool $dryRun = false, string $defaultDuplicateAction = 'update'): array
@@ -375,12 +489,26 @@ class ImportService
 
                 if ($existingId) {
                     $action = $actions[$row['index']] ?? $defaultDuplicateAction;
-                    if (! in_array($action, ['update', 'replace', 'skip'], true)) {
+                    if (! in_array($action, ['update', 'replace', 'skip', 'create'], true)) {
                         $action = $defaultDuplicateAction;
                     }
 
                     if ($action === 'skip') {
                         $counts['skipped']++;
+
+                        continue;
+                    }
+
+                    // False match: create a new asset; leave the matched existing asset unchanged.
+                    if ($action === 'create') {
+                        if ($dryRun) {
+                            $counts['created']++;
+
+                            continue;
+                        }
+
+                        $this->applyRow(null, $row, false);
+                        $counts['created']++;
 
                         continue;
                     }

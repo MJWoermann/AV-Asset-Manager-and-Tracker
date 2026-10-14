@@ -10,7 +10,8 @@
                     <x-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">Scan</x-nav-link>
                     <x-nav-link :href="route('assets.index')" :active="request()->routeIs('assets.*')">Assets</x-nav-link>
                     <x-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-nav-link>
-                    <x-nav-link :href="route('reports.compare')" :active="request()->routeIs('reports.*')">Compare</x-nav-link>
+                    <x-nav-link :href="route('reports.compare')" :active="request()->routeIs('reports.compare*')">Compare</x-nav-link>
+                    <x-nav-link :href="route('reports.unknown-scans')" :active="request()->routeIs('reports.unknown-scans*')">Unknown scans</x-nav-link>
                     <x-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">Locations</x-nav-link>
                     @role('admin|inventory_manager')
                         <x-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-nav-link>
@@ -58,7 +59,8 @@
             <x-responsive-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">Scan</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('assets.index')" :active="request()->routeIs('assets.*')">Assets</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('reports.compare')" :active="request()->routeIs('reports.*')">Compare</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('reports.compare')" :active="request()->routeIs('reports.compare*')">Compare</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('reports.unknown-scans')" :active="request()->routeIs('reports.unknown-scans*')">Unknown scans</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">Locations</x-responsive-nav-link>
             @role('admin|inventory_manager')
                 <x-responsive-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-responsive-nav-link>

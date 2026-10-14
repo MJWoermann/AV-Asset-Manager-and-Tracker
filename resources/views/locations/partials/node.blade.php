@@ -18,9 +18,25 @@
 @endphp
 <li class="border-b border-brand-charcoal/25 dark:border-brand-charcoal last:border-b-0">
     <div class="{{ $rowClasses }} px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <span class="font-medium">{{ $location->name }}</span>
-            <span class="text-brand-charcoal dark:text-brand-silver"> — {{ $location->type->label() }}@if($location->is_portable) (portable)@endif</span>
+        <div class="flex items-start gap-3 min-w-0">
+            @role('admin|inventory_manager')
+                <input
+                    type="checkbox"
+                    class="mt-1 rounded border-brand-charcoal/40 shrink-0"
+                    data-bulk-location-id="{{ $location->id }}"
+                    data-bulk-location-name="{{ mb_strtolower(trim($location->name)) }}"
+                    :checked="!!selected[{{ $location->id }}]"
+                    @change="setSelected({{ $location->id }}, $event.target.checked)"
+                    aria-label="Select {{ $location->name }}"
+                >
+            @endrole
+            <div>
+                <span class="font-medium">{{ $location->name }}</span>
+                @if ($location->room_code)
+                    <span class="text-brand-charcoal dark:text-brand-silver"> ({{ $location->room_code }})</span>
+                @endif
+                <span class="text-brand-charcoal dark:text-brand-silver"> — {{ $location->type->label() }}@if($location->is_portable) (portable)@endif</span>
+            </div>
         </div>
         <div class="flex items-center gap-3 shrink-0">
             <a
@@ -29,6 +45,11 @@
             >Assets</a>
             @role('admin|inventory_manager')
                 <a href="{{ route('locations.edit', $location) }}" class="text-sm text-brand">Edit</a>
+                <form method="POST" action="{{ route('locations.destroy', $location) }}" class="inline" onsubmit="return confirm('Delete this location? Child locations become top-level and assets here lose their location.')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="text-sm text-red-700">Delete</button>
+                </form>
             @endrole
         </div>
     </div>

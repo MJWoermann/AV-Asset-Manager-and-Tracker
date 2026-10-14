@@ -48,11 +48,14 @@
                     @endforeach
                 </select>
             </div>
-            <div class="sm:col-span-2 flex flex-wrap gap-2">
+            <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
                 <x-primary-button>Run comparison</x-primary-button>
-                <button name="export" value="xlsx" class="px-4 py-2 border text-sm">Export XLSX</button>
-                <button name="export" value="csv" class="px-4 py-2 border text-sm">Export CSV</button>
-                <button name="export" value="pdf" class="px-4 py-2 border text-sm">Export PDF</button>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-medium text-brand-charcoal dark:text-brand-silver">Export</span>
+                    <button name="export" value="xlsx" class="px-4 py-2 border text-sm">XLSX</button>
+                    <button name="export" value="csv" class="px-4 py-2 border text-sm">CSV</button>
+                    <button name="export" value="pdf" class="px-4 py-2 border text-sm">PDF</button>
+                </div>
             </div>
         </form>
 
