@@ -1,9 +1,43 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
+import cytoscape from 'cytoscape';
+import JsBarcode from 'jsbarcode';
+import QRCode from 'qrcode';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import {
+    Chart,
+    LineController,
+    LineElement,
+    PointElement,
+    LinearScale,
+    TimeScale,
+    CategoryScale,
+    Filler,
+    Legend,
+    Tooltip,
+} from 'chart.js';
+import annotationPlugin from 'chartjs-plugin-annotation';
+import 'chartjs-adapter-date-fns';
+
+Chart.register(
+    LineController,
+    LineElement,
+    PointElement,
+    LinearScale,
+    TimeScale,
+    CategoryScale,
+    Filler,
+    Legend,
+    Tooltip,
+    annotationPlugin
+);
 
 window.Alpine = Alpine;
 window.Html5Qrcode = Html5Qrcode;
+window.cytoscape = cytoscape;
+window.JsBarcode = JsBarcode;
+window.QRCode = QRCode;
+window.Chart = Chart;
 
 const CAMERA_SCAN_FORMATS = [
     Html5QrcodeSupportedFormats.CODE_128,
@@ -122,9 +156,18 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
         this.highlight = -1;
     },
 
+    emitChanged() {
+        const input = this.$el.querySelector('input[type="hidden"]');
+        this.$dispatch('searchable-select-changed', {
+            value: this.value,
+            name: input?.name || '',
+        });
+    },
+
     select(option) {
         this.value = option.value;
         this.closeList();
+        this.emitChanged();
     },
 
     clear() {
@@ -133,6 +176,7 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
         }
         this.value = '';
         this.closeList();
+        this.emitChanged();
     },
 
     onKeydown(event) {
@@ -261,6 +305,557 @@ Alpine.data('importMapper', (columns, initialSelections = {}, requiredFields = [
 
         event.preventDefault();
         return false;
+    },
+}));
+
+Alpine.data('interfaceTemplateForm', (initialTemplates = []) => ({
+    templates: (initialTemplates || []).map((template, index) => ({
+        key: template.id ? `id-${template.id}` : `new-${index}-${Math.random().toString(36).slice(2, 8)}`,
+        id: template.id || null,
+        name: template.name || '',
+        notes: template.notes || '',
+    })),
+
+    addTemplate() {
+        this.templates.push({
+            key: `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: null,
+            name: '',
+            notes: '',
+        });
+    },
+
+    removeTemplate(index) {
+        this.templates.splice(index, 1);
+    },
+}));
+
+Alpine.data('assetRuFields', (config = {}) => ({
+    supportsByType: config.supportsByType || {},
+    itemTypeId: config.initialTypeId === null || config.initialTypeId === undefined
+        ? ''
+        : String(config.initialTypeId),
+    forceShow: Boolean(config.forceShow),
+
+    get showRuFields() {
+        return this.forceShow || Boolean(this.supportsByType[this.itemTypeId]);
+    },
+}));
+
+Alpine.data('assetFormFields', (config = {}) => ({
+    ruSupportsByType: config.ruSupportsByType || {},
+    stockSupportsByType: config.stockSupportsByType || {},
+    itemTypeId: config.initialTypeId === null || config.initialTypeId === undefined
+        ? ''
+        : String(config.initialTypeId),
+    forceShowRu: Boolean(config.forceShowRu),
+    forceShowStock: Boolean(config.forceShowStock),
+    emailMacNotify: Boolean(config.emailMacNotify),
+    macCustomFields: Array.isArray(config.macCustomFields) ? config.macCustomFields : [],
+    macAddress: config.initialMac === null || config.initialMac === undefined
+        ? ''
+        : String(config.initialMac),
+    customMacValues: {},
+
+    get showRuFields() {
+        return this.forceShowRu || Boolean(this.ruSupportsByType[this.itemTypeId]);
+    },
+
+    get showStockFields() {
+        return this.forceShowStock || Boolean(this.stockSupportsByType[this.itemTypeId]);
+    },
+
+    get showMacNotify() {
+        if (!this.emailMacNotify) {
+            return false;
+        }
+
+        if (String(this.macAddress || '').trim() !== '') {
+            return true;
+        }
+
+        const typeId = Number(this.itemTypeId);
+        return this.macCustomFields.some((field) => {
+            const onType = (field.item_type_ids || []).map(Number).includes(typeId);
+            if (!onType) {
+                return false;
+            }
+            const value = this.customMacValues[String(field.id)]
+                ?? document.querySelector(`[name="custom_fields[${field.id}]"]`)?.value
+                ?? '';
+            return String(value).trim() !== '';
+        });
+    },
+}));
+
+Alpine.data('stockPanel', (config = {}) => ({
+    chartPayload: config.chart || {},
+    action: config.initialAction || 'count',
+    selected: null,
+    chart: null,
+
+    get quantityHint() {
+        if (this.action === 'count') {
+            return 'Absolute on-hand quantity after counting';
+        }
+        if (this.action === 'restock') {
+            return 'Units added from a restock / Momentous PO';
+        }
+        if (this.action === 'breakage') {
+            return 'Units removed due to breakage';
+        }
+        return '';
+    },
+
+    init() {
+        const points = this.chartPayload.points || [];
+        if (config.openDetailId) {
+            this.selected = points.find((point) => String(point.id) === String(config.openDetailId)) || null;
+        }
+        this.$nextTick(() => this.mountChart());
+    },
+
+    mountChart() {
+        const canvas = this.$refs.chart;
+        if (!canvas || typeof Chart === 'undefined') {
+            return;
+        }
+
+        const points = this.chartPayload.points || [];
+        const restocks = this.chartPayload.restock_markers || [];
+        const trend = this.chartPayload.trend?.projection || [];
+        const annotations = {};
+
+        if (this.chartPayload.min_line !== null && this.chartPayload.min_line !== undefined) {
+            annotations.minLine = {
+                type: 'line',
+                yMin: this.chartPayload.min_line,
+                yMax: this.chartPayload.min_line,
+                borderColor: '#ef4444',
+                borderWidth: 1,
+                borderDash: [6, 4],
+                label: {
+                    display: true,
+                    content: 'Min',
+                    position: 'start',
+                },
+            };
+        }
+
+        if (this.chartPayload.max_line !== null && this.chartPayload.max_line !== undefined) {
+            annotations.maxLine = {
+                type: 'line',
+                yMin: this.chartPayload.max_line,
+                yMax: this.chartPayload.max_line,
+                borderColor: '#00adb7',
+                borderWidth: 1,
+                borderDash: [6, 4],
+                label: {
+                    display: true,
+                    content: 'Max',
+                    position: 'start',
+                },
+            };
+        }
+
+        this.chart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'On hand',
+                        data: points.map((point) => ({ x: point.x, y: point.y, meta: point })),
+                        borderColor: '#111827',
+                        backgroundColor: 'transparent',
+                        stepped: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0,
+                    },
+                    {
+                        label: 'Restock',
+                        data: restocks.map((point) => ({ x: point.x, y: point.y, meta: point })),
+                        borderColor: '#00adb7',
+                        backgroundColor: '#00adb7',
+                        showLine: false,
+                        pointRadius: 7,
+                        pointStyle: 'triangle',
+                    },
+                    {
+                        label: 'Trend',
+                        data: trend,
+                        borderColor: '#9ca3af',
+                        borderDash: [8, 4],
+                        pointRadius: 0,
+                        tension: 0,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'nearest', intersect: true },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { tooltipFormat: 'yyyy-MM-dd HH:mm' },
+                        ticks: { maxRotation: 0 },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 },
+                    },
+                },
+                plugins: {
+                    legend: { display: true },
+                    annotation: { annotations },
+                    tooltip: {
+                        callbacks: {
+                            label(context) {
+                                const meta = context.raw?.meta;
+                                if (!meta) {
+                                    return `${context.dataset.label}: ${context.parsed.y}`;
+                                }
+                                return `${meta.type_label}: ${meta.quantity_after}`;
+                            },
+                        },
+                    },
+                },
+                onClick: (_event, elements) => {
+                    if (!elements.length) {
+                        return;
+                    }
+                    const element = elements[0];
+                    const raw = this.chart.data.datasets[element.datasetIndex].data[element.index];
+                    if (raw?.meta) {
+                        this.selected = raw.meta;
+                    }
+                },
+            },
+        });
+    },
+}));
+
+Alpine.data('kanbanQr', (url) => ({
+    init() {
+        if (!this.$refs.qr || !url || typeof QRCode === 'undefined') {
+            return;
+        }
+        QRCode.toCanvas(this.$refs.qr, url, {
+            width: 160,
+            margin: 1,
+            color: { dark: '#000000', light: '#ffffff' },
+        }).catch(() => {});
+    },
+}));
+
+Alpine.data('ruVisualiser', (config = {}) => ({
+    capacity: Number(config.capacity) || 0,
+    rearEnabled: Boolean(config.rearEnabled),
+    face: config.initialFace || 'front',
+    placements: Array.isArray(config.placements) ? config.placements : [],
+    childOptions: Array.isArray(config.childOptions) ? config.childOptions : [],
+    storeUrl: config.storeUrl || '',
+    panel: null,
+    editingId: null,
+    confirmParent: Boolean(config.showParentConfirm),
+    pendingParentName: config.pendingParentName || '',
+    form: {
+        face: config.old?.face || config.initialFace || 'front',
+        start_ru: config.old?.start_ru || '',
+        ru_height: config.old?.ru_height || '',
+        kind: config.old?.kind || 'asset',
+        child_asset_id: config.old?.child_asset_id || '',
+        note: config.old?.note || '',
+        confirm_parent_change: Boolean(config.old?.confirm_parent_change),
+    },
+
+    init() {
+        if (!config.openPanel) {
+            return;
+        }
+
+        this.panel = config.openPanel;
+        this.editingId = config.editingId || null;
+        this.face = this.form.face || this.face;
+
+        const placement = this.editingPlacement();
+        const childId = this.form.child_asset_id || placement?.child_asset_id;
+        if (
+            childId &&
+            !this.childOptions.some((option) => String(option.value) === String(childId))
+        ) {
+            this.childOptions = [
+                ...this.childOptions,
+                {
+                    value: String(childId),
+                    label: placement?.child_name || String(childId),
+                    parent_id: String(config.rackId || ''),
+                    parent_name: config.pendingParentName || null,
+                    ru_height: this.form.ru_height || placement?.ru_height || 1,
+                },
+            ];
+        }
+    },
+
+    get facePlacements() {
+        return this.placements
+            .filter((placement) => placement.face === this.face)
+            .slice()
+            .sort((a, b) => b.start_ru - a.start_ru);
+    },
+
+    get rows() {
+        const occupied = {};
+        this.facePlacements.forEach((placement) => {
+            const start = Number(placement.start_ru);
+            const height = Number(placement.ru_height);
+            for (let ru = start; ru < start + height; ru += 1) {
+                occupied[ru] = placement;
+            }
+        });
+
+        const rows = [];
+        for (let ru = this.capacity; ru >= 1; ru -= 1) {
+            const placement = occupied[ru] || null;
+            const isStart = placement && Number(placement.start_ru) + Number(placement.ru_height) - 1 === ru;
+            rows.push({
+                ru,
+                placement,
+                isStart,
+                span: isStart ? Number(placement.ru_height) : 0,
+                occupied: Boolean(placement),
+            });
+        }
+
+        return rows;
+    },
+
+    placementLabel(placement) {
+        if (!placement) {
+            return '';
+        }
+        if (placement.kind === 'note') {
+            return placement.note || 'Note';
+        }
+        return placement.child_name || 'Asset';
+    },
+
+    selectedChild() {
+        return this.childOptions.find((option) => String(option.value) === String(this.form.child_asset_id));
+    },
+
+    onChildSelected(value) {
+        this.form.child_asset_id = value;
+        const child = this.selectedChild();
+        if (child && (!this.form.ru_height || this.panel === 'add')) {
+            this.form.ru_height = child.ru_height || 1;
+        }
+    },
+
+    openAdd(ru = null) {
+        this.panel = 'add';
+        this.editingId = null;
+        this.confirmParent = false;
+        this.form = {
+            face: this.face,
+            start_ru: ru || '',
+            ru_height: 1,
+            kind: 'asset',
+            child_asset_id: '',
+            note: '',
+            confirm_parent_change: false,
+        };
+    },
+
+    openAddForChild(childId, ruHeight = 1) {
+        this.openAdd();
+        this.form.kind = 'asset';
+        this.form.child_asset_id = String(childId);
+        this.form.ru_height = ruHeight || 1;
+    },
+
+    openEdit(placement) {
+        this.panel = 'edit';
+        this.editingId = placement.id;
+        this.confirmParent = false;
+        this.face = placement.face;
+        this.form = {
+            face: placement.face,
+            start_ru: placement.start_ru,
+            ru_height: placement.ru_height,
+            kind: placement.kind,
+            child_asset_id: placement.child_asset_id || '',
+            note: placement.note || '',
+            confirm_parent_change: false,
+        };
+
+        if (
+            placement.child_asset_id &&
+            !this.childOptions.some((option) => String(option.value) === String(placement.child_asset_id))
+        ) {
+            this.childOptions = [
+                ...this.childOptions,
+                {
+                    value: String(placement.child_asset_id),
+                    label: placement.child_name || String(placement.child_asset_id),
+                    parent_id: String(config.rackId || ''),
+                    parent_name: null,
+                    ru_height: placement.ru_height,
+                },
+            ];
+        }
+    },
+
+    closePanel() {
+        this.panel = null;
+        this.editingId = null;
+        this.confirmParent = false;
+    },
+
+    editingPlacement() {
+        return this.placements.find((placement) => placement.id === this.editingId) || null;
+    },
+
+    needsParentConfirm() {
+        if (this.form.kind !== 'asset' || !this.form.child_asset_id) {
+            return false;
+        }
+        const child = this.selectedChild();
+        if (!child || !child.parent_id) {
+            return false;
+        }
+        return String(child.parent_id) !== String(config.rackId || '');
+    },
+
+    prepareSubmit(event) {
+        if (this.form.confirm_parent_change) {
+            return true;
+        }
+
+        if (this.needsParentConfirm()) {
+            event.preventDefault();
+            const child = this.selectedChild();
+            this.pendingParentName = child?.parent_name || 'another asset';
+            this.confirmParent = true;
+            return false;
+        }
+
+        return true;
+    },
+
+    confirmAndSubmit() {
+        this.form.confirm_parent_change = true;
+        this.confirmParent = false;
+        this.$nextTick(() => {
+            this.$refs.placementForm?.requestSubmit();
+        });
+    },
+}));
+
+Alpine.data('assetConnectionsForm', (config = {}) => ({
+    peerAssetId: '',
+    peerInterfaceId: '',
+    peerInterfaces: [],
+    peerLoading: false,
+    connectionTypeId: '',
+    allowsProtocolByType: config.allowsProtocolByType || {},
+    peerInterfacesUrl: config.peerInterfacesUrl || '',
+
+    get needsProtocol() {
+        return Boolean(this.allowsProtocolByType[String(this.connectionTypeId)]);
+    },
+
+    async loadPeerInterfaces() {
+        this.peerInterfaces = [];
+        this.peerInterfaceId = '';
+
+        if (!this.peerAssetId || !this.peerInterfacesUrl) {
+            return;
+        }
+
+        this.peerLoading = true;
+        const url = this.peerInterfacesUrl.replace('__PEER__', encodeURIComponent(this.peerAssetId));
+
+        try {
+            const res = await fetch(url, { headers: { Accept: 'application/json' } });
+            const data = await res.json().catch(() => ({}));
+            this.peerInterfaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+        } catch (_) {
+            this.peerInterfaces = [];
+        } finally {
+            this.peerLoading = false;
+        }
+    },
+}));
+
+Alpine.data('connectionMap', (graph = { nodes: [], edges: [] }) => ({
+    selection: null,
+    cy: null,
+
+    init() {
+        const elements = [...(graph.nodes || []), ...(graph.edges || [])];
+
+        this.cy = cytoscape({
+            container: this.$refs.cy,
+            elements,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        label: 'data(label)',
+                        'background-color': '#00adb7',
+                        color: '#111827',
+                        'text-valign': 'bottom',
+                        'text-halign': 'center',
+                        'font-size': 10,
+                        'text-margin-y': 6,
+                        width: 28,
+                        height: 28,
+                    },
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        width: 3,
+                        'line-color': 'data(color)',
+                        'target-arrow-color': 'data(color)',
+                        'curve-style': 'bezier',
+                        label: 'data(label)',
+                        'font-size': 9,
+                        color: '#4b5563',
+                        'text-rotation': 'autorotate',
+                    },
+                },
+            ],
+            layout: {
+                name: elements.length > 40 ? 'cose' : 'circle',
+                animate: false,
+                padding: 24,
+            },
+        });
+
+        this.cy.on('tap', 'node', (event) => {
+            const data = event.target.data();
+            this.selection = {
+                kind: 'node',
+                ...data,
+            };
+        });
+
+        this.cy.on('tap', 'edge', (event) => {
+            const data = event.target.data();
+            this.selection = {
+                kind: 'edge',
+                ...data,
+            };
+        });
+
+        this.cy.on('tap', (event) => {
+            if (event.target === this.cy) {
+                this.selection = null;
+            }
+        });
     },
 }));
 
@@ -605,6 +1200,296 @@ Alpine.data('bulkLocations', () => ({
         }
 
         return true;
+    },
+}));
+
+Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) => ({
+    name: initial.name || '',
+    paperPreset: initial.paper_preset || 'continuous_62',
+    widthMm: Number(initial.width_mm) || 62,
+    heightMm: Number(initial.height_mm) || 40,
+    orientation: initial.orientation || 'portrait',
+    elements: Array.isArray(initial.elements) ? initial.elements.map((el) => ({
+        ...el,
+        props: { ...(el.props || {}) },
+    })) : [],
+    logoUrl: initial.logo_url || null,
+    presets,
+    fieldOptions,
+    selectedId: null,
+    scale: 4,
+    drag: null,
+    resize: null,
+
+    get selected() {
+        return this.elements.find((el) => el.id === this.selectedId) || null;
+    },
+
+    get sortedElements() {
+        return [...this.elements].sort((a, b) => (a.z || 0) - (b.z || 0));
+    },
+
+    get elementsJson() {
+        return JSON.stringify(this.elements);
+    },
+
+    get presetNotes() {
+        return this.presets[this.paperPreset]?.notes || '';
+    },
+
+    get canvasStyle() {
+        return {
+            width: `${this.widthMm * this.scale}px`,
+            height: `${this.heightMm * this.scale}px`,
+        };
+    },
+
+    syncElementsJson() {
+        if (this.$refs.elementsInput) {
+            this.$refs.elementsInput.value = this.elementsJson;
+        }
+    },
+
+    onPresetChange() {
+        const preset = this.presets[this.paperPreset];
+        if (!preset) {
+            return;
+        }
+        this.widthMm = Number(preset.width_mm) || this.widthMm;
+        if (!preset.continuous && preset.height_mm) {
+            this.heightMm = Number(preset.height_mm);
+        }
+    },
+
+    newId() {
+        return `el-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    },
+
+    addElement(type) {
+        const defaults = {
+            text: { width: 40, height: 8, props: { content: 'Text', fontSize: 11, fontWeight: 'normal', align: 'left', color: '#000000' } },
+            field: { width: 40, height: 8, props: { fieldKey: 'name', fontSize: 11, fontWeight: 'normal', align: 'left', color: '#000000' } },
+            barcode: { width: 50, height: 16, props: { fieldKey: 'tp_barcode', symbology: 'code128', showText: true } },
+            qr: { width: 20, height: 20, props: { fieldKey: 'tp_barcode', content: '', ecc: 'M' } },
+            rect: { width: 20, height: 10, props: { stroke: '#000000', fill: 'transparent' } },
+            line: { width: 40, height: 2, props: { stroke: '#000000' } },
+            logo: { width: 20, height: 12, props: {} },
+        };
+        const base = defaults[type] || { width: 20, height: 10, props: {} };
+        const el = {
+            id: this.newId(),
+            type,
+            x: 2,
+            y: 2,
+            width: base.width,
+            height: base.height,
+            rotation: 0,
+            z: this.elements.length + 1,
+            props: { ...base.props },
+        };
+        this.elements.push(el);
+        this.selectedId = el.id;
+        this.$nextTick(() => {
+            if (type === 'barcode') {
+                const node = this.$el.querySelector(`[data-el-id="${el.id}"] svg`);
+                if (node) this.renderBarcode(el, node);
+            }
+            if (type === 'qr') {
+                const node = this.$el.querySelector(`[data-el-id="${el.id}"] canvas`);
+                if (node) this.renderQr(el, node);
+            }
+        });
+    },
+
+    removeSelected() {
+        if (!this.selectedId) {
+            return;
+        }
+        this.elements = this.elements.filter((el) => el.id !== this.selectedId);
+        this.selectedId = null;
+    },
+
+    nudgeZ(delta) {
+        if (!this.selected) {
+            return;
+        }
+        this.selected.z = Math.max(0, (this.selected.z || 0) + delta);
+    },
+
+    elementStyle(el) {
+        return {
+            left: `${el.x * this.scale}px`,
+            top: `${el.y * this.scale}px`,
+            width: `${el.width * this.scale}px`,
+            height: `${el.height * this.scale}px`,
+            zIndex: el.z || 0,
+            transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+        };
+    },
+
+    elementInnerStyle(el) {
+        if (el.type !== 'text' && el.type !== 'field') {
+            return {};
+        }
+        return {
+            fontSize: `${el.props.fontSize || 11}px`,
+            fontWeight: el.props.fontWeight || 'normal',
+            textAlign: el.props.align || 'left',
+            color: el.props.color || '#000000',
+            lineHeight: '1.1',
+        };
+    },
+
+    rectStyle(el) {
+        return {
+            border: `1px solid ${el.props.stroke || '#000000'}`,
+            background: el.props.fill || 'transparent',
+        };
+    },
+
+    lineStyle(el) {
+        return {
+            borderTop: `2px solid ${el.props.stroke || '#000000'}`,
+            marginTop: `${Math.max(0, (el.height * this.scale) / 2 - 1)}px`,
+        };
+    },
+
+    previewText(el) {
+        if (el.type === 'text') {
+            return el.props.content || 'Text';
+        }
+        const key = el.props.fieldKey || 'field';
+        return `{${key}}`;
+    },
+
+    renderBarcode(el, node) {
+        if (!node || !window.JsBarcode) {
+            return;
+        }
+        try {
+            node.innerHTML = '';
+            JsBarcode(node, el.props.fieldKey || 'SAMPLE', {
+                format: el.props.symbology === 'code39' ? 'CODE39' : 'CODE128',
+                displayValue: Boolean(el.props.showText),
+                margin: 0,
+                width: 1.5,
+                height: Math.max(20, el.height * this.scale - (el.props.showText ? 14 : 0)),
+                fontSize: 10,
+            });
+        } catch (_) {}
+    },
+
+    async renderQr(el, node) {
+        if (!node || !window.QRCode) {
+            return;
+        }
+        try {
+            await QRCode.toCanvas(node, el.props.fieldKey || el.props.content || 'SAMPLE', {
+                width: Math.max(16, Math.floor(Math.min(el.width, el.height) * this.scale)),
+                margin: 0,
+            });
+        } catch (_) {}
+    },
+
+    startDrag(event, el) {
+        this.selectedId = el.id;
+        this.drag = {
+            id: el.id,
+            startX: event.clientX,
+            startY: event.clientY,
+            origX: el.x,
+            origY: el.y,
+        };
+        el._pointerId = event.pointerId;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        const onMove = (e) => this.onPointerMove(e);
+        const onUp = (e) => {
+            this.drag = null;
+            this.resize = null;
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+    },
+
+    startResize(event, el) {
+        this.selectedId = el.id;
+        this.resize = {
+            id: el.id,
+            startX: event.clientX,
+            startY: event.clientY,
+            origW: el.width,
+            origH: el.height,
+        };
+        const onMove = (e) => this.onPointerMove(e);
+        const onUp = () => {
+            this.drag = null;
+            this.resize = null;
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+    },
+
+    onPointerMove(event) {
+        const snap = (value) => Math.round(value * 2) / 2;
+        if (this.drag) {
+            const el = this.elements.find((item) => item.id === this.drag.id);
+            if (!el) return;
+            const dx = (event.clientX - this.drag.startX) / this.scale;
+            const dy = (event.clientY - this.drag.startY) / this.scale;
+            el.x = snap(Math.max(0, this.drag.origX + dx));
+            el.y = snap(Math.max(0, this.drag.origY + dy));
+        }
+        if (this.resize) {
+            const el = this.elements.find((item) => item.id === this.resize.id);
+            if (!el) return;
+            const dx = (event.clientX - this.resize.startX) / this.scale;
+            const dy = (event.clientY - this.resize.startY) / this.scale;
+            el.width = snap(Math.max(2, this.resize.origW + dx));
+            el.height = snap(Math.max(2, this.resize.origH + dy));
+        }
+    },
+}));
+
+Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, logoUrl = null) => ({
+    labels,
+    widthMm,
+    heightMm,
+    logoUrl,
+
+    renderAll() {
+        this.$nextTick(() => {
+            this.$el.querySelectorAll('.shelf-tag-barcode').forEach((node) => {
+                const value = node.getAttribute('data-value') || '';
+                if (!value || !window.JsBarcode) {
+                    return;
+                }
+                try {
+                    JsBarcode(node, value, {
+                        format: node.getAttribute('data-symbology') === 'code39' ? 'CODE39' : 'CODE128',
+                        displayValue: node.getAttribute('data-show-text') === '1',
+                        margin: 0,
+                        width: 1.4,
+                        height: 40,
+                        fontSize: 10,
+                    });
+                } catch (_) {}
+            });
+
+            this.$el.querySelectorAll('.shelf-tag-qr').forEach(async (node) => {
+                const value = node.getAttribute('data-value') || '';
+                if (!value || !window.QRCode) {
+                    return;
+                }
+                try {
+                    const size = Math.max(32, Math.min(node.clientWidth || 64, node.clientHeight || 64));
+                    await QRCode.toCanvas(node, value, { width: size, margin: 0 });
+                } catch (_) {}
+            });
+        });
     },
 }));
 

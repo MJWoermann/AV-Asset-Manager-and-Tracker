@@ -9,6 +9,7 @@ enum FileCategory: string
     case Photo = 'photo';
     case Floorplan = 'floorplan';
     case Invoice = 'invoice';
+    case Maintenance = 'maintenance';
     case Other = 'other';
 
     public function label(): string
@@ -19,6 +20,7 @@ enum FileCategory: string
             self::Photo => 'Photo',
             self::Floorplan => 'Floorplan',
             self::Invoice => 'Invoice',
+            self::Maintenance => 'Maintenance',
             self::Other => 'Other',
         };
     }

@@ -4,6 +4,14 @@ return [
 
     'disk' => env('ATTACHMENTS_DISK', 'local'),
 
+    'backup_disk' => env('BACKUP_DISK'),
+
+    'allowed_disks' => [
+        'local',
+        'qnap',
+        'sharepoint',
+    ],
+
     'max_kilobytes' => 25600,
 
     'allowed_mimes' => [

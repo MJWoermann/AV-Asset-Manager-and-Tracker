@@ -8,11 +8,18 @@
     "require": {
         "php": "^8.5",
         "barryvdh/laravel-dompdf": "^3.1",
+        "endroid/qr-code": "^6.1",
         "laravel/breeze": "^2.4",
         "laravel/framework": "^13.17",
         "laravel/sanctum": "^4.0",
+        "laravel/socialite": "^5.24",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.29",
+        "league/flysystem-sftp-v3": "^3.29",
         "maatwebsite/excel": "^4.0",
+        "picqer/php-barcode-generator": "^3.3",
+        "sahablibya/laravel-sharepoint-filesystem": "^1.4",
+        "socialiteproviders/microsoft-azure": "^5.2",
         "spatie/laravel-permission": "^8.3"
     },
     "require-dev": {

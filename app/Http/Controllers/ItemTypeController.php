@@ -6,6 +6,7 @@ use App\Http\Requests\DeleteItemTypeRequest;
 use App\Models\Asset;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
+use App\Services\AssetInterfaceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,31 +30,41 @@ class ItemTypeController extends Controller
             'replacementTypes' => collect(),
             'assetCount' => 0,
             'fileRows' => [],
+            'interfaceTemplates' => [],
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AssetInterfaceService $interfaces): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:item_types,name'],
-            'description' => ['nullable', 'string'],
-            'field_sets' => ['nullable', 'array'],
-            'field_sets.*' => ['exists:custom_field_sets,id'],
-        ]);
+        $data = $this->validatedItemType($request);
 
-        $itemType = ItemType::create([
+        $attributes = [
             'name' => $data['name'],
             'slug' => Str::slug($data['name']),
             'description' => $data['description'] ?? null,
-        ]);
+        ];
+
+        if ($request->user()?->hasDeveloperFeature('ru_visualiser')) {
+            $attributes['supports_ru_visualiser'] = (bool) ($data['supports_ru_visualiser'] ?? false);
+        }
+
+        if ($request->user()?->hasDeveloperFeature('stock_consumables')) {
+            $attributes['supports_stock_tracking'] = (bool) ($data['supports_stock_tracking'] ?? false);
+        }
+
+        $itemType = ItemType::create($attributes);
         $itemType->fieldSets()->sync($data['field_sets'] ?? []);
+
+        if ($request->user()?->hasFeature('asset_connections')) {
+            $interfaces->syncTemplates($itemType, $data['interface_templates'] ?? []);
+        }
 
         return redirect()->route('item-types.index')->with('status', 'Item type created.');
     }
 
     public function edit(ItemType $itemType): View
     {
-        $itemType->load(['fieldSets', 'files']);
+        $itemType->load(['fieldSets', 'files', 'interfaceTemplates']);
 
         $fileRows = $itemType->files->map(fn ($file): array => [
             'file' => $file,
@@ -61,6 +72,15 @@ class ItemTypeController extends Controller
             'link_id' => (int) $file->pivot->id,
             'note' => $file->pivot->note,
         ])->all();
+
+        $interfaceTemplates = old('interface_templates');
+        if ($interfaceTemplates === null) {
+            $interfaceTemplates = $itemType->interfaceTemplates->map(fn ($template) => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'notes' => $template->notes,
+            ])->values()->all();
+        }
 
         return view('item-types.form', [
             'itemType' => $itemType,
@@ -71,26 +91,92 @@ class ItemTypeController extends Controller
                 ->get(['id', 'name']),
             'assetCount' => $itemType->assets()->count(),
             'fileRows' => $fileRows,
+            'interfaceTemplates' => $interfaceTemplates,
         ]);
     }
 
-    public function update(Request $request, ItemType $itemType): RedirectResponse
+    public function update(Request $request, ItemType $itemType, AssetInterfaceService $interfaces): RedirectResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:item_types,name,'.$itemType->id],
-            'description' => ['nullable', 'string'],
-            'field_sets' => ['nullable', 'array'],
-            'field_sets.*' => ['exists:custom_field_sets,id'],
-        ]);
+        $data = $this->validatedItemType($request, $itemType);
 
-        $itemType->update([
+        $attributes = [
             'name' => $data['name'],
             'slug' => Str::slug($data['name']),
             'description' => $data['description'] ?? null,
-        ]);
+        ];
+
+        if ($request->user()?->hasDeveloperFeature('ru_visualiser')) {
+            $attributes['supports_ru_visualiser'] = (bool) ($data['supports_ru_visualiser'] ?? false);
+        }
+
+        if ($request->user()?->hasDeveloperFeature('stock_consumables')) {
+            $attributes['supports_stock_tracking'] = (bool) ($data['supports_stock_tracking'] ?? false);
+        }
+
+        $itemType->update($attributes);
         $itemType->fieldSets()->sync($data['field_sets'] ?? []);
 
+        if ($request->user()?->hasFeature('asset_connections')) {
+            $interfaces->syncTemplates($itemType, $data['interface_templates'] ?? []);
+        }
+
         return redirect()->route('item-types.index')->with('status', 'Item type updated.');
+    }
+
+    public function syncMissingInterfaces(ItemType $itemType, AssetInterfaceService $interfaces): RedirectResponse
+    {
+        $created = $interfaces->syncMissingForItemType($itemType);
+
+        return redirect()
+            ->route('item-types.edit', $itemType)
+            ->with('status', $created === 0
+                ? 'No missing interfaces to sync.'
+                : "Synced {$created} missing interface".($created === 1 ? '' : 's').' onto existing assets.');
+    }
+
+    /** @return array<string, mixed> */
+    protected function validatedItemType(Request $request, ?ItemType $itemType = null): array
+    {
+        $nameRule = ['required', 'string', 'max:255', 'unique:item_types,name'];
+        if ($itemType) {
+            $nameRule = ['required', 'string', 'max:255', 'unique:item_types,name,'.$itemType->id];
+        }
+
+        if ($request->has('supports_ru_visualiser')) {
+            $request->merge([
+                'supports_ru_visualiser' => $request->boolean('supports_ru_visualiser'),
+            ]);
+        }
+
+        if ($request->has('supports_stock_tracking')) {
+            $request->merge([
+                'supports_stock_tracking' => $request->boolean('supports_stock_tracking'),
+            ]);
+        }
+
+        $rules = [
+            'name' => $nameRule,
+            'description' => ['nullable', 'string'],
+            'field_sets' => ['nullable', 'array'],
+            'field_sets.*' => ['exists:custom_field_sets,id'],
+        ];
+
+        if ($request->user()?->hasDeveloperFeature('ru_visualiser')) {
+            $rules['supports_ru_visualiser'] = ['sometimes', 'boolean'];
+        }
+
+        if ($request->user()?->hasDeveloperFeature('stock_consumables')) {
+            $rules['supports_stock_tracking'] = ['sometimes', 'boolean'];
+        }
+
+        if ($request->user()?->hasFeature('asset_connections')) {
+            $rules['interface_templates'] = ['nullable', 'array'];
+            $rules['interface_templates.*.id'] = ['nullable', 'integer'];
+            $rules['interface_templates.*.name'] = ['nullable', 'string', 'max:255'];
+            $rules['interface_templates.*.notes'] = ['nullable', 'string'];
+        }
+
+        return $request->validate($rules);
     }
 
     public function destroy(DeleteItemTypeRequest $request, ItemType $itemType): RedirectResponse

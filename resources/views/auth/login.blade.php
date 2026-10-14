@@ -2,6 +2,36 @@
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
+    @if(($sso['google'] ?? false) || ($sso['azure'] ?? false))
+        <div class="mb-6 space-y-3">
+            @if($sso['google'] ?? false)
+                <a
+                    href="{{ route('auth.social.redirect', ['provider' => 'google']) }}"
+                    class="flex w-full items-center justify-center gap-2 rounded-md border border-brand-charcoal/30 bg-white px-4 py-2 text-sm font-medium text-brand-charcoal hover:bg-brand-charcoal/5 dark:border-brand-silver/30 dark:bg-brand-slate dark:text-brand-silver dark:hover:bg-brand-charcoal"
+                >
+                    Continue with Google
+                </a>
+            @endif
+            @if($sso['azure'] ?? false)
+                <a
+                    href="{{ route('auth.social.redirect', ['provider' => 'azure']) }}"
+                    class="flex w-full items-center justify-center gap-2 rounded-md border border-brand-charcoal/30 bg-white px-4 py-2 text-sm font-medium text-brand-charcoal hover:bg-brand-charcoal/5 dark:border-brand-silver/30 dark:bg-brand-slate dark:text-brand-silver dark:hover:bg-brand-charcoal"
+                >
+                    Continue with Microsoft
+                </a>
+            @endif
+        </div>
+
+        <div class="relative mb-6">
+            <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                <div class="w-full border-t border-brand-charcoal/20 dark:border-brand-silver/20"></div>
+            </div>
+            <div class="relative flex justify-center text-xs uppercase">
+                <span class="bg-white px-2 text-brand-charcoal dark:bg-brand-charcoal dark:text-brand-silver">Or sign in with password</span>
+            </div>
+        </div>
+    @endif
+
     <form method="POST" action="{{ route('login') }}">
         @csrf
 

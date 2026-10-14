@@ -16,7 +16,7 @@ class LinkFileRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'linkable_type' => ['required', Rule::in(['asset', 'location', 'item_type'])],
+            'linkable_type' => ['required', Rule::in(['asset', 'location', 'item_type', 'maintenance_log'])],
             'linkable_id' => ['required', 'integer'],
             'note' => ['nullable', 'string', 'max:255'],
         ];

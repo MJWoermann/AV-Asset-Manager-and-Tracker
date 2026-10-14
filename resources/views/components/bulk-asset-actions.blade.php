@@ -23,6 +23,19 @@
         </p>
         <div class="flex flex-wrap gap-2">
             <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="panelOpen = !panelOpen" x-text="panelOpen ? 'Hide bulk edit' : 'Bulk edit'"></button>
+            @feature('shelf_tag_generator')
+                @role('admin|inventory_manager')
+                    @if($currentList)
+                        <form method="GET" action="{{ route('shelf-tags.print.create') }}" class="inline">
+                            <input type="hidden" name="asset_list_id" value="{{ $currentList->id }}">
+                            <template x-for="id in selectedIds" :key="'shelf-'+id">
+                                <input type="hidden" name="asset_ids[]" :value="id">
+                            </template>
+                            <button type="submit" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver">Shelf tags</button>
+                        </form>
+                    @endif
+                @endrole
+            @endfeature
             <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="clearSelection()">Clear</button>
             @if($canDelete)
                 <button type="button" class="px-3 py-2 text-sm bg-red-700 text-white" @click="openDeleteConfirm()">Delete selected</button>

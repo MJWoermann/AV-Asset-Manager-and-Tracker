@@ -35,4 +35,27 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
+    ],
+
+    'azure' => [
+        'client_id' => env('AZURE_CLIENT_ID'),
+        'client_secret' => env('AZURE_CLIENT_SECRET'),
+        'redirect' => env('AZURE_REDIRECT_URI', '/auth/azure/callback'),
+        'tenant' => env('AZURE_TENANT_ID'),
+    ],
+
+    /*
+    | Microsoft Graph (email integration). Prefer dedicated keys so SSO scopes
+    | stay separate from Mail.Send / Mail.Read application permissions.
+    */
+    'microsoft_graph' => [
+        'client_id' => env('MICROSOFT_GRAPH_CLIENT_ID'),
+        'client_secret' => env('MICROSOFT_GRAPH_CLIENT_SECRET'),
+        'tenant_id' => env('MICROSOFT_GRAPH_TENANT_ID'),
+    ],
+
 ];

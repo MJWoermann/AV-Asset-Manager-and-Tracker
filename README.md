@@ -47,9 +47,13 @@ php artisan optimize:clear   # or config/route/view cache in production — see 
 
 Production upgrade (one command): `sudo bash scripts/update.sh` — see [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md) §7 Updates.
 
+## Features and usage
+
+Staff-oriented overview of use cases, roles, and day-to-day workflows: [docs/features-and-usage.md](docs/features-and-usage.md).
+
 ## Production (Ubuntu + Nginx)
 
-See [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md).
+See [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md). Production hardening and security review notes: [docs/security-hardening.md](docs/security-hardening.md).
 
 ## Roles
 
@@ -63,6 +67,14 @@ See [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md).
 
 Bearer tokens via Sanctum. See [docs/api.md](docs/api.md).
 
+## Single sign-on (optional)
+
+Google Workspace and Microsoft Entra (single-tenant) OAuth for existing users. See [docs/sso-setup.md](docs/sso-setup.md).
+
+## Email integration (optional)
+
+Developer-flagged Gmail / Outlook Graph / SMTP notifications for MAC onboarding and maintenance events, plus inbound helpdesk reply logging. See [docs/email-setup.md](docs/email-setup.md). Requires `schedule:run` (and optionally `queue:work`) in production.
+
 ```bash
 curl -X POST /api/auth/token \
   -H "Accept: application/json" \
@@ -74,9 +86,11 @@ curl -X POST /api/auth/token \
 - [CLAUDE.md](CLAUDE.md) — conventions for Claude Code
 - [.cursor/rules/](.cursor/rules/) — Cursor project rules
 
-## Deferred (Phase 2+)
+## Preview features and deferred work
 
-Guest QR invitations, RU slot visualiser, maintenance records with files, manuals/photos gallery, Microsoft 365 SSO, offline scan sync.
+Connections, RU visualiser, shelf tags, and stock/consumables ship as opt-in **Developer features** on each user’s Profile (see [features and usage](docs/features-and-usage.md)). Optional Google / Microsoft Entra SSO: [docs/sso-setup.md](docs/sso-setup.md).
+
+Still deferred: offline scan sync.
 
 ## Licence
 

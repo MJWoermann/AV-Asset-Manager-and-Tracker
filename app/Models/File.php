@@ -71,6 +71,20 @@ class File extends Model
             ->withTimestamps();
     }
 
+    public function stockMovements(): MorphToMany
+    {
+        return $this->morphedByMany(StockMovement::class, 'linkable', 'file_links')
+            ->withPivot(['id', 'note'])
+            ->withTimestamps();
+    }
+
+    public function maintenanceLogs(): MorphToMany
+    {
+        return $this->morphedByMany(AssetMaintenanceLog::class, 'linkable', 'file_links')
+            ->withPivot(['id', 'note'])
+            ->withTimestamps();
+    }
+
     public function isUpload(): bool
     {
         return $this->source_type === FileSourceType::Upload;

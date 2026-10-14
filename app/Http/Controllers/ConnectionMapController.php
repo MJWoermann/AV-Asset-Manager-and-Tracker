@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\ConnectionType;
+use App\Models\ItemType;
+use App\Models\Location;
+use App\Services\AssetConnectionService;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class ConnectionMapController extends Controller
+{
+    public function index(Request $request, AssetConnectionService $connections): View
+    {
+        $filters = [
+            'connection_type_ids' => array_values(array_filter(
+                (array) $request->input('connection_type_ids', []),
+                fn ($id) => $id !== null && $id !== ''
+            )),
+            'location_id' => $request->input('location_id'),
+            'item_type_id' => $request->input('item_type_id'),
+            'search' => $request->string('search')->toString(),
+        ];
+
+        $graph = $connections->buildGraph($filters);
+
+        return view('reports.connection-map', [
+            'graph' => $graph,
+            'filters' => $filters,
+            'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
+            'locations' => Location::query()->orderBy('name')->get(['id', 'name']),
+            'itemTypes' => ItemType::query()->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+}

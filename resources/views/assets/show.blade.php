@@ -29,6 +29,44 @@
             >
                 Files
             </a>
+            @if($connectionsEnabled ?? false)
+                <a
+                    href="{{ route('assets.show', [$asset, 'tab' => 'connections']) }}"
+                    role="tab"
+                    aria-selected="{{ $tab === 'connections' ? 'true' : 'false' }}"
+                    class="px-4 py-2 text-sm border-b-2 -mb-px {{ $tab === 'connections' ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white' }}"
+                >
+                    Connections
+                </a>
+            @endif
+            @if($ruVisualiserEnabled ?? false)
+                <a
+                    href="{{ route('assets.show', [$asset, 'tab' => 'rack']) }}"
+                    role="tab"
+                    aria-selected="{{ $tab === 'rack' ? 'true' : 'false' }}"
+                    class="px-4 py-2 text-sm border-b-2 -mb-px {{ $tab === 'rack' ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white' }}"
+                >
+                    Rack
+                </a>
+            @endif
+            @if($stockEnabled ?? false)
+                <a
+                    href="{{ route('assets.show', [$asset, 'tab' => 'stock']) }}"
+                    role="tab"
+                    aria-selected="{{ $tab === 'stock' ? 'true' : 'false' }}"
+                    class="px-4 py-2 text-sm border-b-2 -mb-px {{ $tab === 'stock' ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white' }}"
+                >
+                    Stock
+                </a>
+            @endif
+            <a
+                href="{{ route('assets.show', [$asset, 'tab' => 'maintenance']) }}"
+                role="tab"
+                aria-selected="{{ $tab === 'maintenance' ? 'true' : 'false' }}"
+                class="px-4 py-2 text-sm border-b-2 -mb-px {{ $tab === 'maintenance' ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white' }}"
+            >
+                Maintenance
+            </a>
             <a
                 href="{{ route('assets.show', [$asset, 'tab' => 'history']) }}"
                 role="tab"
@@ -39,13 +77,43 @@
             </a>
         </div>
 
-        @if($tab === 'files')
+        @if($tab === 'rack')
+            @include('assets.partials.rack', [
+                'asset' => $asset,
+                'ruPlacementsPayload' => $ruPlacementsPayload ?? [],
+                'ruChildAssetOptions' => $ruChildAssetOptions ?? [],
+                'ruUnplacedChildren' => $ruUnplacedChildren ?? collect(),
+            ])
+        @elseif($tab === 'stock')
+            @include('assets.partials.stock', [
+                'asset' => $asset,
+                'stockChartPayload' => $stockChartPayload ?? [],
+                'stockTokens' => $stockTokens ?? collect(),
+                'stockReorderMeta' => $stockReorderMeta ?? [],
+                'stockAction' => $stockAction ?? null,
+            ])
+        @elseif($tab === 'connections')
+            @include('assets.partials.connections', [
+                'asset' => $asset,
+                'connectionPeers' => $connectionPeers ?? collect(),
+                'connectionTypes' => $connectionTypes ?? collect(),
+                'peerAssetOptions' => $peerAssetOptions ?? [],
+            ])
+        @elseif($tab === 'files')
             <x-file-attachments
                 linkable-type="asset"
                 :linkable-id="$asset->id"
                 :rows="$fileRows"
                 :can-mutate="true"
             />
+        @elseif($tab === 'maintenance')
+            @include('assets.partials.maintenance', [
+                'asset' => $asset,
+                'maintenanceLogs' => $maintenanceLogs ?? collect(),
+                'maintenanceLogTypes' => $maintenanceLogTypes ?? [],
+                'maintenanceStatuses' => $maintenanceStatuses ?? [],
+                'canDeleteMaintenanceLogs' => $canDeleteMaintenanceLogs ?? false,
+            ])
         @elseif($tab === 'history')
             <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
                 <table class="min-w-full text-sm">

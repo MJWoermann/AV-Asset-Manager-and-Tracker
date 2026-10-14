@@ -78,11 +78,15 @@ class FileController extends Controller
         $linkable = $this->linkableFromRequest($data['linkable_type'] ?? null, $data['linkable_id'] ?? null);
         $this->authorizeMutate($linkable);
 
-        $this->attachments->storeUpload($request->file('file'), [
-            'title' => $data['title'],
-            'category' => $data['category'],
-            'note' => $data['note'] ?? null,
-        ], $linkable);
+        try {
+            $this->attachments->storeUpload($request->file('file'), [
+                'title' => $data['title'],
+                'category' => $data['category'],
+                'note' => $data['note'] ?? null,
+            ], $linkable);
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors(['file' => $exception->getMessage()]);
+        }
 
         return back()->with('status', 'File uploaded.');
     }

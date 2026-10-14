@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Support\DeveloperFeatures;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -16,6 +17,12 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $featureRules = [];
+
+        foreach (DeveloperFeatures::keys() as $key) {
+            $featureRules['features.'.$key] = ['sometimes', 'boolean'];
+        }
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => [
@@ -27,6 +34,8 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
             'theme' => ['required', 'in:light,dark'],
+            'features' => ['sometimes', 'array'],
+            ...$featureRules,
         ];
     }
 }

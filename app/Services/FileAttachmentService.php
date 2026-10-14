@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Enums\FileCategory;
 use App\Enums\FileSourceType;
 use App\Models\Asset;
+use App\Models\AssetMaintenanceLog;
 use App\Models\AuditLog;
 use App\Models\File;
 use App\Models\FileLink;
 use App\Models\ItemType;
 use App\Models\Location;
+use App\Models\StockMovement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -30,6 +32,8 @@ class FileAttachmentService
             'asset' => Asset::class,
             'location' => Location::class,
             'item_type' => ItemType::class,
+            'stock_movement' => StockMovement::class,
+            'maintenance_log' => AssetMaintenanceLog::class,
             default => throw new InvalidArgumentException('Unsupported linkable type.'),
         };
     }
@@ -47,6 +51,8 @@ class FileAttachmentService
             Asset::class => 'asset',
             Location::class => 'location',
             ItemType::class => 'item_type',
+            StockMovement::class => 'stock_movement',
+            AssetMaintenanceLog::class => 'maintenance_log',
             default => throw new InvalidArgumentException('Unsupported linkable model.'),
         };
     }
@@ -76,12 +82,12 @@ class FileAttachmentService
             $filename = Str::uuid()->toString().'.'.$extension;
             $path = $directory.'/'.$filename;
 
-            Storage::disk($disk)->put($path, $processed['contents']);
+            $this->putContents($disk, $path, $processed['contents']);
 
             $thumbnailPath = null;
             if ($processed['thumbnail'] !== null) {
                 $thumbnailPath = $directory.'/'.Str::uuid()->toString().'_thumb.jpg';
-                Storage::disk($disk)->put($thumbnailPath, $processed['thumbnail']);
+                $this->putContents($disk, $thumbnailPath, $processed['thumbnail']);
             }
 
             $file = File::query()->create([
@@ -262,6 +268,61 @@ class FileAttachmentService
         usort($rows, fn (array $a, array $b): int => strcasecmp($a['file']->title, $b['file']->title));
 
         return $rows;
+    }
+
+    /**
+     * Stream string contents to a disk (local or remote) after in-memory processing.
+     */
+    public function putContents(string $disk, string $path, string $contents): void
+    {
+        $stream = fopen('php://temp', 'r+');
+
+        if ($stream === false) {
+            throw new RuntimeException('Unable to open temporary stream for attachment upload.');
+        }
+
+        try {
+            fwrite($stream, $contents);
+            rewind($stream);
+
+            $written = Storage::disk($disk)->writeStream($path, $stream);
+
+            if ($written === false) {
+                throw new RuntimeException("Unable to store attachment on disk [{$disk}].");
+            }
+        } catch (RuntimeException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            throw new RuntimeException(
+                "Unable to store attachment on disk [{$disk}]: {$exception->getMessage()}",
+                previous: $exception,
+            );
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+    }
+
+    /**
+     * @return resource
+     */
+    public function readStream(string $disk, string $path)
+    {
+        try {
+            $stream = Storage::disk($disk)->readStream($path);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException(
+                "Unable to read attachment from disk [{$disk}]: {$exception->getMessage()}",
+                previous: $exception,
+            );
+        }
+
+        if ($stream === null) {
+            throw new RuntimeException("Unable to read attachment from disk [{$disk}] at [{$path}].");
+        }
+
+        return $stream;
     }
 
     /**

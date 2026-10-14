@@ -1,7 +1,26 @@
+@php
+    $initialInterfaceTemplates = collect($interfaceTemplates ?? [])->map(fn ($row) => [
+        'id' => $row['id'] ?? null,
+        'name' => $row['name'] ?? '',
+        'notes' => $row['notes'] ?? '',
+    ])->values()->all();
+@endphp
+
 <x-app-layout>
     <x-slot name="header"><h2 class="font-semibold text-xl">{{ $itemType->exists ? 'Edit type' : 'New type' }}</h2></x-slot>
     <div class="max-w-3xl mx-auto px-4">
-        <form method="POST" action="{{ $itemType->exists ? route('item-types.update', $itemType) : route('item-types.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
+        @if (session('status'))
+            <p class="mb-3 text-sm text-brand">{{ session('status') }}</p>
+        @endif
+
+        <form
+            method="POST"
+            action="{{ $itemType->exists ? route('item-types.update', $itemType) : route('item-types.store') }}"
+            class="space-y-4 bg-white dark:bg-brand-slate border p-4"
+            @feature('asset_connections')
+                x-data="interfaceTemplateForm(@js($initialInterfaceTemplates))"
+            @endfeature
+        >
             @csrf
             @if($itemType->exists) @method('PUT') @endif
             <div>
@@ -12,6 +31,47 @@
                 <x-input-label for="description" value="Description" />
                 <textarea id="description" name="description" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" rows="2">{{ old('description', $itemType->description) }}</textarea>
             </div>
+
+            @developerFeature('ru_visualiser')
+                <label for="supports_ru_visualiser" class="flex items-start gap-2 text-sm">
+                    <input type="hidden" name="supports_ru_visualiser" value="0">
+                    <input
+                        id="supports_ru_visualiser"
+                        type="checkbox"
+                        name="supports_ru_visualiser"
+                        value="1"
+                        class="rounded text-brand mt-0.5"
+                        @checked(old('supports_ru_visualiser', $itemType->supports_ru_visualiser))
+                    >
+                    <span>
+                        <span class="font-medium">Supports RU visualiser</span>
+                        <span class="block text-xs text-brand-charcoal dark:text-brand-silver mt-0.5">
+                            Enables a Rack tab on assets of this type for front/rear unit placements.
+                        </span>
+                    </span>
+                </label>
+            @enddeveloperFeature
+
+            @developerFeature('stock_consumables')
+                <label for="supports_stock_tracking" class="flex items-start gap-2 text-sm">
+                    <input type="hidden" name="supports_stock_tracking" value="0">
+                    <input
+                        id="supports_stock_tracking"
+                        type="checkbox"
+                        name="supports_stock_tracking"
+                        value="1"
+                        class="rounded text-brand mt-0.5"
+                        @checked(old('supports_stock_tracking', $itemType->supports_stock_tracking))
+                    >
+                    <span>
+                        <span class="font-medium">Supports stock tracking</span>
+                        <span class="block text-xs text-brand-charcoal dark:text-brand-silver mt-0.5">
+                            Enables a Stock tab with movements, reorder levels, and Kanban QR tags.
+                        </span>
+                    </span>
+                </label>
+            @enddeveloperFeature
+
             <fieldset>
                 <legend class="text-sm font-semibold mb-2">Custom field sets</legend>
                 <p class="text-xs text-brand-charcoal dark:text-brand-silver mb-2">
@@ -27,6 +87,40 @@
                     </label>
                 @endforeach
             </fieldset>
+
+            @feature('asset_connections')
+                <fieldset class="space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <legend class="text-sm font-semibold">Interface templates</legend>
+                        <button type="button" class="text-sm text-brand" @click="addTemplate()">Add interface</button>
+                    </div>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        New assets of this type receive these interfaces. Editing templates does not rewrite existing assets — use Sync missing below.
+                    </p>
+
+                    <template x-if="templates.length === 0">
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">No interface templates yet.</p>
+                    </template>
+
+                    <template x-for="(template, index) in templates" :key="template.key">
+                        <div class="border border-brand-charcoal/20 dark:border-brand-charcoal p-3 space-y-2">
+                            <input type="hidden" :name="`interface_templates[${index}][id]`" :value="template.id || ''">
+                            <div class="flex flex-wrap gap-2 items-start">
+                                <div class="flex-1 min-w-[10rem]">
+                                    <x-input-label value="Name" />
+                                    <input type="text" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" :name="`interface_templates[${index}][name]`" x-model="template.name" required>
+                                </div>
+                                <div class="flex-1 min-w-[10rem]">
+                                    <x-input-label value="Notes" />
+                                    <input type="text" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" :name="`interface_templates[${index}][notes]`" x-model="template.notes">
+                                </div>
+                                <button type="button" class="text-sm text-red-600 mt-6" @click="removeTemplate(index)">Remove</button>
+                            </div>
+                        </div>
+                    </template>
+                </fieldset>
+            @endfeature
+
             <div class="flex flex-wrap items-center gap-3">
                 <x-primary-button>Save</x-primary-button>
                 <a href="{{ route('item-types.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
@@ -34,6 +128,19 @@
         </form>
 
         @if($itemType->exists)
+            @feature('asset_connections')
+                <div class="mt-8 space-y-3 border p-4 bg-white dark:bg-brand-slate">
+                    <h3 class="font-semibold text-lg">Sync missing interfaces</h3>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Copy any template interfaces that existing assets of this type do not already have (by template or name).
+                    </p>
+                    <form method="POST" action="{{ route('item-types.sync-interfaces', $itemType) }}">
+                        @csrf
+                        <x-secondary-button type="submit">Sync missing templates</x-secondary-button>
+                    </form>
+                </div>
+            @endfeature
+
             <div class="mt-8 space-y-3">
                 <h3 class="font-semibold text-lg">Files</h3>
                 <p class="text-xs text-brand-charcoal dark:text-brand-silver">

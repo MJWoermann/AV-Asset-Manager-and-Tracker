@@ -1,10 +1,47 @@
+@php
+    $ruVisualiserEnabled = $ruVisualiserEnabled ?? false;
+    $stockTrackingEnabled = $stockTrackingEnabled ?? false;
+    $emailIntegrationEnabled = $emailIntegrationEnabled ?? false;
+    $macCustomFields = $macCustomFields ?? [];
+    $itemTypesSupportRu = $itemTypesSupportRu ?? [];
+    $itemTypesSupportStock = $itemTypesSupportStock ?? [];
+    $initialItemTypeId = old('item_type_id', $asset->item_type_id);
+    $showRuFieldsInitially = $ruVisualiserEnabled && (
+        (bool) ($itemTypesSupportRu[(string) $initialItemTypeId] ?? false)
+        || ($asset->exists && ($asset->itemType?->supports_ru_visualiser || $asset->ru_height !== null))
+    );
+    $showStockFieldsInitially = $stockTrackingEnabled && (
+        (bool) ($itemTypesSupportStock[(string) $initialItemTypeId] ?? false)
+        || ($asset->exists && ($asset->itemType?->supports_stock_tracking || $asset->min_stock_level !== null || $asset->max_stock_level !== null))
+    );
+    $ruHeightValue = old('ru_height', $ruHeightPrefill ?? $asset->ru_height);
+    $needsAssetFormAlpine = $ruVisualiserEnabled || $stockTrackingEnabled || ($emailIntegrationEnabled && ! $asset->exists);
+@endphp
+
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl">{{ $asset->exists ? 'Edit asset' : 'New asset' }}</h2>
     </x-slot>
 
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <form method="POST" action="{{ $asset->exists ? route('assets.update', $asset) : route('assets.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
+        <form
+            method="POST"
+            action="{{ $asset->exists ? route('assets.update', $asset) : route('assets.store') }}"
+            class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
+            @if($needsAssetFormAlpine)
+                x-data="assetFormFields(@js([
+                    'ruSupportsByType' => $itemTypesSupportRu,
+                    'stockSupportsByType' => $itemTypesSupportStock,
+                    'initialTypeId' => $initialItemTypeId !== null ? (string) $initialItemTypeId : '',
+                    'forceShowRu' => (bool) ($asset->exists && $asset->ru_height !== null),
+                    'forceShowStock' => (bool) ($asset->exists && ($asset->min_stock_level !== null || $asset->max_stock_level !== null)),
+                    'macCustomFields' => $macCustomFields,
+                    'emailMacNotify' => (bool) ($emailIntegrationEnabled && ! $asset->exists),
+                    'initialMac' => (string) old('mac_address', $asset->mac_address),
+                ]))"
+                @searchable-select-changed="if ($event.detail.name === 'item_type_id') itemTypeId = $event.detail.value"
+            @endif
+        >
             @csrf
             @if($asset->exists) @method('PUT') @endif
             @if(! $asset->exists && ! empty($unknownScanId ?? null))
@@ -85,7 +122,15 @@
                 ] as $field => $label)
                     <div>
                         <x-input-label :for="$field" :value="$label" />
-                        <x-text-input :id="$field" :name="$field" class="mt-1 block w-full" :value="old($field, $asset->{$field})" />
+                        <x-text-input
+                            :id="$field"
+                            :name="$field"
+                            class="mt-1 block w-full"
+                            :value="old($field, $asset->{$field})"
+                            @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
+                                x-model="macAddress"
+                            @endif
+                        />
                     </div>
                 @endforeach
                 <div>
@@ -105,6 +150,101 @@
                     <x-text-input id="replacement_cost" name="replacement_cost" type="number" step="0.01" class="mt-1 block w-full" :value="old('replacement_cost', $asset->replacement_cost)" />
                 </div>
             </div>
+
+            @if($ruVisualiserEnabled)
+                <fieldset
+                    class="border border-brand-silver dark:border-brand-charcoal p-3 space-y-3"
+                    x-show="showRuFields"
+                    x-cloak
+                    @unless($showRuFieldsInitially)
+                        style="display: none;"
+                    @endunless
+                >
+                    <legend class="px-1 text-sm font-semibold text-brand">Rack / RU</legend>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Set rack capacity for the RU visualiser. When empty, a custom field named <span class="font-mono">ru</span> is used to prefill height.
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <x-input-label for="ru_height" value="RU height" />
+                            <x-text-input
+                                id="ru_height"
+                                name="ru_height"
+                                type="number"
+                                min="1"
+                                class="mt-1 block w-full"
+                                :value="$ruHeightValue"
+                            />
+                            <x-input-error :messages="$errors->get('ru_height')" class="mt-1" />
+                        </div>
+                        <div class="flex items-end">
+                            <label for="ru_rear_enabled" class="flex items-start gap-2 text-sm">
+                                <input type="hidden" name="ru_rear_enabled" value="0">
+                                <input
+                                    id="ru_rear_enabled"
+                                    type="checkbox"
+                                    name="ru_rear_enabled"
+                                    value="1"
+                                    class="rounded text-brand mt-0.5"
+                                    @checked(old('ru_rear_enabled', $asset->ru_rear_enabled))
+                                >
+                                <span>
+                                    <span class="font-medium">Enable rear face</span>
+                                    <span class="block text-xs text-brand-charcoal dark:text-brand-silver mt-0.5">
+                                        Show a separate rear elevation on the Rack tab.
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <x-input-error :messages="$errors->get('ru_rear_enabled')" class="mt-1" />
+                </fieldset>
+            @endif
+
+            @if($stockTrackingEnabled)
+                <fieldset
+                    class="border border-brand-silver dark:border-brand-charcoal p-3 space-y-3"
+                    x-show="showStockFields"
+                    x-cloak
+                    @unless($showStockFieldsInitially)
+                        style="display: none;"
+                    @endunless
+                >
+                    <legend class="px-1 text-sm font-semibold text-brand">Stock levels</legend>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        On-hand quantity is updated from the Stock tab. Set reorder min/max here.
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <x-input-label for="min_stock_level" value="Min stock level" />
+                            <x-text-input
+                                id="min_stock_level"
+                                name="min_stock_level"
+                                type="number"
+                                min="0"
+                                class="mt-1 block w-full"
+                                :value="old('min_stock_level', $asset->min_stock_level)"
+                            />
+                            <x-input-error :messages="$errors->get('min_stock_level')" class="mt-1" />
+                        </div>
+                        <div>
+                            <x-input-label for="max_stock_level" value="Max stock level" />
+                            <x-text-input
+                                id="max_stock_level"
+                                name="max_stock_level"
+                                type="number"
+                                min="0"
+                                class="mt-1 block w-full"
+                                :value="old('max_stock_level', $asset->max_stock_level)"
+                            />
+                            <x-input-error :messages="$errors->get('max_stock_level')" class="mt-1" />
+                        </div>
+                    </div>
+                    @if($asset->exists)
+                        <p class="text-sm">Current on hand: <span class="font-semibold">{{ $asset->quantity ?? 0 }}</span></p>
+                    @endif
+                </fieldset>
+            @endif
 
             @if($asset->exists && $asset->itemType)
                 @php
@@ -141,12 +281,59 @@
                         </div>
                     </fieldset>
                 @endforeach
+            @elseif(! $asset->exists && ($emailIntegrationEnabled ?? false) && count($macCustomFields) > 0)
+                <fieldset class="border border-brand-silver dark:border-brand-charcoal p-3 space-y-3" x-show="itemTypeId" x-cloak>
+                    <legend class="px-1 text-sm font-semibold text-brand">MAC custom fields</legend>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">Shown for MAC onboarding when the selected item type includes these fields.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @foreach($macCustomFields as $macField)
+                            <div
+                                x-show="(@js($macField['item_type_ids'])).map(String).includes(String(itemTypeId))"
+                                x-cloak
+                            >
+                                <x-input-label :for="'cf_'.$macField['id']" :value="$macField['name']" />
+                                <x-text-input
+                                    :id="'cf_'.$macField['id']"
+                                    :name="'custom_fields['.$macField['id'].']'"
+                                    class="mt-1 block w-full"
+                                    :value="old('custom_fields.'.$macField['id'], '')"
+                                    x-model="customMacValues['{{ $macField['id'] }}']"
+                                />
+                            </div>
+                        @endforeach
+                    </div>
+                </fieldset>
             @endif
 
             <div>
                 <x-input-label for="notes" value="Notes" />
                 <textarea id="notes" name="notes" rows="3" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">{{ old('notes', $asset->notes) }}</textarea>
             </div>
+
+            @feature('email_integration')
+                @if(! $asset->exists && ($emailIntegrationEnabled ?? false))
+                    <label
+                        class="flex items-start gap-2 text-sm border border-brand-silver dark:border-brand-charcoal p-3"
+                        x-show="showMacNotify"
+                        x-cloak
+                    >
+                        <input type="hidden" name="notify_mac_onboarding" value="0">
+                        <input
+                            type="checkbox"
+                            name="notify_mac_onboarding"
+                            value="1"
+                            class="rounded text-brand mt-0.5"
+                            @checked(old('notify_mac_onboarding'))
+                        >
+                        <span>
+                            <span class="font-medium">Email IT helpdesk with MAC details</span>
+                            <span class="block text-xs text-brand-charcoal dark:text-brand-silver mt-0.5">
+                                Sends the MAC onboarding template when at least one MAC value is present.
+                            </span>
+                        </span>
+                    </label>
+                @endif
+            @endfeature
 
             <div class="flex gap-2">
                 <x-primary-button>Save</x-primary-button>

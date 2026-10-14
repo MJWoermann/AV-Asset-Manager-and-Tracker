@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Enums\AssetStatus;
 use App\Services\FileAttachmentService;
 use App\Support\AssetSearch;
+use Database\Factories\AssetFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class Asset extends Model
 {
+    /** @use HasFactory<AssetFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'item_type_id',
         'location_id',
@@ -35,7 +40,11 @@ class Asset extends Model
         'mac_address',
         'test_tag_expiry',
         'quantity',
+        'min_stock_level',
+        'max_stock_level',
         'notes',
+        'ru_height',
+        'ru_rear_enabled',
     ];
 
     protected function casts(): array
@@ -46,6 +55,11 @@ class Asset extends Model
             'warranty_expiry' => 'date',
             'test_tag_expiry' => 'date',
             'replacement_cost' => 'decimal:2',
+            'quantity' => 'integer',
+            'min_stock_level' => 'integer',
+            'max_stock_level' => 'integer',
+            'ru_height' => 'integer',
+            'ru_rear_enabled' => 'boolean',
         ];
     }
 
@@ -90,9 +104,41 @@ class Asset extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
+    public function ruPlacements(): HasMany
+    {
+        return $this->hasMany(AssetRuPlacement::class, 'rack_asset_id');
+    }
+
+    public function ruPlacementAsChild(): HasMany
+    {
+        return $this->hasMany(AssetRuPlacement::class, 'child_asset_id');
+    }
+
     public function customFieldValues(): HasMany
     {
         return $this->hasMany(AssetCustomFieldValue::class);
+    }
+
+    public function interfaces(): HasMany
+    {
+        return $this->hasMany(AssetInterface::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class)->orderBy('recorded_at')->orderBy('id');
+    }
+
+    public function stockTokens(): HasMany
+    {
+        return $this->hasMany(AssetStockToken::class);
+    }
+
+    public function maintenanceLogs(): HasMany
+    {
+        return $this->hasMany(AssetMaintenanceLog::class)
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id');
     }
 
     public function auditLogs(): MorphMany

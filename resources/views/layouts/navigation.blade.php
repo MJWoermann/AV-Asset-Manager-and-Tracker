@@ -12,8 +12,8 @@
                     <x-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-nav-link>
 
                     @php
-                        $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*');
-                        $dataActive = request()->routeIs('locations.*', 'item-types.*', 'custom-field-sets.*', 'files.*');
+                        $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*', 'reports.connection-map*');
+                        $dataActive = request()->routeIs('locations.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*', 'shelf-tags.*');
                     @endphp
 
                     <x-dropdown align="left" width="48">
@@ -30,6 +30,9 @@
                         <x-slot name="content">
                             <x-dropdown-link :href="route('reports.compare')">Compare</x-dropdown-link>
                             <x-dropdown-link :href="route('reports.unknown-scans')">Unknown scans</x-dropdown-link>
+                            @feature('asset_connections')
+                                <x-dropdown-link :href="route('reports.connection-map')">Connection map</x-dropdown-link>
+                            @endfeature
                         </x-slot>
                     </x-dropdown>
 
@@ -50,6 +53,13 @@
                                 <x-dropdown-link :href="route('item-types.index')">Item Types</x-dropdown-link>
                                 <x-dropdown-link :href="route('custom-field-sets.index')">Field sets</x-dropdown-link>
                                 <x-dropdown-link :href="route('files.index')">Files</x-dropdown-link>
+                                @feature('asset_connections')
+                                    <x-dropdown-link :href="route('connection-types.index')">Connection types</x-dropdown-link>
+                                @endfeature
+                                @feature('shelf_tag_generator')
+                                    <x-dropdown-link :href="route('shelf-tags.layouts.index')">Shelf tag layouts</x-dropdown-link>
+                                    <x-dropdown-link :href="route('shelf-tags.print.create')">Print shelf tags</x-dropdown-link>
+                                @endfeature
                             @endrole
                         </x-slot>
                     </x-dropdown>
@@ -59,7 +69,20 @@
                     @endrole
                     @role('admin')
                         <x-nav-link :href="route('admin.export-columns.edit')" :active="request()->routeIs('admin.export-columns.*')">Export columns</x-nav-link>
+                        <x-nav-link :href="route('admin.storage.edit')" :active="request()->routeIs('admin.storage.*')">Storage</x-nav-link>
+                        <x-nav-link :href="route('admin.sso.edit')" :active="request()->routeIs('admin.sso.*')">SSO</x-nav-link>
+                        @feature('email_integration')
+                            <x-nav-link :href="route('admin.email.edit')" :active="request()->routeIs('admin.email.edit', 'admin.email.update', 'admin.email.test')">Email</x-nav-link>
+                            <x-nav-link :href="route('admin.email.recipients.index')" :active="request()->routeIs('admin.email.recipients.*')">Recipients</x-nav-link>
+                            <x-nav-link :href="route('admin.email.templates.index')" :active="request()->routeIs('admin.email.templates.*')">Templates</x-nav-link>
+                            <x-nav-link :href="route('admin.email.rules.index')" :active="request()->routeIs('admin.email.rules.*')">Email rules</x-nav-link>
+                        @endfeature
                     @endrole
+                    @feature('email_integration')
+                        @role('admin|inventory_manager')
+                            <x-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.inbound.*')">Inbound email</x-nav-link>
+                        @endrole
+                    @endfeature
                 </div>
             </div>
 
@@ -105,6 +128,9 @@
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Reports</div>
             <x-responsive-nav-link :href="route('reports.compare')" :active="request()->routeIs('reports.compare*')">Compare</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('reports.unknown-scans')" :active="request()->routeIs('reports.unknown-scans*')">Unknown scans</x-responsive-nav-link>
+            @feature('asset_connections')
+                <x-responsive-nav-link :href="route('reports.connection-map')" :active="request()->routeIs('reports.connection-map*')">Connection map</x-responsive-nav-link>
+            @endfeature
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Data</div>
             <x-responsive-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">Locations</x-responsive-nav-link>
@@ -112,6 +138,13 @@
                 <x-responsive-nav-link :href="route('item-types.index')" :active="request()->routeIs('item-types.*')">Item Types</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('custom-field-sets.index')" :active="request()->routeIs('custom-field-sets.*')">Field sets</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('files.index')" :active="request()->routeIs('files.index')">Files</x-responsive-nav-link>
+                @feature('asset_connections')
+                    <x-responsive-nav-link :href="route('connection-types.index')" :active="request()->routeIs('connection-types.*')">Connection types</x-responsive-nav-link>
+                @endfeature
+                @feature('shelf_tag_generator')
+                    <x-responsive-nav-link :href="route('shelf-tags.layouts.index')" :active="request()->routeIs('shelf-tags.layouts.*')">Shelf tag layouts</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('shelf-tags.print.create')" :active="request()->routeIs('shelf-tags.print.*')">Print shelf tags</x-responsive-nav-link>
+                @endfeature
             @endrole
 
             @role('admin|inventory_manager')
@@ -119,7 +152,20 @@
             @endrole
             @role('admin')
                 <x-responsive-nav-link :href="route('admin.export-columns.edit')" :active="request()->routeIs('admin.export-columns.*')">Export columns</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.storage.edit')" :active="request()->routeIs('admin.storage.*')">Storage</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.sso.edit')" :active="request()->routeIs('admin.sso.*')">SSO</x-responsive-nav-link>
+                @feature('email_integration')
+                    <x-responsive-nav-link :href="route('admin.email.edit')" :active="request()->routeIs('admin.email.edit', 'admin.email.update', 'admin.email.test')">Email</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('admin.email.recipients.index')" :active="request()->routeIs('admin.email.recipients.*')">Recipients</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('admin.email.templates.index')" :active="request()->routeIs('admin.email.templates.*')">Templates</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('admin.email.rules.index')" :active="request()->routeIs('admin.email.rules.*')">Email rules</x-responsive-nav-link>
+                @endfeature
             @endrole
+            @feature('email_integration')
+                @role('admin|inventory_manager')
+                    <x-responsive-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.inbound.*')">Inbound email</x-responsive-nav-link>
+                @endrole
+            @endfeature
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
             <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>

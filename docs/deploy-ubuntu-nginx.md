@@ -77,6 +77,24 @@ sudo chmod -R ug+rwx storage bootstrap/cache
 
 First-time install needs no extra environment variables for per-user asset table columns or the asset **History** tab. Column choices are stored in `users.preferences` after each user saves them in the UI; History reads the existing append-only `audit_logs` table.
 
+### Optional: Google and Microsoft Entra SSO
+
+OAuth client IDs and secrets belong in `.env` only (not the database). Provider toggles and allowed email domains are configured in the app under **Admin → SSO**.
+
+Set `APP_URL` to your public site URL, add `GOOGLE_*` and/or `AZURE_*` variables (see `.env.example`), register matching callback URLs in Google Cloud and Entra, then follow the full checklist:
+
+**[docs/sso-setup.md](sso-setup.md)** — IdP setup, `.env` mapping, admin whitelist, link-only users, and troubleshooting.
+
+SSO signs in **existing** users only; password login remains available.
+
+### Optional: Email integration (Gmail / Outlook Graph / SMTP)
+
+Outbound notifications and inbound helpdesk reply polling are gated by the per-user developer feature `email_integration`. Secrets stay in `.env`; driver toggles and mailbox settings live under **Admin → Email**.
+
+Full host-specific setup (Gmail app passwords, Entra Graph `Mail.Send`/`Mail.Read`, manual SMTP/IMAP): **[docs/email-setup.md](email-setup.md)**.
+
+Ensure cron runs `php artisan schedule:run` every minute so `email:poll-inbound` can honour the configured poll interval. Use `queue:work` if you queue mail delivery.
+
 ## 4. Nginx site
 
 Create `/etc/nginx/sites-available/av-asset-manager`:
@@ -212,9 +230,80 @@ Optional: after migrate, re-apply audit hardening from §2 if you recreate DB gr
 
 Do **not** grant `UPDATE`/`DELETE` on `audit_logs` to the app DB user.
 
+## 8. Remote attachment storage (QNAP / SharePoint)
+
+Attachments use Laravel disks. Set `ATTACHMENTS_DISK` to `local` (default), `qnap`, or `sharepoint`. Optional `BACKUP_DISK` (same allow-list) enables nightly `php artisan app:backup` via the scheduler and Admin → Storage.
+
+Downloads always go through the authenticated app proxy (`/files/{id}/download`); do not expose raw NAS or Graph URLs to browsers.
+
+### QNAP
+
+Pick one mode with `QNAP_DRIVER`:
+
+| Mode | When to use | Key env |
+|------|-------------|---------|
+| `mount` (default) | NFS/SMB mount on the LEMP host | `QNAP_MOUNT_PATH=/mnt/qnap/av-assets` |
+| `sftp` | No OS mount; app writes over SFTP | `QNAP_SFTP_HOST`, user/password or key, `QNAP_SFTP_ROOT` |
+| `s3` | QuObjects / S3-compatible | `QNAP_S3_ENDPOINT`, key/secret, bucket; path-style usually `true` |
+
+Mount example (NFS):
+
+```bash
+sudo mkdir -p /mnt/qnap/av-assets
+# add fstab entry for your NAS share, then:
+sudo mount -a
+sudo chown -R www-data:www-data /mnt/qnap/av-assets
+sudo chmod 775 /mnt/qnap/av-assets
+```
+
+Set `QNAP_THROW=true` in production so storage failures surface clearly. After cutting over live uploads:
+
+```bash
+# Preview
+php artisan attachments:migrate-disk local qnap --dry-run
+# Copy + update files.disk (optionally --delete-source)
+php artisan attachments:migrate-disk local qnap
+```
+
+Then set `ATTACHMENTS_DISK=qnap` and `php artisan config:cache`.
+
+### SharePoint (Microsoft Graph, app-only)
+
+1. Entra app registration → note tenant ID and client ID; create a client secret.
+2. API permissions (application): `Files.ReadWrite.All` and/or `Sites.ReadWrite.All`, then **Grant admin consent**.
+3. Resolve the document library drive ID (Graph Explorer: site → drives).
+4. Env:
+
+```bash
+GRAPH_CLIENT_ID=...
+GRAPH_CLIENT_SECRET=...
+GRAPH_TENANT_ID=...
+SHAREPOINT_DRIVE_ID=...
+SHAREPOINT_PREFIX=AV-Asset-Manager/attachments
+ATTACHMENTS_DISK=sharepoint
+# or BACKUP_DISK=sharepoint for backups only
+```
+
+Optional `SHAREPOINT_ROOT_ITEM_ID` mounts a single folder as the disk root. Interactive user sign-in via Entra/Google is configured separately — see [sso-setup.md](sso-setup.md). Storage/backup here uses app-only client credentials only.
+
+### Backups and restore
+
+```bash
+# Manual / scheduled when BACKUP_DISK is set
+php artisan app:backup --disk=qnap --keep=7
+
+# Restore SQL + attachment blobs onto ATTACHMENTS_DISK (destructive)
+php artisan app:restore backups/2026-10-14_021500 --disk=qnap --force
+```
+
+Backup archives exclude `.env` and Graph/QNAP secrets. SQL dumps include user password hashes — treat restore media as sensitive. Ensure `queue:work` and `schedule:run` (cron) are running for queued Admin → Storage actions, the nightly backup, and optional email inbound polling (`email:poll-inbound` — see [email-setup.md](email-setup.md)).
+
 ## Security checklist
 
+Full evaluation, threat model, and prioritized application hardening: **[docs/security-hardening.md](security-hardening.md)**.
+
 - [ ] `APP_DEBUG=false`
+- [ ] Public registration disabled (see hardening guide — highest priority)
 - [ ] Strong DB password; MariaDB on localhost only
 - [ ] Dedicated DB user (not root)
 - [ ] `storage` and `bootstrap/cache` writable by `www-data` only as needed
@@ -223,3 +312,6 @@ Do **not** grant `UPDATE`/`DELETE` on `audit_logs` to the app DB user.
 - [ ] Admin password rotated after first login
 - [ ] Audit logs treated as append-only
 - [ ] Updates always run `php artisan migrate --force` before serving traffic
+- [ ] QNAP mount owned by `www-data` (or SFTP/S3 credentials scoped to the attachment path)
+- [ ] SharePoint Graph app has admin consent; secrets only in `.env` / secret store
+- [ ] `BACKUP_DISK` private to ops; restore media handled as confidential

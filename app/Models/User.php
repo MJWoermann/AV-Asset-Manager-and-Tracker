@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\AssetTableColumns;
+use App\Support\DeveloperFeatures;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -31,6 +32,22 @@ class User extends Authenticatable
     public function prefersDarkMode(): bool
     {
         return $this->theme === 'dark';
+    }
+
+    /**
+     * Whether the user has opted into a developer feature via preferences.features.{feature}.
+     */
+    public function hasFeature(string $feature): bool
+    {
+        return DeveloperFeatures::enabled($this->preferences, $feature);
+    }
+
+    /**
+     * Alias for hasFeature() (RU Visualiser / plan naming).
+     */
+    public function hasDeveloperFeature(string $key): bool
+    {
+        return $this->hasFeature($key);
     }
 
     /**

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnsureDeveloperFeature;
+use App\Http\Middleware\EnsureUserHasFeature;
 use App\Http\Middleware\EnsureUserHasRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'feature' => EnsureUserHasFeature::class,
+            'developer_feature' => EnsureDeveloperFeature::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);

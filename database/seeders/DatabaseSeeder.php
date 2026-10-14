@@ -12,8 +12,11 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             ItemTypeSeeder::class,
             LocationSeeder::class,
+            ConnectionTypeSeeder::class,
             AssetListSeeder::class,
             SampleAssetSeeder::class,
+            ShelfTagLayoutSeeder::class,
+            EmailIntegrationSeeder::class,
         ]);
     }
 }

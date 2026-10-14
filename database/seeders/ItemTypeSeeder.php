@@ -34,6 +34,11 @@ class ItemTypeSeeder extends Seeder
                 ['name' => 'Length', 'slug' => 'length', 'type' => 'text'],
                 ['name' => 'Connector', 'slug' => 'connector', 'type' => 'text'],
             ],
+            'Restocking' => [
+                ['name' => 'Supplier', 'slug' => 'supplier', 'type' => 'text'],
+                ['name' => 'URL', 'slug' => 'url', 'type' => 'text'],
+                ['name' => 'SKU', 'slug' => 'sku', 'type' => 'text'],
+            ],
         ];
 
         $createdSets = [];
@@ -60,9 +65,9 @@ class ItemTypeSeeder extends Seeder
 
         $types = [
             ['name' => 'LX Fixture', 'slug' => 'lx-fixture', 'sets' => ['Network Details', 'DMX / sACN Details']],
-            ['name' => 'Bulk Item', 'slug' => 'bulk-item', 'sets' => ['Countable Variations']],
+            ['name' => 'Bulk Item', 'slug' => 'bulk-item', 'sets' => ['Countable Variations', 'Restocking'], 'supports_stock_tracking' => true],
             ['name' => 'Audio Equipment', 'slug' => 'audio-equipment', 'sets' => ['Network Details']],
-            ['name' => 'Rack/RoadCase', 'slug' => 'rack-roadcase', 'sets' => ['Road Case & Rack Dimensions']],
+            ['name' => 'Rack/RoadCase', 'slug' => 'rack-roadcase', 'sets' => ['Road Case & Rack Dimensions'], 'supports_ru_visualiser' => true],
             ['name' => 'Vision Item', 'slug' => 'vision-item', 'sets' => ['Network Details']],
         ];
 
@@ -71,17 +76,35 @@ class ItemTypeSeeder extends Seeder
                 ->orWhere('name', $typeDef['name'])
                 ->first();
 
+            $attributes = [
+                'name' => $typeDef['name'],
+                'slug' => $typeDef['slug'],
+            ];
+
+            if (array_key_exists('supports_ru_visualiser', $typeDef)) {
+                $attributes['supports_ru_visualiser'] = $typeDef['supports_ru_visualiser'];
+            }
+
+            if (array_key_exists('supports_stock_tracking', $typeDef)) {
+                $attributes['supports_stock_tracking'] = $typeDef['supports_stock_tracking'];
+            }
+
             if ($type) {
-                $type->update(['name' => $typeDef['name'], 'slug' => $typeDef['slug']]);
+                $type->update($attributes);
             } else {
-                $type = ItemType::create([
-                    'name' => $typeDef['name'],
-                    'slug' => $typeDef['slug'],
-                ]);
+                $type = ItemType::create($attributes);
             }
 
             $ids = collect($typeDef['sets'])->map(fn ($n) => $createdSets[$n]->id)->all();
             $type->fieldSets()->syncWithoutDetaching($ids);
         }
+
+        ItemType::query()
+            ->whereIn('slug', ['rack-roadcase', 'rack', 'roadcase'])
+            ->update(['supports_ru_visualiser' => true]);
+
+        ItemType::query()
+            ->where('slug', 'bulk-item')
+            ->update(['supports_stock_tracking' => true]);
     }
 }
