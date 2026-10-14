@@ -4,7 +4,7 @@
         <form method="POST" action="{{ route('import.upload') }}" enctype="multipart/form-data" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             <p class="text-sm text-gray-600 dark:text-brand-silver">
-                Upload a CSV or Excel file with a single worksheet (max 25MB).
+                Upload a CSV or Excel file (max 25MB). If the workbook has multiple sheets, the first sheet is used.
                 You will map columns (including item type and location) on the next step.
             </p>
             <div>
