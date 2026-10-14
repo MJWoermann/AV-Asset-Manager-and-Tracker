@@ -24,24 +24,11 @@ class ImportController extends Controller
         $uploaded = $request->file('file');
 
         // #region agent log
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> e66f147436674ccb6e812b4a3de5c849c8cc6fc3
         $excelTemp = storage_path('framework/cache/laravel-excel');
         file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode([
             'sessionId' => '6fb0ed',
             'runId' => 'post-fix',
             'hypothesisId' => 'F',
-<<<<<<< HEAD
-=======
-=======
-        file_put_contents(base_path('debug-6fb0ed.log'), json_encode([
-            'sessionId' => '6fb0ed',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'B',
->>>>>>> d7fb3c7211100d622762abddfb85a457b6127252
->>>>>>> e66f147436674ccb6e812b4a3de5c849c8cc6fc3
             'location' => 'ImportController.php:upload',
             'message' => 'upload before store',
             'data' => [
@@ -52,20 +39,11 @@ class ImportController extends Controller
                 'temp_exists' => $uploaded ? is_file($uploaded->getPathname()) : false,
                 'is_valid' => $uploaded?->isValid(),
                 'size' => $uploaded?->getSize(),
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> e66f147436674ccb6e812b4a3de5c849c8cc6fc3
                 'excel_temp_dir' => $excelTemp,
                 'excel_temp_exists' => is_dir($excelTemp),
                 'excel_temp_writable' => is_dir($excelTemp) ? is_writable($excelTemp) : false,
                 'sys_temp_dir' => sys_get_temp_dir(),
                 'storage_logs_writable' => is_writable(storage_path('logs')),
-<<<<<<< HEAD
-=======
-=======
->>>>>>> d7fb3c7211100d622762abddfb85a457b6127252
->>>>>>> e66f147436674ccb6e812b4a3de5c849c8cc6fc3
             ],
             'timestamp' => (int) (microtime(true) * 1000),
         ])."\n", FILE_APPEND);
@@ -74,15 +52,7 @@ class ImportController extends Controller
         $path = $uploaded->store('imports');
 
         // #region agent log
-<<<<<<< HEAD
         file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode([
-=======
-<<<<<<< HEAD
-        file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode([
-=======
-        file_put_contents(base_path('debug-6fb0ed.log'), json_encode([
->>>>>>> d7fb3c7211100d622762abddfb85a457b6127252
->>>>>>> e66f147436674ccb6e812b4a3de5c849c8cc6fc3
             'sessionId' => '6fb0ed',
             'runId' => 'post-fix',
             'hypothesisId' => 'B',
@@ -91,14 +61,7 @@ class ImportController extends Controller
             'data' => [
                 'stored_path' => $path,
                 'stored_exists' => Storage::exists($path),
-<<<<<<< HEAD
                 'stored_absolute' => Storage::path($path),
-=======
-<<<<<<< HEAD
-                'stored_absolute' => Storage::path($path),
-=======
->>>>>>> d7fb3c7211100d622762abddfb85a457b6127252
->>>>>>> e66f147436674ccb6e812b4a3de5c849c8cc6fc3
                 'temp_path' => $uploaded->getPathname(),
                 'temp_exists' => is_file($uploaded->getPathname()),
                 'temp_size' => is_file($uploaded->getPathname()) ? filesize($uploaded->getPathname()) : null,
@@ -112,27 +75,12 @@ class ImportController extends Controller
             $columns = $this->imports->readHeadingColumns(Storage::path($path));
         } catch (ValidationException $e) {
             // #region agent log
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> e66f147436674ccb6e812b4a3de5c849c8cc6fc3
             file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode([
                 'sessionId' => '6fb0ed',
                 'runId' => 'post-fix',
                 'hypothesisId' => 'A',
                 'location' => 'ImportController.php:upload',
                 'message' => 'validation exception from readHeadingColumns',
-<<<<<<< HEAD
-=======
-=======
-            file_put_contents(base_path('debug-6fb0ed.log'), json_encode([
-                'sessionId' => '6fb0ed',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'A',
-            'location' => 'ImportController.php:upload',
-            'message' => 'validation exception from readHeadingColumns',
->>>>>>> d7fb3c7211100d622762abddfb85a457b6127252
->>>>>>> e66f147436674ccb6e812b4a3de5c849c8cc6fc3
                 'data' => [
                     'errors' => $e->errors(),
                 ],
