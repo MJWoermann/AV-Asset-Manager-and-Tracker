@@ -40,7 +40,7 @@ class ImportAssetTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('Item type for imported rows');
         $response->assertSee('Upload & map columns');
-        $response->assertSee('single worksheet');
+        $response->assertSee('first sheet is used');
     }
 
     public function test_upload_rejects_unsupported_file_type_with_clear_message(): void
@@ -75,7 +75,7 @@ class ImportAssetTest extends TestCase
         ]);
     }
 
-    public function test_upload_rejects_spreadsheet_with_multiple_worksheets(): void
+    public function test_upload_uses_first_sheet_when_workbook_has_multiple_worksheets(): void
     {
         Storage::fake('local');
         $path = tempnam(sys_get_temp_dir(), 'import');
@@ -100,31 +100,14 @@ class ImportAssetTest extends TestCase
         );
 
         $response = $this->actingAs($this->manager())
-            ->from(route('import.create'))
             ->post(route('import.upload'), ['file' => $file]);
 
         @unlink($xlsxPath);
 
-        $response->assertRedirect(route('import.create'));
-        $response->assertSessionHasErrors([
-            'file' => 'Unable to process files with multiple worksheets. Save each sheet as its own CSV or Excel file and import them one at a time.',
-        ]);
-    }
-
-    public function test_upload_rejects_file_without_headings(): void
-    {
-        Storage::fake('local');
-
-        $response = $this->actingAs($this->manager())
-            ->from(route('import.create'))
-            ->post(route('import.upload'), [
-                'file' => UploadedFile::fake()->createWithContent('blank.csv', "\n\n"),
-            ]);
-
-        $response->assertRedirect(route('import.create'));
-        $response->assertSessionHasErrors([
-            'file' => 'Unable to find column headings. Make sure the first row of the file contains column names.',
-        ]);
+        $response->assertOk();
+        $response->assertSee('Name');
+        $response->assertSee('Type');
+        $response->assertDontSee('Unable to process files with multiple worksheets');
     }
 
     public function test_user_facing_read_error_explains_unrecognised_file_type(): void

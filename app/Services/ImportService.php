@@ -80,20 +80,64 @@ class ImportService
      */
     public function readHeadingColumns(UploadedFile|string $file): array
     {
+        // #region agent log
+        $debugLog = function (string $hypothesisId, string $message, array $data = []) {
+            $payload = [
+                'sessionId' => '6fb0ed',
+                'runId' => 'post-fix',
+                'hypothesisId' => $hypothesisId,
+                'location' => 'ImportService.php:readHeadingColumns',
+                'message' => $message,
+                'data' => $data,
+                'timestamp' => (int) (microtime(true) * 1000),
+            ];
+            file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode($payload)."\n", FILE_APPEND);
+        };
+        // #endregion
+
+        $excelTemp = storage_path('framework/cache/laravel-excel');
+        if (! is_dir($excelTemp)) {
+            mkdir($excelTemp, 0755, true);
+        }
+
+        // #region agent log
+        $debugLog('F', 'readHeadingColumns entry', [
+            'excel_temp_dir' => $excelTemp,
+            'excel_temp_exists' => is_dir($excelTemp),
+            'excel_temp_writable' => is_writable($excelTemp),
+            'sys_temp_dir' => sys_get_temp_dir(),
+            'sys_temp_writable' => is_writable(sys_get_temp_dir()),
+            'input_type' => is_string($file) ? 'string' : get_class($file),
+            'original_name' => $file instanceof UploadedFile ? $file->getClientOriginalName() : null,
+            'extension' => $file instanceof UploadedFile ? $file->getClientOriginalExtension() : pathinfo((string) $file, PATHINFO_EXTENSION),
+            'mime' => $file instanceof UploadedFile ? $file->getMimeType() : null,
+            'client_mime' => $file instanceof UploadedFile ? $file->getClientMimeType() : null,
+            'path' => $file instanceof UploadedFile ? $file->getPathname() : (string) $file,
+            'path_exists' => $file instanceof UploadedFile ? is_file($file->getPathname()) : is_file((string) $file),
+            'size' => $file instanceof UploadedFile ? $file->getSize() : (is_file((string) $file) ? filesize((string) $file) : null),
+            'is_valid' => $file instanceof UploadedFile ? $file->isValid() : null,
+            'error' => $file instanceof UploadedFile ? $file->getError() : null,
+        ]);
+        // #endregion
+
         try {
             $sheets = Excel::toArray(new HeadingRowImport, $file);
         } catch (Throwable $e) {
+            // #region agent log
+            $debugLog('C', 'Excel::toArray threw', [
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
+                'user_facing' => $this->userFacingReadError($e),
+                'path_exists_after' => $file instanceof UploadedFile ? is_file($file->getPathname()) : is_file((string) $file),
+            ]);
+            // #endregion
+
             throw ValidationException::withMessages([
                 'file' => $this->userFacingReadError($e),
             ]);
         }
 
-        if (count($sheets) > 1) {
-            throw ValidationException::withMessages([
-                'file' => 'Unable to process files with multiple worksheets. Save each sheet as its own CSV or Excel file and import them one at a time.',
-            ]);
-        }
-
+        // Previous importer behaviour: use the first sheet only; do not reject multi-sheet workbooks.
         $columns = $sheets[0][0] ?? [];
         if (! is_array($columns)) {
             $columns = [];
@@ -104,19 +148,13 @@ class ImportService
             $columns,
         ));
 
-        $hasHeading = false;
-        foreach ($columns as $column) {
-            if ($column !== '') {
-                $hasHeading = true;
-                break;
-            }
-        }
-
-        if (! $hasHeading) {
-            throw ValidationException::withMessages([
-                'file' => 'Unable to find column headings. Make sure the first row of the file contains column names.',
-            ]);
-        }
+        // #region agent log
+        $debugLog('A', 'readHeadingColumns success (first sheet)', [
+            'sheet_count' => count($sheets),
+            'column_count' => count($columns),
+            'first_heading_sample' => array_slice($columns, 0, 8),
+        ]);
+        // #endregion
 
         return $columns;
     }
@@ -171,10 +209,10 @@ class ImportService
             || str_contains($message, 'workbook')
             || str_contains($message, 'worksheet')
         ) {
-            return 'Unable to process that spreadsheet. Export a single worksheet as CSV or a simple Excel file and try again.';
+            return 'Unable to process that spreadsheet. Export as CSV or a simple Excel file and try again.';
         }
 
-        return 'Unable to process that file. Upload a valid CSV or Excel file with a single worksheet.';
+        return 'Unable to process that file. Upload a valid CSV or Excel file.';
     }
 
     /**

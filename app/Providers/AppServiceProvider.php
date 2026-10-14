@@ -24,5 +24,10 @@ class AppServiceProvider extends ServiceProvider
         AssetListItem::observe(AuditableObserver::class);
         Location::observe(AuditableObserver::class);
         User::observe(AuditableObserver::class);
+
+        $excelTemp = storage_path('framework/cache/laravel-excel');
+        if (! is_dir($excelTemp)) {
+            mkdir($excelTemp, 0755, true);
+        }
     }
 }

@@ -1,4 +1,6 @@
 *
 !data/
 !locks/
+!laravel-excel/
+!laravel-excel/.gitignore
 !.gitignore

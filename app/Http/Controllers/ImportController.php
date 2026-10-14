@@ -22,11 +22,72 @@ class ImportController extends Controller
     public function upload(ImportUploadRequest $request): View|RedirectResponse
     {
         $uploaded = $request->file('file');
+
+        // #region agent log
+        $excelTemp = storage_path('framework/cache/laravel-excel');
+        file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode([
+            'sessionId' => '6fb0ed',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'F',
+            'location' => 'ImportController.php:upload',
+            'message' => 'upload before store',
+            'data' => [
+                'original_name' => $uploaded?->getClientOriginalName(),
+                'extension' => $uploaded?->getClientOriginalExtension(),
+                'mime' => $uploaded?->getMimeType(),
+                'temp_path' => $uploaded?->getPathname(),
+                'temp_exists' => $uploaded ? is_file($uploaded->getPathname()) : false,
+                'is_valid' => $uploaded?->isValid(),
+                'size' => $uploaded?->getSize(),
+                'excel_temp_dir' => $excelTemp,
+                'excel_temp_exists' => is_dir($excelTemp),
+                'excel_temp_writable' => is_dir($excelTemp) ? is_writable($excelTemp) : false,
+                'sys_temp_dir' => sys_get_temp_dir(),
+                'storage_logs_writable' => is_writable(storage_path('logs')),
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
+        // #endregion
+
         $path = $uploaded->store('imports');
 
+        // #region agent log
+        file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode([
+            'sessionId' => '6fb0ed',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'B',
+            'location' => 'ImportController.php:upload',
+            'message' => 'upload after store, before read',
+            'data' => [
+                'stored_path' => $path,
+                'stored_exists' => Storage::exists($path),
+                'stored_absolute' => Storage::path($path),
+                'temp_path' => $uploaded->getPathname(),
+                'temp_exists' => is_file($uploaded->getPathname()),
+                'temp_size' => is_file($uploaded->getPathname()) ? filesize($uploaded->getPathname()) : null,
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
+        // #endregion
+
         try {
-            $columns = $this->imports->readHeadingColumns($uploaded);
+            // Prefer the persisted storage path so Excel does not depend on the PHP upload temp file.
+            $columns = $this->imports->readHeadingColumns(Storage::path($path));
         } catch (ValidationException $e) {
+            // #region agent log
+            file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode([
+                'sessionId' => '6fb0ed',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'A',
+                'location' => 'ImportController.php:upload',
+                'message' => 'validation exception from readHeadingColumns',
+                'data' => [
+                    'errors' => $e->errors(),
+                ],
+                'timestamp' => (int) (microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+            // #endregion
+
             Storage::delete($path);
 
             throw $e;
