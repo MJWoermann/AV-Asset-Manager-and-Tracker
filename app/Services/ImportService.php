@@ -91,6 +91,7 @@ class ImportService
                 'data' => $data,
                 'timestamp' => (int) (microtime(true) * 1000),
             ];
+<<<<<<< HEAD
             file_put_contents(storage_path('logs/debug-6fb0ed.log'), json_encode($payload)."\n", FILE_APPEND);
         };
         // #endregion
@@ -107,6 +108,14 @@ class ImportService
             'excel_temp_writable' => is_writable($excelTemp),
             'sys_temp_dir' => sys_get_temp_dir(),
             'sys_temp_writable' => is_writable(sys_get_temp_dir()),
+=======
+            file_put_contents(base_path('debug-6fb0ed.log'), json_encode($payload)."\n", FILE_APPEND);
+        };
+        // #endregion
+
+        // #region agent log
+        $debugLog('B', 'readHeadingColumns entry', [
+>>>>>>> d7fb3c7211100d622762abddfb85a457b6127252
             'input_type' => is_string($file) ? 'string' : get_class($file),
             'original_name' => $file instanceof UploadedFile ? $file->getClientOriginalName() : null,
             'extension' => $file instanceof UploadedFile ? $file->getClientOriginalExtension() : pathinfo((string) $file, PATHINFO_EXTENSION),
