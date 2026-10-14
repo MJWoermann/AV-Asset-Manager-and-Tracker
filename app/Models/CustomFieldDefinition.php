@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CustomFieldDefinition extends Model
 {
+    /** @var list<string> */
+    public const LAYOUT_TYPES = ['spacer', 'divider'];
+
     protected $fillable = [
         'custom_field_set_id',
         'name',
@@ -24,6 +27,11 @@ class CustomFieldDefinition extends Model
             'options' => 'array',
             'is_required' => 'boolean',
         ];
+    }
+
+    public function isLayoutElement(): bool
+    {
+        return in_array($this->type, self::LAYOUT_TYPES, true);
     }
 
     public function fieldSet(): BelongsTo

@@ -22,6 +22,14 @@
                 Details
             </a>
             <a
+                href="{{ route('assets.show', [$asset, 'tab' => 'files']) }}"
+                role="tab"
+                aria-selected="{{ $tab === 'files' ? 'true' : 'false' }}"
+                class="px-4 py-2 text-sm border-b-2 -mb-px {{ $tab === 'files' ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white' }}"
+            >
+                Files
+            </a>
+            <a
                 href="{{ route('assets.show', [$asset, 'tab' => 'history']) }}"
                 role="tab"
                 aria-selected="{{ $tab === 'history' ? 'true' : 'false' }}"
@@ -31,7 +39,14 @@
             </a>
         </div>
 
-        @if($tab === 'history')
+        @if($tab === 'files')
+            <x-file-attachments
+                linkable-type="asset"
+                :linkable-id="$asset->id"
+                :rows="$fileRows"
+                :can-mutate="true"
+            />
+        @elseif($tab === 'history')
             <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
                 <table class="min-w-full text-sm">
                     <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
@@ -46,13 +61,24 @@
                         @forelse($auditLogs as $log)
                             <tr class="border-t border-brand-silver dark:border-brand-charcoal align-top">
                                 <td class="px-3 py-2 whitespace-nowrap">{{ $log->created_at?->format('Y-m-d H:i') }}</td>
-                                <td class="px-3 py-2 capitalize">{{ $log->action }}</td>
+                                <td class="px-3 py-2 capitalize">{{ str_replace('_', ' ', $log->action) }}</td>
                                 <td class="px-3 py-2">{{ $log->user?->name ?? 'System' }}</td>
                                 <td class="px-3 py-2">
                                     @if($log->action === 'created')
                                         <span class="text-brand-charcoal dark:text-brand-silver">Asset created</span>
                                     @elseif($log->action === 'deleted')
                                         <span class="text-brand-charcoal dark:text-brand-silver">Asset deleted</span>
+                                    @elseif($log->action === 'file_linked')
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Linked file: {{ $log->new_values['title'] ?? '—' }}
+                                            @if(! empty($log->new_values['category']))
+                                                ({{ $log->new_values['category'] }})
+                                            @endif
+                                        </span>
+                                    @elseif($log->action === 'file_unlinked')
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Unlinked file: {{ $log->old_values['title'] ?? '—' }}
+                                        </span>
                                     @else
                                         @php $keys = $log->changedAttributeKeys(); @endphp
                                         @if($keys === [])
@@ -99,7 +125,36 @@
                 @endif
             </div>
 
-            @if($asset->customFieldValues->isNotEmpty())
+            @if($asset->itemType?->fieldSets->isNotEmpty())
+                @php
+                    $customValues = $asset->customFieldValues->keyBy('custom_field_definition_id');
+                @endphp
+                @foreach($asset->itemType->fieldSets as $set)
+                    @continue($set->definitions->isEmpty())
+                    <div>
+                        <h3 class="font-semibold mb-2">{{ $set->name }}</h3>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            @foreach($set->definitions as $def)
+                                @if($def->type === 'divider')
+                                    <div class="sm:col-span-2 py-1">
+                                        @if($def->name !== '' && strcasecmp($def->name, 'Divider') !== 0)
+                                            <div class="font-medium text-brand-charcoal dark:text-brand-silver mb-2">{{ $def->name }}</div>
+                                        @endif
+                                        <hr class="border-brand-silver dark:border-brand-charcoal">
+                                    </div>
+                                @elseif($def->type === 'spacer')
+                                    <div class="min-h-[1.5rem]" aria-hidden="true"></div>
+                                @else
+                                    <div class="flex justify-between gap-4 border-b border-brand-silver/50 dark:border-brand-charcoal pb-1">
+                                        <span>{{ $def->name }}</span>
+                                        <span class="font-mono">{{ $customValues[$def->id]->value ?? '—' }}</span>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            @elseif($asset->customFieldValues->isNotEmpty())
                 <div>
                     <h3 class="font-semibold mb-2">Custom fields</h3>
                     <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm space-y-2">

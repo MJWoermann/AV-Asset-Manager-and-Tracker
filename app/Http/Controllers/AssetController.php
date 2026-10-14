@@ -7,10 +7,13 @@ use App\Http\Requests\BulkUpdateAssetsRequest;
 use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
 use App\Models\AssetList;
+use App\Models\CustomFieldDefinition;
 use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\UnknownScan;
 use App\Services\BulkAssetUpdateService;
+use App\Services\FileAttachmentService;
+use App\Support\AssetBrowseFilters;
 use App\Support\AssetTableColumns;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,20 +23,16 @@ class AssetController extends Controller
 {
     public function index(Request $request): View
     {
-        $term = $request->string('q')->toString() ?: null;
-
-        $locationId = $request->integer('location_id') ?: null;
-        $itemTypeId = $request->integer('item_type_id') ?: null;
+        $term = AssetBrowseFilters::term($request);
+        $selectedColumns = $request->user()->assetTableColumns();
 
         $assets = Asset::query()
             ->with(['itemType', 'location', 'parent', 'customFieldValues'])
-            ->whereNull('parent_id')
-            ->search($term)
-            ->when($request->status, fn ($query, $status) => $query->where('status', $status))
-            ->when($locationId, function ($query) use ($locationId) {
-                $query->whereIn('location_id', Location::selfAndDescendantIds($locationId));
-            })
-            ->when($itemTypeId, fn ($query) => $query->where('item_type_id', $itemTypeId))
+            ->whereNull('parent_id');
+
+        AssetBrowseFilters::applyToAssetQuery($assets, $request);
+
+        $assets = $assets
             ->orderBySearchRelevance($term)
             ->paginate(50)
             ->withQueryString();
@@ -42,10 +41,9 @@ class AssetController extends Controller
             'assets' => $assets,
             'statuses' => AssetStatus::options(),
             'q' => $term ?? '',
-            'locationId' => $locationId,
-            'itemTypeId' => $itemTypeId,
             'availableColumns' => AssetTableColumns::definitions(),
-            'selectedColumns' => $request->user()->assetTableColumns(),
+            'selectedColumns' => $selectedColumns,
+            'preservedFilters' => AssetBrowseFilters::hiddenPreservedParams($request, $selectedColumns),
             'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
             'itemTypes' => ItemType::orderBy('name')->get(),
             'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
@@ -132,20 +130,29 @@ class AssetController extends Controller
         return redirect()->route('assets.show', $asset)->with('status', 'Asset created.');
     }
 
-    public function show(Request $request, Asset $asset): View
+    public function show(Request $request, Asset $asset, FileAttachmentService $attachments): View
     {
         $asset->load(['itemType.fieldSets.definitions', 'location.parent.parent', 'children.itemType', 'customFieldValues.definition', 'parent']);
 
-        $tab = $request->string('tab')->toString() === 'history' ? 'history' : 'details';
+        $tab = match ($request->string('tab')->toString()) {
+            'history' => 'history',
+            'files' => 'files',
+            default => 'details',
+        };
 
         $auditLogs = $tab === 'history'
             ? $asset->auditLogs()->with('user')->paginate(25)->withQueryString()
             : null;
 
+        $fileRows = $tab === 'files'
+            ? $attachments->filesForAsset($asset)
+            : [];
+
         return view('assets.show', [
             'asset' => $asset,
             'tab' => $tab,
             'auditLogs' => $auditLogs,
+            'fileRows' => $fileRows,
         ]);
     }
 
@@ -209,11 +216,21 @@ class AssetController extends Controller
     protected function syncCustomFields(Asset $asset, Request $request): void
     {
         $values = $request->input('custom_fields', []);
-        if (! is_array($values)) {
+        if (! is_array($values) || $values === []) {
             return;
         }
 
+        $layoutIds = CustomFieldDefinition::query()
+            ->whereIn('id', array_keys($values))
+            ->whereIn('type', CustomFieldDefinition::LAYOUT_TYPES)
+            ->pluck('id')
+            ->all();
+
         foreach ($values as $definitionId => $value) {
+            if (in_array((int) $definitionId, $layoutIds, true)) {
+                continue;
+            }
+
             if ($value === null || $value === '') {
                 AssetCustomFieldValue::where('asset_id', $asset->id)
                     ->where('custom_field_definition_id', $definitionId)

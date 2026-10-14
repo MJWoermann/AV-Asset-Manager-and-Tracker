@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header"><h2 class="font-semibold text-xl">{{ $itemType->exists ? 'Edit type' : 'New type' }}</h2></x-slot>
-    <div class="max-w-xl mx-auto px-4">
+    <div class="max-w-3xl mx-auto px-4">
         <form method="POST" action="{{ $itemType->exists ? route('item-types.update', $itemType) : route('item-types.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             @if($itemType->exists) @method('PUT') @endif
@@ -34,6 +34,19 @@
         </form>
 
         @if($itemType->exists)
+            <div class="mt-8 space-y-3">
+                <h3 class="font-semibold text-lg">Files</h3>
+                <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                    Files linked here appear on every asset of this type.
+                </p>
+                <x-file-attachments
+                    linkable-type="item_type"
+                    :linkable-id="$itemType->id"
+                    :rows="$fileRows"
+                    :can-mutate="true"
+                />
+            </div>
+
             <div class="mt-6 space-y-2">
                 @if($replacementTypes->isEmpty())
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver">

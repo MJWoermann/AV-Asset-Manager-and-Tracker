@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Enums\LocationType;
+use App\Services\FileAttachmentService;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Collection;
 
 class Location extends Model
@@ -29,6 +31,13 @@ class Location extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Location $location): void {
+            app(FileAttachmentService::class)->detachAll($location);
+        });
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id');
@@ -42,6 +51,14 @@ class Location extends Model
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class);
+    }
+
+    public function files(): MorphToMany
+    {
+        return $this->morphToMany(File::class, 'linkable', 'file_links')
+            ->withPivot(['id', 'note'])
+            ->withTimestamps()
+            ->orderBy('files.title');
     }
 
     public function breadcrumb(): string

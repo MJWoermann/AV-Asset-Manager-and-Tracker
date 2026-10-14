@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Enums\AssetStatus;
+use App\Services\FileAttachmentService;
 use App\Support\AssetSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class Asset extends Model
 {
@@ -62,6 +64,10 @@ class Asset extends Model
                 });
             }
         });
+
+        static::deleting(function (Asset $asset): void {
+            app(FileAttachmentService::class)->detachAll($asset);
+        });
     }
 
     public function itemType(): BelongsTo
@@ -92,6 +98,14 @@ class Asset extends Model
     public function auditLogs(): MorphMany
     {
         return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');
+    }
+
+    public function files(): MorphToMany
+    {
+        return $this->morphToMany(File::class, 'linkable', 'file_links')
+            ->withPivot(['id', 'note'])
+            ->withTimestamps()
+            ->orderBy('files.title');
     }
 
     public function isContainer(): bool

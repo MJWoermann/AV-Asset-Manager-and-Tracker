@@ -38,6 +38,17 @@
             </div>
         @endif
 
+        <form id="asset-filters" method="GET" class="mb-4 flex flex-col sm:flex-row gap-2">
+            <input type="search" name="q" value="{{ $q }}" placeholder="Search FMI, barcode, SN, IP, MAC…" class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white">
+            @foreach($preservedFilters as $param => $value)
+                <input type="hidden" name="{{ $param }}" value="{{ $value }}">
+            @endforeach
+            <button class="px-4 py-2 bg-black text-white dark:bg-brand">Filter</button>
+            @if(\App\Support\AssetBrowseFilters::hasActiveFilters(request()))
+                <a href="{{ route('lists.show', $list) }}" class="px-4 py-2 border text-sm inline-flex items-center">Clear</a>
+            @endif
+        </form>
+
         <x-bulk-asset-actions
             :statuses="$statuses"
             :locations="$locations"
@@ -63,6 +74,12 @@
                             <th class="px-3 py-2">{{ \App\Support\AssetTableColumns::label($column) }}</th>
                         @endforeach
                     </tr>
+                    <x-asset-column-filters
+                        :selected-columns="$selectedColumns"
+                        :statuses="$statuses"
+                        :locations="$locations"
+                        :item-types="$itemTypes"
+                    />
                 </thead>
                 <tbody>
                     @forelse($items as $item)
@@ -89,6 +106,7 @@
                                         :column="$column"
                                         :item="$item"
                                         :indent="$indent"
+                                        :term="$q"
                                         :selected-columns="$selectedColumns"
                                     />
                                 @else

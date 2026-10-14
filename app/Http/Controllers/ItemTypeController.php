@@ -28,6 +28,7 @@ class ItemTypeController extends Controller
             'fieldSets' => CustomFieldSet::with('definitions')->orderBy('name')->get(),
             'replacementTypes' => collect(),
             'assetCount' => 0,
+            'fileRows' => [],
         ]);
     }
 
@@ -52,7 +53,14 @@ class ItemTypeController extends Controller
 
     public function edit(ItemType $itemType): View
     {
-        $itemType->load('fieldSets');
+        $itemType->load(['fieldSets', 'files']);
+
+        $fileRows = $itemType->files->map(fn ($file): array => [
+            'file' => $file,
+            'inherited' => false,
+            'link_id' => (int) $file->pivot->id,
+            'note' => $file->pivot->note,
+        ])->all();
 
         return view('item-types.form', [
             'itemType' => $itemType,
@@ -62,6 +70,7 @@ class ItemTypeController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'assetCount' => $itemType->assets()->count(),
+            'fileRows' => $fileRows,
         ]);
     }
 

@@ -205,5 +205,104 @@ class CustomFieldSetTest extends TestCase
         $response->assertSee('Network Details');
         $response->assertSee('IP Address');
         $response->assertSee('customFieldSetForm(', false);
+        $response->assertSee('Add spacer');
+        $response->assertSee('Add divider');
+    }
+
+    public function test_manager_can_reorder_fields(): void
+    {
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Network Details',
+            'slug' => 'network-details',
+        ]);
+        $first = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'IP Address',
+            'slug' => 'ip-address',
+            'type' => 'text',
+            'sort_order' => 0,
+        ]);
+        $second = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'MAC Address',
+            'slug' => 'mac-address',
+            'type' => 'text',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($this->manager())->put(route('custom-field-sets.update', $fieldSet), [
+            'name' => 'Network Details',
+            'fields' => [
+                [
+                    'id' => $second->id,
+                    'name' => 'MAC Address',
+                    'type' => 'text',
+                    'is_required' => '0',
+                ],
+                [
+                    'id' => $first->id,
+                    'name' => 'IP Address',
+                    'type' => 'text',
+                    'is_required' => '0',
+                ],
+            ],
+        ])->assertRedirect(route('custom-field-sets.index'));
+
+        $this->assertSame(0, $second->fresh()->sort_order);
+        $this->assertSame(1, $first->fresh()->sort_order);
+        $this->assertSame(['MAC Address', 'IP Address'], $fieldSet->fresh()->definitions->pluck('name')->all());
+    }
+
+    public function test_manager_can_add_spacer_and_divider(): void
+    {
+        $this->actingAs($this->manager())->post(route('custom-field-sets.store'), [
+            'name' => 'Layout Set',
+            'fields' => [
+                [
+                    'name' => 'IP Address',
+                    'type' => 'text',
+                    'is_required' => '0',
+                ],
+                [
+                    'name' => '',
+                    'type' => 'spacer',
+                    'is_required' => '0',
+                ],
+                [
+                    'name' => 'Network',
+                    'type' => 'divider',
+                    'is_required' => '1',
+                ],
+                [
+                    'name' => 'MAC Address',
+                    'type' => 'text',
+                    'is_required' => '0',
+                ],
+            ],
+        ])->assertRedirect(route('custom-field-sets.index'));
+
+        $fieldSet = CustomFieldSet::query()->where('name', 'Layout Set')->first();
+        $this->assertNotNull($fieldSet);
+
+        $definitions = $fieldSet->definitions;
+        $this->assertCount(4, $definitions);
+        $this->assertSame(['IP Address', 'Spacer', 'Network', 'MAC Address'], $definitions->pluck('name')->all());
+        $this->assertSame(['text', 'spacer', 'divider', 'text'], $definitions->pluck('type')->all());
+        $this->assertFalse($definitions[1]->is_required);
+        $this->assertFalse($definitions[2]->is_required);
+        $this->assertNull($definitions[1]->options);
+        $this->assertNull($definitions[2]->options);
+    }
+
+    public function test_data_field_still_requires_name(): void
+    {
+        $this->actingAs($this->manager())
+            ->post(route('custom-field-sets.store'), [
+                'name' => 'Broken Set',
+                'fields' => [
+                    ['name' => '', 'type' => 'text'],
+                ],
+            ])
+            ->assertSessionHasErrors(['fields.0.name']);
     }
 }

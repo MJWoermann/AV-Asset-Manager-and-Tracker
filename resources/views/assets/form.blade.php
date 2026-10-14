@@ -116,16 +116,27 @@
                         <legend class="px-1 text-sm font-semibold text-brand">{{ $set->name }}</legend>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             @foreach($set->definitions as $def)
-                                <div>
-                                    <x-input-label :for="'cf_'.$def->id" :value="$def->name" />
-                                    @if($def->type === 'checkbox')
-                                        <input type="checkbox" id="cf_{{ $def->id }}" name="custom_fields[{{ $def->id }}]" value="1" class="rounded border-gray-300 text-brand"
-                                            @checked(old('custom_fields.'.$def->id, $values[$def->id]->value ?? null) == '1')>
-                                    @else
-                                        <x-text-input id="cf_{{ $def->id }}" name="custom_fields[{{ $def->id }}]" class="mt-1 block w-full"
-                                            :value="old('custom_fields.'.$def->id, $values[$def->id]->value ?? '')" />
-                                    @endif
-                                </div>
+                                @if($def->type === 'divider')
+                                    <div class="sm:col-span-2 py-1">
+                                        @if($def->name !== '' && strcasecmp($def->name, 'Divider') !== 0)
+                                            <div class="text-sm font-medium text-brand-charcoal dark:text-brand-silver mb-2">{{ $def->name }}</div>
+                                        @endif
+                                        <hr class="border-brand-silver dark:border-brand-charcoal">
+                                    </div>
+                                @elseif($def->type === 'spacer')
+                                    <div class="min-h-[2.5rem]" aria-hidden="true"></div>
+                                @else
+                                    <div>
+                                        <x-input-label :for="'cf_'.$def->id" :value="$def->name" />
+                                        @if($def->type === 'checkbox')
+                                            <input type="checkbox" id="cf_{{ $def->id }}" name="custom_fields[{{ $def->id }}]" value="1" class="rounded border-gray-300 text-brand"
+                                                @checked(old('custom_fields.'.$def->id, $values[$def->id]->value ?? null) == '1')>
+                                        @else
+                                            <x-text-input id="cf_{{ $def->id }}" name="custom_fields[{{ $def->id }}]" class="mt-1 block w-full"
+                                                :value="old('custom_fields.'.$def->id, $values[$def->id]->value ?? '')" />
+                                        @endif
+                                    </div>
+                                @endif
                             @endforeach
                         </div>
                     </fieldset>

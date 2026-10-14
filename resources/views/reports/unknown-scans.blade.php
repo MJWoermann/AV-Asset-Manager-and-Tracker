@@ -28,6 +28,33 @@
             </div>
         </form>
 
+        @role('admin')
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    Admin: remove duplicate codes (keep the latest scan of each) or clear the entire unknown scans table.
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                    <form
+                        method="POST"
+                        action="{{ route('reports.unknown-scans.deduplicate') }}"
+                        onsubmit="return confirm('Remove duplicate unknown scans, keeping only the latest scan of each code?')"
+                    >
+                        @csrf
+                        <x-secondary-button>Remove duplicates</x-secondary-button>
+                    </form>
+                    <form
+                        method="POST"
+                        action="{{ route('reports.unknown-scans.destroy-all') }}"
+                        onsubmit="return confirm('Clear the entire unknown scans table? This cannot be undone.')"
+                    >
+                        @csrf
+                        @method('DELETE')
+                        <x-danger-button>Clear all</x-danger-button>
+                    </form>
+                </div>
+            </div>
+        @endrole
+
         <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver/40 dark:bg-brand-charcoal/40 text-left">

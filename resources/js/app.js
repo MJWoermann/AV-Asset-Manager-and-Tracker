@@ -265,6 +265,7 @@ Alpine.data('importMapper', (columns, initialSelections = {}, requiredFields = [
 }));
 
 Alpine.data('customFieldSetForm', (initialFields = []) => ({
+    draggedIndex: null,
     fields: (initialFields || []).map((field, index) => ({
         key: field.id ? `id-${field.id}` : `new-${index}-${Math.random().toString(36).slice(2, 8)}`,
         id: field.id || null,
@@ -274,9 +275,17 @@ Alpine.data('customFieldSetForm', (initialFields = []) => ({
         is_required: !!field.is_required,
     })),
 
+    isLayoutType(type) {
+        return type === 'spacer' || type === 'divider';
+    },
+
+    newFieldKey() {
+        return `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    },
+
     addField() {
         this.fields.push({
-            key: `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            key: this.newFieldKey(),
             id: null,
             name: '',
             type: 'text',
@@ -285,8 +294,79 @@ Alpine.data('customFieldSetForm', (initialFields = []) => ({
         });
     },
 
+    addSpacer() {
+        this.fields.push({
+            key: this.newFieldKey(),
+            id: null,
+            name: 'Spacer',
+            type: 'spacer',
+            options: '',
+            is_required: false,
+        });
+    },
+
+    addDivider() {
+        this.fields.push({
+            key: this.newFieldKey(),
+            id: null,
+            name: 'Divider',
+            type: 'divider',
+            options: '',
+            is_required: false,
+        });
+    },
+
     removeField(index) {
         this.fields.splice(index, 1);
+    },
+
+    moveField(index, direction) {
+        const target = index + direction;
+        if (target < 0 || target >= this.fields.length) {
+            return;
+        }
+
+        const fields = [...this.fields];
+        const [item] = fields.splice(index, 1);
+        fields.splice(target, 0, item);
+        this.fields = fields;
+    },
+
+    onTypeChange(field) {
+        if (this.isLayoutType(field.type)) {
+            field.is_required = false;
+            field.options = '';
+            if (!field.name || field.name.trim() === '') {
+                field.name = field.type === 'spacer' ? 'Spacer' : 'Divider';
+            }
+        }
+    },
+
+    onDragStart(index, event) {
+        this.draggedIndex = index;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(index));
+    },
+
+    onDragOver(event) {
+        event.dataTransfer.dropEffect = 'move';
+    },
+
+    onDrop(index) {
+        if (this.draggedIndex === null || this.draggedIndex === index) {
+            this.draggedIndex = null;
+            return;
+        }
+
+        const fields = [...this.fields];
+        const [item] = fields.splice(this.draggedIndex, 1);
+        fields.splice(index, 0, item);
+        this.fields = fields;
+        this.draggedIndex = null;
+    },
+
+    onDragEnd() {
+        this.draggedIndex = null;
     },
 }));
 
@@ -567,6 +647,9 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         );
         this.recent = [...this.serverUnknowns, ...storedWithoutDupUnknowns].slice(0, 50);
         this.persistRecent();
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67bc37'},body:JSON.stringify({sessionId:'67bc37',location:'app.js:barcodeScanner.init',message:'scan recent init',data:{eventListId:this.eventListId,storedLen:stored.length,storedAfterDedup:storedWithoutDupUnknowns.length,serverUnknownsLen:this.serverUnknowns.length,recentLen:this.recent.length,storageKey:this.storageKey(),recentUnknownCount:this.recent.filter((e)=>e.unknown).length,recentKnownCount:this.recent.filter((e)=>!e.unknown).length},timestamp:Date.now(),hypothesisId:'A,C,D'})}).catch(()=>{});
+        // #endregion
         this.$nextTick(() => this.focusInput());
     },
 
@@ -597,8 +680,16 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     },
 
     resetRecent() {
+        // #region agent log
+        const beforeLen = this.recent.length;
+        const beforeKnown = this.recent.filter((e) => !e.unknown).length;
+        const beforeUnknown = this.recent.filter((e) => e.unknown).length;
+        // #endregion
         this.recent = [...this.serverUnknowns];
         this.persistRecent();
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67bc37'},body:JSON.stringify({sessionId:'67bc37',location:'app.js:barcodeScanner.resetRecent',message:'resetRecent called',data:{beforeLen,beforeKnown,beforeUnknown,afterLen:this.recent.length,serverUnknownsLen:this.serverUnknowns.length,eventListId:this.eventListId,storageKey:this.storageKey()},timestamp:Date.now(),hypothesisId:'A,B,E'})}).catch(()=>{});
+        // #endregion
     },
 
     focusInput() {

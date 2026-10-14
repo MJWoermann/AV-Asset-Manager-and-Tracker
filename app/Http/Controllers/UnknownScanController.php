@@ -92,4 +92,28 @@ class UnknownScanController extends Controller
 
         return back()->with('status', 'Note saved.');
     }
+
+    public function destroyAll(): RedirectResponse
+    {
+        $deleted = UnknownScan::clearAll();
+
+        return redirect()
+            ->route('reports.unknown-scans')
+            ->with('status', $deleted === 1
+                ? 'Cleared 1 unknown scan.'
+                : "Cleared {$deleted} unknown scans.");
+    }
+
+    public function deduplicate(): RedirectResponse
+    {
+        $deleted = UnknownScan::deleteDuplicatesKeepingLatest();
+
+        return redirect()
+            ->route('reports.unknown-scans')
+            ->with('status', $deleted === 0
+                ? 'No duplicate unknown scans found.'
+                : ($deleted === 1
+                    ? 'Removed 1 duplicate unknown scan.'
+                    : "Removed {$deleted} duplicate unknown scans."));
+    }
 }

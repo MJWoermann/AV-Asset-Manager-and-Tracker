@@ -6,6 +6,7 @@
     'placeholder' => '—',
     'required' => false,
     'nullable' => false,
+    'form' => null,
 ])
 
 @php
@@ -34,7 +35,7 @@
     @keydown="onKeydown($event)"
     @click.outside="closeList()"
 >
-    <input type="hidden" name="{{ $name }}" id="{{ $id }}" x-model="value" @if($required) required @endif>
+    <input type="hidden" name="{{ $name }}" id="{{ $id }}" x-model="value" @if($required) required @endif @if($form) form="{{ $form }}" @endif>
 
     <div class="flex gap-1">
         <button

@@ -3,48 +3,54 @@
 namespace App\Exports;
 
 use App\Models\Asset;
+use App\Models\AssetListItem;
+use App\Support\AssetExportColumns;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 
 class AssetsExport implements FromCollection, WithHeadings
 {
-    public function __construct(public ?int $listId = null) {}
+    /** @var list<string> */
+    protected array $columns;
+
+    public function __construct(public ?int $listId = null)
+    {
+        $this->columns = $this->listId
+            ? AssetExportColumns::forLists()
+            : AssetExportColumns::forAssets();
+    }
 
     public function collection(): Collection
     {
-        $query = Asset::query()->with('itemType')->orderBy('name');
+        $relations = AssetExportColumns::relationsFor($this->columns);
 
         if ($this->listId) {
-            $query->whereIn('id', function ($q) {
-                $q->select('asset_id')
-                    ->from('asset_list_items')
-                    ->where('asset_list_id', $this->listId);
-            });
+            $with = ['asset'];
+            foreach ($relations as $relation) {
+                $with[] = 'asset.'.$relation;
+            }
+
+            return AssetListItem::query()
+                ->with($with)
+                ->where('asset_list_id', $this->listId)
+                ->whereHas('asset')
+                ->get()
+                ->sortBy(fn (AssetListItem $item) => Str::lower((string) $item->asset?->name))
+                ->values()
+                ->map(fn (AssetListItem $item) => AssetExportColumns::row($item->asset, $this->columns, $item));
         }
 
-        return $query->get()->map(fn (Asset $a) => [
-            $a->name,
-            $a->description,
-            $a->itemType?->name,
-            $a->status?->value,
-            $a->manufacturer,
-            $a->model,
-            $a->serial_number,
-            $a->fmi_ast,
-            $a->tp_barcode,
-            $a->rig_tag,
-            $a->ip_address,
-            $a->mac_address,
-            $a->quantity,
-        ]);
+        return Asset::query()
+            ->with($relations)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Asset $asset) => AssetExportColumns::row($asset, $this->columns));
     }
 
     public function headings(): array
     {
-        return [
-            'Name', 'Description', 'Item Type', 'Status', 'Manufacturer', 'Model', 'Serial Number',
-            'FMI AST#', 'TP Barcode', 'RIG Tag #', 'IP Address', 'MAC Address', 'Quantity',
-        ];
+        return AssetExportColumns::headings($this->columns);
     }
 }

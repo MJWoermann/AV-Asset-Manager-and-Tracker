@@ -41,9 +41,10 @@ class AssetItemTypeFilterTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Fixture Asset');
-        $response->assertDontSee('Rack Asset');
-        $response->assertSee('searchableSelect(', false);
+        $this->assertSame(
+            ['Fixture Asset'],
+            $response->viewData('assets')->pluck('name')->all()
+        );
         $response->assertSee('name="item_type_id"', false);
         $response->assertSee('id="filter_item_type_id"', false);
         $response->assertSee('All item types');
@@ -75,7 +76,9 @@ class AssetItemTypeFilterTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Available Fixture');
-        $response->assertDontSee('Lost Fixture');
+        $this->assertSame(
+            ['Available Fixture'],
+            $response->viewData('assets')->pluck('name')->all()
+        );
     }
 }

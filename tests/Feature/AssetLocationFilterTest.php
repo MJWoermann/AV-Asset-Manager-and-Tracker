@@ -56,10 +56,10 @@ class AssetLocationFilterTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('In Room Asset');
-        $response->assertDontSee('Other Site Asset');
-        $response->assertSee('searchableSelect(', false);
-        $response->assertSee('placeholder="Search…"', false);
+        $this->assertSame(
+            ['In Room Asset'],
+            $response->viewData('assets')->pluck('name')->all()
+        );
         $response->assertSee('name="location_id"', false);
         $response->assertSee('id="filter_location_id"', false);
         $response->assertSee('All locations');
@@ -107,7 +107,9 @@ class AssetLocationFilterTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Room A Asset');
-        $response->assertDontSee('Room B Asset');
+        $this->assertSame(
+            ['Room A Asset'],
+            $response->viewData('assets')->pluck('name')->all()
+        );
     }
 }

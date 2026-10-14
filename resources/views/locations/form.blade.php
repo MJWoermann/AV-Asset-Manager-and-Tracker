@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header"><h2 class="font-semibold text-xl">{{ $location->exists ? 'Edit location' : 'New location' }}</h2></x-slot>
-    <div class="max-w-xl mx-auto px-4">
+    <div class="max-w-3xl mx-auto px-4">
         <form method="POST" action="{{ $location->exists ? route('locations.update', $location) : route('locations.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             @if($location->exists) @method('PUT') @endif
@@ -37,5 +37,17 @@
             </label>
             <x-primary-button>Save</x-primary-button>
         </form>
+
+        @if($location->exists)
+            <div class="mt-8 space-y-3">
+                <h3 class="font-semibold text-lg">Files</h3>
+                <x-file-attachments
+                    linkable-type="location"
+                    :linkable-id="$location->id"
+                    :rows="$fileRows"
+                    :can-mutate="true"
+                />
+            </div>
+        @endif
     </div>
 </x-app-layout>

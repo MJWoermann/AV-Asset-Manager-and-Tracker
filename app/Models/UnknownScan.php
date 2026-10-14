@@ -82,4 +82,32 @@ class UnknownScan extends Model
     {
         return $query->whereNull('resolved_asset_id');
     }
+
+    /**
+     * Delete every unknown scan row.
+     */
+    public static function clearAll(): int
+    {
+        return static::query()->delete();
+    }
+
+    /**
+     * Delete duplicate scanned codes, keeping the latest row (highest id) for each code.
+     */
+    public static function deleteDuplicatesKeepingLatest(): int
+    {
+        $keepIds = static::query()
+            ->toBase()
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('scanned_code')
+            ->pluck('id');
+
+        if ($keepIds->isEmpty()) {
+            return 0;
+        }
+
+        return static::query()
+            ->whereNotIn('id', $keepIds)
+            ->delete();
+    }
 }

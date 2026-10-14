@@ -82,7 +82,30 @@ class ScanController extends Controller
             ]);
         }
 
-        $scan->update($this->validatedSessionLists($request));
+        $previousEventListId = $scan->event_list_id;
+        $data = $this->validatedSessionLists($request);
+        $scan->update($data);
+
+        // #region agent log
+        file_put_contents(
+            base_path('debug-67bc37.log'),
+            json_encode([
+                'sessionId' => '67bc37',
+                'location' => 'ScanController.php:updateLists',
+                'message' => 'updateLists called',
+                'data' => [
+                    'scanId' => $scan->id,
+                    'previousEventListId' => $previousEventListId,
+                    'newEventListId' => $data['event_list_id'] ?? null,
+                    'eventListChanged' => (int) $previousEventListId !== (int) ($data['event_list_id'] ?? 0),
+                    'inventoryListId' => $data['inventory_list_id'] ?? null,
+                ],
+                'timestamp' => (int) (microtime(true) * 1000),
+                'hypothesisId' => 'C,D',
+            ])."\n",
+            FILE_APPEND
+        );
+        // #endregion
 
         return redirect()->route('scan.index')->with('status', 'Scan lists updated.');
     }

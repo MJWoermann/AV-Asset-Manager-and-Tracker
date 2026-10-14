@@ -9,12 +9,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class CustomFieldSetController extends Controller
 {
     /** @var list<string> */
-    public const FIELD_TYPES = ['text', 'number', 'checkbox', 'select'];
+    public const FIELD_TYPES = ['text', 'number', 'checkbox', 'select', 'spacer', 'divider'];
 
     public function index(): View
     {
@@ -89,7 +90,7 @@ class CustomFieldSetController extends Controller
     /** @return array<string, mixed> */
     protected function validated(Request $request, ?CustomFieldSet $fieldSet = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => [
                 'required',
                 'string',
@@ -107,11 +108,26 @@ class CustomFieldSetController extends Controller
                         : $query->whereRaw('0 = 1')
                 ),
             ],
-            'fields.*.name' => ['required', 'string', 'max:255'],
+            'fields.*.name' => ['nullable', 'string', 'max:255'],
             'fields.*.type' => ['required', Rule::in(self::FIELD_TYPES)],
             'fields.*.options' => ['nullable', 'string', 'max:2000'],
             'fields.*.is_required' => ['sometimes', 'boolean'],
         ]);
+
+        $errors = [];
+        foreach ($data['fields'] ?? [] as $index => $field) {
+            $type = (string) ($field['type'] ?? '');
+            $name = trim((string) ($field['name'] ?? ''));
+            if ($name === '' && ! in_array($type, CustomFieldDefinition::LAYOUT_TYPES, true)) {
+                $errors["fields.$index.name"] = 'The field name is required.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $data;
     }
 
     /**
@@ -122,10 +138,18 @@ class CustomFieldSetController extends Controller
         $keptIds = [];
 
         foreach (array_values($fields) as $index => $field) {
-            $name = trim((string) $field['name']);
             $type = (string) $field['type'];
-            $options = $this->parseOptions($type, $field['options'] ?? null);
-            $isRequired = filter_var($field['is_required'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $isLayout = in_array($type, CustomFieldDefinition::LAYOUT_TYPES, true);
+            $name = trim((string) ($field['name'] ?? ''));
+            if ($name === '') {
+                $name = match ($type) {
+                    'spacer' => 'Spacer',
+                    'divider' => 'Divider',
+                    default => $name,
+                };
+            }
+            $options = $isLayout ? null : $this->parseOptions($type, $field['options'] ?? null);
+            $isRequired = $isLayout ? false : filter_var($field['is_required'] ?? false, FILTER_VALIDATE_BOOLEAN);
             $definitionId = isset($field['id']) ? (int) $field['id'] : null;
 
             if ($definitionId) {

@@ -25,33 +25,15 @@
             </div>
         @endif
 
-        <form method="GET" class="mb-4 flex flex-col sm:flex-row gap-2">
+        <form id="asset-filters" method="GET" class="mb-4 flex flex-col sm:flex-row gap-2">
             <input type="search" name="q" value="{{ $q }}" placeholder="Search FMI, barcode, SN, IP, MAC…" class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white">
-            <select name="status" class="rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                <option value="">All statuses</option>
-                @foreach($statuses as $value => $label)
-                    <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
-                @endforeach
-            </select>
-            <x-searchable-select
-                class="relative min-w-[14rem] sm:w-64"
-                name="location_id"
-                id="filter_location_id"
-                :options="$locations->map(fn ($location) => ['value' => $location->id, 'label' => $location->breadcrumb()])"
-                :selected="$locationId"
-                placeholder="All locations"
-                nullable
-            />
-            <x-searchable-select
-                class="relative min-w-[12rem] sm:w-56"
-                name="item_type_id"
-                id="filter_item_type_id"
-                :options="$itemTypes->map(fn ($itemType) => ['value' => $itemType->id, 'label' => $itemType->name])"
-                :selected="$itemTypeId"
-                placeholder="All item types"
-                nullable
-            />
-            <button class="px-4 py-2 bg-black text-white dark:bg-brand">Search</button>
+            @foreach($preservedFilters as $param => $value)
+                <input type="hidden" name="{{ $param }}" value="{{ $value }}">
+            @endforeach
+            <button class="px-4 py-2 bg-black text-white dark:bg-brand">Filter</button>
+            @if(\App\Support\AssetBrowseFilters::hasActiveFilters(request()))
+                <a href="{{ route('assets.index') }}" class="px-4 py-2 border text-sm inline-flex items-center">Clear</a>
+            @endif
         </form>
 
         <x-bulk-asset-actions
@@ -78,6 +60,12 @@
                             <th class="px-3 py-2">{{ \App\Support\AssetTableColumns::label($column) }}</th>
                         @endforeach
                     </tr>
+                    <x-asset-column-filters
+                        :selected-columns="$selectedColumns"
+                        :statuses="$statuses"
+                        :locations="$locations"
+                        :item-types="$itemTypes"
+                    />
                 </thead>
                 <tbody>
                     @forelse($assets as $asset)

@@ -10,16 +10,55 @@
                     <x-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">Scan</x-nav-link>
                     <x-nav-link :href="route('assets.index')" :active="request()->routeIs('assets.*')">Assets</x-nav-link>
                     <x-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-nav-link>
-                    <x-nav-link :href="route('reports.compare')" :active="request()->routeIs('reports.compare*')">Compare</x-nav-link>
-                    <x-nav-link :href="route('reports.unknown-scans')" :active="request()->routeIs('reports.unknown-scans*')">Unknown scans</x-nav-link>
-                    <x-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">Locations</x-nav-link>
+
+                    @php
+                        $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*');
+                        $dataActive = request()->routeIs('locations.*', 'item-types.*', 'custom-field-sets.*', 'files.*');
+                    @endphp
+
+                    <x-dropdown align="left" width="48">
+                        <x-slot name="trigger">
+                            <button type="button" @class([
+                                'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium border-b-2',
+                                'text-brand border-brand' => $reportsActive,
+                                'text-brand-silver hover:text-white border-transparent' => ! $reportsActive,
+                            ])>
+                                Reports
+                                <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </x-slot>
+                        <x-slot name="content">
+                            <x-dropdown-link :href="route('reports.compare')">Compare</x-dropdown-link>
+                            <x-dropdown-link :href="route('reports.unknown-scans')">Unknown scans</x-dropdown-link>
+                        </x-slot>
+                    </x-dropdown>
+
+                    <x-dropdown align="left" width="48">
+                        <x-slot name="trigger">
+                            <button type="button" @class([
+                                'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium border-b-2',
+                                'text-brand border-brand' => $dataActive,
+                                'text-brand-silver hover:text-white border-transparent' => ! $dataActive,
+                            ])>
+                                Data
+                                <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </x-slot>
+                        <x-slot name="content">
+                            <x-dropdown-link :href="route('locations.index')">Locations</x-dropdown-link>
+                            @role('admin|inventory_manager')
+                                <x-dropdown-link :href="route('item-types.index')">Item Types</x-dropdown-link>
+                                <x-dropdown-link :href="route('custom-field-sets.index')">Field sets</x-dropdown-link>
+                                <x-dropdown-link :href="route('files.index')">Files</x-dropdown-link>
+                            @endrole
+                        </x-slot>
+                    </x-dropdown>
+
                     @role('admin|inventory_manager')
                         <x-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-nav-link>
-                        <x-nav-link :href="route('item-types.index')" :active="request()->routeIs('item-types.*')">Types</x-nav-link>
-                        <x-nav-link :href="route('custom-field-sets.index')" :active="request()->routeIs('custom-field-sets.*')">Field sets</x-nav-link>
                     @endrole
                     @role('admin')
-                        <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.*')">Users</x-nav-link>
+                        <x-nav-link :href="route('admin.export-columns.edit')" :active="request()->routeIs('admin.export-columns.*')">Export columns</x-nav-link>
                     @endrole
                 </div>
             </div>
@@ -34,6 +73,9 @@
                     </x-slot>
                     <x-slot name="content">
                         <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
+                        @role('admin')
+                            <x-dropdown-link :href="route('admin.users.index')">Manage users</x-dropdown-link>
+                        @endrole
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">Log Out</x-dropdown-link>
@@ -59,18 +101,31 @@
             <x-responsive-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">Scan</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('assets.index')" :active="request()->routeIs('assets.*')">Assets</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-responsive-nav-link>
+
+            <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Reports</div>
             <x-responsive-nav-link :href="route('reports.compare')" :active="request()->routeIs('reports.compare*')">Compare</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('reports.unknown-scans')" :active="request()->routeIs('reports.unknown-scans*')">Unknown scans</x-responsive-nav-link>
+
+            <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Data</div>
             <x-responsive-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">Locations</x-responsive-nav-link>
             @role('admin|inventory_manager')
-                <x-responsive-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('item-types.index')" :active="request()->routeIs('item-types.*')">Types</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('item-types.index')" :active="request()->routeIs('item-types.*')">Item Types</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('custom-field-sets.index')" :active="request()->routeIs('custom-field-sets.*')">Field sets</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('files.index')" :active="request()->routeIs('files.index')">Files</x-responsive-nav-link>
+            @endrole
+
+            @role('admin|inventory_manager')
+                <x-responsive-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-responsive-nav-link>
             @endrole
             @role('admin')
-                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.*')">Users</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.export-columns.edit')" :active="request()->routeIs('admin.export-columns.*')">Export columns</x-responsive-nav-link>
             @endrole
+
+            <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
             <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>
+            @role('admin')
+                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">Manage users</x-responsive-nav-link>
+            @endrole
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <x-responsive-nav-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">Log Out</x-responsive-nav-link>

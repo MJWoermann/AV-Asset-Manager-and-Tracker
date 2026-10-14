@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\AssetList;
+use App\Models\ItemType;
 use App\Models\Location;
+use App\Support\AssetBrowseFilters;
 use App\Support\AssetTableColumns;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,22 +42,37 @@ class AssetListController extends Controller
 
     public function show(Request $request, AssetList $list): View
     {
+        $term = AssetBrowseFilters::term($request);
+        $selectedColumns = $request->user()->assetTableColumns();
+
         $items = $list->items()
-            ->with(['asset.itemType', 'asset.location', 'asset.parent'])
+            ->with(['asset.itemType', 'asset.location', 'asset.parent', 'asset.customFieldValues'])
+            ->whereHas(
+                'asset',
+                fn ($query) => AssetBrowseFilters::applyToAssetQuery($query, $request, includeQuantity: false)
+            );
+
+        AssetBrowseFilters::applyToListItemQuery($items, $request);
+
+        $items = $items
             ->join('assets', 'assets.id', '=', 'asset_list_items.asset_id')
             ->orderByRaw('COALESCE(assets.parent_id, assets.id)')
             ->orderBy('assets.parent_id')
             ->orderBy('assets.name')
             ->select('asset_list_items.*')
-            ->paginate(50);
+            ->paginate(50)
+            ->withQueryString();
 
         return view('lists.show', [
             'list' => $list,
             'items' => $items,
+            'q' => $term ?? '',
             'availableColumns' => AssetTableColumns::definitions(),
-            'selectedColumns' => $request->user()->assetTableColumns(),
+            'selectedColumns' => $selectedColumns,
+            'preservedFilters' => AssetBrowseFilters::hiddenPreservedParams($request, $selectedColumns),
             'statuses' => AssetStatus::options(),
-            'locations' => Location::orderBy('name')->get(),
+            'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
+            'itemTypes' => ItemType::orderBy('name')->get(),
             'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
             'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
         ]);

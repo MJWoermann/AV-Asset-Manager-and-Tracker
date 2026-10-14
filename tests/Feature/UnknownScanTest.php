@@ -40,6 +40,22 @@ class UnknownScanTest extends TestCase
         return $user;
     }
 
+    protected function admin(): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole('admin');
+
+        return $user;
+    }
+
+    protected function inventoryManager(): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole('inventory_manager');
+
+        return $user;
+    }
+
     public function test_unknown_barcode_is_logged_and_returned_in_scan_response(): void
     {
         $user = $this->scanner();
@@ -194,5 +210,99 @@ class UnknownScanTest extends TestCase
         $response->assertSee('SESSION-UNKNOWN-1');
         $response->assertSee('Unknown scan report');
         $response->assertSee('Create asset', false);
+    }
+
+    public function test_admin_can_clear_all_unknown_scans(): void
+    {
+        $admin = $this->admin();
+        UnknownScan::create([
+            'scanned_code' => 'CLEAR-1',
+            'user_id' => $admin->id,
+            'quantity' => 1,
+        ]);
+        UnknownScan::create([
+            'scanned_code' => 'CLEAR-2',
+            'user_id' => $admin->id,
+            'quantity' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)->delete(route('reports.unknown-scans.destroy-all'));
+
+        $response->assertRedirect(route('reports.unknown-scans'));
+        $response->assertSessionHas('status', 'Cleared 2 unknown scans.');
+        $this->assertDatabaseCount('unknown_scans', 0);
+    }
+
+    public function test_admin_can_remove_duplicate_unknown_scans_keeping_latest(): void
+    {
+        $admin = $this->admin();
+
+        $olderDup = UnknownScan::create([
+            'scanned_code' => 'DUP-CODE',
+            'user_id' => $admin->id,
+            'quantity' => 1,
+            'note' => 'older',
+        ]);
+        $latestDup = UnknownScan::create([
+            'scanned_code' => 'DUP-CODE',
+            'user_id' => $admin->id,
+            'quantity' => 2,
+            'note' => 'latest',
+        ]);
+        $unique = UnknownScan::create([
+            'scanned_code' => 'UNIQUE-CODE',
+            'user_id' => $admin->id,
+            'quantity' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('reports.unknown-scans.deduplicate'));
+
+        $response->assertRedirect(route('reports.unknown-scans'));
+        $response->assertSessionHas('status', 'Removed 1 duplicate unknown scan.');
+        $this->assertDatabaseMissing('unknown_scans', ['id' => $olderDup->id]);
+        $this->assertDatabaseHas('unknown_scans', [
+            'id' => $latestDup->id,
+            'note' => 'latest',
+        ]);
+        $this->assertDatabaseHas('unknown_scans', ['id' => $unique->id]);
+        $this->assertDatabaseCount('unknown_scans', 2);
+    }
+
+    public function test_non_admin_cannot_clear_or_deduplicate_unknown_scans(): void
+    {
+        $manager = $this->inventoryManager();
+        UnknownScan::create([
+            'scanned_code' => 'KEEP-ME',
+            'user_id' => $manager->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($manager)
+            ->delete(route('reports.unknown-scans.destroy-all'))
+            ->assertForbidden();
+
+        $this->actingAs($manager)
+            ->post(route('reports.unknown-scans.deduplicate'))
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('unknown_scans', 1);
+    }
+
+    public function test_admin_sees_maintenance_actions_on_unknown_scans_report(): void
+    {
+        $admin = $this->admin();
+        $scanner = $this->scanner();
+
+        $this->actingAs($admin)
+            ->get(route('reports.unknown-scans'))
+            ->assertOk()
+            ->assertSee('Remove duplicates')
+            ->assertSee('Clear all');
+
+        $this->actingAs($scanner)
+            ->get(route('reports.unknown-scans'))
+            ->assertOk()
+            ->assertDontSee('Remove duplicates')
+            ->assertDontSee('Clear all');
     }
 }

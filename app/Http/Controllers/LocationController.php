@@ -32,6 +32,7 @@ class LocationController extends Controller
             'location' => new Location(['type' => LocationType::Site]),
             'parents' => Location::orderBy('name')->get(),
             'types' => LocationType::cases(),
+            'fileRows' => [],
         ]);
     }
 
@@ -44,10 +45,20 @@ class LocationController extends Controller
 
     public function edit(Location $location): View
     {
+        $location->load('files');
+
+        $fileRows = $location->files->map(fn ($file): array => [
+            'file' => $file,
+            'inherited' => false,
+            'link_id' => (int) $file->pivot->id,
+            'note' => $file->pivot->note,
+        ])->all();
+
         return view('locations.form', [
             'location' => $location,
             'parents' => Location::where('id', '!=', $location->id)->orderBy('name')->get(),
             'types' => LocationType::cases(),
+            'fileRows' => $fileRows,
         ]);
     }
 
