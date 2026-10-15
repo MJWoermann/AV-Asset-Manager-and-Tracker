@@ -9,7 +9,7 @@
                 <x-asset-column-picker :available-columns="$availableColumns" :selected-columns="$selectedColumns" />
                 @role('admin|inventory_manager')
                     @feature('shelf_tag_generator')
-                        <a href="{{ route('shelf-tags.index', ['asset_list_id' => $list->id]) }}" class="px-3 py-2 border text-sm">Shelf tags</a>
+                        <a href="{{ route('labels.index', ['asset_list_id' => $list->id]) }}" class="px-3 py-2 border text-sm">Labels</a>
                     @endfeature
                     <a href="{{ route('export.list', [$list, 'format' => 'xlsx']) }}" class="px-3 py-2 border text-sm">Export</a>
                     <a href="{{ route('lists.edit', $list) }}" class="px-3 py-2 border text-sm">Edit</a>

@@ -159,12 +159,12 @@ class ShelfTagLbxImportTest extends TestCase
         $user = $this->manager();
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.layouts.import'))
+            ->get(route('labels.layouts.import'))
             ->assertOk()
             ->assertSee('Import P-touch layout');
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.index'))
+            ->get(route('labels.index'))
             ->assertOk()
             ->assertSee('Import .lbx');
 
@@ -176,13 +176,13 @@ class ShelfTagLbxImportTest extends TestCase
             true
         );
 
-        $response = $this->actingAs($user)->post(route('shelf-tags.layouts.import.store'), [
+        $response = $this->actingAs($user)->post(route('labels.layouts.import.store'), [
             'lbx' => $upload,
         ]);
 
         $layout = ShelfTagLayout::query()->first();
         $this->assertNotNull($layout);
-        $response->assertRedirect(route('shelf-tags.layouts.edit', $layout));
+        $response->assertRedirect(route('labels.layouts.edit', $layout));
         $response->assertSessionHas('status');
 
         $this->assertSame('continuous_62', $layout->paper_preset);
@@ -203,7 +203,7 @@ class ShelfTagLbxImportTest extends TestCase
         $user = $this->scanner(feature: true);
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.layouts.import'))
+            ->get(route('labels.layouts.import'))
             ->assertForbidden();
 
         $upload = new UploadedFile(
@@ -215,7 +215,7 @@ class ShelfTagLbxImportTest extends TestCase
         );
 
         $this->actingAs($user)
-            ->post(route('shelf-tags.layouts.import.store'), ['lbx' => $upload])
+            ->post(route('labels.layouts.import.store'), ['lbx' => $upload])
             ->assertForbidden();
     }
 
@@ -224,7 +224,7 @@ class ShelfTagLbxImportTest extends TestCase
         $user = $this->manager(feature: false);
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.layouts.import'))
+            ->get(route('labels.layouts.import'))
             ->assertNotFound();
 
         $upload = new UploadedFile(
@@ -236,7 +236,7 @@ class ShelfTagLbxImportTest extends TestCase
         );
 
         $this->actingAs($user)
-            ->post(route('shelf-tags.layouts.import.store'), ['lbx' => $upload])
+            ->post(route('labels.layouts.import.store'), ['lbx' => $upload])
             ->assertNotFound();
     }
 

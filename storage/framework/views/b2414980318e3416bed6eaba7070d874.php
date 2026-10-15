@@ -15,7 +15,7 @@
      <?php $__env->slot('header', null, []); ?> 
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-                <h2 class="font-semibold text-xl">Shelf tag preview</h2>
+                <h2 class="font-semibold text-xl">Label preview</h2>
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                     <?php echo e($count); ?> label<?php echo e($count === 1 ? '' : 's'); ?>
 
@@ -27,8 +27,8 @@
             </div>
             <div class="flex flex-wrap gap-2 print:hidden">
                 <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
-                <a href="<?php echo e(route('shelf-tags.print.pdf')); ?>" class="px-3 py-2 border text-sm">Download PDF</a>
-                <a href="<?php echo e(route('shelf-tags.index', ['asset_list_id' => $list->id, 'shelf_tag_layout_id' => $layout->id])); ?>" class="px-3 py-2 border text-sm">Back</a>
+                <a href="<?php echo e(route('labels.print.pdf')); ?>" class="px-3 py-2 border text-sm">Download PDF</a>
+                <a href="<?php echo e(route('labels.index', ['asset_list_id' => $list->id, 'shelf_tag_layout_id' => $layout->id])); ?>" class="px-3 py-2 border text-sm">Back</a>
             </div>
         </div>
      <?php $__env->endSlot(); ?>

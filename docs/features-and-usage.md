@@ -76,8 +76,8 @@ Main navigation (desktop and phone menu):
 | **Scan** | Start or continue a stocktake session |
 | **Assets** | Full catalogue — search, filters, columns, bulk actions |
 | **Lists** | Inventory and event lists; open a list to browse its members |
-| **Reports** | Compare lists, unknown scans, and (if enabled) connection map |
-| **Data** | Locations, item types, field sets, files, plus optional tools (connection types, shelf tags) |
+| **Reports** | Compare lists, unknown scans, and (if enabled) connection map and labels |
+| **Data** | Locations, item types, field sets, files, plus optional tools (connection types) |
 | **Import** | Spreadsheet import (managers) |
 | **Admin links** | Export columns, Storage, SSO (admins only) |
 | **Profile** | Your name/email, theme, and optional preview features |
@@ -183,10 +183,10 @@ Some capabilities are shipped but turned on **per user** under **Profile → Dev
 |---------|--------------|----------|
 | **Asset connections** | Ports/interfaces on assets, link cable/signal paths, Connection types under Data, Connection map report | Documenting how racks and devices are wired |
 | **RU visualiser** | **Rack** tab: place child gear in rack-unit slots (front/rear) | Visual rack elevation for touring racks |
-| **Shelf tag generator** | Layout editor + print/PDF from Assets, lists, or Data → Print shelf tags | Warehouse shelf labels and bag tags |
+| **Label generator** | Layout editor + print/PDF from Assets, lists, or Reports → Labels | Warehouse shelf labels and bag tags |
 | **Stock / consumables** | **Stock** tab: quantities, movements, min/max, charts; Kanban/QR tags for managers | Counting cables, consumables, spare packs |
 
-**Guest stock link:** managers can issue a token URL so someone can adjust a tracked stock item **without logging in** (rate-limited). Use only where you trust the physical QR (e.g. on a shelf tag in a controlled store).
+**Guest stock link:** managers can issue a token URL so someone can adjust a tracked stock item **without logging in** (rate-limited). Use only where you trust the physical QR (e.g. on a label in a controlled store).
 
 Ask an admin before enabling preview features in production if your organisation has a staged rollout.
 
@@ -218,7 +218,7 @@ If you are evaluating the product or onboarding a team:
 4. Build one **inventory list** and one empty **event list**.
 5. On a phone, open **Scan**, run a short session, then open **Reports → Compare**.
 6. Open an asset and walk through **Files**, **Maintenance**, and **History**.
-7. Optionally enable one preview feature (e.g. shelf tags or stock) and try it on a non-critical type.
+7. Optionally enable one preview feature (e.g. labels or stock) and try it on a non-critical type.
 
 That path covers the core value: catalogue → scan → compare → keep records current.
 

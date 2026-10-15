@@ -7,6 +7,7 @@ use App\Enums\LocationType;
 use App\Models\Asset;
 use App\Models\CustomFieldDefinition;
 use App\Models\ItemType;
+use App\Models\Location;
 use App\Models\Manufacturer;
 use App\Models\User;
 use App\Services\ImportService;
@@ -288,6 +289,63 @@ class ImportAssetTest extends TestCase
             'custom_field_definition_id' => $definition->id,
             'value' => 'Red',
         ]);
+    }
+
+    public function test_import_reuses_existing_locations_under_site_hierarchy(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+
+        $site = Location::create([
+            'name' => 'Main Warehouse',
+            'type' => LocationType::Site,
+        ]);
+        $level = Location::create([
+            'name' => 'Ground Floor',
+            'type' => LocationType::Level,
+            'parent_id' => $site->id,
+        ]);
+        $room = Location::create([
+            'name' => 'Store A',
+            'type' => LocationType::Room,
+            'parent_id' => $level->id,
+        ]);
+        $rack = Location::create([
+            'name' => 'Rack 01',
+            'type' => LocationType::Rack,
+            'parent_id' => $room->id,
+        ]);
+
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
+            'Name,Type,Level,Room,Rack',
+            'Console One,Mixer,Ground Floor,Store A,Rack 01',
+        ]));
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+
+        $prepare = $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Name' => 'name',
+                'Type' => 'item_type',
+                'Level' => 'location_level',
+                'Room' => 'location_room',
+                'Rack' => 'location_rack',
+            ],
+        ]);
+        $prepare->assertOk();
+
+        $process = $this->actingAs($user)->post(route('import.process'), [
+            'bulk_action' => 'update',
+        ]);
+        $process->assertRedirect(route('assets.index'));
+
+        $this->assertSame(1, Location::query()->where('name', 'Ground Floor')->count());
+        $this->assertSame(1, Location::query()->where('name', 'Store A')->count());
+        $this->assertSame(1, Location::query()->where('name', 'Rack 01')->count());
+
+        $asset = Asset::query()->where('name', 'Console One')->first();
+        $this->assertNotNull($asset);
+        $this->assertSame($rack->id, $asset->location_id);
     }
 
     public function test_duplicate_detection_supports_update_replace_skip_and_create(): void

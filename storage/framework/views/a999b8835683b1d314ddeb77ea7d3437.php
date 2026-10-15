@@ -11,13 +11,13 @@
      <?php $__env->slot('header', null, []); ?> 
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-                <h2 class="font-semibold text-xl">Print shelf tag</h2>
+                <h2 class="font-semibold text-xl">Print label</h2>
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver"><?php echo e($asset->name); ?></p>
             </div>
             <div class="flex flex-wrap gap-2 print:hidden">
                 <?php if($layout): ?>
                     <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
-                    <a href="<?php echo e(route('assets.shelf-tag.pdf', [$asset, 'layout' => $layout->id])); ?>" class="px-3 py-2 border text-sm">Download PDF</a>
+                    <a href="<?php echo e(route('assets.label.pdf', [$asset, 'layout' => $layout->id])); ?>" class="px-3 py-2 border text-sm">Download PDF</a>
                 <?php endif; ?>
                 <a href="<?php echo e(route('assets.show', $asset)); ?>" class="px-3 py-2 border text-sm">Back to asset</a>
             </div>
@@ -28,10 +28,10 @@
         <div class="print:hidden bg-white dark:bg-brand-slate border p-4 max-w-md">
             <?php if($layouts->isEmpty()): ?>
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                    Create a <a href="<?php echo e(route('shelf-tags.layouts.create')); ?>" class="text-brand underline">shelf tag layout</a> before printing.
+                    Create a <a href="<?php echo e(route('labels.layouts.create')); ?>" class="text-brand underline">label layout</a> before printing.
                 </p>
             <?php else: ?>
-                <form method="GET" action="<?php echo e(route('assets.shelf-tag', $asset)); ?>">
+                <form method="GET" action="<?php echo e(route('assets.label', $asset)); ?>">
                     <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'layout','value' => 'Layout']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -99,7 +99,7 @@
                 </div>
             </div>
         <?php elseif($layouts->isNotEmpty()): ?>
-            <p class="text-sm text-brand-charcoal dark:text-brand-silver print:hidden">Choose a layout to preview this asset’s shelf tag.</p>
+            <p class="text-sm text-brand-charcoal dark:text-brand-silver print:hidden">Choose a layout to preview this asset’s label.</p>
         <?php endif; ?>
     </div>
 

@@ -6,7 +6,7 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-                <h2 class="font-semibold text-xl">Shelf tag preview</h2>
+                <h2 class="font-semibold text-xl">Label preview</h2>
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                     {{ $count }} label{{ $count === 1 ? '' : 's' }}
                     · {{ $layout->name }}
@@ -15,8 +15,8 @@
             </div>
             <div class="flex flex-wrap gap-2 print:hidden">
                 <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
-                <a href="{{ route('shelf-tags.print.pdf') }}" class="px-3 py-2 border text-sm">Download PDF</a>
-                <a href="{{ route('shelf-tags.index', ['asset_list_id' => $list->id, 'shelf_tag_layout_id' => $layout->id]) }}" class="px-3 py-2 border text-sm">Back</a>
+                <a href="{{ route('labels.print.pdf') }}" class="px-3 py-2 border text-sm">Download PDF</a>
+                <a href="{{ route('labels.index', ['asset_list_id' => $list->id, 'shelf_tag_layout_id' => $layout->id]) }}" class="px-3 py-2 border text-sm">Back</a>
             </div>
         </div>
     </x-slot>

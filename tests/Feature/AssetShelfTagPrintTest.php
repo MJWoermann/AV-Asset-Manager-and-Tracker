@@ -73,11 +73,11 @@ class AssetShelfTagPrintTest extends TestCase
         $asset = $this->makeAsset();
 
         $this->actingAs($user)
-            ->get(route('assets.shelf-tag', $asset))
+            ->get(route('assets.label', $asset))
             ->assertNotFound();
 
         $this->actingAs($user)
-            ->get(route('assets.shelf-tag.pdf', $asset))
+            ->get(route('assets.label.pdf', $asset))
             ->assertNotFound();
     }
 
@@ -87,11 +87,11 @@ class AssetShelfTagPrintTest extends TestCase
         $asset = $this->makeAsset();
 
         $this->actingAs($user)
-            ->get(route('assets.shelf-tag', $asset))
+            ->get(route('assets.label', $asset))
             ->assertForbidden();
 
         $this->actingAs($user)
-            ->get(route('assets.shelf-tag.pdf', $asset))
+            ->get(route('assets.label.pdf', $asset))
             ->assertForbidden();
     }
 
@@ -103,7 +103,7 @@ class AssetShelfTagPrintTest extends TestCase
         $this->actingAs($user)
             ->get(route('assets.show', $asset))
             ->assertOk()
-            ->assertSee(route('assets.shelf-tag', $asset, false), false)
+            ->assertSee(route('assets.label', $asset, false), false)
             ->assertSee('Print', false);
     }
 
@@ -115,7 +115,7 @@ class AssetShelfTagPrintTest extends TestCase
         $this->actingAs($user)
             ->get(route('assets.show', $asset))
             ->assertOk()
-            ->assertDontSee(route('assets.shelf-tag', $asset, false), false);
+            ->assertDontSee(route('assets.label', $asset, false), false);
     }
 
     public function test_layout_query_auto_previews_single_asset_label(): void
@@ -134,7 +134,7 @@ class AssetShelfTagPrintTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('assets.shelf-tag', [$asset, 'layout' => $layout->id]))
+            ->get(route('assets.label', [$asset, 'layout' => $layout->id]))
             ->assertOk()
             ->assertSee('Rack Amp Solo')
             ->assertSee('Solo Layout')
@@ -162,7 +162,7 @@ class AssetShelfTagPrintTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)
-            ->get(route('assets.shelf-tag', $asset));
+            ->get(route('assets.label', $asset));
 
         $response->assertOk()
             ->assertSee('Default Preview Asset')
@@ -186,7 +186,7 @@ class AssetShelfTagPrintTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('assets.shelf-tag.pdf', [$asset, 'layout' => $layout->id]))
+            ->get(route('assets.label.pdf', [$asset, 'layout' => $layout->id]))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
     }
@@ -197,9 +197,9 @@ class AssetShelfTagPrintTest extends TestCase
         $asset = $this->makeAsset();
 
         $this->actingAs($user)
-            ->get(route('assets.shelf-tag', $asset))
+            ->get(route('assets.label', $asset))
             ->assertOk()
-            ->assertSee(route('shelf-tags.layouts.create', [], false), false)
+            ->assertSee(route('labels.layouts.create', [], false), false)
             ->assertDontSee('shelfTagPrintPreview(', false);
     }
 }

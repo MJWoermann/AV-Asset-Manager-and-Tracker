@@ -19,7 +19,7 @@ class ShelfTagLayoutController extends Controller
 {
     public function index(): RedirectResponse
     {
-        return redirect()->route('shelf-tags.index');
+        return redirect()->route('labels.index');
     }
 
     public function importForm(): View
@@ -41,7 +41,7 @@ class ShelfTagLayoutController extends Controller
         $warnings = $result['warnings'];
 
         return redirect()
-            ->route('shelf-tags.layouts.edit', $result['layout'])
+            ->route('labels.layouts.edit', $result['layout'])
             ->with('status', $status)
             ->with('import_warnings', $warnings);
     }
@@ -70,8 +70,8 @@ class ShelfTagLayoutController extends Controller
         $layout = ShelfTagLayout::query()->create($data);
 
         return redirect()
-            ->route('shelf-tags.layouts.edit', $layout)
-            ->with('status', 'Shelf tag layout created.');
+            ->route('labels.layouts.edit', $layout)
+            ->with('status', 'Label layout created.');
     }
 
     public function edit(ShelfTagLayout $layout): View
@@ -99,8 +99,8 @@ class ShelfTagLayoutController extends Controller
         $layout->update($data);
 
         return redirect()
-            ->route('shelf-tags.layouts.edit', $layout)
-            ->with('status', 'Shelf tag layout saved.');
+            ->route('labels.layouts.edit', $layout)
+            ->with('status', 'Label layout saved.');
     }
 
     public function destroy(ShelfTagLayout $layout): RedirectResponse
@@ -108,8 +108,8 @@ class ShelfTagLayoutController extends Controller
         $layout->delete();
 
         return redirect()
-            ->route('shelf-tags.index')
-            ->with('status', 'Shelf tag layout deleted.');
+            ->route('labels.index')
+            ->with('status', 'Label layout deleted.');
     }
 
     /**

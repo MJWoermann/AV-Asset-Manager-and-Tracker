@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Shelf tags</title>
+    <title>Labels</title>
     <style>
         @page { margin: 0; }
         body { margin: 0; padding: 0; font-family: DejaVu Sans, sans-serif; color: #000; }

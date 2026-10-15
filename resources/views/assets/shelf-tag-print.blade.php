@@ -2,13 +2,13 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-                <h2 class="font-semibold text-xl">Print shelf tag</h2>
+                <h2 class="font-semibold text-xl">Print label</h2>
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">{{ $asset->name }}</p>
             </div>
             <div class="flex flex-wrap gap-2 print:hidden">
                 @if($layout)
                     <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
-                    <a href="{{ route('assets.shelf-tag.pdf', [$asset, 'layout' => $layout->id]) }}" class="px-3 py-2 border text-sm">Download PDF</a>
+                    <a href="{{ route('assets.label.pdf', [$asset, 'layout' => $layout->id]) }}" class="px-3 py-2 border text-sm">Download PDF</a>
                 @endif
                 <a href="{{ route('assets.show', $asset) }}" class="px-3 py-2 border text-sm">Back to asset</a>
             </div>
@@ -19,10 +19,10 @@
         <div class="print:hidden bg-white dark:bg-brand-slate border p-4 max-w-md">
             @if($layouts->isEmpty())
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                    Create a <a href="{{ route('shelf-tags.layouts.create') }}" class="text-brand underline">shelf tag layout</a> before printing.
+                    Create a <a href="{{ route('labels.layouts.create') }}" class="text-brand underline">label layout</a> before printing.
                 </p>
             @else
-                <form method="GET" action="{{ route('assets.shelf-tag', $asset) }}">
+                <form method="GET" action="{{ route('assets.label', $asset) }}">
                     <x-input-label for="layout" value="Layout" />
                     <select
                         id="layout"
@@ -71,7 +71,7 @@
                 </div>
             </div>
         @elseif($layouts->isNotEmpty())
-            <p class="text-sm text-brand-charcoal dark:text-brand-silver print:hidden">Choose a layout to preview this asset’s shelf tag.</p>
+            <p class="text-sm text-brand-charcoal dark:text-brand-silver print:hidden">Choose a layout to preview this asset’s label.</p>
         @endif
     </div>
 

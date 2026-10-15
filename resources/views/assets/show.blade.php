@@ -9,7 +9,7 @@
                 <a href="{{ route('assets.edit', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
                 @role('admin|inventory_manager')
                     @feature('shelf_tag_generator')
-                        <a href="{{ route('assets.shelf-tag', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
+                        <a href="{{ route('assets.label', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
                     @endfeature
                 @endrole
             </div>

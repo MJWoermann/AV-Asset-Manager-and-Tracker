@@ -18,7 +18,7 @@ class ShelfTagLayoutFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->words(3, true).' shelf tag',
+            'name' => fake()->words(3, true).' label',
             'paper_preset' => ShelfTagPaperPresets::DEFAULT,
             'width_mm' => 62.0,
             'height_mm' => 40.0,

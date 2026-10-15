@@ -26,12 +26,12 @@
             @feature('shelf_tag_generator')
                 @role('admin|inventory_manager')
                     @if($currentList)
-                        <form method="GET" action="{{ route('shelf-tags.index') }}" class="inline">
+                        <form method="GET" action="{{ route('labels.index') }}" class="inline">
                             <input type="hidden" name="asset_list_id" value="{{ $currentList->id }}">
                             <template x-for="id in selectedIds" :key="'shelf-'+id">
                                 <input type="hidden" name="asset_ids[]" :value="id">
                             </template>
-                            <button type="submit" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver">Shelf tags</button>
+                            <button type="submit" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver">Labels</button>
                         </form>
                     @endif
                 @endrole

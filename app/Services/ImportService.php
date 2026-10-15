@@ -701,6 +701,34 @@ class ImportService
         $parentId = null;
         $resolvedId = null;
 
+        // #region agent log
+        $sameNameLevels = $level
+            ? Location::query()->where('name', $level)->where('type', LocationType::Level->value)->get(['id', 'name', 'type', 'parent_id'])->toArray()
+            : [];
+        $sameNameAny = $level
+            ? Location::query()->whereRaw('LOWER(name) = ?', [Str::lower($level)])->get(['id', 'name', 'type', 'parent_id'])->toArray()
+            : [];
+        file_put_contents(
+            base_path('debug-ebc14c.log'),
+            json_encode([
+                'sessionId' => 'ebc14c',
+                'hypothesisId' => 'A,B,C',
+                'location' => 'ImportService.php:resolveLocation',
+                'message' => 'resolveLocation entry',
+                'data' => [
+                    'level' => $level,
+                    'room' => $room,
+                    'rack' => $rack,
+                    'sameNameLevels' => $sameNameLevels,
+                    'sameNameCaseInsensitive' => $sameNameAny,
+                    'totalLocations' => Location::query()->count(),
+                ],
+                'timestamp' => (int) (microtime(true) * 1000),
+            ])."\n",
+            FILE_APPEND
+        );
+        // #endregion
+
         if ($level) {
             $location = $this->firstOrCreateLocation($level, LocationType::Level, $parentId);
             $parentId = $location->id;
@@ -718,22 +746,79 @@ class ImportService
             $resolvedId = $location->id;
         }
 
+        // #region agent log
+        file_put_contents(
+            base_path('debug-ebc14c.log'),
+            json_encode([
+                'sessionId' => 'ebc14c',
+                'hypothesisId' => 'A',
+                'location' => 'ImportService.php:resolveLocation:exit',
+                'message' => 'resolveLocation exit',
+                'data' => ['resolvedId' => $resolvedId, 'finalParentChain' => $resolvedId],
+                'timestamp' => (int) (microtime(true) * 1000),
+            ])."\n",
+            FILE_APPEND
+        );
+        // #endregion
+
         return $resolvedId;
     }
 
     protected function firstOrCreateLocation(string $name, LocationType $type, ?int $parentId): Location
     {
-        $query = Location::query()
+        $baseQuery = Location::query()
             ->where('name', $name)
             ->where('type', $type->value);
 
+        $exactQuery = (clone $baseQuery);
         if ($parentId) {
-            $query->where('parent_id', $parentId);
+            $exactQuery->where('parent_id', $parentId);
         } else {
-            $query->whereNull('parent_id');
+            $exactQuery->whereNull('parent_id');
         }
 
-        $existing = $query->first();
+        $existing = $exactQuery->first();
+        $matchedVia = $existing ? 'exact_parent' : null;
+
+        // Import maps Level/Room/Rack only (no Site). Levels often live under a Site, so
+        // when no parent is known, reuse an existing name+type match anywhere in the tree.
+        if (! $existing && $parentId === null) {
+            $existing = (clone $baseQuery)->orderBy('id')->first();
+            $matchedVia = $existing ? 'hierarchy_fallback' : null;
+        }
+
+        // #region agent log
+        $nameMatchesIgnoringParent = (clone $baseQuery)->get(['id', 'name', 'type', 'parent_id'])->toArray();
+        $caseInsensitiveMatches = Location::query()
+            ->whereRaw('LOWER(name) = ?', [Str::lower($name)])
+            ->where('type', $type->value)
+            ->get(['id', 'name', 'type', 'parent_id'])
+            ->toArray();
+        file_put_contents(
+            base_path('debug-ebc14c.log'),
+            json_encode([
+                'sessionId' => 'ebc14c',
+                'runId' => 'post-fix',
+                'hypothesisId' => $existing ? 'reuse' : 'A,B,C,D',
+                'location' => 'ImportService.php:firstOrCreateLocation',
+                'message' => $existing ? 'reused existing location' : 'creating new location',
+                'data' => [
+                    'lookupName' => $name,
+                    'lookupType' => $type->value,
+                    'lookupParentId' => $parentId,
+                    'requireNullParent' => $parentId === null,
+                    'foundId' => $existing?->id,
+                    'matchedVia' => $matchedVia,
+                    'nameMatchesIgnoringParent' => $nameMatchesIgnoringParent,
+                    'caseInsensitiveMatches' => $caseInsensitiveMatches,
+                    'willCreate' => $existing === null,
+                ],
+                'timestamp' => (int) (microtime(true) * 1000),
+            ])."\n",
+            FILE_APPEND
+        );
+        // #endregion
+
         if ($existing) {
             return $existing;
         }

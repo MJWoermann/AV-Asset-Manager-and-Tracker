@@ -18,7 +18,7 @@
                 <a href="<?php echo e(route('assets.edit', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
                 <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
                     <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
-                        <a href="<?php echo e(route('assets.shelf-tag', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
+                        <a href="<?php echo e(route('assets.label', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>

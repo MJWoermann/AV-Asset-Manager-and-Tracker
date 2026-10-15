@@ -28,8 +28,8 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h2 class="font-semibold text-xl">{{ $layout->exists ? 'Edit shelf tag layout' : 'New shelf tag layout' }}</h2>
-            <a href="{{ route('shelf-tags.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to shelf tags</a>
+            <h2 class="font-semibold text-xl">{{ $layout->exists ? 'Edit label layout' : 'New label layout' }}</h2>
+            <a href="{{ route('labels.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to labels</a>
         </div>
     </x-slot>
 
@@ -63,7 +63,7 @@
         <form
             method="POST"
             enctype="multipart/form-data"
-            action="{{ $layout->exists ? route('shelf-tags.layouts.update', $layout) : route('shelf-tags.layouts.store') }}"
+            action="{{ $layout->exists ? route('labels.layouts.update', $layout) : route('labels.layouts.store') }}"
             class="space-y-4"
             @submit="syncFormFields()"
         >
@@ -479,7 +479,7 @@
 
             <div class="flex flex-wrap items-center gap-3">
                 <x-primary-button>Save layout</x-primary-button>
-                <a href="{{ route('shelf-tags.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
+                <a href="{{ route('labels.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
             </div>
         </form>
     </div>

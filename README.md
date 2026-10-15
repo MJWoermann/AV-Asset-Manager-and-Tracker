@@ -94,7 +94,7 @@ curl -X POST /api/auth/token \
 
 ## Preview features and deferred work
 
-Connections, RU visualiser, shelf tags, and stock/consumables ship as opt-in **Developer features** on each user’s Profile (see [features and usage](docs/features-and-usage.md)). Optional Google / Microsoft Entra SSO: [docs/sso-setup.md](docs/sso-setup.md).
+Connections, RU visualiser, labels, and stock/consumables ship as opt-in **Developer features** on each user’s Profile (see [features and usage](docs/features-and-usage.md)). Optional Google / Microsoft Entra SSO: [docs/sso-setup.md](docs/sso-setup.md).
 
 Still deferred: offline scan sync.
 

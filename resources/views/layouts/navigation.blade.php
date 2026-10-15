@@ -12,7 +12,7 @@
                     <x-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-nav-link>
 
                     @php
-                        $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*', 'reports.connection-map*', 'shelf-tags.*');
+                        $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*', 'reports.connection-map*', 'labels.*');
                         $dataActive = request()->routeIs('locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
                     @endphp
 
@@ -35,7 +35,7 @@
                             @endfeature
                             @feature('shelf_tag_generator')
                                 @role('admin|inventory_manager')
-                                    <x-dropdown-link :href="route('shelf-tags.index')">Shelf tags</x-dropdown-link>
+                                    <x-dropdown-link :href="route('labels.index')">Labels</x-dropdown-link>
                                 @endrole
                             @endfeature
                         </x-slot>
@@ -135,7 +135,7 @@
             @endfeature
             @feature('shelf_tag_generator')
                 @role('admin|inventory_manager')
-                    <x-responsive-nav-link :href="route('shelf-tags.index')" :active="request()->routeIs('shelf-tags.*')">Shelf tags</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('labels.index')" :active="request()->routeIs('labels.*')">Labels</x-responsive-nav-link>
                 @endrole
             @endfeature
 

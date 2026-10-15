@@ -253,15 +253,15 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     });
 
     Route::middleware(['feature:shelf_tag_generator', 'role:admin,inventory_manager'])->group(function () {
-        Route::get('/assets/{asset}/shelf-tag', [AssetShelfTagPrintController::class, 'show'])
-            ->name('assets.shelf-tag');
-        Route::get('/assets/{asset}/shelf-tag/pdf', [AssetShelfTagPrintController::class, 'pdf'])
-            ->name('assets.shelf-tag.pdf');
+        Route::get('/assets/{asset}/label', [AssetShelfTagPrintController::class, 'show'])
+            ->name('assets.label');
+        Route::get('/assets/{asset}/label/pdf', [AssetShelfTagPrintController::class, 'pdf'])
+            ->name('assets.label.pdf');
     });
 
     Route::middleware(['feature:shelf_tag_generator', 'role:admin,inventory_manager'])
-        ->prefix('shelf-tags')
-        ->name('shelf-tags.')
+        ->prefix('labels')
+        ->name('labels.')
         ->group(function () {
             Route::get('/', [ShelfTagPrintController::class, 'create'])->name('index');
 

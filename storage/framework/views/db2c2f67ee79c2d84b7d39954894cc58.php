@@ -20,13 +20,13 @@
 
     <?php if($layouts->isEmpty()): ?>
         <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">
-            Create a <a href="<?php echo e(route('shelf-tags.layouts.create')); ?>" class="text-brand underline">shelf tag layout</a> before printing.
+            Create a <a href="<?php echo e(route('labels.layouts.create')); ?>" class="text-brand underline">label layout</a> before printing.
         </p>
     <?php endif; ?>
 
     <form
         method="GET"
-        action="<?php echo e(route('shelf-tags.index')); ?>"
+        action="<?php echo e(route('labels.index')); ?>"
         class="mb-4 space-y-4 bg-white dark:bg-brand-slate border p-4"
         id="shelf-tag-print-filters"
     >
@@ -82,7 +82,7 @@
                 <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand text-sm">Filter</button>
                 <?php if($q !== ''): ?>
                     <a
-                        href="<?php echo e(route('shelf-tags.index', array_filter(['asset_list_id' => $selectedListId, 'shelf_tag_layout_id' => $selectedLayoutId]))); ?>"
+                        href="<?php echo e(route('labels.index', array_filter(['asset_list_id' => $selectedListId, 'shelf_tag_layout_id' => $selectedLayoutId]))); ?>"
                         class="px-4 py-2 border text-sm inline-flex items-center justify-center"
                     >Clear</a>
                 <?php endif; ?>
@@ -90,7 +90,7 @@
         <?php endif; ?>
     </form>
 
-    <form method="POST" action="<?php echo e(route('shelf-tags.print.preview')); ?>" class="space-y-4 bg-white dark:bg-brand-slate border p-4" @submit="prepareSubmit($event)">
+    <form method="POST" action="<?php echo e(route('labels.print.preview')); ?>" class="space-y-4 bg-white dark:bg-brand-slate border p-4" @submit="prepareSubmit($event)">
         <?php echo csrf_field(); ?>
         <input type="hidden" name="asset_list_id" value="<?php echo e($selectedListId); ?>">
         <input type="hidden" name="mode" value="selected">

@@ -39,7 +39,7 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
     {
         $user = $this->manager();
 
-        $response = $this->actingAs($user)->post(route('shelf-tags.layouts.store'), [
+        $response = $this->actingAs($user)->post(route('labels.layouts.store'), [
             'name' => 'Grid settings layout',
             'paper_preset' => ShelfTagPaperPresets::DEFAULT,
             'width_mm' => 62,
@@ -56,7 +56,7 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
 
         $layout = ShelfTagLayout::query()->first();
         $this->assertNotNull($layout);
-        $response->assertRedirect(route('shelf-tags.layouts.edit', $layout));
+        $response->assertRedirect(route('labels.layouts.edit', $layout));
 
         $this->assertFalse((bool) data_get($layout->editor_settings, 'show_grid'));
         $this->assertTrue((bool) data_get($layout->editor_settings, 'snap_to_grid'));
@@ -70,7 +70,7 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
         $this->assertTrue($settings['snap_to_grid']);
         $this->assertSame(2.5, $settings['grid_size_mm']);
 
-        $edit = $this->actingAs($user)->get(route('shelf-tags.layouts.edit', $layout));
+        $edit = $this->actingAs($user)->get(route('labels.layouts.edit', $layout));
         $edit->assertOk();
         $edit->assertSee('shelfTagDesigner(', false);
         $edit->assertSee('Show grid', false);
@@ -88,7 +88,7 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->put(route('shelf-tags.layouts.update', $layout), [
+            ->put(route('labels.layouts.update', $layout), [
                 'name' => $layout->name,
                 'paper_preset' => ShelfTagPaperPresets::DEFAULT,
                 'width_mm' => 62,
@@ -102,7 +102,7 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
                     'grid_size_mm' => 10,
                 ]),
             ])
-            ->assertRedirect(route('shelf-tags.layouts.edit', $layout));
+            ->assertRedirect(route('labels.layouts.edit', $layout));
 
         $layout->refresh();
         $settings = $layout->normalizedEditorSettings();
@@ -117,7 +117,7 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
     {
         $user = $this->manager();
 
-        $this->actingAs($user)->post(route('shelf-tags.layouts.store'), [
+        $this->actingAs($user)->post(route('labels.layouts.store'), [
             'name' => 'Flat grid fields',
             'paper_preset' => ShelfTagPaperPresets::DEFAULT,
             'width_mm' => 62,
@@ -143,7 +143,7 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
         $user = $this->manager();
 
         $this->actingAs($user)
-            ->post(route('shelf-tags.layouts.store'), [
+            ->post(route('labels.layouts.store'), [
                 'name' => 'Diecut auto',
                 'paper_preset' => 'diecut_62x100',
                 'width_mm' => 62,

@@ -1923,18 +1923,37 @@ Alpine.data('bulkLocations', () => ({
     },
 
     selectDuplicateNames(names) {
+        // #region agent log
+        const _boxes = [...this.$el.querySelectorAll('[data-bulk-location-id]')];
+        const _sampleDom = _boxes.slice(0, 5).map((el) => ({
+            id: el.getAttribute('data-bulk-location-id'),
+            name: el.getAttribute('data-bulk-location-name'),
+        }));
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'B',location:'app.js:selectDuplicateNames:entry',message:'selectDuplicateNames entered',data:{namesType:typeof names,isArray:Array.isArray(names),namesCount:Array.isArray(names)?names.length:null,namesSample:Array.isArray(names)?names.slice(0,3):names,boxCount:_boxes.length,sampleDom:_sampleDom},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const normalized = new Set(
             (names || []).map((name) => String(name).trim().toLowerCase())
         );
         const next = {};
+        let matched = 0;
+        let unmatchedSample = [];
         [...this.$el.querySelectorAll('[data-bulk-location-id]')].forEach((el) => {
             const name = (el.getAttribute('data-bulk-location-name') || '').trim().toLowerCase();
             if (normalized.has(name)) {
                 next[Number(el.getAttribute('data-bulk-location-id'))] = true;
+                matched++;
+            } else if (unmatchedSample.length < 5) {
+                unmatchedSample.push(name);
             }
         });
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'C',location:'app.js:selectDuplicateNames:match',message:'duplicate name match result',data:{normalizedCount:normalized.size,normalizedSample:[...normalized].slice(0,5),matched,selectedKeys:Object.keys(next).length,unmatchedSample},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         this.selected = next;
         this.panelOpen = true;
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'D',location:'app.js:selectDuplicateNames:exit',message:'selection applied',data:{selectedCount:this.selectedIds.length,panelOpen:this.panelOpen},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
     },
 
     clearSelection() {

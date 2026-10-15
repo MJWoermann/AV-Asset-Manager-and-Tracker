@@ -16,7 +16,7 @@ class DeveloperFeatures
         return [
             'asset_connections' => 'Asset connections',
             'ru_visualiser' => 'RU visualiser',
-            'shelf_tag_generator' => 'Shelf tag generator',
+            'shelf_tag_generator' => 'Label generator',
             'stock_consumables' => 'Stock / consumables',
             'email_integration' => 'Email integration',
         ];

@@ -102,21 +102,21 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $user = $this->manager(feature: false);
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.index'))
+            ->get(route('labels.index'))
             ->assertNotFound();
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.layouts.index'))
+            ->get(route('labels.layouts.index'))
             ->assertNotFound();
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.print.create'))
+            ->get(route('labels.print.create'))
             ->assertNotFound();
 
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee(route('shelf-tags.index', [], false), false);
+            ->assertDontSee(route('labels.index', [], false), false);
     }
 
     public function test_scanner_with_flag_on_gets_forbidden(): void
@@ -124,15 +124,15 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $user = $this->scanner(feature: true);
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.index'))
+            ->get(route('labels.index'))
             ->assertForbidden();
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.layouts.index'))
+            ->get(route('labels.layouts.index'))
             ->assertForbidden();
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.print.create'))
+            ->get(route('labels.print.create'))
             ->assertForbidden();
     }
 
@@ -141,10 +141,10 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         Storage::fake('public');
         $user = $this->manager();
 
-        $create = $this->actingAs($user)->get(route('shelf-tags.layouts.create'));
-        $create->assertOk()->assertSee('New shelf tag layout');
+        $create = $this->actingAs($user)->get(route('labels.layouts.create'));
+        $create->assertOk()->assertSee('New label layout');
 
-        $response = $this->actingAs($user)->post(route('shelf-tags.layouts.store'), [
+        $response = $this->actingAs($user)->post(route('labels.layouts.store'), [
             'name' => 'Warehouse 62mm',
             'paper_preset' => ShelfTagPaperPresets::DEFAULT,
             'width_mm' => 62,
@@ -158,13 +158,13 @@ class ShelfTagGeneratorFeatureTest extends TestCase
 
         $layout = ShelfTagLayout::query()->first();
         $this->assertNotNull($layout);
-        $response->assertRedirect(route('shelf-tags.layouts.edit', $layout));
+        $response->assertRedirect(route('labels.layouts.edit', $layout));
         $this->assertSame('Warehouse 62mm', $layout->name);
         $this->assertNotNull($layout->logo_path);
         Storage::disk('public')->assertExists($layout->logo_path);
 
         $this->actingAs($user)
-            ->put(route('shelf-tags.layouts.update', $layout), [
+            ->put(route('labels.layouts.update', $layout), [
                 'name' => 'Warehouse 62mm updated',
                 'paper_preset' => ShelfTagPaperPresets::DEFAULT,
                 'width_mm' => 62,
@@ -174,14 +174,14 @@ class ShelfTagGeneratorFeatureTest extends TestCase
                 'elements' => json_encode(ShelfTagLayoutFactory::sampleElements()),
                 'editor_settings' => json_encode(ShelfTagPaperPresets::defaultEditorSettings()),
             ])
-            ->assertRedirect(route('shelf-tags.layouts.edit', $layout));
+            ->assertRedirect(route('labels.layouts.edit', $layout));
 
         $this->assertSame('Warehouse 62mm updated', $layout->fresh()->name);
         $this->assertSame(45.0, (float) $layout->fresh()->height_mm);
 
         $this->actingAs($user)
-            ->delete(route('shelf-tags.layouts.destroy', $layout))
-            ->assertRedirect(route('shelf-tags.index'));
+            ->delete(route('labels.layouts.destroy', $layout))
+            ->assertRedirect(route('labels.index'));
 
         $this->assertDatabaseMissing('shelf_tag_layouts', ['id' => $layout->id]);
     }
@@ -191,7 +191,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $user = $this->manager();
 
         $this->actingAs($user)
-            ->post(route('shelf-tags.layouts.store'), [
+            ->post(route('labels.layouts.store'), [
                 'name' => 'Bad preset',
                 'paper_preset' => 'not_a_real_preset',
                 'width_mm' => 62,
@@ -208,7 +208,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $user = $this->manager();
 
         $this->actingAs($user)
-            ->post(route('shelf-tags.layouts.store'), [
+            ->post(route('labels.layouts.store'), [
                 'name' => 'Bad diecut',
                 'paper_preset' => 'diecut_62x100',
                 'width_mm' => 62,
@@ -233,22 +233,22 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('shelf-tags.print.preview'), [
+            ->post(route('labels.print.preview'), [
                 'shelf_tag_layout_id' => $layout->id,
                 'asset_list_id' => $list->id,
                 'mode' => 'all',
             ])
-            ->assertRedirect(route('shelf-tags.print.show'));
+            ->assertRedirect(route('labels.print.show'));
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.print.show'))
+            ->get(route('labels.print.show'))
             ->assertOk()
             ->assertSee('Rack Amp')
             ->assertSee('Print', false)
             ->assertSee('Download PDF', false);
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.print.pdf'))
+            ->get(route('labels.print.pdf'))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
     }
@@ -263,7 +263,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $layout = ShelfTagLayout::factory()->create(['created_by' => $user->id]);
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.print.create', [
+            ->get(route('labels.print.create', [
                 'asset_list_id' => $list->id,
                 'shelf_tag_layout_id' => $layout->id,
             ]))
@@ -285,7 +285,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $this->attachToList($list, $other, $user);
 
         $response = $this->actingAs($user)
-            ->get(route('shelf-tags.print.create', [
+            ->get(route('labels.print.create', [
                 'asset_list_id' => $list->id,
                 'q' => 'TP-MATCH',
             ]));
@@ -312,16 +312,16 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('shelf-tags.print.preview'), [
+            ->post(route('labels.print.preview'), [
                 'shelf_tag_layout_id' => $layout->id,
                 'asset_list_id' => $list->id,
                 'mode' => 'selected',
                 'asset_ids' => [$keep->id],
             ])
-            ->assertRedirect(route('shelf-tags.print.show'));
+            ->assertRedirect(route('labels.print.show'));
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.print.show'))
+            ->get(route('labels.print.show'))
             ->assertOk()
             ->assertSee('Keep Label')
             ->assertDontSee('Skip Label');
@@ -337,7 +337,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $this->attachToList($list, $b, $user);
 
         $response = $this->actingAs($user)
-            ->get(route('shelf-tags.print.create', [
+            ->get(route('labels.print.create', [
                 'asset_list_id' => $list->id,
                 'asset_ids' => [$a->id],
             ]));
@@ -357,8 +357,8 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $layout = ShelfTagLayout::factory()->create(['created_by' => $user->id]);
 
         $this->actingAs($user)
-            ->from(route('shelf-tags.print.create'))
-            ->post(route('shelf-tags.print.preview'), [
+            ->from(route('labels.print.create'))
+            ->post(route('labels.print.preview'), [
                 'shelf_tag_layout_id' => $layout->id,
                 'asset_list_id' => $list->id,
                 'mode' => 'selected',
@@ -440,13 +440,13 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $this->actingAs($user)
             ->get(route('lists.show', $list))
             ->assertOk()
-            ->assertSee('Shelf tags', false);
+            ->assertSee('Labels', false);
 
         $disabled = $this->manager(feature: false);
         $this->actingAs($disabled)
             ->get(route('lists.show', $list))
             ->assertOk()
-            ->assertDontSee(route('shelf-tags.index', ['asset_list_id' => $list->id], false), false);
+            ->assertDontSee(route('labels.index', ['asset_list_id' => $list->id], false), false);
     }
 
     public function test_nav_shows_shelf_tag_link_under_reports_for_enabled_manager(): void
@@ -456,8 +456,8 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee(route('shelf-tags.index', [], false), false)
-            ->assertSee('Shelf tags', false)
+            ->assertSee(route('labels.index', [], false), false)
+            ->assertSee('Labels', false)
             ->assertDontSee('Shelf tag layouts', false)
             ->assertDontSee('Print shelf tags', false);
     }
@@ -471,7 +471,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.index'))
+            ->get(route('labels.index'))
             ->assertOk()
             ->assertSee('Hub Layout', false)
             ->assertSee('Layouts', false)
@@ -480,7 +480,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
             ->assertViewIs('shelf-tags.index');
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.layouts.index'))
-            ->assertRedirect(route('shelf-tags.index'));
+            ->get(route('labels.layouts.index'))
+            ->assertRedirect(route('labels.index'));
     }
 }

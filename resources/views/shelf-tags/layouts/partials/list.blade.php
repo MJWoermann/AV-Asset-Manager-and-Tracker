@@ -13,8 +13,8 @@
             </div>
         </div>
         <div class="flex items-center gap-3 text-sm">
-            <a href="{{ route('shelf-tags.layouts.edit', $layout) }}" class="text-brand">Edit</a>
-            <form method="POST" action="{{ route('shelf-tags.layouts.destroy', $layout) }}" onsubmit="return confirm('Delete this layout?')">
+            <a href="{{ route('labels.layouts.edit', $layout) }}" class="text-brand">Edit</a>
+            <form method="POST" action="{{ route('labels.layouts.destroy', $layout) }}" onsubmit="return confirm('Delete this layout?')">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="text-red-600">Delete</button>
@@ -22,5 +22,5 @@
         </div>
     </div>
 @empty
-    <p class="text-sm text-brand-charcoal dark:text-brand-silver">No shelf tag layouts yet. Create one to start printing.</p>
+    <p class="text-sm text-brand-charcoal dark:text-brand-silver">No label layouts yet. Create one to start printing.</p>
 @endforelse

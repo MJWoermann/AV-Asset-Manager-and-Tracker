@@ -20,7 +20,7 @@
         <div class="no-print flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h1 class="text-xl font-semibold">Kanban tags — {{ $asset->name }}</h1>
-                <p class="text-sm text-brand-charcoal">Print this page for shelf tags. QR codes open the guest stock update URL.</p>
+                <p class="text-sm text-brand-charcoal">Print this page for labels. QR codes open the guest stock update URL.</p>
             </div>
             <div class="flex gap-2">
                 <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>

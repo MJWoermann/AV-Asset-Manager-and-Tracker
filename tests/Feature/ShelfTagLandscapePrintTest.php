@@ -150,15 +150,15 @@ class ShelfTagLandscapePrintTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('shelf-tags.print.preview'), [
+            ->post(route('labels.print.preview'), [
                 'shelf_tag_layout_id' => $layout->id,
                 'asset_list_id' => $list->id,
                 'mode' => 'all',
             ])
-            ->assertRedirect(route('shelf-tags.print.show'));
+            ->assertRedirect(route('labels.print.show'));
 
         $this->actingAs($user)
-            ->get(route('shelf-tags.print.show'))
+            ->get(route('labels.print.show'))
             ->assertOk()
             ->assertSee('width: 110mm', false)
             ->assertSee('height: 62mm', false)

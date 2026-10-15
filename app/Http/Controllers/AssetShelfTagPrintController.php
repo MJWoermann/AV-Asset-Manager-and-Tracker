@@ -63,7 +63,7 @@ class AssetShelfTagPrintController extends Controller
             $this->mmToPoints($layout->displayHeightMm()),
         ]);
 
-        $filename = 'shelf-tag-'.$asset->id.'-'.now()->format('Ymd-His').'.pdf';
+        $filename = 'label-'.$asset->id.'-'.now()->format('Ymd-His').'.pdf';
 
         return $pdf->download($filename);
     }

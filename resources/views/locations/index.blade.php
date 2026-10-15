@@ -37,9 +37,51 @@
                     </p>
                     <button
                         type="button"
+                        id="debug-select-duplicates"
                         class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver"
-                        @click="selectDuplicateNames(@js($duplicateNames))"
+                        data-duplicate-names="{{ json_encode($duplicateNames) }}"
+                        @click="
+                            (() => {
+                                // #region agent log
+                                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'A',location:'locations/index.blade.php:@click',message:'Select duplicates click handler entered',data:{},timestamp:Date.now()})}).catch(()=>{});
+                                // #endregion
+                                try {
+                                    const parsed = @js($duplicateNames);
+                                    // #region agent log
+                                    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'A',location:'locations/index.blade.php:parsed',message:'@js parse succeeded',data:{count:Array.isArray(parsed)?parsed.length:null,sample:Array.isArray(parsed)?parsed.slice(0,3):parsed},timestamp:Date.now()})}).catch(()=>{});
+                                    // #endregion
+                                    selectDuplicateNames(parsed);
+                                } catch (err) {
+                                    // #region agent log
+                                    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'A',location:'locations/index.blade.php:catch',message:'@js or selectDuplicateNames threw',data:{error:String(err&&err.message||err),stack:String(err&&err.stack||'')},timestamp:Date.now()})}).catch(()=>{});
+                                    // #endregion
+                                }
+                            })()
+                        "
                     >Select duplicates</button>
+                    {{-- #region agent log --}}
+                    <script>
+                        (function () {
+                            const btn = document.getElementById('debug-select-duplicates');
+                            if (!btn) return;
+                            btn.addEventListener('click', function () {
+                                let attrOk = null;
+                                let attrErr = null;
+                                let attrCount = null;
+                                try {
+                                    const raw = btn.getAttribute('data-duplicate-names');
+                                    const parsed = JSON.parse(raw);
+                                    attrOk = true;
+                                    attrCount = Array.isArray(parsed) ? parsed.length : null;
+                                } catch (e) {
+                                    attrOk = false;
+                                    attrErr = String(e && e.message || e);
+                                }
+                                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'E',location:'locations/index.blade.php:native-click',message:'Native click fired on Select duplicates',data:{attrOk,attrErr,attrCount,hasAlpine:!!(window.Alpine),boxCount:document.querySelectorAll('[data-bulk-location-id]').length},timestamp:Date.now()})}).catch(function(){});
+                            }, true);
+                        })();
+                    </script>
+                    {{-- #endregion --}}
                 </div>
             @endif
 

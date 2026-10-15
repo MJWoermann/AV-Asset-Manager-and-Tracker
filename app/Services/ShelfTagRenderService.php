@@ -47,7 +47,7 @@ class ShelfTagRenderService
 
             if (count($assetIds) > self::MAX_BATCH) {
                 throw ValidationException::withMessages([
-                    'asset_ids' => 'You can print at most '.self::MAX_BATCH.' shelf tags at a time.',
+                    'asset_ids' => 'You can print at most '.self::MAX_BATCH.' labels at a time.',
                 ]);
             }
 

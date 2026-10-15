@@ -109,7 +109,7 @@ class ShelfTagPrintController extends Controller
             'mode' => $request->validated('mode'),
         ]);
 
-        return redirect()->route('shelf-tags.print.show');
+        return redirect()->route('labels.print.show');
     }
 
     public function show(Request $request, ShelfTagRenderService $renderer): View|RedirectResponse
@@ -117,8 +117,8 @@ class ShelfTagPrintController extends Controller
         $job = $this->jobFromSession($request);
         if ($job === null) {
             return redirect()
-                ->route('shelf-tags.index')
-                ->withErrors(['shelf_tag_layout_id' => 'Choose a layout and list to preview shelf tags.']);
+                ->route('labels.index')
+                ->withErrors(['shelf_tag_layout_id' => 'Choose a layout and list to preview labels.']);
         }
 
         [$layout, $list, $assets] = $this->loadJob($job, $renderer);
@@ -138,7 +138,7 @@ class ShelfTagPrintController extends Controller
         $job = $this->jobFromSession($request);
         if ($job === null) {
             return redirect()
-                ->route('shelf-tags.index')
+                ->route('labels.index')
                 ->withErrors(['shelf_tag_layout_id' => 'Choose a layout and list before downloading PDF.']);
         }
 
@@ -181,7 +181,7 @@ class ShelfTagPrintController extends Controller
             'labels' => $labels,
         ])->setPaper([0, 0, $this->mmToPoints($paperW), $this->mmToPoints($paperH)]);
 
-        $filename = 'shelf-tags-'.$list->id.'-'.now()->format('Ymd-His').'.pdf';
+        $filename = 'labels-'.$list->id.'-'.now()->format('Ymd-His').'.pdf';
 
         return $pdf->download($filename);
     }

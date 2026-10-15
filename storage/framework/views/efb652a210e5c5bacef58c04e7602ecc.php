@@ -37,8 +37,8 @@
 <?php $component->withAttributes([]); ?>
      <?php $__env->slot('header', null, []); ?> 
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h2 class="font-semibold text-xl"><?php echo e($layout->exists ? 'Edit shelf tag layout' : 'New shelf tag layout'); ?></h2>
-            <a href="<?php echo e(route('shelf-tags.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to shelf tags</a>
+            <h2 class="font-semibold text-xl"><?php echo e($layout->exists ? 'Edit label layout' : 'New label layout'); ?></h2>
+            <a href="<?php echo e(route('labels.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to labels</a>
         </div>
      <?php $__env->endSlot(); ?>
 
@@ -72,7 +72,7 @@
         <form
             method="POST"
             enctype="multipart/form-data"
-            action="<?php echo e($layout->exists ? route('shelf-tags.layouts.update', $layout) : route('shelf-tags.layouts.store')); ?>"
+            action="<?php echo e($layout->exists ? route('labels.layouts.update', $layout) : route('labels.layouts.store')); ?>"
             class="space-y-4"
             @submit="syncFormFields()"
         >
@@ -685,7 +685,7 @@
 <?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
 <?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
 <?php endif; ?>
-                <a href="<?php echo e(route('shelf-tags.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
+                <a href="<?php echo e(route('labels.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
             </div>
         </form>
     </div>

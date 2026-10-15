@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h2 class="font-semibold text-xl">Shelf tags</h2>
+            <h2 class="font-semibold text-xl">Labels</h2>
             <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                <a href="{{ route('shelf-tags.layouts.import') }}" class="px-3 py-2 border border-brand-charcoal/40 dark:border-brand-silver/40 text-sm inline-flex items-center justify-center">Import .lbx</a>
-                <a href="{{ route('shelf-tags.layouts.create') }}" class="px-3 py-2 bg-brand text-white text-sm inline-flex items-center justify-center">New layout</a>
+                <a href="{{ route('labels.layouts.import') }}" class="px-3 py-2 border border-brand-charcoal/40 dark:border-brand-silver/40 text-sm inline-flex items-center justify-center">Import .lbx</a>
+                <a href="{{ route('labels.layouts.create') }}" class="px-3 py-2 bg-brand text-white text-sm inline-flex items-center justify-center">New layout</a>
             </div>
         </div>
     </x-slot>
