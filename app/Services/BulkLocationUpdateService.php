@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\LocationType;
 use App\Models\Asset;
 use App\Models\Location;
 use Illuminate\Support\Collection;
@@ -119,6 +120,7 @@ class BulkLocationUpdateService
     /**
      * Merge selected locations that share the same name (case-insensitive).
      * Assets and child locations on duplicates move to the kept location.
+     * Prefer keeping a location that has a room code and sits under a site.
      *
      * @param  Collection<int, int|string>  $locationIds
      * @return array{updated: int, deleted: int, merged: int, assets_moved: int}
@@ -136,14 +138,18 @@ class BulkLocationUpdateService
             ]);
         }
 
+        /** @var Collection<int, Location> $hierarchyLookup */
+        $hierarchyLookup = Location::query()->get(['id', 'parent_id', 'type'])->keyBy('id');
+
         $deleted = 0;
         $merged = 0;
         $assetsMoved = 0;
 
         foreach ($groups as $group) {
             /** @var Location $survivor */
-            $survivor = $group->first();
-            $duplicateIds = $group->slice(1)->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $survivor = $this->chooseMergeSurvivor($group, $hierarchyLookup);
+            $duplicates = $group->where('id', '!=', $survivor->id)->values();
+            $duplicateIds = $duplicates->pluck('id')->map(fn ($id) => (int) $id)->all();
             $groupIds = $group->pluck('id')->map(fn ($id) => (int) $id)->all();
 
             if ($survivor->parent_id !== null && in_array((int) $survivor->parent_id, $duplicateIds, true)) {
@@ -159,7 +165,7 @@ class BulkLocationUpdateService
                 ->where('id', '!=', $survivor->id)
                 ->update(['parent_id' => $survivor->id]);
 
-            foreach ($group->slice(1) as $duplicate) {
+            foreach ($duplicates as $duplicate) {
                 $duplicate->delete();
                 $deleted++;
             }
@@ -173,6 +179,76 @@ class BulkLocationUpdateService
             'merged' => $merged,
             'assets_moved' => $assetsMoved,
         ];
+    }
+
+    /**
+     * @param  Collection<int, Location>  $group
+     * @param  Collection<int, Location>  $hierarchyLookup
+     */
+    protected function chooseMergeSurvivor(Collection $group, Collection $hierarchyLookup): Location
+    {
+        return $group
+            ->sort(function (Location $a, Location $b) use ($hierarchyLookup): int {
+                $scoreCmp = $this->mergeSurvivorScore($b, $hierarchyLookup)
+                    <=> $this->mergeSurvivorScore($a, $hierarchyLookup);
+
+                if ($scoreCmp !== 0) {
+                    return $scoreCmp;
+                }
+
+                return $a->id <=> $b->id;
+            })
+            ->first();
+    }
+
+    /**
+     * @param  Collection<int, Location>  $hierarchyLookup
+     */
+    protected function mergeSurvivorScore(Location $location, Collection $hierarchyLookup): int
+    {
+        $score = 0;
+
+        if (filled($location->room_code)) {
+            $score += 1;
+        }
+
+        if ($this->locationHasSite($location, $hierarchyLookup)) {
+            $score += 1;
+        }
+
+        return $score;
+    }
+
+    /**
+     * True when the location is a site or has a site ancestor.
+     *
+     * @param  Collection<int, Location>  $hierarchyLookup
+     */
+    protected function locationHasSite(Location $location, Collection $hierarchyLookup): bool
+    {
+        if ($location->type === LocationType::Site) {
+            return true;
+        }
+
+        $currentId = $location->parent_id !== null ? (int) $location->parent_id : null;
+        $guard = 0;
+
+        while ($currentId !== null && $guard < 100) {
+            $parent = $hierarchyLookup->get($currentId);
+
+            if ($parent === null) {
+                return false;
+            }
+
+            if ($parent->type === LocationType::Site) {
+                return true;
+            }
+
+            $currentId = $parent->parent_id !== null ? (int) $parent->parent_id : null;
+            $guard++;
+        }
+
+        return false;
     }
 
     /**

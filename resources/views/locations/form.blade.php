@@ -35,7 +35,9 @@
                 <input type="checkbox" name="is_portable" value="1" class="rounded text-brand" @checked(old('is_portable', $location->is_portable))>
                 Portable items pool
             </label>
-            <x-primary-button>Save</x-primary-button>
+            <div class="flex justify-end">
+                <x-primary-button>Save</x-primary-button>
+            </div>
         </form>
 
         @if($location->exists)

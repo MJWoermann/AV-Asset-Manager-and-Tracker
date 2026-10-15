@@ -1889,6 +1889,29 @@ Alpine.data('bulkLocations', () => ({
         clear_parent: false,
     },
 
+    init() {
+        // #region agent log
+        this.$nextTick(() => {
+            const selectAll = this.$el.querySelector('input[aria-label="Select all locations"]');
+            let boxCount = 0;
+            let elTag = null;
+            let err = null;
+            try {
+                elTag = this.$el ? this.$el.tagName : null;
+                boxCount = this.pageCheckboxes().length;
+            } catch (e) {
+                err = String(e && e.message ? e.message : e);
+            }
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'F',location:'app.js:bulkLocations.init',message:'bulkLocations init probe',data:{hasSelectAll:!!selectAll,boxCount,elTag,err,docBoxCount:document.querySelectorAll('[data-bulk-location-id]').length},timestamp:Date.now()})}).catch(()=>{});
+            if (selectAll) {
+                selectAll.addEventListener('change', (e) => {
+                    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'G',location:'app.js:bulkLocations.nativeChange',message:'Native change on select-all',data:{checked:!!e.target.checked},timestamp:Date.now()})}).catch(()=>{});
+                }, true);
+            }
+        });
+        // #endregion
+    },
+
     get selectedIds() {
         return Object.keys(this.selected)
             .filter((id) => this.selected[id])
@@ -1911,15 +1934,33 @@ Alpine.data('bulkLocations', () => ({
     },
 
     setSelected(id, checked) {
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'H',location:'app.js:bulkLocations.setSelected',message:'Row checkbox setSelected',data:{id,checked:!!checked},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         this.selected = { ...this.selected, [id]: !!checked };
     },
 
     toggleAll(checked) {
+        // #region agent log
+        let boxes = [];
+        let err = null;
+        try {
+            boxes = this.pageCheckboxes();
+        } catch (e) {
+            err = String(e && e.message ? e.message : e);
+        }
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'G',location:'app.js:bulkLocations.toggleAll',message:'toggleAll invoked',data:{checked:!!checked,boxCount:boxes.length,boxIdsSample:boxes.slice(0,8),selectedCountBefore:this.selectedIds.length,err},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const next = { ...this.selected };
         this.pageCheckboxes().forEach((id) => {
             next[id] = !!checked;
         });
         this.selected = next;
+        // #region agent log
+        this.$nextTick(() => {
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'G',location:'app.js:bulkLocations.toggleAll.after',message:'toggleAll after state',data:{selectedCountAfter:this.selectedIds.length,allPageSelected:this.allPageSelected,selectedKeysSample:Object.keys(this.selected).slice(0,8)},timestamp:Date.now()})}).catch(()=>{});
+        });
+        // #endregion
     },
 
     selectDuplicateNames(names) {
@@ -3476,6 +3517,79 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         }
     },
 }));
+
+const SCROLL_RESTORE_KEY = 'av.scrollRestore';
+
+function currentScrollKey() {
+    return `${window.location.pathname}${window.location.search}`;
+}
+
+function saveScrollPosition() {
+    try {
+        sessionStorage.setItem(
+            SCROLL_RESTORE_KEY,
+            JSON.stringify({
+                key: currentScrollKey(),
+                x: window.scrollX,
+                y: window.scrollY,
+            })
+        );
+    } catch {
+        // Ignore quota / private-mode failures.
+    }
+}
+
+function restoreScrollPosition() {
+    let data;
+
+    try {
+        const raw = sessionStorage.getItem(SCROLL_RESTORE_KEY);
+        if (!raw) {
+            return;
+        }
+
+        data = JSON.parse(raw);
+        sessionStorage.removeItem(SCROLL_RESTORE_KEY);
+    } catch {
+        return;
+    }
+
+    if (!data || data.key !== currentScrollKey()) {
+        return;
+    }
+
+    const x = Number(data.x) || 0;
+    const y = Number(data.y) || 0;
+
+    if (x === 0 && y === 0) {
+        return;
+    }
+
+    if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+    }
+
+    const apply = () => window.scrollTo(x, y);
+
+    apply();
+    requestAnimationFrame(apply);
+
+    if (document.readyState !== 'complete') {
+        window.addEventListener('load', apply, { once: true });
+    }
+}
+
+document.addEventListener(
+    'submit',
+    (event) => {
+        if (event.target instanceof HTMLFormElement) {
+            saveScrollPosition();
+        }
+    },
+    true
+);
+
+restoreScrollPosition();
 
 Alpine.start();
 

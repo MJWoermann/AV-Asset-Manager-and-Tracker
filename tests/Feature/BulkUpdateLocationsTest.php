@@ -187,6 +187,35 @@ class BulkUpdateLocationsTest extends TestCase
         $this->assertDatabaseMissing('locations', ['id' => $dup->id]);
     }
 
+    public function test_merge_prefers_location_with_room_code_and_site(): void
+    {
+        $user = $this->manager();
+        $site = Location::create(['name' => 'Main Site', 'type' => LocationType::Site]);
+        $orphan = Location::create([
+            'name' => 'Control Room',
+            'type' => LocationType::Room,
+        ]);
+        $preferred = Location::create([
+            'name' => 'Control Room',
+            'type' => LocationType::Room,
+            'room_code' => 'CR-12',
+            'parent_id' => $site->id,
+        ]);
+        $assetOnOrphan = $this->makeAsset(['name' => 'On Orphan', 'location_id' => $orphan->id]);
+        $assetOnPreferred = $this->makeAsset(['name' => 'On Preferred', 'location_id' => $preferred->id]);
+
+        $response = $this->actingAs($user)->post(route('locations.bulk-update'), [
+            'action' => 'merge_duplicates',
+            'location_ids' => [$orphan->id, $preferred->id],
+        ]);
+
+        $response->assertRedirect(route('locations.index'));
+        $this->assertDatabaseHas('locations', ['id' => $preferred->id]);
+        $this->assertDatabaseMissing('locations', ['id' => $orphan->id]);
+        $this->assertSame($preferred->id, $assetOnOrphan->fresh()->location_id);
+        $this->assertSame($preferred->id, $assetOnPreferred->fresh()->location_id);
+    }
+
     public function test_merge_without_duplicate_names_fails_validation(): void
     {
         $user = $this->manager();
