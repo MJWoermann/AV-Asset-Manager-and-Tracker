@@ -68,6 +68,7 @@ class RuVisualiserService
      *     face: string|RuPlacementFace,
      *     start_ru: int,
      *     ru_height?: int|null,
+     *     full_depth?: bool,
      *     kind: string|RuPlacementKind,
      *     child_asset_id?: int|null,
      *     note?: string|null,
@@ -84,8 +85,7 @@ class RuVisualiserService
             $kind = $this->resolveKind($data['kind'] ?? null);
             $startRu = (int) ($data['start_ru'] ?? 0);
             $confirmParentChange = (bool) ($data['confirm_parent_change'] ?? false);
-
-            $this->assertFaceAllowed($rack, $face);
+            $fullDepth = $kind === RuPlacementKind::Asset && (bool) ($data['full_depth'] ?? false);
 
             $child = null;
             $note = null;
@@ -104,6 +104,11 @@ class RuVisualiserService
 
                 $this->assertChildPlaceableOnRack($rack, $child, null, $confirmParentChange);
                 $ruHeight ??= $this->defaultPlacementHeight($child);
+
+                if ($fullDepth) {
+                    $face = RuPlacementFace::Front;
+                    $this->assertFullDepthAllowed($rack);
+                }
             } else {
                 $note = isset($data['note']) ? trim((string) $data['note']) : '';
                 if ($note === '') {
@@ -112,15 +117,18 @@ class RuVisualiserService
                     ]);
                 }
                 $ruHeight ??= 1;
+                $fullDepth = false;
             }
 
-            $this->assertSpanValid($rack, $face, $startRu, $ruHeight, null);
+            $this->assertFaceAllowed($rack, $face);
+            $this->assertSpanValid($rack, $face, $startRu, $ruHeight, null, $fullDepth);
 
             $placement = AssetRuPlacement::query()->create([
                 'rack_asset_id' => $rack->id,
                 'face' => $face,
                 'start_ru' => $startRu,
                 'ru_height' => $ruHeight,
+                'full_depth' => $fullDepth,
                 'kind' => $kind,
                 'child_asset_id' => $child?->id,
                 'note' => $kind === RuPlacementKind::Note ? $note : null,
@@ -135,6 +143,7 @@ class RuVisualiserService
                 'face' => $face->value,
                 'start_ru' => $startRu,
                 'ru_height' => $ruHeight,
+                'full_depth' => $fullDepth,
                 'kind' => $kind->value,
                 'child_asset_id' => $child?->id,
                 'note' => $kind === RuPlacementKind::Note ? $note : null,
@@ -149,6 +158,7 @@ class RuVisualiserService
      *     face?: string|RuPlacementFace,
      *     start_ru?: int,
      *     ru_height?: int|null,
+     *     full_depth?: bool,
      *     kind?: string|RuPlacementKind,
      *     child_asset_id?: int|null,
      *     note?: string|null,
@@ -173,14 +183,15 @@ class RuVisualiserService
                 : (int) $placement->start_ru;
             $confirmParentChange = (bool) ($data['confirm_parent_change'] ?? false);
 
-            $this->assertFaceAllowed($rack, $face);
-
             $previousChildId = $placement->child_asset_id ? (int) $placement->child_asset_id : null;
             $child = null;
             $note = $placement->note;
             $ruHeight = array_key_exists('ru_height', $data) && $data['ru_height'] !== null && $data['ru_height'] !== ''
                 ? (int) $data['ru_height']
                 : (int) $placement->ru_height;
+            $fullDepth = array_key_exists('full_depth', $data)
+                ? (bool) $data['full_depth']
+                : (bool) $placement->full_depth;
 
             if ($kind === RuPlacementKind::Asset) {
                 $childId = array_key_exists('child_asset_id', $data)
@@ -200,6 +211,11 @@ class RuVisualiserService
                     }
                 }
                 $note = null;
+
+                if ($fullDepth) {
+                    $face = RuPlacementFace::Front;
+                    $this->assertFullDepthAllowed($rack);
+                }
             } else {
                 if (array_key_exists('note', $data)) {
                     $note = trim((string) $data['note']);
@@ -210,26 +226,25 @@ class RuVisualiserService
                     ]);
                 }
                 $child = null;
+                $fullDepth = false;
             }
 
-            $this->assertSpanValid($rack, $face, $startRu, $ruHeight, $placement->id);
+            $this->assertFaceAllowed($rack, $face);
+            $this->assertSpanValid($rack, $face, $startRu, $ruHeight, $placement->id, $fullDepth);
 
             $old = $placement->only([
-                'face', 'start_ru', 'ru_height', 'kind', 'child_asset_id', 'note',
+                'face', 'start_ru', 'ru_height', 'full_depth', 'kind', 'child_asset_id', 'note',
             ]);
 
             $placement->update([
                 'face' => $face,
                 'start_ru' => $startRu,
                 'ru_height' => $ruHeight,
+                'full_depth' => $fullDepth,
                 'kind' => $kind,
                 'child_asset_id' => $child?->id,
                 'note' => $kind === RuPlacementKind::Note ? $note : null,
             ]);
-
-            if ($previousChildId && ($child === null || $previousChildId !== (int) $child->id)) {
-                $this->clearParentIfLastPlacement($rack, $previousChildId);
-            }
 
             if ($child) {
                 $this->assignParent($rack, $child, $confirmParentChange);
@@ -240,6 +255,7 @@ class RuVisualiserService
                 'face' => $face->value,
                 'start_ru' => $startRu,
                 'ru_height' => $ruHeight,
+                'full_depth' => $fullDepth,
                 'kind' => $kind->value,
                 'child_asset_id' => $child?->id,
                 'note' => $kind === RuPlacementKind::Note ? $note : null,
@@ -254,17 +270,13 @@ class RuVisualiserService
         DB::transaction(function () use ($placement): void {
             $placement->refresh();
             $rack = Asset::query()->lockForUpdate()->findOrFail($placement->rack_asset_id);
-            $childId = $placement->child_asset_id ? (int) $placement->child_asset_id : null;
 
             $old = $placement->only([
-                'id', 'face', 'start_ru', 'ru_height', 'kind', 'child_asset_id', 'note',
+                'id', 'face', 'start_ru', 'ru_height', 'full_depth', 'kind', 'child_asset_id', 'note',
             ]);
 
+            // Keep parent_id — child remains under the rack and shows as unplaced.
             $placement->delete();
-
-            if ($childId) {
-                $this->clearParentIfLastPlacement($rack, $childId);
-            }
 
             $this->auditRack($rack, 'ru_placement_deleted', $old, null);
         });
@@ -300,13 +312,13 @@ class RuVisualiserService
         }
 
         if (! $rearEnabled) {
-            $hasRear = $rack->ruPlacements->contains(
-                fn (AssetRuPlacement $p): bool => $p->face === RuPlacementFace::Rear
+            $blocksRearDisable = $rack->ruPlacements->contains(
+                fn (AssetRuPlacement $p): bool => $p->face === RuPlacementFace::Rear || (bool) $p->full_depth
             );
 
-            if ($hasRear) {
+            if ($blocksRearDisable) {
                 throw ValidationException::withMessages([
-                    'ru_rear_enabled' => 'Clear rear-face placements before disabling the rear face.',
+                    'ru_rear_enabled' => 'Clear rear-face and full-depth placements before disabling the rear face.',
                 ]);
             }
         }
@@ -345,12 +357,22 @@ class RuVisualiserService
         }
     }
 
+    protected function assertFullDepthAllowed(Asset $rack): void
+    {
+        if (! $rack->ru_rear_enabled) {
+            throw ValidationException::withMessages([
+                'full_depth' => 'Full-depth placements require the rear face to be enabled on this rack.',
+            ]);
+        }
+    }
+
     protected function assertSpanValid(
         Asset $rack,
         RuPlacementFace $face,
         int $startRu,
         int $ruHeight,
         ?int $ignorePlacementId,
+        bool $fullDepth = false,
     ): void {
         $capacity = (int) $rack->ru_height;
 
@@ -373,20 +395,33 @@ class RuVisualiserService
             ]);
         }
 
+        $occupiedFaces = $fullDepth
+            ? [RuPlacementFace::Front->value, RuPlacementFace::Rear->value]
+            : [$face->value];
+
         $overlaps = AssetRuPlacement::query()
             ->where('rack_asset_id', $rack->id)
-            ->where('face', $face->value)
             ->when($ignorePlacementId, fn ($q) => $q->where('id', '!=', $ignorePlacementId))
             ->get()
-            ->filter(function (AssetRuPlacement $existing) use ($startRu, $endRu): bool {
+            ->filter(function (AssetRuPlacement $existing) use ($startRu, $endRu, $occupiedFaces): bool {
                 $existingEnd = (int) $existing->start_ru + (int) $existing->ru_height - 1;
+                $spansOverlap = $startRu <= $existingEnd && (int) $existing->start_ru <= $endRu;
+                if (! $spansOverlap) {
+                    return false;
+                }
 
-                return $startRu <= $existingEnd && (int) $existing->start_ru <= $endRu;
+                $existingFaces = (bool) $existing->full_depth
+                    ? [RuPlacementFace::Front->value, RuPlacementFace::Rear->value]
+                    : [$existing->face->value];
+
+                return count(array_intersect($occupiedFaces, $existingFaces)) > 0;
             });
 
         if ($overlaps->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'start_ru' => 'This placement overlaps another placement on the same face.',
+                'start_ru' => $fullDepth
+                    ? 'This full-depth placement overlaps another placement on the front or rear face.'
+                    : 'This placement overlaps another placement on the same face.',
             ]);
         }
     }
@@ -449,27 +484,6 @@ class RuVisualiserService
         }
 
         $child->update(['parent_id' => $rack->id]);
-    }
-
-    protected function clearParentIfLastPlacement(Asset $rack, int $childId): void
-    {
-        $child = Asset::query()->find($childId);
-        if (! $child) {
-            return;
-        }
-
-        if ((int) ($child->parent_id ?? 0) !== (int) $rack->id) {
-            return;
-        }
-
-        $remaining = AssetRuPlacement::query()
-            ->where('rack_asset_id', $rack->id)
-            ->where('child_asset_id', $childId)
-            ->exists();
-
-        if (! $remaining) {
-            $child->update(['parent_id' => null]);
-        }
     }
 
     protected function childIsAncestorOfRack(Asset $rack, Asset $child): bool

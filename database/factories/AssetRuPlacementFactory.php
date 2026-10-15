@@ -25,6 +25,7 @@ class AssetRuPlacementFactory extends Factory
             'face' => RuPlacementFace::Front,
             'start_ru' => 1,
             'ru_height' => 1,
+            'full_depth' => false,
             'kind' => RuPlacementKind::Note,
             'child_asset_id' => null,
             'note' => fake()->sentence(),
@@ -49,8 +50,18 @@ class AssetRuPlacementFactory extends Factory
                 'child_asset_id' => $child->id,
                 'note' => null,
                 'ru_height' => max(1, (int) ($child->ru_height ?? 1)),
+                'full_depth' => false,
             ];
         });
+    }
+
+    public function fullDepth(): static
+    {
+        return $this->state(fn (): array => [
+            'full_depth' => true,
+            'face' => RuPlacementFace::Front,
+            'kind' => RuPlacementKind::Asset,
+        ]);
     }
 
     public function rear(): static

@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,9 +16,24 @@ class AssetLocationFilterTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_assets_index_filters_by_location_including_descendants(): void
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RoleSeeder::class);
+    }
+
+    protected function scanner(): User
     {
         $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
+
+    public function test_assets_index_filters_by_location_including_descendants(): void
+    {
+        $user = $this->scanner();
         $itemType = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',
@@ -68,7 +84,7 @@ class AssetLocationFilterTest extends TestCase
 
     public function test_assets_index_exact_location_filter_excludes_siblings(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $itemType = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',

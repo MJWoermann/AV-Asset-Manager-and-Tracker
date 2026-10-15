@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\LocationType;
 use App\Models\Location;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,9 +13,24 @@ class LocationHierarchyTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_locations_index_nests_children_under_parents_and_links_to_filtered_assets(): void
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RoleSeeder::class);
+    }
+
+    protected function scanner(): User
     {
         $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
+
+    public function test_locations_index_nests_children_under_parents_and_links_to_filtered_assets(): void
+    {
+        $user = $this->scanner();
 
         $site = Location::create([
             'name' => 'Main Warehouse',
@@ -48,7 +64,7 @@ class LocationHierarchyTest extends TestCase
 
     public function test_locations_index_alternates_row_shades_for_adjacent_same_type_siblings(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
 
         Location::create(['name' => 'Site Alpha', 'type' => LocationType::Site]);
         Location::create(['name' => 'Site Beta', 'type' => LocationType::Site]);

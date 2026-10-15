@@ -240,6 +240,99 @@ class ShelfTagGeneratorFeatureTest extends TestCase
             ->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_print_setup_lists_assets_with_checkboxes(): void
+    {
+        $user = $this->manager();
+        $list = $this->makeList($user);
+        $asset = $this->makeAsset(['name' => 'Selectable Amp', 'tp_barcode' => 'TP-SEL-1']);
+        $this->attachToList($list, $asset, $user);
+
+        $layout = ShelfTagLayout::factory()->create(['created_by' => $user->id]);
+
+        $this->actingAs($user)
+            ->get(route('shelf-tags.print.create', [
+                'asset_list_id' => $list->id,
+                'shelf_tag_layout_id' => $layout->id,
+            ]))
+            ->assertOk()
+            ->assertSee('Selectable Amp')
+            ->assertSee('TP-SEL-1')
+            ->assertSee('Select visible', false)
+            ->assertSee('shelfTagPrintSetup(', false)
+            ->assertSee('Assets on list', false);
+    }
+
+    public function test_print_setup_filters_assets_by_search(): void
+    {
+        $user = $this->manager();
+        $list = $this->makeList($user);
+        $match = $this->makeAsset(['name' => 'Match Fixture', 'tp_barcode' => 'TP-MATCH-99']);
+        $other = $this->makeAsset(['name' => 'Other Fixture', 'tp_barcode' => 'TP-OTHER-11']);
+        $this->attachToList($list, $match, $user);
+        $this->attachToList($list, $other, $user);
+
+        $response = $this->actingAs($user)
+            ->get(route('shelf-tags.print.create', [
+                'asset_list_id' => $list->id,
+                'q' => 'TP-MATCH',
+            ]));
+
+        $response->assertOk();
+        $assets = $response->viewData('listAssets');
+        $this->assertSame(['Match Fixture'], $assets->pluck('name')->all());
+        $response->assertSee('Match Fixture');
+        $response->assertDontSee('Other Fixture');
+    }
+
+    public function test_print_preview_uses_only_selected_assets(): void
+    {
+        $user = $this->manager();
+        $list = $this->makeList($user);
+        $keep = $this->makeAsset(['name' => 'Keep Label']);
+        $skip = $this->makeAsset(['name' => 'Skip Label']);
+        $this->attachToList($list, $keep, $user);
+        $this->attachToList($list, $skip, $user);
+
+        $layout = ShelfTagLayout::factory()->create([
+            'created_by' => $user->id,
+            'elements' => ShelfTagLayoutFactory::sampleElements(),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('shelf-tags.print.preview'), [
+                'shelf_tag_layout_id' => $layout->id,
+                'asset_list_id' => $list->id,
+                'mode' => 'selected',
+                'asset_ids' => [$keep->id],
+            ])
+            ->assertRedirect(route('shelf-tags.print.show'));
+
+        $this->actingAs($user)
+            ->get(route('shelf-tags.print.show'))
+            ->assertOk()
+            ->assertSee('Keep Label')
+            ->assertDontSee('Skip Label');
+    }
+
+    public function test_print_setup_preselects_query_asset_ids(): void
+    {
+        $user = $this->manager();
+        $list = $this->makeList($user);
+        $a = $this->makeAsset(['name' => 'Preselect A']);
+        $b = $this->makeAsset(['name' => 'Preselect B']);
+        $this->attachToList($list, $a, $user);
+        $this->attachToList($list, $b, $user);
+
+        $response = $this->actingAs($user)
+            ->get(route('shelf-tags.print.create', [
+                'asset_list_id' => $list->id,
+                'asset_ids' => [$a->id],
+            ]));
+
+        $response->assertOk();
+        $this->assertSame([$a->id], $response->viewData('preselectedIds'));
+    }
+
     public function test_selected_ids_not_on_list_are_rejected(): void
     {
         $user = $this->manager();

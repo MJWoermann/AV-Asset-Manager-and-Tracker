@@ -17,13 +17,7 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
-        $featureRules = [];
-
-        foreach (DeveloperFeatures::keys() as $key) {
-            $featureRules['features.'.$key] = ['sometimes', 'boolean'];
-        }
-
-        return [
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => [
                 'required',
@@ -34,8 +28,18 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
             'theme' => ['required', 'in:light,dark'],
-            'features' => ['sometimes', 'array'],
-            ...$featureRules,
         ];
+
+        if ($this->user()?->hasRole('admin')) {
+            $featureRules = [];
+            foreach (DeveloperFeatures::keys() as $key) {
+                $featureRules['features.'.$key] = ['sometimes', 'boolean'];
+            }
+
+            $rules['features'] = ['sometimes', 'array'];
+            $rules = [...$rules, ...$featureRules];
+        }
+
+        return $rules;
     }
 }

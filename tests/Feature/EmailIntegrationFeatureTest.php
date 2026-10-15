@@ -112,6 +112,10 @@ class EmailIntegrationFeatureTest extends TestCase
             ->assertNotFound();
 
         $this->actingAs($user)
+            ->get(route('admin.email.outbound.index'))
+            ->assertNotFound();
+
+        $this->actingAs($user)
             ->get(route('assets.create'))
             ->assertOk()
             ->assertDontSee('Email IT helpdesk with MAC details', false);
@@ -321,6 +325,44 @@ class EmailIntegrationFeatureTest extends TestCase
         ]);
     }
 
+    public function test_inbound_index_filters_by_status_and_supports_all(): void
+    {
+        $user = $this->admin();
+        $this->enableMailSettings();
+
+        $pending = InboundEmailAction::factory()->create([
+            'status' => InboundEmailActionStatus::Pending,
+            'subject' => 'Pending inbound subject',
+        ]);
+        $applied = InboundEmailAction::factory()->create([
+            'status' => InboundEmailActionStatus::Applied,
+            'subject' => 'Applied inbound subject',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.email.inbound.index'))
+            ->assertOk()
+            ->assertSee('Pending inbound subject', false)
+            ->assertDontSee('Applied inbound subject', false)
+            ->assertSee('name="status"', false);
+
+        $this->actingAs($user)
+            ->get(route('admin.email.inbound.index', ['status' => 'applied']))
+            ->assertOk()
+            ->assertSee('Applied inbound subject', false)
+            ->assertDontSee('Pending inbound subject', false);
+
+        $this->actingAs($user)
+            ->get(route('admin.email.inbound.index', ['status' => 'all']))
+            ->assertOk()
+            ->assertSee('Pending inbound subject', false)
+            ->assertSee('Applied inbound subject', false)
+            ->assertSee('value="all"', false);
+
+        $this->assertModelExists($pending);
+        $this->assertModelExists($applied);
+    }
+
     public function test_template_required_fields_enforced_for_helpdesk_recipient(): void
     {
         Mail::fake();
@@ -387,5 +429,34 @@ class EmailIntegrationFeatureTest extends TestCase
         $this->assertTrue($settings['enabled']);
         $this->assertSame('gmail', $settings['driver']);
         $this->assertSame('imap.gmail.com', $settings['imap_host']);
+    }
+
+    public function test_admin_and_manager_can_view_outbound_threads_index(): void
+    {
+        $admin = $this->admin();
+        $manager = $this->manager();
+        $scanner = User::factory()->create(['theme' => 'light']);
+        $scanner->assignRole('scanner');
+        $scanner = $this->withEmailFeature($scanner);
+
+        $thread = OutboundEmailThread::factory()->create([
+            'subject' => 'MAC registration outbound',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.email.outbound.index'))
+            ->assertOk()
+            ->assertSee('MAC registration outbound', false);
+
+        $this->actingAs($manager)
+            ->get(route('admin.email.outbound.index'))
+            ->assertOk()
+            ->assertSee('MAC registration outbound', false);
+
+        $this->actingAs($scanner)
+            ->get(route('admin.email.outbound.index'))
+            ->assertForbidden();
+
+        $this->assertModelExists($thread);
     }
 }

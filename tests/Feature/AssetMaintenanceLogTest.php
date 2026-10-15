@@ -210,4 +210,119 @@ class AssetMaintenanceLogTest extends TestCase
             ->assertSee('Annual service', false)
             ->assertSee('Add entry', false);
     }
+
+    public function test_maintenance_tab_filters_by_type(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->makeAsset();
+
+        AssetMaintenanceLog::factory()->create([
+            'asset_id' => $asset->id,
+            'user_id' => $user->id,
+            'type' => MaintenanceLogType::Fault,
+            'summary' => 'Fault only entry',
+        ]);
+        AssetMaintenanceLog::factory()->create([
+            'asset_id' => $asset->id,
+            'user_id' => $user->id,
+            'type' => MaintenanceLogType::Service,
+            'summary' => 'Service only entry',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [
+                $asset,
+                'tab' => 'maintenance',
+                'log_type' => MaintenanceLogType::Fault->value,
+            ]))
+            ->assertOk()
+            ->assertSee('Fault only entry', false)
+            ->assertDontSee('Service only entry');
+    }
+
+    public function test_maintenance_tab_filters_by_user(): void
+    {
+        $user = $this->scanner();
+        $other = $this->scanner();
+        $asset = $this->makeAsset();
+
+        AssetMaintenanceLog::factory()->create([
+            'asset_id' => $asset->id,
+            'user_id' => $user->id,
+            'type' => MaintenanceLogType::Note,
+            'summary' => 'Logged by current user',
+        ]);
+        AssetMaintenanceLog::factory()->create([
+            'asset_id' => $asset->id,
+            'user_id' => $other->id,
+            'type' => MaintenanceLogType::Note,
+            'summary' => 'Logged by other user',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [
+                $asset,
+                'tab' => 'maintenance',
+                'user_id' => $other->id,
+            ]))
+            ->assertOk()
+            ->assertSee('Logged by other user', false)
+            ->assertDontSee('Logged by current user');
+    }
+
+    public function test_maintenance_tab_filters_by_date_range(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->makeAsset();
+
+        AssetMaintenanceLog::factory()->create([
+            'asset_id' => $asset->id,
+            'user_id' => $user->id,
+            'type' => MaintenanceLogType::Note,
+            'summary' => 'In range maintenance',
+            'occurred_at' => '2025-06-15 10:00:00',
+        ]);
+        AssetMaintenanceLog::factory()->create([
+            'asset_id' => $asset->id,
+            'user_id' => $user->id,
+            'type' => MaintenanceLogType::Note,
+            'summary' => 'Out of range maintenance',
+            'occurred_at' => '2024-01-01 10:00:00',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [
+                $asset,
+                'tab' => 'maintenance',
+                'date_from' => '2025-06-01',
+                'date_to' => '2025-06-30',
+            ]))
+            ->assertOk()
+            ->assertSee('In range maintenance', false)
+            ->assertDontSee('Out of range maintenance');
+    }
+
+    public function test_maintenance_tab_shows_empty_filter_message(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->makeAsset();
+
+        AssetMaintenanceLog::factory()->create([
+            'asset_id' => $asset->id,
+            'user_id' => $user->id,
+            'type' => MaintenanceLogType::Note,
+            'summary' => 'Existing note',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [
+                $asset,
+                'tab' => 'maintenance',
+                'log_type' => MaintenanceLogType::Fault->value,
+            ]))
+            ->assertOk()
+            ->assertSee('No maintenance entries match these filters.', false)
+            ->assertDontSee('Existing note')
+            ->assertDontSee('No maintenance entries yet.');
+    }
 }

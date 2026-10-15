@@ -94,4 +94,30 @@ class File extends Model
     {
         return $this->source_type === FileSourceType::Url;
     }
+
+    public function isPreviewableImage(): bool
+    {
+        if (! $this->isUpload()) {
+            return false;
+        }
+
+        $mime = strtolower((string) $this->mime_type);
+
+        return in_array($mime, ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'], true);
+    }
+
+    public function isPreviewablePdf(): bool
+    {
+        return $this->isUpload() && strtolower((string) $this->mime_type) === 'application/pdf';
+    }
+
+    public function isPreviewable(): bool
+    {
+        return $this->isPreviewableImage() || $this->isPreviewablePdf();
+    }
+
+    public function hasThumbnail(): bool
+    {
+        return filled($this->thumbnail_path);
+    }
 }

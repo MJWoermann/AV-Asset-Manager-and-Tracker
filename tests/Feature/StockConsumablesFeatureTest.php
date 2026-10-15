@@ -287,6 +287,24 @@ class StockConsumablesFeatureTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_guest_stock_routes_return_404_when_kill_switch_disabled(): void
+    {
+        config(['app.stock_guest_enabled' => false]);
+
+        $asset = $this->stockAsset(quantity: 12);
+        $created = app(KanbanTagService::class)->rotate($asset, 'kanban-a');
+
+        $this->get(route('stock.guest.show', ['token' => $created['plain_token']]))
+            ->assertNotFound();
+
+        $this->post(route('stock.guest.store', ['token' => $created['plain_token']]), [
+            'type' => 'count',
+            'quantity' => 8,
+        ])->assertNotFound();
+
+        $this->assertSame(12, (int) $asset->fresh()->quantity);
+    }
+
     public function test_login_path_records_stock_movement(): void
     {
         $user = $this->scanner();

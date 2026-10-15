@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\ItemType;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,9 +14,24 @@ class AssetSearchTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_search_matches_partial_identifier_fields(): void
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RoleSeeder::class);
+    }
+
+    protected function scanner(): User
     {
         $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
+
+    public function test_search_matches_partial_identifier_fields(): void
+    {
+        $user = $this->scanner();
         $itemType = $this->itemType();
 
         Asset::create([
@@ -34,7 +50,7 @@ class AssetSearchTest extends TestCase
 
     public function test_exact_identifier_match_ranks_above_partial_name_match(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $itemType = $this->itemType();
 
         $exact = Asset::create([
@@ -67,7 +83,7 @@ class AssetSearchTest extends TestCase
 
     public function test_multi_token_search_matches_across_different_fields(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $itemType = $this->itemType();
 
         Asset::create([
@@ -89,7 +105,10 @@ class AssetSearchTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('FOH Console');
-        $response->assertDontSee('Yamaha Speaker');
+        $this->assertSame(
+            ['FOH Console'],
+            $response->viewData('assets')->pluck('name')->all()
+        );
     }
 
     private function itemType(): ItemType

@@ -24,7 +24,7 @@
     </x-slot>
 
     <div
-        class="max-w-7xl mx-auto px-4"
+        class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8"
         x-data="shelfTagDesigner(@js($initial), @js($presets), @js($fieldOptions))"
     >
         @if (session('status'))
@@ -49,8 +49,8 @@
             @if($layout->exists) @method('PUT') @endif
             <input type="hidden" name="elements" x-ref="elementsInput" :value="elementsJson">
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                <div class="lg:col-span-3 space-y-3 bg-white dark:bg-brand-slate border p-3">
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                <div class="xl:col-span-3 space-y-3 bg-white dark:bg-brand-slate border p-3">
                     <div>
                         <x-input-label for="name" value="Name" />
                         <x-text-input id="name" name="name" class="mt-1 block w-full" x-model="name" required />
@@ -102,26 +102,93 @@
                     </p>
                 </div>
 
-                <div class="lg:col-span-6 space-y-3">
+                <div class="xl:col-span-7 space-y-3">
                     <div class="bg-white dark:bg-brand-slate border p-3">
                         <div class="flex flex-wrap gap-2 mb-3 text-sm">
-                            <button type="button" class="px-2 py-1 border" @click="addElement('text')">Text</button>
-                            <button type="button" class="px-2 py-1 border" @click="addElement('field')">Field</button>
-                            <button type="button" class="px-2 py-1 border" @click="addElement('barcode')">Barcode</button>
-                            <button type="button" class="px-2 py-1 border" @click="addElement('qr')">QR</button>
-                            <button type="button" class="px-2 py-1 border" @click="addElement('rect')">Rect</button>
-                            <button type="button" class="px-2 py-1 border" @click="addElement('line')">Line</button>
-                            <button type="button" class="px-2 py-1 border" @click="addElement('logo')">Logo</button>
+                            <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 border" @click="addElement('text')">
+                                <svg class="h-4 w-4 shrink-0 text-brand-charcoal dark:text-brand-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 7V5h16v2M9 19h6M12 5v14" />
+                                </svg>
+                                Text
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 border" @click="addElement('field')">
+                                <svg class="h-4 w-4 shrink-0 text-brand-charcoal dark:text-brand-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 7h16M4 12h10M4 17h16" />
+                                </svg>
+                                Field
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 border" @click="addElement('barcode')">
+                                <svg class="h-4 w-4 shrink-0 text-brand-charcoal dark:text-brand-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 6v12M7 6v12M10 6v12M12 6v12M15 6v12M18 6v12M20 6v12" />
+                                </svg>
+                                Barcode
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 border" @click="addElement('qr')">
+                                <svg class="h-4 w-4 shrink-0 text-brand-charcoal dark:text-brand-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 3h3v3h-3v-3zm4-3h3v3h-3v-3zm-4 0h3v2h-3v-2zm4 4h3v3h-3v-3z" />
+                                </svg>
+                                QR
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 border" @click="addElement('rect')">
+                                <svg class="h-4 w-4 shrink-0 text-brand-charcoal dark:text-brand-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="5" y="6" width="14" height="12" stroke-width="1.75" />
+                                </svg>
+                                Rect
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 border" @click="addElement('line')">
+                                <svg class="h-4 w-4 shrink-0 text-brand-charcoal dark:text-brand-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-width="1.75" d="M4 12h16" />
+                                </svg>
+                                Line
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 border" @click="addElement('logo')">
+                                <svg class="h-4 w-4 shrink-0 text-brand-charcoal dark:text-brand-silver" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 16l4.5-4.5a2 2 0 012.8 0L16 16m-2-2l1.5-1.5a2 2 0 012.8 0L20 14M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Logo
+                            </button>
                         </div>
-                        <div class="overflow-auto border border-dashed border-brand-charcoal/40 bg-brand-silver/20 p-4">
+
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3 text-sm border-t border-brand-silver dark:border-brand-charcoal pt-3">
+                            <label class="inline-flex items-center gap-2">
+                                <input type="checkbox" class="rounded text-brand" x-model="showGrid">
+                                Show grid
+                            </label>
+                            <label class="inline-flex items-center gap-2">
+                                <input type="checkbox" class="rounded text-brand" x-model="snapToGrid">
+                                Snap to grid
+                            </label>
+                            <label class="inline-flex items-center gap-2">
+                                <span class="text-brand-charcoal dark:text-brand-silver">Grid</span>
+                                <select
+                                    class="rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white text-sm py-1"
+                                    x-model.number="gridSizeMm"
+                                >
+                                    <option :value="2.5">2.5 mm</option>
+                                    <option :value="5">5 mm</option>
+                                    <option :value="10">10 mm</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="overflow-auto rounded border-2 border-brand-charcoal dark:border-brand-black bg-brand-charcoal dark:bg-black p-5 shadow-inner">
                             <div
-                                class="relative bg-white shadow-sm mx-auto"
+                                class="relative bg-white shadow-md mx-auto ring-1 ring-black/20"
                                 :style="canvasStyle"
                                 @pointerdown.self="selectedId = null"
                             >
+                                <div
+                                    x-show="showGrid"
+                                    class="absolute inset-0 pointer-events-none z-[1]"
+                                    :style="gridOverlayStyle"
+                                    aria-hidden="true"
+                                >
+                                    <div class="absolute top-0 bottom-0 w-px bg-brand" :style="centerCrosshairStyleX"></div>
+                                    <div class="absolute left-0 right-0 h-px bg-brand" :style="centerCrosshairStyleY"></div>
+                                </div>
                                 <template x-for="el in sortedElements" :key="el.id">
                                     <div
-                                        class="absolute border border-transparent select-none"
+                                        class="absolute border border-transparent select-none z-[2]"
                                         :data-el-id="el.id"
                                         :class="selectedId === el.id ? 'ring-2 ring-brand border-brand' : 'hover:border-brand-charcoal/40'"
                                         :style="elementStyle(el)"
@@ -162,12 +229,16 @@
                             </div>
                         </div>
                         <p class="mt-2 text-xs text-brand-charcoal dark:text-brand-silver">
-                            Canvas scale: <span x-text="scale.toFixed(1)"></span>px per mm. Drag to move, corner handle to resize.
+                            Canvas scale: <span x-text="scale.toFixed(1)"></span>px per mm.
+                            Grid originates from the label centre.
+                            Drag to move, corner handle to resize.
+                            <span x-show="snapToGrid">Snapping to <span x-text="gridSizeMm"></span> mm grid.</span>
+                            <span x-show="showGrid && !snapToGrid">Grid shown as guides only.</span>
                         </p>
                     </div>
                 </div>
 
-                <div class="lg:col-span-3 space-y-3 bg-white dark:bg-brand-slate border p-3">
+                <div class="xl:col-span-2 space-y-3 bg-white dark:bg-brand-slate border p-3">
                     <h3 class="font-medium text-sm">Selected element</h3>
                     <template x-if="!selected">
                         <p class="text-sm text-brand-charcoal dark:text-brand-silver">Select an element on the canvas.</p>

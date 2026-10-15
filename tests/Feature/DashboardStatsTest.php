@@ -6,12 +6,28 @@ use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\ItemType;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class DashboardStatsTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RoleSeeder::class);
+    }
+
+    protected function scanner(): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
 
     public function test_guest_is_redirected_to_login(): void
     {
@@ -20,7 +36,7 @@ class DashboardStatsTest extends TestCase
 
     public function test_dashboard_shows_status_and_type_counts_with_filter_links(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $fixture = ItemType::create(['name' => 'LX Fixture', 'slug' => 'lx-fixture']);
         $rack = ItemType::create(['name' => 'Rack/RoadCase', 'slug' => 'rack-roadcase']);
 
@@ -68,7 +84,7 @@ class DashboardStatsTest extends TestCase
 
     public function test_dashboard_shows_latest_asset_changes(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $type = ItemType::create(['name' => 'Audio', 'slug' => 'audio']);
         $asset = Asset::create([
             'name' => 'Mic Pack',

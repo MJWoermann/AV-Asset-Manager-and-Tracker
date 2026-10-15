@@ -1,51 +1,109 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
-import cytoscape from 'cytoscape';
-import JsBarcode from 'jsbarcode';
-import QRCode from 'qrcode';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import {
-    Chart,
-    LineController,
-    LineElement,
-    PointElement,
-    LinearScale,
-    TimeScale,
-    CategoryScale,
-    Filler,
-    Legend,
-    Tooltip,
-} from 'chart.js';
-import annotationPlugin from 'chartjs-plugin-annotation';
-import 'chartjs-adapter-date-fns';
-
-Chart.register(
-    LineController,
-    LineElement,
-    PointElement,
-    LinearScale,
-    TimeScale,
-    CategoryScale,
-    Filler,
-    Legend,
-    Tooltip,
-    annotationPlugin
-);
 
 window.Alpine = Alpine;
-window.Html5Qrcode = Html5Qrcode;
-window.cytoscape = cytoscape;
-window.JsBarcode = JsBarcode;
-window.QRCode = QRCode;
-window.Chart = Chart;
-
-const CAMERA_SCAN_FORMATS = [
-    Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.CODE_39,
-    Html5QrcodeSupportedFormats.QR_CODE,
-];
 
 const CAMERA_SAME_CODE_DEBOUNCE_MS = 800;
+
+/** @type {Promise<typeof import('chart.js').Chart> | null} */
+let chartModulePromise = null;
+/** @type {Promise<typeof import('cytoscape').default> | null} */
+let cytoscapeModulePromise = null;
+/** @type {Promise<typeof import('qrcode').default> | null} */
+let qrcodeModulePromise = null;
+/** @type {Promise<typeof import('jsbarcode').default> | null} */
+let jsBarcodeModulePromise = null;
+/** @type {Promise<{ Html5Qrcode: typeof import('html5-qrcode').Html5Qrcode, Html5QrcodeSupportedFormats: typeof import('html5-qrcode').Html5QrcodeSupportedFormats }> | null} */
+let html5QrcodeModulePromise = null;
+
+async function loadChart() {
+    if (!chartModulePromise) {
+        chartModulePromise = (async () => {
+            const {
+                Chart,
+                LineController,
+                LineElement,
+                PointElement,
+                LinearScale,
+                TimeScale,
+                CategoryScale,
+                Filler,
+                Legend,
+                Tooltip,
+            } = await import('chart.js');
+            const { default: annotationPlugin } = await import('chartjs-plugin-annotation');
+            await import('chartjs-adapter-date-fns');
+
+            Chart.register(
+                LineController,
+                LineElement,
+                PointElement,
+                LinearScale,
+                TimeScale,
+                CategoryScale,
+                Filler,
+                Legend,
+                Tooltip,
+                annotationPlugin
+            );
+
+            window.Chart = Chart;
+            return Chart;
+        })();
+    }
+
+    return chartModulePromise;
+}
+
+async function loadCytoscape() {
+    if (!cytoscapeModulePromise) {
+        cytoscapeModulePromise = import('cytoscape').then((mod) => {
+            const cytoscape = mod.default;
+            window.cytoscape = cytoscape;
+            return cytoscape;
+        });
+    }
+
+    return cytoscapeModulePromise;
+}
+
+async function loadQRCode() {
+    if (!qrcodeModulePromise) {
+        qrcodeModulePromise = import('qrcode').then((mod) => {
+            const QRCode = mod.default;
+            window.QRCode = QRCode;
+            return QRCode;
+        });
+    }
+
+    return qrcodeModulePromise;
+}
+
+async function loadJsBarcode() {
+    if (!jsBarcodeModulePromise) {
+        jsBarcodeModulePromise = import('jsbarcode').then((mod) => {
+            const JsBarcode = mod.default;
+            window.JsBarcode = JsBarcode;
+            return JsBarcode;
+        });
+    }
+
+    return jsBarcodeModulePromise;
+}
+
+async function loadHtml5Qrcode() {
+    if (!html5QrcodeModulePromise) {
+        html5QrcodeModulePromise = import('html5-qrcode').then((mod) => {
+            window.Html5Qrcode = mod.Html5Qrcode;
+            return {
+                Html5Qrcode: mod.Html5Qrcode,
+                Html5QrcodeSupportedFormats: mod.Html5QrcodeSupportedFormats,
+            };
+        });
+    }
+
+    return html5QrcodeModulePromise;
+}
 
 function searchTokens(term) {
     return String(term || '')
@@ -415,12 +473,13 @@ Alpine.data('stockPanel', (config = {}) => ({
         this.$nextTick(() => this.mountChart());
     },
 
-    mountChart() {
+    async mountChart() {
         const canvas = this.$refs.chart;
-        if (!canvas || typeof Chart === 'undefined') {
+        if (!canvas) {
             return;
         }
 
+        const Chart = await loadChart();
         const points = this.chartPayload.points || [];
         const restocks = this.chartPayload.restock_markers || [];
         const trend = this.chartPayload.trend?.projection || [];
@@ -537,16 +596,80 @@ Alpine.data('stockPanel', (config = {}) => ({
 }));
 
 Alpine.data('kanbanQr', (url) => ({
-    init() {
-        if (!this.$refs.qr || !url || typeof QRCode === 'undefined') {
+    async init() {
+        if (!this.$refs.qr || !url) {
             return;
         }
-        QRCode.toCanvas(this.$refs.qr, url, {
-            width: 160,
-            margin: 1,
-            color: { dark: '#000000', light: '#ffffff' },
-        }).catch(() => {});
+
+        try {
+            const QRCode = await loadQRCode();
+            await QRCode.toCanvas(this.$refs.qr, url, {
+                width: 160,
+                margin: 1,
+                color: { dark: '#000000', light: '#ffffff' },
+            });
+        } catch (_) {}
     },
+}));
+
+const buildRuFaceRows = (capacity, placements, face) => {
+    const occupied = {};
+    const mirrored = {};
+
+    (Array.isArray(placements) ? placements : []).forEach((placement) => {
+        const onFace = placement.face === face;
+        const mirrorOnRear = Boolean(placement.full_depth) && face === 'rear' && placement.face === 'front';
+        if (!onFace && !mirrorOnRear) {
+            return;
+        }
+
+        const start = Number(placement.start_ru);
+        const height = Number(placement.ru_height);
+        for (let ru = start; ru < start + height; ru += 1) {
+            occupied[ru] = placement;
+            if (mirrorOnRear) {
+                mirrored[ru] = true;
+            }
+        }
+    });
+
+    const rows = [];
+    for (let ru = capacity; ru >= 1; ru -= 1) {
+        const placement = occupied[ru] || null;
+        const isStart = placement && Number(placement.start_ru) + Number(placement.ru_height) - 1 === ru;
+        rows.push({
+            ru,
+            placement,
+            isStart,
+            span: isStart ? Number(placement.ru_height) : 0,
+            occupied: Boolean(placement),
+            mirrored: Boolean(mirrored[ru]),
+        });
+    }
+
+    return rows;
+};
+
+const ruPlacementLabel = (placement) => {
+    if (!placement) {
+        return '';
+    }
+    if (placement.kind === 'note') {
+        return placement.note || 'Note';
+    }
+    return placement.child_name || 'Asset';
+};
+
+Alpine.data('ruRackPreview', (config = {}) => ({
+    capacity: Number(config.capacity) || 0,
+    face: 'front',
+    placements: Array.isArray(config.placements) ? config.placements : [],
+
+    get rows() {
+        return buildRuFaceRows(this.capacity, this.placements, this.face);
+    },
+
+    placementLabel: ruPlacementLabel,
 }));
 
 Alpine.data('ruVisualiser', (config = {}) => ({
@@ -564,6 +687,7 @@ Alpine.data('ruVisualiser', (config = {}) => ({
         face: config.old?.face || config.initialFace || 'front',
         start_ru: config.old?.start_ru || '',
         ru_height: config.old?.ru_height || '',
+        full_depth: Boolean(config.old?.full_depth),
         kind: config.old?.kind || 'asset',
         child_asset_id: config.old?.child_asset_id || '',
         note: config.old?.note || '',
@@ -598,48 +722,11 @@ Alpine.data('ruVisualiser', (config = {}) => ({
         }
     },
 
-    get facePlacements() {
-        return this.placements
-            .filter((placement) => placement.face === this.face)
-            .slice()
-            .sort((a, b) => b.start_ru - a.start_ru);
-    },
-
     get rows() {
-        const occupied = {};
-        this.facePlacements.forEach((placement) => {
-            const start = Number(placement.start_ru);
-            const height = Number(placement.ru_height);
-            for (let ru = start; ru < start + height; ru += 1) {
-                occupied[ru] = placement;
-            }
-        });
-
-        const rows = [];
-        for (let ru = this.capacity; ru >= 1; ru -= 1) {
-            const placement = occupied[ru] || null;
-            const isStart = placement && Number(placement.start_ru) + Number(placement.ru_height) - 1 === ru;
-            rows.push({
-                ru,
-                placement,
-                isStart,
-                span: isStart ? Number(placement.ru_height) : 0,
-                occupied: Boolean(placement),
-            });
-        }
-
-        return rows;
+        return buildRuFaceRows(this.capacity, this.placements, this.face);
     },
 
-    placementLabel(placement) {
-        if (!placement) {
-            return '';
-        }
-        if (placement.kind === 'note') {
-            return placement.note || 'Note';
-        }
-        return placement.child_name || 'Asset';
-    },
+    placementLabel: ruPlacementLabel,
 
     selectedChild() {
         return this.childOptions.find((option) => String(option.value) === String(this.form.child_asset_id));
@@ -658,9 +745,10 @@ Alpine.data('ruVisualiser', (config = {}) => ({
         this.editingId = null;
         this.confirmParent = false;
         this.form = {
-            face: this.face,
+            face: this.face === 'rear' && !this.rearEnabled ? 'front' : this.face,
             start_ru: ru || '',
             ru_height: 1,
+            full_depth: false,
             kind: 'asset',
             child_asset_id: '',
             note: '',
@@ -679,11 +767,12 @@ Alpine.data('ruVisualiser', (config = {}) => ({
         this.panel = 'edit';
         this.editingId = placement.id;
         this.confirmParent = false;
-        this.face = placement.face;
+        this.face = placement.full_depth ? 'front' : placement.face;
         this.form = {
-            face: placement.face,
+            face: placement.full_depth ? 'front' : placement.face,
             start_ru: placement.start_ru,
             ru_height: placement.ru_height,
+            full_depth: Boolean(placement.full_depth),
             kind: placement.kind,
             child_asset_id: placement.child_asset_id || '',
             note: placement.note || '',
@@ -729,6 +818,10 @@ Alpine.data('ruVisualiser', (config = {}) => ({
     },
 
     prepareSubmit(event) {
+        if (this.form.kind === 'asset' && this.form.full_depth) {
+            this.form.face = 'front';
+        }
+
         if (this.form.confirm_parent_change) {
             return true;
         }
@@ -793,8 +886,9 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [] }) => ({
     selection: null,
     cy: null,
 
-    init() {
+    async init() {
         const elements = [...(graph.nodes || []), ...(graph.edges || [])];
+        const cytoscape = await loadCytoscape();
 
         this.cy = cytoscape({
             container: this.$refs.cy,
@@ -1220,6 +1314,9 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     scale: 4,
     drag: null,
     resize: null,
+    showGrid: true,
+    snapToGrid: false,
+    gridSizeMm: 5,
 
     get selected() {
         return this.elements.find((el) => el.id === this.selectedId) || null;
@@ -1242,6 +1339,35 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             width: `${this.widthMm * this.scale}px`,
             height: `${this.heightMm * this.scale}px`,
         };
+    },
+
+    get gridOverlayStyle() {
+        const stepPx = Math.max(0.5, Number(this.gridSizeMm) || 5) * this.scale;
+        const centerX = (this.widthMm / 2) * this.scale;
+        const centerY = (this.heightMm / 2) * this.scale;
+        return {
+            backgroundImage: [
+                'linear-gradient(to right, rgba(0,0,0,0.14) 1px, transparent 1px)',
+                'linear-gradient(to bottom, rgba(0,0,0,0.14) 1px, transparent 1px)',
+            ].join(', '),
+            backgroundSize: `${stepPx}px ${stepPx}px`,
+            backgroundPosition: `${centerX}px ${centerY}px`,
+        };
+    },
+
+    get centerCrosshairStyleX() {
+        return { left: `${(this.widthMm / 2) * this.scale}px` };
+    },
+
+    get centerCrosshairStyleY() {
+        return { top: `${(this.heightMm / 2) * this.scale}px` };
+    },
+
+    snapToCenterGrid(value, sizeMm) {
+        const step = Math.max(0.5, Number(this.gridSizeMm) || 5);
+        const center = sizeMm / 2;
+        const snapped = center + Math.round((value - center) / step) * step;
+        return Math.round(snapped * 1000) / 1000;
     },
 
     syncElementsJson() {
@@ -1362,11 +1488,12 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         return `{${key}}`;
     },
 
-    renderBarcode(el, node) {
-        if (!node || !window.JsBarcode) {
+    async renderBarcode(el, node) {
+        if (!node) {
             return;
         }
         try {
+            const JsBarcode = await loadJsBarcode();
             node.innerHTML = '';
             JsBarcode(node, el.props.fieldKey || 'SAMPLE', {
                 format: el.props.symbology === 'code39' ? 'CODE39' : 'CODE128',
@@ -1380,10 +1507,11 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     },
 
     async renderQr(el, node) {
-        if (!node || !window.QRCode) {
+        if (!node) {
             return;
         }
         try {
+            const QRCode = await loadQRCode();
             await QRCode.toCanvas(node, el.props.fieldKey || el.props.content || 'SAMPLE', {
                 width: Math.max(16, Math.floor(Math.min(el.width, el.height) * this.scale)),
                 margin: 0,
@@ -1434,22 +1562,124 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     },
 
     onPointerMove(event) {
-        const snap = (value) => Math.round(value * 2) / 2;
         if (this.drag) {
             const el = this.elements.find((item) => item.id === this.drag.id);
             if (!el) return;
             const dx = (event.clientX - this.drag.startX) / this.scale;
             const dy = (event.clientY - this.drag.startY) / this.scale;
-            el.x = snap(Math.max(0, this.drag.origX + dx));
-            el.y = snap(Math.max(0, this.drag.origY + dy));
+            const rawX = Math.max(0, this.drag.origX + dx);
+            const rawY = Math.max(0, this.drag.origY + dy);
+            if (this.snapToGrid) {
+                el.x = Math.max(0, this.snapToCenterGrid(rawX, this.widthMm));
+                el.y = Math.max(0, this.snapToCenterGrid(rawY, this.heightMm));
+            } else {
+                el.x = Math.round(rawX * 10) / 10;
+                el.y = Math.round(rawY * 10) / 10;
+            }
         }
         if (this.resize) {
             const el = this.elements.find((item) => item.id === this.resize.id);
             if (!el) return;
             const dx = (event.clientX - this.resize.startX) / this.scale;
             const dy = (event.clientY - this.resize.startY) / this.scale;
-            el.width = snap(Math.max(2, this.resize.origW + dx));
-            el.height = snap(Math.max(2, this.resize.origH + dy));
+            if (this.snapToGrid) {
+                const snappedRight = this.snapToCenterGrid(el.x + this.resize.origW + dx, this.widthMm);
+                const snappedBottom = this.snapToCenterGrid(el.y + this.resize.origH + dy, this.heightMm);
+                el.width = Math.max(2, Math.round((snappedRight - el.x) * 1000) / 1000);
+                el.height = Math.max(2, Math.round((snappedBottom - el.y) * 1000) / 1000);
+            } else {
+                el.width = Math.max(2, Math.round((this.resize.origW + dx) * 10) / 10);
+                el.height = Math.max(2, Math.round((this.resize.origH + dy) * 10) / 10);
+            }
+        }
+    },
+}));
+
+Alpine.data('shelfTagPrintSetup', (assets = [], preselectedIds = [], maxBatch = 200) => ({
+    assets: Array.isArray(assets) ? assets : [],
+    maxBatch: Number(maxBatch) || 200,
+    filter: '',
+    selected: Object.fromEntries(
+        (Array.isArray(preselectedIds) ? preselectedIds : [])
+            .map((id) => Number(id))
+            .filter((id) => id > 0)
+            .map((id) => [id, true])
+    ),
+
+    get selectedIds() {
+        return Object.keys(this.selected)
+            .filter((id) => this.selected[id])
+            .map((id) => Number(id));
+    },
+
+    get selectedCount() {
+        return this.selectedIds.length;
+    },
+
+    get overLimit() {
+        return this.selectedCount > this.maxBatch;
+    },
+
+    get canSubmit() {
+        return this.selectedCount > 0 && !this.overLimit;
+    },
+
+    get visibleAssets() {
+        const term = String(this.filter || '')
+            .trim()
+            .toLowerCase();
+        if (!term) {
+            return this.assets;
+        }
+
+        return this.assets.filter((asset) => {
+            const haystack = [
+                asset.name,
+                asset.tp_barcode,
+                asset.fmi_ast,
+                asset.item_type,
+                asset.status,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+
+            return haystack.includes(term);
+        });
+    },
+
+    get allVisibleSelected() {
+        const visible = this.visibleAssets;
+        return visible.length > 0 && visible.every((asset) => !!this.selected[asset.id]);
+    },
+
+    setSelected(id, checked) {
+        this.selected = { ...this.selected, [Number(id)]: !!checked };
+    },
+
+    toggleVisible(checked) {
+        const next = { ...this.selected };
+        this.visibleAssets.forEach((asset) => {
+            next[asset.id] = !!checked;
+        });
+        this.selected = next;
+    },
+
+    selectVisible() {
+        this.toggleVisible(true);
+    },
+
+    clearVisible() {
+        this.toggleVisible(false);
+    },
+
+    clearSelection() {
+        this.selected = {};
+    },
+
+    prepareSubmit(event) {
+        if (!this.canSubmit) {
+            event.preventDefault();
         }
     },
 }));
@@ -1460,11 +1690,17 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
     heightMm,
     logoUrl,
 
-    renderAll() {
-        this.$nextTick(() => {
-            this.$el.querySelectorAll('.shelf-tag-barcode').forEach((node) => {
+    async renderAll() {
+        await this.$nextTick();
+
+        const barcodeNodes = [...this.$el.querySelectorAll('.shelf-tag-barcode')];
+        const qrNodes = [...this.$el.querySelectorAll('.shelf-tag-qr')];
+
+        if (barcodeNodes.length) {
+            const JsBarcode = await loadJsBarcode();
+            barcodeNodes.forEach((node) => {
                 const value = node.getAttribute('data-value') || '';
-                if (!value || !window.JsBarcode) {
+                if (!value) {
                     return;
                 }
                 try {
@@ -1478,18 +1714,23 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
                     });
                 } catch (_) {}
             });
+        }
 
-            this.$el.querySelectorAll('.shelf-tag-qr').forEach(async (node) => {
-                const value = node.getAttribute('data-value') || '';
-                if (!value || !window.QRCode) {
-                    return;
-                }
-                try {
-                    const size = Math.max(32, Math.min(node.clientWidth || 64, node.clientHeight || 64));
-                    await QRCode.toCanvas(node, value, { width: size, margin: 0 });
-                } catch (_) {}
-            });
-        });
+        if (qrNodes.length) {
+            const QRCode = await loadQRCode();
+            await Promise.all(
+                qrNodes.map(async (node) => {
+                    const value = node.getAttribute('data-value') || '';
+                    if (!value) {
+                        return;
+                    }
+                    try {
+                        const size = Math.max(32, Math.min(node.clientWidth || 64, node.clientHeight || 64));
+                        await QRCode.toCanvas(node, value, { width: size, margin: 0 });
+                    } catch (_) {}
+                })
+            );
+        }
     },
 }));
 
@@ -1678,11 +1919,17 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         this.error = '';
         this.scanning = true;
         await this.$nextTick();
-        this.scanner = new Html5Qrcode('qr-reader', {
-            formatsToSupport: CAMERA_SCAN_FORMATS,
-            verbose: false,
-        });
+
         try {
+            const { Html5Qrcode, Html5QrcodeSupportedFormats } = await loadHtml5Qrcode();
+            this.scanner = new Html5Qrcode('qr-reader', {
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                ],
+                verbose: false,
+            });
             await this.scanner.start(
                 { facingMode: 'environment' },
                 {

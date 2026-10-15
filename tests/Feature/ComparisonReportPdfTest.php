@@ -9,6 +9,7 @@ use App\Models\AssetListItem;
 use App\Models\ItemType;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -17,9 +18,24 @@ class ComparisonReportPdfTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_authenticated_user_can_download_comparison_report_as_pdf(): void
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RoleSeeder::class);
+    }
+
+    protected function scanner(): User
     {
         $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
+
+    public function test_authenticated_user_can_download_comparison_report_as_pdf(): void
+    {
+        $user = $this->scanner();
         $itemType = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',
@@ -97,7 +113,7 @@ class ComparisonReportPdfTest extends TestCase
 
     public function test_compare_form_offers_pdf_export(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
 
         $response = $this->actingAs($user)->get(route('reports.compare'));
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\InboundEmailActionController;
 use App\Http\Controllers\Admin\InboundEmailRuleController;
 use App\Http\Controllers\Admin\NotificationRecipientController;
 use App\Http\Controllers\Admin\NotificationTemplateController;
+use App\Http\Controllers\Admin\OutboundEmailThreadController;
 use App\Http\Controllers\Admin\SsoSettingsController;
 use App\Http\Controllers\Admin\StorageController;
 use App\Http\Controllers\Admin\UserController;
@@ -52,10 +53,10 @@ Route::middleware('throttle:30,1')->group(function () {
 });
 
 Route::get('/dashboard', DashboardController::class)
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'role:admin,inventory_manager,scanner'])
     ->name('dashboard');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -85,9 +86,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/files/{file}/link', [FileController::class, 'link'])->name('files.link');
     Route::delete('/files/links/{fileLink}', [FileController::class, 'unlink'])->name('files.unlink');
     Route::get('/files/{file}/download', [FileController::class, 'download'])->name('files.download');
+    Route::get('/files/{file}/preview', [FileController::class, 'preview'])->name('files.preview');
     Route::get('/files/{file}/thumbnail', [FileController::class, 'thumbnail'])->name('files.thumbnail');
     Route::middleware('role:admin,inventory_manager')->group(function () {
         Route::get('/files', [FileController::class, 'index'])->name('files.index');
+        Route::get('/files/{file}', [FileController::class, 'show'])->name('files.show');
         Route::delete('/files/{file}', [FileController::class, 'destroy'])->name('files.destroy');
     });
 
@@ -176,34 +179,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/inbound', [InboundEmailActionController::class, 'index'])->name('inbound.index');
             Route::post('/inbound/{inboundEmailAction}/apply', [InboundEmailActionController::class, 'apply'])->name('inbound.apply');
             Route::post('/inbound/{inboundEmailAction}/reject', [InboundEmailActionController::class, 'reject'])->name('inbound.reject');
+            Route::get('/outbound', [OutboundEmailThreadController::class, 'index'])->name('outbound.index');
         });
 
     Route::middleware('feature:asset_connections')->group(function () {
         Route::get('/reports/connection-map', [ConnectionMapController::class, 'index'])
             ->name('reports.connection-map');
-
-        Route::post('/assets/{asset}/interfaces', [AssetInterfaceController::class, 'store'])
-            ->name('assets.interfaces.store');
-        Route::put('/assets/{asset}/interfaces/{interface}', [AssetInterfaceController::class, 'update'])
-            ->name('assets.interfaces.update');
-        Route::delete('/assets/{asset}/interfaces/{interface}', [AssetInterfaceController::class, 'destroy'])
-            ->name('assets.interfaces.destroy');
-
-        Route::post('/assets/{asset}/connections', [AssetConnectionController::class, 'store'])
-            ->name('assets.connections.store');
-        Route::delete('/assets/{asset}/connections/{connection}', [AssetConnectionController::class, 'destroy'])
-            ->name('assets.connections.destroy');
         Route::get('/assets/{asset}/peer-interfaces/{peer}', [AssetConnectionController::class, 'peerInterfaces'])
             ->name('assets.peer-interfaces');
 
         Route::middleware('role:admin,inventory_manager')->group(function () {
+            Route::post('/assets/{asset}/interfaces', [AssetInterfaceController::class, 'store'])
+                ->name('assets.interfaces.store');
+            Route::put('/assets/{asset}/interfaces/{interface}', [AssetInterfaceController::class, 'update'])
+                ->name('assets.interfaces.update');
+            Route::delete('/assets/{asset}/interfaces/{interface}', [AssetInterfaceController::class, 'destroy'])
+                ->name('assets.interfaces.destroy');
+
+            Route::post('/assets/{asset}/connections', [AssetConnectionController::class, 'store'])
+                ->name('assets.connections.store');
+            Route::delete('/assets/{asset}/connections/{connection}', [AssetConnectionController::class, 'destroy'])
+                ->name('assets.connections.destroy');
+
             Route::resource('connection-types', ConnectionTypeController::class)->except(['show']);
             Route::post('/item-types/{item_type}/sync-interfaces', [ItemTypeController::class, 'syncMissingInterfaces'])
                 ->name('item-types.sync-interfaces');
         });
     });
 
-    Route::middleware('developer_feature:ru_visualiser')->group(function () {
+    Route::middleware(['developer_feature:ru_visualiser', 'role:admin,inventory_manager'])->group(function () {
         Route::post('/assets/{asset}/ru-placements', [AssetRuPlacementController::class, 'store'])
             ->name('assets.ru-placements.store');
         Route::put('/assets/{asset}/ru-placements/{ruPlacement}', [AssetRuPlacementController::class, 'update'])

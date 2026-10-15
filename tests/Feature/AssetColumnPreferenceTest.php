@@ -9,12 +9,28 @@ use App\Models\AssetListItem;
 use App\Models\ItemType;
 use App\Models\User;
 use App\Support\AssetTableColumns;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class AssetColumnPreferenceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RoleSeeder::class);
+    }
+
+    protected function scanner(): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
 
     public function test_guest_cannot_update_asset_table_columns(): void
     {
@@ -25,7 +41,7 @@ class AssetColumnPreferenceTest extends TestCase
 
     public function test_assets_index_uses_default_columns(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $type = ItemType::create(['name' => 'LX Fixture', 'slug' => 'lx-fixture']);
         Asset::create([
             'name' => 'Moving Head',
@@ -45,7 +61,7 @@ class AssetColumnPreferenceTest extends TestCase
 
     public function test_user_can_save_asset_table_columns(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
 
         $response = $this->actingAs($user)->from(route('assets.index'))->patch(route('preferences.asset-columns'), [
             'columns' => ['name', 'fmi_ast', 'serial_number'],
@@ -65,7 +81,7 @@ class AssetColumnPreferenceTest extends TestCase
 
     public function test_saved_columns_apply_on_assets_index_and_lists(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $user->preferences = [
             AssetTableColumns::PREFERENCE_KEY => ['name', 'fmi_ast', 'serial_number'],
         ];
@@ -111,7 +127,7 @@ class AssetColumnPreferenceTest extends TestCase
 
     public function test_invalid_columns_are_rejected(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
 
         $response = $this->actingAs($user)->from(route('assets.index'))->patch(route('preferences.asset-columns'), [
             'columns' => ['name', 'not_a_real_column'],
@@ -123,7 +139,7 @@ class AssetColumnPreferenceTest extends TestCase
 
     public function test_name_column_is_always_retained(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
 
         $this->actingAs($user)->patch(route('preferences.asset-columns'), [
             'columns' => ['status', 'location'],

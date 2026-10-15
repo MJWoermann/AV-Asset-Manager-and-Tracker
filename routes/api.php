@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/token', [TokenController::class, 'store'])->middleware('throttle:10,1');
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'role:admin,inventory_manager,scanner'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user()->load('roles');
     });

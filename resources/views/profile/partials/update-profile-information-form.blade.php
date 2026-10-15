@@ -56,29 +56,47 @@
             <x-input-error class="mt-2" :messages="$errors->get('theme')" />
         </div>
 
-        <fieldset class="space-y-3">
-            <legend class="text-sm font-medium text-gray-900 dark:text-white">
-                {{ __('Developer features') }}
-            </legend>
-            <p class="text-sm text-gray-600 dark:text-brand-silver">
-                {{ __('Optional previews for features still under development. Enabling a flag only affects your account.') }}
-            </p>
+        @if ($user->hasRole('admin'))
+            <fieldset class="space-y-3">
+                <legend class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ __('Developer features') }}
+                </legend>
+                <p class="text-sm text-gray-600 dark:text-brand-silver">
+                    {{ __('Optional previews for features still under development. Enabling a flag only affects your account.') }}
+                </p>
 
-            @foreach (\App\Support\DeveloperFeatures::definitions() as $featureKey => $featureLabel)
-                <label for="features_{{ $featureKey }}" class="flex items-start gap-2 text-sm text-gray-800 dark:text-brand-silver">
-                    <input type="hidden" name="features[{{ $featureKey }}]" value="0">
-                    <input
-                        id="features_{{ $featureKey }}"
-                        type="checkbox"
-                        name="features[{{ $featureKey }}]"
-                        value="1"
-                        class="rounded border-gray-300 text-brand mt-0.5"
-                        @checked(old('features.'.$featureKey, $user->hasFeature($featureKey)))
-                    >
-                    <span class="font-medium text-gray-900 dark:text-white">{{ __($featureLabel) }}</span>
-                </label>
-            @endforeach
-        </fieldset>
+                @foreach (\App\Support\DeveloperFeatures::definitions() as $featureKey => $featureLabel)
+                    <label for="features_{{ $featureKey }}" class="flex items-start gap-2 text-sm text-gray-800 dark:text-brand-silver">
+                        <input type="hidden" name="features[{{ $featureKey }}]" value="0">
+                        <input
+                            id="features_{{ $featureKey }}"
+                            type="checkbox"
+                            name="features[{{ $featureKey }}]"
+                            value="1"
+                            class="rounded border-gray-300 text-brand mt-0.5"
+                            @checked(old('features.'.$featureKey, $user->hasFeature($featureKey)))
+                        >
+                        <span class="font-medium text-gray-900 dark:text-white">{{ __($featureLabel) }}</span>
+                    </label>
+                @endforeach
+            </fieldset>
+        @elseif (collect(\App\Support\DeveloperFeatures::keys())->contains(fn (string $key): bool => $user->hasFeature($key)))
+            <div class="space-y-2">
+                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ __('Developer features') }}
+                </p>
+                <p class="text-sm text-gray-600 dark:text-brand-silver">
+                    {{ __('Feature flags on your account can only be changed by an administrator.') }}
+                </p>
+                <ul class="list-disc list-inside text-sm text-gray-800 dark:text-brand-silver">
+                    @foreach (\App\Support\DeveloperFeatures::definitions() as $featureKey => $featureLabel)
+                        @if ($user->hasFeature($featureKey))
+                            <li>{{ __($featureLabel) }}</li>
+                        @endif
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>

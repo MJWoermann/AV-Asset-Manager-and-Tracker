@@ -19,16 +19,18 @@ Response includes `token`. Revoke with `DELETE /api/auth/token` (authenticated).
 
 ## Endpoints
 
+Token issuance and all authenticated API routes require one of `admin`, `inventory_manager`, or `scanner`. Roleless accounts receive `403`.
+
 | Method | Path | Roles | Description |
 |--------|------|-------|-------------|
-| GET | `/api/user` | any auth | Current user + roles |
-| GET | `/api/assets` | any auth | Paginated assets (`?q=&per_page=`) |
-| GET | `/api/assets/{id}` | any auth | Asset detail |
+| GET | `/api/user` | admin, inventory_manager, scanner | Current user + roles |
+| GET | `/api/assets` | admin, inventory_manager, scanner | Paginated assets (`?q=&per_page=`) |
+| GET | `/api/assets/{id}` | admin, inventory_manager, scanner | Asset detail |
 | POST | `/api/assets` | admin, inventory_manager, scanner | Create asset |
 | PUT | `/api/assets/{id}` | admin, inventory_manager, scanner | Update asset |
-| GET | `/api/lists` | any auth | All lists |
-| GET | `/api/lists/{id}` | any auth | List with items |
-| POST | `/api/lists/compare` | any auth | Body: `scanned_list_id`, `inventory_list_id` |
+| GET | `/api/lists` | admin, inventory_manager, scanner | All lists |
+| GET | `/api/lists/{id}` | admin, inventory_manager, scanner | List with items |
+| POST | `/api/lists/compare` | admin, inventory_manager, scanner | Body: `scanned_list_id`, `inventory_list_id` |
 | POST | `/api/scan` | admin, inventory_manager, scanner | Body: `scan_session_id`, `code`, `quantity?` |
 
 Rate limits: token endpoint 10/min; scan 60/min.

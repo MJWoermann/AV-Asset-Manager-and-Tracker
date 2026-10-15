@@ -292,4 +292,165 @@ class FileAttachmentTest extends TestCase
             ->get(route('files.download', $file))
             ->assertOk();
     }
+
+    public function test_url_download_rejects_non_http_schemes(): void
+    {
+        $user = $this->scanner();
+        $file = File::factory()->url()->create([
+            'external_url' => 'javascript:alert(1)',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('files.download', $file))
+            ->assertNotFound();
+    }
+
+    public function test_roleless_user_cannot_download_file(): void
+    {
+        $user = User::factory()->create();
+        $file = File::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('files.download', $file))
+            ->assertForbidden();
+    }
+
+    public function test_guest_cannot_preview_file(): void
+    {
+        $file = File::factory()->create();
+
+        $this->get(route('files.preview', $file))->assertRedirect(route('login'));
+    }
+
+    public function test_authenticated_user_can_preview_pdf_inline(): void
+    {
+        $user = $this->scanner();
+        $path = 'attachments/test/preview.pdf';
+        Storage::disk('local')->put($path, '%PDF-1.4 preview test');
+
+        $file = File::factory()->create([
+            'path' => $path,
+            'mime_type' => 'application/pdf',
+            'original_filename' => 'preview.pdf',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('files.preview', $file));
+
+        $response->assertOk();
+        $this->assertStringContainsString('inline', (string) $response->headers->get('Content-Disposition'));
+        $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
+    }
+
+    public function test_authenticated_user_can_preview_jpeg_inline(): void
+    {
+        $user = $this->scanner();
+        $path = 'attachments/test/preview.jpg';
+        Storage::disk('local')->put($path, 'fake-jpeg-bytes');
+
+        $file = File::factory()->create([
+            'path' => $path,
+            'mime_type' => 'image/jpeg',
+            'original_filename' => 'preview.jpg',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('files.preview', $file));
+
+        $response->assertOk();
+        $this->assertStringContainsString('inline', (string) $response->headers->get('Content-Disposition'));
+        $this->assertSame('image/jpeg', $response->headers->get('Content-Type'));
+    }
+
+    public function test_preview_rejects_non_previewable_upload(): void
+    {
+        $user = $this->scanner();
+        $path = 'attachments/test/data.csv';
+        Storage::disk('local')->put($path, "a,b\n1,2\n");
+
+        $file = File::factory()->create([
+            'path' => $path,
+            'mime_type' => 'text/csv',
+            'original_filename' => 'data.csv',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('files.preview', $file))
+            ->assertStatus(415);
+    }
+
+    public function test_thumbnail_route_streams_when_thumbnail_path_set(): void
+    {
+        $user = $this->scanner();
+        $thumbPath = 'attachments/test/thumb.jpg';
+        Storage::disk('local')->put($thumbPath, 'thumb-bytes');
+
+        $file = File::factory()->create([
+            'mime_type' => 'image/jpeg',
+            'thumbnail_path' => $thumbPath,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('files.thumbnail', $file))
+            ->assertOk();
+    }
+
+    public function test_manager_can_view_file_show_with_linked_entities(): void
+    {
+        $manager = $this->manager();
+        $itemType = $this->makeItemType('Shared Type');
+        $asset = $this->makeAsset($itemType);
+        $asset->update(['name' => 'Linked Camera']);
+
+        $file = File::factory()->create(['title' => 'Shared Manual']);
+
+        FileLink::query()->create([
+            'file_id' => $file->id,
+            'linkable_type' => Asset::class,
+            'linkable_id' => $asset->id,
+            'note' => 'On asset',
+        ]);
+        FileLink::query()->create([
+            'file_id' => $file->id,
+            'linkable_type' => ItemType::class,
+            'linkable_id' => $itemType->id,
+            'note' => null,
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('files.show', $file))
+            ->assertOk()
+            ->assertSee('Shared Manual')
+            ->assertSee('Linked Camera')
+            ->assertSee('Shared Type')
+            ->assertSee('Asset')
+            ->assertSee('Item type');
+    }
+
+    public function test_scanner_cannot_view_file_show(): void
+    {
+        $file = File::factory()->create();
+
+        $this->actingAs($this->scanner())
+            ->get(route('files.show', $file))
+            ->assertForbidden();
+    }
+
+    public function test_file_show_renders_deleted_linkable_without_error(): void
+    {
+        $manager = $this->manager();
+        $file = File::factory()->create(['title' => 'Orphan Link File']);
+        $missingAssetId = 999_999;
+
+        FileLink::query()->create([
+            'file_id' => $file->id,
+            'linkable_type' => Asset::class,
+            'linkable_id' => $missingAssetId,
+            'note' => null,
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('files.show', $file))
+            ->assertOk()
+            ->assertSee('Orphan Link File')
+            ->assertSee('Deleted (#'.$missingAssetId.')');
+    }
 }

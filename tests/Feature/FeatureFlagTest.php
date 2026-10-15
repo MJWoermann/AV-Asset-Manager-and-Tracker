@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -15,6 +16,8 @@ class FeatureFlagTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(RoleSeeder::class);
+
         Route::middleware(['web', 'auth', 'feature:asset_connections'])
             ->get('/__test/feature/asset-connections', fn () => response('feature-ok'));
 
@@ -22,9 +25,25 @@ class FeatureFlagTest extends TestCase
             ->get('/__test/feature/email-integration', fn () => response('email-feature-ok'));
     }
 
-    public function test_profile_can_enable_asset_connections_feature_flag(): void
+    protected function admin(): User
     {
         $user = User::factory()->create(['theme' => 'light']);
+        $user->assignRole('admin');
+
+        return $user;
+    }
+
+    protected function scanner(): User
+    {
+        $user = User::factory()->create(['theme' => 'light']);
+        $user->assignRole('scanner');
+
+        return $user;
+    }
+
+    public function test_admin_can_enable_asset_connections_feature_flag(): void
+    {
+        $user = $this->admin();
 
         $response = $this
             ->actingAs($user)
@@ -47,16 +66,15 @@ class FeatureFlagTest extends TestCase
         $this->assertTrue(data_get($user->preferences, 'features.asset_connections'));
     }
 
-    public function test_profile_can_disable_asset_connections_feature_flag(): void
+    public function test_admin_can_disable_asset_connections_feature_flag(): void
     {
-        $user = User::factory()->create([
-            'theme' => 'light',
-            'preferences' => [
-                'features' => [
-                    'asset_connections' => true,
-                ],
+        $user = $this->admin();
+        $user->preferences = [
+            'features' => [
+                'asset_connections' => true,
             ],
-        ]);
+        ];
+        $user->save();
 
         $response = $this
             ->actingAs($user)
@@ -79,9 +97,32 @@ class FeatureFlagTest extends TestCase
         $this->assertFalse(data_get($user->preferences, 'features.asset_connections'));
     }
 
+    public function test_non_admin_cannot_enable_developer_feature_flags(): void
+    {
+        $user = $this->scanner();
+
+        $this
+            ->actingAs($user)
+            ->patch(route('profile.update'), [
+                'name' => $user->name,
+                'email' => $user->email,
+                'theme' => 'light',
+                'features' => [
+                    'asset_connections' => '1',
+                ],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('profile.edit'));
+
+        $user->refresh();
+
+        $this->assertFalse($user->hasFeature('asset_connections'));
+        $this->assertNull(data_get($user->preferences, 'features.asset_connections'));
+    }
+
     public function test_feature_middleware_returns_404_when_flag_is_off(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
 
         $this->assertFalse($user->hasFeature('asset_connections'));
 
@@ -92,13 +133,13 @@ class FeatureFlagTest extends TestCase
 
     public function test_feature_middleware_allows_access_when_flag_is_on(): void
     {
-        $user = User::factory()->create([
-            'preferences' => [
-                'features' => [
-                    'asset_connections' => true,
-                ],
+        $user = $this->scanner();
+        $user->preferences = [
+            'features' => [
+                'asset_connections' => true,
             ],
-        ]);
+        ];
+        $user->save();
 
         $this->actingAs($user)
             ->get('/__test/feature/asset-connections')
@@ -106,9 +147,9 @@ class FeatureFlagTest extends TestCase
             ->assertSee('feature-ok');
     }
 
-    public function test_email_integration_feature_flag_can_be_toggled_and_gates_middleware(): void
+    public function test_email_integration_feature_flag_can_be_toggled_by_admin_and_gates_middleware(): void
     {
-        $user = User::factory()->create(['theme' => 'light']);
+        $user = $this->admin();
 
         $this->actingAs($user)
             ->patch(route('profile.update'), [

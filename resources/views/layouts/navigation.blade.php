@@ -67,27 +67,11 @@
                     @role('admin|inventory_manager')
                         <x-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-nav-link>
                     @endrole
-                    @role('admin')
-                        <x-nav-link :href="route('admin.export-columns.edit')" :active="request()->routeIs('admin.export-columns.*')">Export columns</x-nav-link>
-                        <x-nav-link :href="route('admin.storage.edit')" :active="request()->routeIs('admin.storage.*')">Storage</x-nav-link>
-                        <x-nav-link :href="route('admin.sso.edit')" :active="request()->routeIs('admin.sso.*')">SSO</x-nav-link>
-                        @feature('email_integration')
-                            <x-nav-link :href="route('admin.email.edit')" :active="request()->routeIs('admin.email.edit', 'admin.email.update', 'admin.email.test')">Email</x-nav-link>
-                            <x-nav-link :href="route('admin.email.recipients.index')" :active="request()->routeIs('admin.email.recipients.*')">Recipients</x-nav-link>
-                            <x-nav-link :href="route('admin.email.templates.index')" :active="request()->routeIs('admin.email.templates.*')">Templates</x-nav-link>
-                            <x-nav-link :href="route('admin.email.rules.index')" :active="request()->routeIs('admin.email.rules.*')">Email rules</x-nav-link>
-                        @endfeature
-                    @endrole
-                    @feature('email_integration')
-                        @role('admin|inventory_manager')
-                            <x-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.inbound.*')">Inbound email</x-nav-link>
-                        @endrole
-                    @endfeature
                 </div>
             </div>
 
             <div class="hidden sm:flex sm:items-center">
-                <x-dropdown align="right" width="48">
+                <x-dropdown align="right" width="w-56">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 text-sm text-brand-silver hover:text-white">
                             {{ Auth::user()->name }}
@@ -96,9 +80,37 @@
                     </x-slot>
                     <x-slot name="content">
                         <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
+
                         @role('admin')
+                            <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
+                            <div class="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-brand-silver/70">Admin</div>
                             <x-dropdown-link :href="route('admin.users.index')">Manage users</x-dropdown-link>
+                            <x-dropdown-link :href="route('admin.export-columns.edit')">Export columns</x-dropdown-link>
+                            <x-dropdown-link :href="route('admin.storage.edit')">Storage</x-dropdown-link>
+                            <x-dropdown-link :href="route('admin.sso.edit')">SSO</x-dropdown-link>
+                            @feature('email_integration')
+                                <div class="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-brand-silver/70">Email</div>
+                                <x-dropdown-link :href="route('admin.email.edit')">Settings</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.email.recipients.index')">Recipients</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.email.templates.index')">Templates</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.email.rules.index')">Rules</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.email.inbound.index')">Inbound</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.email.outbound.index')">Outbound</x-dropdown-link>
+                            @endfeature
                         @endrole
+
+                        @feature('email_integration')
+                            @role('inventory_manager')
+                                @unlessrole('admin')
+                                    <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
+                                    <div class="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-brand-silver/70">Email</div>
+                                    <x-dropdown-link :href="route('admin.email.inbound.index')">Inbound</x-dropdown-link>
+                                    <x-dropdown-link :href="route('admin.email.outbound.index')">Outbound</x-dropdown-link>
+                                @endunlessrole
+                            @endrole
+                        @endfeature
+
+                        <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">Log Out</x-dropdown-link>
@@ -150,28 +162,37 @@
             @role('admin|inventory_manager')
                 <x-responsive-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-responsive-nav-link>
             @endrole
+
+            <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
+            <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>
+
             @role('admin')
+                <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Admin</div>
+                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">Manage users</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.export-columns.edit')" :active="request()->routeIs('admin.export-columns.*')">Export columns</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.storage.edit')" :active="request()->routeIs('admin.storage.*')">Storage</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.sso.edit')" :active="request()->routeIs('admin.sso.*')">SSO</x-responsive-nav-link>
                 @feature('email_integration')
-                    <x-responsive-nav-link :href="route('admin.email.edit')" :active="request()->routeIs('admin.email.edit', 'admin.email.update', 'admin.email.test')">Email</x-responsive-nav-link>
+                    <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Email</div>
+                    <x-responsive-nav-link :href="route('admin.email.edit')" :active="request()->routeIs('admin.email.edit', 'admin.email.update', 'admin.email.test')">Settings</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('admin.email.recipients.index')" :active="request()->routeIs('admin.email.recipients.*')">Recipients</x-responsive-nav-link>
                     <x-responsive-nav-link :href="route('admin.email.templates.index')" :active="request()->routeIs('admin.email.templates.*')">Templates</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.email.rules.index')" :active="request()->routeIs('admin.email.rules.*')">Email rules</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('admin.email.rules.index')" :active="request()->routeIs('admin.email.rules.*')">Rules</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.inbound.*')">Inbound</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('admin.email.outbound.index')" :active="request()->routeIs('admin.email.outbound.*')">Outbound</x-responsive-nav-link>
                 @endfeature
             @endrole
+
             @feature('email_integration')
-                @role('admin|inventory_manager')
-                    <x-responsive-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.inbound.*')">Inbound email</x-responsive-nav-link>
+                @role('inventory_manager')
+                    @unlessrole('admin')
+                        <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Email</div>
+                        <x-responsive-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.inbound.*')">Inbound</x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('admin.email.outbound.index')" :active="request()->routeIs('admin.email.outbound.*')">Outbound</x-responsive-nav-link>
+                    @endunlessrole
                 @endrole
             @endfeature
 
-            <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
-            <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>
-            @role('admin')
-                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">Manage users</x-responsive-nav-link>
-            @endrole
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <x-responsive-nav-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">Log Out</x-responsive-nav-link>

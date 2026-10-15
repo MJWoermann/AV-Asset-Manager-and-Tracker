@@ -29,6 +29,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public Registration
+    |--------------------------------------------------------------------------
+    |
+    | When false (default), GET/POST /register are not registered. Create users
+    | via Admin → Users or php artisan app:install. Set true only for local/dev.
+    |
+    */
+
+    'allow_registration' => filter_var(env('ALLOW_REGISTRATION', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Guest Stock QR Surface
+    |--------------------------------------------------------------------------
+    |
+    | When false, public Kanban token routes (/stock/t/{token}) return 404.
+    | Defaults true so existing printed QR labels keep working.
+    |
+    */
+
+    'stock_guest_enabled' => filter_var(env('STOCK_GUEST_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

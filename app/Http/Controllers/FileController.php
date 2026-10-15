@@ -49,6 +49,18 @@ class FileController extends Controller
         ]);
     }
 
+    public function show(File $file): View
+    {
+        $this->authorizeManager();
+
+        $file->load(['uploader', 'links.linkable']);
+
+        return view('files.show', [
+            'file' => $file,
+            'links' => $file->links,
+        ]);
+    }
+
     public function search(Request $request): JsonResponse
     {
         $term = trim((string) $request->string('q'));
@@ -139,6 +151,9 @@ class FileController extends Controller
     public function download(File $file): StreamedResponse|RedirectResponse
     {
         if ($file->isUrl()) {
+            $scheme = strtolower((string) parse_url((string) $file->external_url, PHP_URL_SCHEME));
+            abort_unless(in_array($scheme, ['http', 'https'], true), 404);
+
             return redirect()->away($file->external_url);
         }
 
@@ -151,6 +166,30 @@ class FileController extends Controller
             $file->path,
             $file->original_filename ?: $file->title
         );
+    }
+
+    public function preview(File $file): StreamedResponse|RedirectResponse
+    {
+        if ($file->isUrl()) {
+            $scheme = strtolower((string) parse_url((string) $file->external_url, PHP_URL_SCHEME));
+            abort_unless(in_array($scheme, ['http', 'https'], true), 404);
+
+            return redirect()->away($file->external_url);
+        }
+
+        abort_unless($file->isPreviewable(), 415);
+        abort_unless($file->path && $file->disk, 404);
+
+        $disk = Storage::disk($file->disk);
+        abort_unless($disk->exists($file->path), 404);
+
+        $filename = $file->original_filename ?: $file->title;
+        $disposition = 'inline; filename="'.addslashes($filename).'"';
+
+        return $disk->response($file->path, $filename, [
+            'Content-Type' => (string) $file->mime_type,
+            'Content-Disposition' => $disposition,
+        ]);
     }
 
     public function thumbnail(File $file): StreamedResponse

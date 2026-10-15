@@ -15,13 +15,16 @@ class InboundEmailActionController extends Controller
     public function index(Request $request): View
     {
         $status = $request->string('status')->toString();
+        $allowed = array_merge(['all'], array_keys(InboundEmailActionStatus::options()));
+        if (! in_array($status, $allowed, true)) {
+            $status = InboundEmailActionStatus::Pending->value;
+        }
 
         $actions = InboundEmailAction::query()
             ->with(['asset', 'rule'])
             ->when(
-                $status !== '' && array_key_exists($status, InboundEmailActionStatus::options()),
+                $status !== 'all',
                 fn ($query) => $query->where('status', $status),
-                fn ($query) => $query->where('status', InboundEmailActionStatus::Pending->value),
             )
             ->latest()
             ->paginate(50)
@@ -30,7 +33,7 @@ class InboundEmailActionController extends Controller
         return view('admin.email.inbound.index', [
             'actions' => $actions,
             'statuses' => InboundEmailActionStatus::options(),
-            'status' => $status !== '' ? $status : InboundEmailActionStatus::Pending->value,
+            'status' => $status,
         ]);
     }
 

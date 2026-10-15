@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\AssetList;
 use App\Models\ShelfTagLayout;
 use App\Services\ShelfTagRenderService;
+use App\Support\AssetBrowseFilters;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,24 +19,74 @@ class ShelfTagPrintController extends Controller
 {
     public const SESSION_KEY = 'shelf_tag_print_job';
 
+    /** Max assets rendered on the print setup checklist. */
+    public const SELECTION_DISPLAY_CAP = 500;
+
     public function create(Request $request): View
     {
         $lists = AssetList::query()->orderBy('type')->orderBy('name')->get();
         $layouts = ShelfTagLayout::query()->orderBy('name')->get();
 
-        $selectedIds = collect($request->query('asset_ids', []))
+        $selectedIds = collect(old('asset_ids', $request->query('asset_ids', [])))
             ->map(fn ($id) => (int) $id)
             ->filter(fn ($id) => $id > 0)
             ->values()
             ->all();
 
+        $selectedListId = (int) (old('asset_list_id') ?: $request->integer('asset_list_id') ?: 0) ?: null;
+        $selectedLayoutId = (int) (old('shelf_tag_layout_id') ?: $request->integer('shelf_tag_layout_id') ?: 0) ?: null;
+        $term = AssetBrowseFilters::term($request);
+        $listAssets = collect();
+        $listAssetTotal = 0;
+        $listAssetTruncated = false;
+
+        if ($selectedListId !== null) {
+            $list = AssetList::query()->find($selectedListId);
+
+            if ($list !== null) {
+                $query = Asset::query()
+                    ->whereIn(
+                        'id',
+                        $list->items()->whereNotNull('asset_id')->select('asset_id')
+                    )
+                    ->with(['itemType', 'location']);
+
+                AssetBrowseFilters::applyToAssetQuery($query, $request, includeQuantity: false);
+
+                $listAssetTotal = (clone $query)->count();
+                $listAssets = (clone $query)
+                    ->orderBy('name')
+                    ->limit(self::SELECTION_DISPLAY_CAP)
+                    ->get();
+                $listAssetTruncated = $listAssetTotal > $listAssets->count();
+            }
+        }
+
+        $displayedIds = $listAssets->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        if ($selectedIds !== []) {
+            $preselectedIds = array_values(array_intersect($selectedIds, $displayedIds));
+        } elseif (
+            $listAssets->isNotEmpty()
+            && $listAssetTotal <= ShelfTagRenderService::MAX_BATCH
+            && ! AssetBrowseFilters::hasActiveFilters($request)
+        ) {
+            $preselectedIds = $displayedIds;
+        } else {
+            $preselectedIds = [];
+        }
+
         return view('shelf-tags.print.create', [
             'lists' => $lists,
             'layouts' => $layouts,
-            'selectedListId' => $request->integer('asset_list_id') ?: null,
-            'selectedLayoutId' => $request->integer('shelf_tag_layout_id') ?: null,
-            'mode' => $selectedIds !== [] ? 'selected' : 'all',
-            'selectedAssetIds' => $selectedIds,
+            'selectedListId' => $selectedListId,
+            'selectedLayoutId' => $selectedLayoutId,
+            'listAssets' => $listAssets,
+            'listAssetTotal' => $listAssetTotal,
+            'listAssetTruncated' => $listAssetTruncated,
+            'preselectedIds' => $preselectedIds,
+            'q' => $term ?? '',
+            'maxBatch' => ShelfTagRenderService::MAX_BATCH,
         ]);
     }
 

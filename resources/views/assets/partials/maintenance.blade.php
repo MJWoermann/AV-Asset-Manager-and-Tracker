@@ -117,6 +117,51 @@
     <section class="space-y-3">
         <h3 class="font-semibold text-lg">History</h3>
 
+        @php
+            $maintenanceFiltersActive = \App\Support\AssetMaintenanceFilters::hasActiveFilters(request());
+            $userOptions = $maintenanceUserOptions ?? collect();
+        @endphp
+
+        <form
+            method="GET"
+            action="{{ route('assets.show', $asset) }}"
+            class="flex flex-col sm:flex-row flex-wrap gap-3 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
+        >
+            <input type="hidden" name="tab" value="maintenance">
+            <div>
+                <x-input-label for="maintenance_date_from" value="From" />
+                <x-text-input id="maintenance_date_from" name="date_from" type="date" class="mt-1 block w-full" :value="request('date_from')" />
+            </div>
+            <div>
+                <x-input-label for="maintenance_date_to" value="To" />
+                <x-text-input id="maintenance_date_to" name="date_to" type="date" class="mt-1 block w-full" :value="request('date_to')" />
+            </div>
+            <div class="min-w-[10rem]">
+                <x-input-label for="maintenance_filter_type" value="Type" />
+                <select id="maintenance_filter_type" name="log_type" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                    <option value="">All</option>
+                    @foreach($types as $value => $label)
+                        <option value="{{ $value }}" @selected(request('log_type') === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="min-w-[10rem]">
+                <x-input-label for="maintenance_filter_user_id" value="User" />
+                <select id="maintenance_filter_user_id" name="user_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                    <option value="">All</option>
+                    @foreach($userOptions as $option)
+                        <option value="{{ $option['value'] }}" @selected((string) request('user_id') === (string) $option['value'])>{{ $option['label'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="flex items-end gap-2 flex-wrap">
+                <x-primary-button>Filter</x-primary-button>
+                @if($maintenanceFiltersActive)
+                    <a href="{{ route('assets.show', [$asset, 'tab' => 'maintenance']) }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Clear</a>
+                @endif
+            </div>
+        </form>
+
         <div class="space-y-4">
             @forelse($logs as $log)
                 @php
@@ -183,7 +228,9 @@
                     </div>
                 </article>
             @empty
-                <p class="text-sm text-brand-charcoal dark:text-brand-silver">No maintenance entries yet.</p>
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    {{ $maintenanceFiltersActive ? 'No maintenance entries match these filters.' : 'No maintenance entries yet.' }}
+                </p>
             @endforelse
         </div>
     </section>

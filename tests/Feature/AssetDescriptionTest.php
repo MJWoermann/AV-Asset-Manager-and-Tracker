@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\ItemType;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,9 +14,32 @@ class AssetDescriptionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_store_persists_description_on_asset(): void
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RoleSeeder::class);
+    }
+
+    protected function manager(): User
     {
         $user = User::factory()->create();
+        $user->assignRole('inventory_manager');
+
+        return $user;
+    }
+
+    protected function scanner(): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
+
+    public function test_store_persists_description_on_asset(): void
+    {
+        $user = $this->manager();
         $itemType = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',
@@ -37,7 +61,7 @@ class AssetDescriptionTest extends TestCase
 
     public function test_update_persists_description_on_asset(): void
     {
-        $user = User::factory()->create();
+        $user = $this->manager();
         $itemType = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',
@@ -62,7 +86,7 @@ class AssetDescriptionTest extends TestCase
 
     public function test_show_page_displays_description(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $itemType = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',
@@ -82,7 +106,7 @@ class AssetDescriptionTest extends TestCase
 
     public function test_search_matches_description(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $itemType = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',

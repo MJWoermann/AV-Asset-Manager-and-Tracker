@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\ItemType;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,9 +14,24 @@ class AssetItemTypeFilterTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_assets_index_filters_by_item_type(): void
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RoleSeeder::class);
+    }
+
+    protected function scanner(): User
     {
         $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
+
+    public function test_assets_index_filters_by_item_type(): void
+    {
+        $user = $this->scanner();
         $fixture = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',
@@ -53,7 +69,7 @@ class AssetItemTypeFilterTest extends TestCase
 
     public function test_assets_index_item_type_filter_combines_with_status(): void
     {
-        $user = User::factory()->create();
+        $user = $this->scanner();
         $fixture = ItemType::create([
             'name' => 'LX Fixture',
             'slug' => 'lx-fixture',

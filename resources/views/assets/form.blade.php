@@ -109,6 +109,24 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {{-- #region agent log --}}
+                @php
+                    file_put_contents(base_path('debug-94d1bc.log'), json_encode([
+                        'sessionId' => '94d1bc',
+                        'runId' => 'post-fix',
+                        'hypothesisId' => 'A',
+                        'location' => 'assets/form.blade.php:identifier-grid',
+                        'message' => 'Compiled view still contains literal x-text-input tags',
+                        'data' => [
+                            'compiledViewPath' => __FILE__,
+                            'literalXTextInputInCompiled' => str_contains((string) @file_get_contents(__FILE__), '<x-text-input'),
+                            'emailIntegrationEnabled' => (bool) ($emailIntegrationEnabled ?? false),
+                            'assetExists' => (bool) $asset->exists,
+                        ],
+                        'timestamp' => (int) round(microtime(true) * 1000),
+                    ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
+                @endphp
+                {{-- #endregion --}}
                 @foreach([
                     'manufacturer' => 'Manufacturer',
                     'model' => 'Model',
@@ -122,15 +140,23 @@
                 ] as $field => $label)
                     <div>
                         <x-input-label :for="$field" :value="$label" />
-                        <x-text-input
-                            :id="$field"
-                            :name="$field"
-                            class="mt-1 block w-full"
-                            :value="old($field, $asset->{$field})"
-                            @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
+                        {{-- @if inside a component tag prevents Blade from compiling it to <input> --}}
+                        @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
+                            <x-text-input
+                                :id="$field"
+                                :name="$field"
+                                class="mt-1 block w-full"
+                                :value="old($field, $asset->{$field})"
                                 x-model="macAddress"
-                            @endif
-                        />
+                            />
+                        @else
+                            <x-text-input
+                                :id="$field"
+                                :name="$field"
+                                class="mt-1 block w-full"
+                                :value="old($field, $asset->{$field})"
+                            />
+                        @endif
                     </div>
                 @endforeach
                 <div>
@@ -340,5 +366,38 @@
                 <a href="{{ $asset->exists ? route('assets.show', $asset) : route('assets.index') }}" class="px-4 py-2 text-sm border border-brand-charcoal dark:border-white">Cancel</a>
             </div>
         </form>
+        {{-- #region agent log --}}
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const fields = ['name', 'manufacturer', 'model', 'serial_number', 'mac_address', 'purchase_date'];
+                const byId = {};
+                fields.forEach((id) => {
+                    const el = document.getElementById(id);
+                    byId[id] = el ? { tag: el.tagName, type: el.getAttribute('type'), display: getComputedStyle(el).display, height: getComputedStyle(el).height } : null;
+                });
+                const payload = {
+                    sessionId: '94d1bc',
+                    runId: 'post-fix',
+                    hypothesisId: 'A',
+                    location: 'assets/form.blade.php:dom-probe',
+                    message: 'DOM probe for missing identifier inputs',
+                    data: {
+                        nameInputPresent: !!document.querySelector('input#name'),
+                        manufacturerInputPresent: !!document.querySelector('input#manufacturer'),
+                        literalXTextInputCount: document.querySelectorAll('x-text-input').length,
+                        manufacturerNamedTag: document.querySelector('[name="manufacturer"]')?.tagName ?? null,
+                        alpineErrorLikely: typeof window.Alpine === 'undefined',
+                        byId,
+                    },
+                    timestamp: Date.now(),
+                };
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '94d1bc' },
+                    body: JSON.stringify(payload),
+                }).catch(() => {});
+            });
+        </script>
+        {{-- #endregion --}}
     </div>
 </x-app-layout>

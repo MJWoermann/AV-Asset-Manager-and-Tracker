@@ -157,9 +157,45 @@ class AssetConnectionFeatureTest extends TestCase
         $this->assertTrue($asset->interfaces()->where('name', 'LAN 1')->first()->isFromTemplate());
     }
 
-    public function test_adhoc_interface_crud(): void
+    public function test_scanner_cannot_mutate_interfaces_or_connections(): void
     {
         $user = $this->scanner();
+        $asset = $this->makeAsset();
+        $peer = $this->makeAsset(name: 'Peer');
+        $iface = AssetInterface::factory()->create(['asset_id' => $asset->id, 'name' => 'Port 1']);
+        $peerIface = AssetInterface::factory()->create(['asset_id' => $peer->id, 'name' => 'In 1']);
+        $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
+
+        $this->actingAs($user)
+            ->post(route('assets.interfaces.store', $asset), [
+                'name' => 'HDMI Out',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->put(route('assets.interfaces.update', [$asset, $iface]), [
+                'name' => 'HDMI 1',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->delete(route('assets.interfaces.destroy', [$asset, $iface]))
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->post(route('assets.connections.store', $asset), [
+                'local_interface_id' => $iface->id,
+                'peer_interface_id' => $peerIface->id,
+                'connection_type_id' => $network->id,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('asset_connections', 0);
+    }
+
+    public function test_adhoc_interface_crud(): void
+    {
+        $user = $this->manager();
         $asset = $this->makeAsset();
 
         $this->actingAs($user)
@@ -191,7 +227,7 @@ class AssetConnectionFeatureTest extends TestCase
 
     public function test_connection_create_uses_canonical_ordering_and_allows_multi_link(): void
     {
-        $user = $this->scanner();
+        $user = $this->manager();
         $assetA = $this->makeAsset(name: 'Switch');
         $assetB = $this->makeAsset(name: 'Encoder');
         $ifaceA = AssetInterface::factory()->create(['asset_id' => $assetA->id, 'name' => 'Port 1']);
@@ -226,7 +262,7 @@ class AssetConnectionFeatureTest extends TestCase
 
     public function test_custom_protocol_is_required_when_type_allows_protocol(): void
     {
-        $user = $this->scanner();
+        $user = $this->manager();
         $assetA = $this->makeAsset(name: 'A');
         $assetB = $this->makeAsset(name: 'B');
         $ifaceA = AssetInterface::factory()->create(['asset_id' => $assetA->id]);

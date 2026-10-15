@@ -170,11 +170,15 @@ sudo systemctl restart php8.5-fpm
 
 ## 6. Firewall (LAN only example)
 
+Minimal open ports for a first boot:
+
 ```bash
 sudo ufw allow OpenSSH
 sudo ufw allow 80/tcp
 sudo ufw enable
 ```
+
+For production on corporate WiFi, prefer **source-restricted** rules (staff subnets for HTTP/HTTPS, admin/jump only for SSH) and keep MariaDB off the WiFi path. Limit host outbound internet to SSO (Google/Microsoft Entra OAuth) and email (SMTP and/or Microsoft Graph) when IT policy allows. Full patterns, `APP_URL`/split-DNS notes, and guest QR / Sanctum reachability: **[security-hardening.md — Corporate LAN / staff WiFi deployment](security-hardening.md#corporate-lan--staff-wifi-deployment)**.
 
 ## 7. Updates
 
@@ -300,12 +304,17 @@ Backup archives exclude `.env` and Graph/QNAP secrets. SQL dumps include user pa
 
 ## Security checklist
 
-Full evaluation, threat model, and prioritized application hardening: **[docs/security-hardening.md](security-hardening.md)**.
+Full evaluation, threat model, prioritized application hardening, and **corporate LAN / staff WiFi networking**: **[docs/security-hardening.md](security-hardening.md)**.
 
 - [ ] `APP_DEBUG=false`
-- [ ] Public registration disabled (see hardening guide — highest priority)
+- [ ] `ALLOW_REGISTRATION=false` (default; create users via Admin → Users or `app:install`)
+- [ ] Optional: `STOCK_GUEST_ENABLED=false` if guest Kanban QR should be off
+- [ ] Confirm every user has an app role (`admin`, `inventory_manager`, or `scanner`)
 - [ ] Strong DB password; MariaDB on localhost only
 - [ ] Dedicated DB user (not root)
+- [ ] Firewall: HTTP(S) from staff WiFi/LAN subnets only; SSH from admin/jump only; no MariaDB on WiFi
+- [ ] `APP_URL` matches the hostname staff resolve on corporate WiFi (PWA, API, SSO callbacks, guest QR)
+- [ ] Outbound from the host limited to SSO + email where policy allows (see security-hardening corporate LAN section)
 - [ ] `storage` and `bootstrap/cache` writable by `www-data` only as needed
 - [ ] Web root is `public/` only
 - [ ] Uploads limited to 25MB in Nginx and PHP (`upload_max_filesize`, `post_max_size`)

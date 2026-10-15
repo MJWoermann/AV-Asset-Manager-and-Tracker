@@ -11,10 +11,11 @@
             <div class="text-sm text-red-600">{{ $errors->first() }}</div>
         @endif
 
-        <form method="GET" class="flex flex-wrap gap-3 items-end">
+        <form method="GET" action="{{ route('admin.email.inbound.index') }}" class="flex flex-wrap gap-3 items-end">
             <div>
                 <x-input-label for="status" value="Status" />
                 <select id="status" name="status" class="mt-1 block rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                    <option value="all" @selected($status === 'all')>All</option>
                     @foreach($statuses as $value => $label)
                         <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
                     @endforeach

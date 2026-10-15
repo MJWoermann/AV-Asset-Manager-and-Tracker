@@ -33,6 +33,7 @@
             'face' => old('face', 'front'),
             'start_ru' => old('start_ru'),
             'ru_height' => old('ru_height'),
+            'full_depth' => (bool) old('full_depth', false),
             'kind' => $oldKind,
             'child_asset_id' => old('child_asset_id', ''),
             'note' => old('note', ''),
@@ -104,40 +105,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-2">
-                <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal overflow-hidden">
-                    <template x-for="row in rows" :key="face + '-' + row.ru">
-                        <button
-                            type="button"
-                            class="w-full flex min-h-[2rem] border-b border-brand-silver/60 dark:border-brand-charcoal text-left"
-                            :class="row.occupied ? 'bg-brand/10 hover:bg-brand/15' : 'hover:bg-brand/5'"
-                            @click="row.placement ? openEdit(row.placement) : openAdd(row.ru)"
-                        >
-                            <div class="w-12 shrink-0 flex items-center justify-center text-xs font-mono text-brand-charcoal dark:text-brand-silver border-r border-brand-silver dark:border-brand-charcoal"
-                                 :class="row.occupied ? 'bg-brand-silver/40 dark:bg-brand-charcoal/50' : ''">
-                                <span x-text="row.ru"></span>
-                            </div>
-                            <div class="flex-1 px-3 py-1.5 min-w-0 flex items-center">
-                                <template x-if="row.isStart">
-                                    <div class="min-w-0">
-                                        <div class="text-sm font-medium truncate" x-text="placementLabel(row.placement)"></div>
-                                        <div class="text-xs text-brand-charcoal dark:text-brand-silver">
-                                            <span x-text="row.placement.start_ru"></span>–<span x-text="Number(row.placement.start_ru) + Number(row.placement.ru_height) - 1"></span>
-                                            RU
-                                            ·
-                                            <span x-text="row.placement.kind === 'note' ? 'Note' : 'Asset'"></span>
-                                        </div>
-                                    </div>
-                                </template>
-                                <template x-if="row.occupied && !row.isStart">
-                                    <span class="text-xs text-brand-charcoal/50 dark:text-brand-silver/50">┊</span>
-                                </template>
-                                <template x-if="!row.occupied">
-                                    <span class="text-xs text-brand-charcoal/60 dark:text-brand-silver/60">Empty</span>
-                                </template>
-                            </div>
-                        </button>
-                    </template>
-                </div>
+                @include('assets.partials.ru-diagram', ['interactive' => true, 'compact' => false])
             </div>
 
             <div class="space-y-4">
@@ -169,6 +137,7 @@
                                 name="face"
                                 class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
                                 x-model="form.face"
+                                :disabled="form.full_depth && form.kind === 'asset'"
                                 required
                             >
                                 <option value="front">Front</option>
@@ -176,6 +145,9 @@
                                     <option value="rear">Rear</option>
                                 @endif
                             </select>
+                            <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver" x-show="form.full_depth && form.kind === 'asset'" x-cloak>
+                                Full-depth placements are stored on the front face and mirrored on the rear.
+                            </p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
@@ -210,6 +182,7 @@
                                 name="kind"
                                 class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
                                 x-model="form.kind"
+                                @change="if (form.kind !== 'asset') { form.full_depth = false; }"
                                 required
                             >
                                 <option value="asset">Child asset</option>
@@ -235,6 +208,29 @@
                             <p class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="selectedChild()?.parent_name">
                                 Currently parented to <span x-text="selectedChild()?.parent_name"></span>
                             </p>
+
+                            @if($rearEnabled)
+                                <input
+                                    type="hidden"
+                                    name="full_depth"
+                                    :value="form.kind === 'asset' && form.full_depth ? '1' : '0'"
+                                    :disabled="form.kind !== 'asset'"
+                                >
+                                <label class="flex items-start gap-2 text-sm pt-1">
+                                    <input
+                                        type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand"
+                                        x-model="form.full_depth"
+                                        @change="if (form.full_depth) { form.face = 'front'; }"
+                                    >
+                                    <span>
+                                        Full depth
+                                        <span class="block text-xs text-brand-charcoal dark:text-brand-silver">
+                                            Occupies the same RU span on the rear face as well.
+                                        </span>
+                                    </span>
+                                </label>
+                            @endif
                         </div>
 
                         <div x-show="form.kind === 'note'" x-cloak>
@@ -262,7 +258,7 @@
                         x-cloak
                         method="POST"
                         :action="editingPlacement()?.destroy_url"
-                        onsubmit="return confirm('Remove this RU placement?')"
+                        onsubmit="return confirm('Remove this RU placement? The child asset will stay under this rack.')"
                         class="pt-2 border-t border-brand-silver dark:border-brand-charcoal"
                     >
                         @csrf

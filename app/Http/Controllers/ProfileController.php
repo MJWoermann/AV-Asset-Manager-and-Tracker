@@ -37,15 +37,17 @@ class ProfileController extends Controller
             $user->email_verified_at = null;
         }
 
-        $featureFlags = [];
-        foreach (DeveloperFeatures::keys() as $key) {
-            $featureFlags[$key] = $request->boolean('features.'.$key);
-        }
+        if ($user->hasRole('admin')) {
+            $featureFlags = [];
+            foreach (DeveloperFeatures::keys() as $key) {
+                $featureFlags[$key] = $request->boolean('features.'.$key);
+            }
 
-        $user->preferences = DeveloperFeatures::mergeIntoPreferences(
-            $user->preferences,
-            $featureFlags,
-        );
+            $user->preferences = DeveloperFeatures::mergeIntoPreferences(
+                $user->preferences,
+                $featureFlags,
+            );
+        }
 
         $user->save();
 

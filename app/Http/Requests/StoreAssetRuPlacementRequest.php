@@ -17,10 +17,18 @@ class StoreAssetRuPlacementRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $merge = [];
+
         if ($this->has('confirm_parent_change')) {
-            $this->merge([
-                'confirm_parent_change' => $this->boolean('confirm_parent_change'),
-            ]);
+            $merge['confirm_parent_change'] = $this->boolean('confirm_parent_change');
+        }
+
+        if ($this->has('full_depth')) {
+            $merge['full_depth'] = $this->boolean('full_depth');
+        }
+
+        if ($merge !== []) {
+            $this->merge($merge);
         }
     }
 
@@ -33,6 +41,11 @@ class StoreAssetRuPlacementRequest extends FormRequest
             'face' => ['required', Rule::enum(RuPlacementFace::class)],
             'start_ru' => ['required', 'integer', 'min:1', 'max:65535'],
             'ru_height' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'full_depth' => [
+                'sometimes',
+                'boolean',
+                'prohibited_unless:kind,asset',
+            ],
             'kind' => ['required', Rule::enum(RuPlacementKind::class)],
             'child_asset_id' => [
                 'nullable',

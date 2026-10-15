@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreConnectionTypeRequest;
 use App\Http\Requests\UpdateConnectionTypeRequest;
 use App\Models\ConnectionType;
+use App\Support\ConnectionTypeColors;
 use App\Support\ConnectionTypeIcons;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
@@ -25,13 +26,16 @@ class ConnectionTypeController extends Controller
 
     public function create(): View
     {
+        $connectionType = new ConnectionType([
+            'color' => '#00adb7',
+            'icon' => 'generic',
+            'sort_order' => 100,
+        ]);
+
         return view('connection-types.form', [
-            'connectionType' => new ConnectionType([
-                'color' => '#00adb7',
-                'icon' => 'generic',
-                'sort_order' => 100,
-            ]),
+            'connectionType' => $connectionType,
             'icons' => ConnectionTypeIcons::keys(),
+            'colors' => ConnectionTypeColors::optionsFor($connectionType->color),
         ]);
     }
 
@@ -59,6 +63,7 @@ class ConnectionTypeController extends Controller
         return view('connection-types.form', [
             'connectionType' => $connectionType,
             'icons' => ConnectionTypeIcons::keys(),
+            'colors' => ConnectionTypeColors::optionsFor($connectionType->color),
         ]);
     }
 

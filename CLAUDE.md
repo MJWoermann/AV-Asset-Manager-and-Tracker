@@ -39,6 +39,7 @@ Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset manage
 6. Uploads: jpg/png/pdf/docx/xlsx/csv, max 25MB. Phase 1 import focuses on xlsx/csv.
 7. Brand: black/white primary; turquoise `#00adb7` sparingly for emphasis. Use Heroicons-style SVG or simple icons; Tailwind utilities with `brand-*` colours.
 8. Match existing Laravel structure: controllers thin, services for scan/compare, Form Request validation where already used.
+9. Admin settings / sub-pages (`/admin/*`) go in the profile dropdown (and mobile Account/Admin section), not the top-level nav. Keep operational links (Import, Data, Reports) in the main bar.
 
 ## Key paths
 

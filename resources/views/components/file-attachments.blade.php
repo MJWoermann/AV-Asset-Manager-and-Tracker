@@ -17,6 +17,11 @@
     selectedId: null,
     selectedTitle: '',
     searching: false,
+    previewOpen: false,
+    previewUrl: '',
+    previewDownloadUrl: '',
+    previewKind: 'image',
+    previewTitle: '',
     async search() {
         this.searching = true;
         try {
@@ -34,6 +39,18 @@
         this.selectedTitle = file.title;
         this.results = [];
         this.query = file.title;
+    },
+    openPreview(url, downloadUrl, kind, title) {
+        this.previewUrl = url;
+        this.previewDownloadUrl = downloadUrl;
+        this.previewKind = kind;
+        this.previewTitle = title;
+        this.previewOpen = true;
+    },
+    closePreview() {
+        this.previewOpen = false;
+        this.previewUrl = '';
+        this.previewDownloadUrl = '';
     }
 }">
     <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
@@ -57,10 +74,25 @@
                     @endphp
                     <tr class="border-t border-brand-silver dark:border-brand-charcoal align-top">
                         <td class="px-3 py-2">
-                            <div class="font-medium">{{ $file->title }}</div>
-                            @if($inherited)
-                                <div class="text-xs text-brand-charcoal dark:text-brand-silver">Via item type</div>
-                            @endif
+                            <div class="flex items-center gap-2">
+                                @if($file->hasThumbnail())
+                                    <img
+                                        src="{{ route('files.thumbnail', $file) }}"
+                                        alt=""
+                                        class="h-10 w-10 object-cover border border-brand-silver dark:border-brand-charcoal shrink-0"
+                                    >
+                                @elseif($file->isPreviewableImage() || $file->isPreviewablePdf())
+                                    <span class="inline-flex h-10 w-10 items-center justify-center text-xs font-medium bg-brand-silver/50 dark:bg-brand-charcoal border border-brand-silver dark:border-brand-charcoal shrink-0">
+                                        {{ $file->isPreviewablePdf() ? 'PDF' : 'IMG' }}
+                                    </span>
+                                @endif
+                                <div>
+                                    <div class="font-medium">{{ $file->title }}</div>
+                                    @if($inherited)
+                                        <div class="text-xs text-brand-charcoal dark:text-brand-silver">Via item type</div>
+                                    @endif
+                                </div>
+                            </div>
                         </td>
                         <td class="px-3 py-2">{{ $file->category->label() }}</td>
                         <td class="px-3 py-2">
@@ -72,10 +104,17 @@
                         </td>
                         <td class="px-3 py-2 text-brand-charcoal dark:text-brand-silver">{{ $note ?: '—' }}</td>
                         <td class="px-3 py-2 text-right whitespace-nowrap">
+                            @if($file->isPreviewable())
+                                <button
+                                    type="button"
+                                    class="text-brand text-sm"
+                                    @click="openPreview(@js(route('files.preview', $file)), @js(route('files.download', $file)), @js($file->isPreviewablePdf() ? 'pdf' : 'image'), @js($file->title))"
+                                >Preview</button>
+                            @endif
                             @if($file->isUrl())
-                                <a href="{{ $file->external_url }}" target="_blank" rel="noopener" class="text-brand text-sm">Open</a>
+                                <a href="{{ $file->external_url }}" target="_blank" rel="noopener" class="text-brand text-sm {{ $file->isPreviewable() ? 'ms-2' : '' }}">Open</a>
                             @else
-                                <a href="{{ route('files.download', $file) }}" class="text-brand text-sm">Download</a>
+                                <a href="{{ route('files.download', $file) }}" class="text-brand text-sm {{ $file->isPreviewable() ? 'ms-2' : '' }}">Download</a>
                             @endif
                             @if($canMutate && ! $inherited && $linkId)
                                 <form method="POST" action="{{ route('files.unlink', $linkId) }}" class="inline ms-2" onsubmit="return confirm('Unlink this file?')">
@@ -196,4 +235,6 @@
             </form>
         </div>
     @endif
+
+    @include('files.partials.preview-modal')
 </div>

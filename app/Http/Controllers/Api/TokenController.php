@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -18,12 +19,16 @@ class TokenController extends Controller
             'device_name' => ['required', 'string', 'max:255'],
         ]);
 
-        $user = \App\Models\User::where('email', $data['email'])->first();
+        $user = User::where('email', $data['email'])->first();
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
+        }
+
+        if (! $user->hasAnyRole(['admin', 'inventory_manager', 'scanner'])) {
+            abort(403, 'You do not have permission to perform this action.');
         }
 
         $token = $user->createToken($data['device_name'])->plainTextToken;

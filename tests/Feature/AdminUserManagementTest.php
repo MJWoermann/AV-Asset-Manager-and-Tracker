@@ -77,7 +77,7 @@ class AdminUserManagementTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Delete', false);
-        $response->assertSee(route('admin.users.destroy', $scanner), false);
-        $response->assertDontSee(route('admin.users.destroy', $admin), false);
+        $response->assertSee('action="'.route('admin.users.destroy', $scanner).'"', false);
+        $response->assertDontSee('action="'.route('admin.users.destroy', $admin).'"', false);
     }
 }

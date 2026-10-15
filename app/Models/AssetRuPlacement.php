@@ -19,6 +19,7 @@ class AssetRuPlacement extends Model
         'face',
         'start_ru',
         'ru_height',
+        'full_depth',
         'kind',
         'child_asset_id',
         'note',
@@ -31,6 +32,7 @@ class AssetRuPlacement extends Model
             'kind' => RuPlacementKind::class,
             'start_ru' => 'integer',
             'ru_height' => 'integer',
+            'full_depth' => 'boolean',
         ];
     }
 

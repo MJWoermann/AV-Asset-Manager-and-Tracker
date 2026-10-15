@@ -31,7 +31,10 @@ class AssetColumnFilterTest extends TestCase
 
     protected function user(): User
     {
-        return User::factory()->create();
+        $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
     }
 
     public function test_assets_index_filters_by_column_text_fields(): void

@@ -21,7 +21,9 @@ Related docs: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md), [sso-setup.md](s
 
 The app already has useful controls: Spatie roles on many admin routes, Sanctum + throttles on API token issuance, login lockout, CSRF on web forms, UUID attachment paths, hashed guest stock tokens, SSO domain allow-lists, and append-only audit-log design.
 
-The highest-risk gap for a production install is **open self-registration**: anyone who can reach `/register` can create an account with **no role**, and `User` does **not** implement `MustVerifyEmail`, so `auth` + `verified` middleware does not block them. Those accounts can use most authenticated web surfaces and obtain API tokens. Harden that first, then tighten authorization on API/file routes and production config.
+**P0/P1 hardening is implemented in code:** public registration defaults off (`ALLOW_REGISTRATION=false`), authenticated web/API access requires a Spatie app role (`admin`, `inventory_manager`, or `scanner`), API tokens are refused without a role, developer feature flags are admin-only, connection/RU writes are manager-gated, URL file downloads allow only `http`/`https`, and guest stock QR can be disabled with `STOCK_GUEST_ENABLED=false`.
+
+**Email verification is intentionally not used** for access control. Isolated LEMP installs often have no outbound mail; `User` does not implement `MustVerifyEmail`. Admins create users (or run `app:install`) with `email_verified_at` set and a role assigned — no mail required.
 
 ---
 
@@ -29,30 +31,30 @@ The highest-risk gap for a production install is **open self-registration**: any
 
 Severity reflects impact if the host is reachable by untrusted users (or a compromised staff account). On a tightly firewalled LAN with registration disabled, Critical items become lower priority but should still be fixed.
 
-### Critical
+### Critical (P0 — mitigated)
 
-| ID | Area | Evidence | Risk |
-|----|------|----------|------|
-| C1 | Public registration | `routes/auth.php` (`GET/POST register`); `RegisteredUserController` creates user + logs in with no role | Untrusted signup → inventory access |
-| C2 | Email verification not enforced | `User` does not implement `MustVerifyEmail`; web group still uses `middleware(['auth', 'verified'])` | `verified` is a no-op; new accounts reach the dashboard immediately |
-| C3 | Roleless authenticated access | Many web routes require only `auth`/`verified` (e.g. assets CRUD, scan, file download); API token issuance has no role check | Self-registered users inherit broad access until roles are assigned |
+| ID | Area | Status |
+|----|------|--------|
+| C1 | Public registration | **Mitigated** — `ALLOW_REGISTRATION` defaults false; register UI hidden; controller returns 404 when off |
+| C2 | Email verification not enforced | **By design** — no `MustVerifyEmail`; access is role-gated, not mail-gated |
+| C3 | Roleless authenticated access | **Mitigated** — web app group uses `role:admin,inventory_manager,scanner`; roleless users get 403 |
 
-### High
+### High (P1 — mitigated / residual)
 
-| ID | Area | Evidence | Risk |
-|----|------|----------|------|
-| H1 | API authorization incomplete | `routes/api.php`: group is `auth:sanctum` only. `AssetApiController::store/update` and scan check roles; **`index`/`show` and list/compare do not** | Any token holder can enumerate assets and lists |
-| H2 | File download / search IDOR | `FileController::download`, `thumbnail`, `search` — any authenticated user; no per-file ownership check | Enumerate file IDs → download all attachments |
-| H3 | External URL redirect | `download()` uses `redirect()->away($file->external_url)` for URL attachments | Stored open redirect / phishing via attached URLs |
-| H4 | Self-service developer features | Profile updates merge all `DeveloperFeatures` keys into `preferences`; `feature:` / `developer_feature:` middleware only check that flag | Any user can enable stock, connections, RU visualiser, etc. |
-| H5 | Feature-gated writes without roles | Connection / interface mutations under `feature:asset_connections` lack `role:`; RU placements under `developer_feature:` only | Flag + any auth user → mutate connection graph / rack layout |
-| H6 | Web asset/file/scan mutations under-authorized | `assets.store` / `update` / `bulk-update`, maintenance logs, uploads, scan — not wrapped in `role:` | Broader than intended role model if roleless users exist |
+| ID | Area | Status |
+|----|------|--------|
+| H1 | API authorization incomplete | **Mitigated** — Sanctum group + token issuance require app roles |
+| H2 | File download / search IDOR | **Pragmatic** — any app role may search/download/thumbnail; no per-file ownership (acceptable for this sensitivity) |
+| H3 | External URL redirect | **Mitigated** — `download()` allows only `http`/`https` schemes before `redirect()->away()` |
+| H4 | Self-service developer features | **Mitigated** — only admins may merge `features.*` on profile |
+| H5 | Feature-gated writes without roles | **Mitigated** — connection/interface + RU placement writes require `admin` or `inventory_manager` |
+| H6 | Web asset/file/scan mutations under-authorized | **Partially mitigated** — roleless users blocked by app-group role middleware; finer per-action role split remains product policy |
 
 ### Medium
 
 | ID | Area | Evidence | Risk |
 |----|------|----------|------|
-| M1 | Guest stock always on | `StockTracking::guestSurfaceEnabled()` returns `true`; public `GET/POST /stock/t/{token}` with `throttle:30,1` | Leaked/printed QR = unauthenticated stock mutation until revoke |
+| M1 | Guest stock kill-switch | **Mitigated** — `STOCK_GUEST_ENABLED` (default true) via `StockTracking::guestSurfaceEnabled()`; set false to 404 guest routes | Keep tokens revoked when unused |
 | M2 | Registration / password-reset throttle gaps | Register unthrottled; `forgot-password` outside SSO throttle group; login uses 5-attempt lockout in `LoginRequest` | Signup spam; reset-email abuse |
 | M3 | Weak first-admin password path | `app:install` / some admin user flows allow weaker `min:8` vs `Password::defaults()` on register | Weak break-glass admin |
 | M4 | SSO email binding | `SocialAuthService` matches by email; Azure “verified” is weaker than Google’s `email_verified` check | IdP/email edge cases → wrong account session |
@@ -90,6 +92,8 @@ Do these on every production host. Many are already sketched in [deploy-ubuntu-n
   - Optionally HSTS in Nginx (`Strict-Transport-Security`).
 - Add security headers beyond the example (`X-Frame-Options`, `X-Content-Type-Options`): `Referrer-Policy`, `Permissions-Policy`, and a Content-Security-Policy appropriate for Blade + Vite + scanner libs.
 - Deny direct access to `/storage` blobs if you ever symlink user uploads there; this app should serve attachments only via authenticated `/files/{id}/download`.
+
+For a typical TP corporate WiFi layout (staff reach the host on the LAN; the host only talks outbound for SSO and email), see **[Corporate LAN / staff WiFi deployment](#corporate-lan--staff-wifi-deployment)** below.
 
 ### 2. Application environment
 
@@ -139,7 +143,7 @@ LOG_LEVEL=warning
 - Treat printed QR URLs as bearer credentials for that asset’s stock.
 - Rotate or revoke tokens when labels are lost or staff leave.
 - Prefer short-lived campaigns; monitor `last_used_at` for unexpected use.
-- Until a global kill-switch exists in code, restrict network access to the host if guest QR must be disabled.
+- Disable the surface with `STOCK_GUEST_ENABLED=false` when unused; still restrict who can reach the host on the network (see corporate LAN section).
 
 ### 7. Logging and monitoring
 
@@ -149,33 +153,133 @@ LOG_LEVEL=warning
 
 ---
 
+## Corporate LAN / staff WiFi deployment
+
+Goal for a typical self-hosted LEMP install on the corporate network:
+
+| Direction | What should work |
+|-----------|------------------|
+| **Inbound (staff → host)** | Web UI, PWA install/update shell, Sanctum `/api/*`, optional guest stock QR (`/stock/t/…`), and file downloads via the app (`/files/{id}/download`) — all reachable from staff WiFi (phones and laptops) |
+| **Outbound (host → internet)** | Only what SSO and email need (Google/Microsoft Entra OAuth; SMTP and/or Microsoft Graph mail). Everything else stays LAN-local |
+
+Do **not** put MariaDB or SSH on the staff WiFi path. Bind the DB to localhost; restrict SSH to admin/jump subnets. Keep `ALLOW_REGISTRATION=false` (default) and follow the rest of this guide.
+
+### Inbound: staff reach the app, not the database
+
+1. **Listen on the LAN interface** — Nginx serves `80`/`443` on the host’s corporate NIC (see [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md) §4 / `nginx.example`). Prefer a stable hostname over a raw IP in `server_name` and `APP_URL`.
+2. **Firewall allow from staff WiFi only** — Replace the broad “allow 80 from anywhere” example with source subnets your IT assigns to corporate WiFi (and wired LAN if needed). Placeholders only — use your real CIDRs:
+
+```bash
+# Example pattern (replace with your staff / admin subnets)
+sudo ufw default deny incoming
+sudo ufw default allow outgoing   # tighten outbound separately (below)
+
+# SSH: admin / jump hosts only — not the whole WiFi pool
+sudo ufw allow from STAFF_ADMIN_SUBNET_CIDR to any port 22 proto tcp
+
+# App HTTP/HTTPS: staff WiFi (+ optional wired) only
+sudo ufw allow from STAFF_WIFI_SUBNET_CIDR to any port 80 proto tcp
+sudo ufw allow from STAFF_WIFI_SUBNET_CIDR to any port 443 proto tcp
+# sudo ufw allow from STAFF_WIRED_SUBNET_CIDR to any port 80 proto tcp
+# sudo ufw allow from STAFF_WIRED_SUBNET_CIDR to any port 443 proto tcp
+
+sudo ufw enable
+sudo ufw status numbered
+```
+
+3. **Do not expose MariaDB or SSH to WiFi broadly** — Keep `bind-address = 127.0.0.1` for MariaDB. Never open `3306` on the WiFi ACLs. SSH from admin subnets (or VPN jump) only.
+4. **Optional mDNS / DNS hostname** — Avahi/`*.local` or an internal A/AAAA record (e.g. `av-assets.corp.example`) so phones and laptops resolve the same name. Whatever staff type in the browser must match `APP_URL` (scheme + host + port).
+5. **HTTPS on the LAN if feasible** — Prefer a corporate internal CA cert or split-horizon public name so browsers trust TLS. After HTTPS: `APP_URL=https://…`, `SESSION_SECURE_COOKIE=true`, and optional HSTS. If you must stay on HTTP LAN-only, document that risk and keep `SESSION_SECURE_COOKIE=false` (as in the deploy guide).
+
+Nginx can also deny by source (same idea as UFW):
+
+```nginx
+# Inside the server { } block — replace with your staff CIDRs
+allow STAFF_WIFI_SUBNET_CIDR;
+# allow STAFF_WIRED_SUBNET_CIDR;
+deny all;
+```
+
+### `APP_URL` and name resolution
+
+- Set `APP_URL` to the URL staff actually use on corporate WiFi (e.g. `https://av-assets.corp.example` or `http://YOUR_HOSTNAME`).
+- PWA start URL, Sanctum clients, guest QR links, email deep links, and OAuth callbacks all derive from that value. If phones cannot resolve or reach `APP_URL`, install/API/QR flows break even when a laptop using a different URL works.
+- After changing `APP_URL`, run `php artisan config:cache` (or `scripts/update.sh`) and re-check SSO redirect URIs in Google/Entra.
+
+### SSO: IdP is on the internet; callbacks hit your LAN URL
+
+Staff browsers talk to Google / Microsoft Entra on the public internet, then the IdP redirects the browser back to `{APP_URL}/auth/google/callback` or `{APP_URL}/auth/azure/callback`.
+
+- Register those **exact** callback URLs in the IdP (see [sso-setup.md](sso-setup.md)).
+- The redirect target must be reachable from the staff device on WiFi — usually the LAN hostname, or the same hostname via **split DNS** (internal resolver returns the private host IP; internet clients need not reach the app).
+- The LEMP host itself needs **outbound HTTPS** to the IdP token endpoints during the OAuth code exchange. That is expected internet use; it is not the same as exposing the app inbound to the public internet.
+
+### Email: outbound only
+
+Notifications / Graph mail need outbound connectivity from the host (or from the configured mail path): SMTP (commonly `587`/`465`) and/or Microsoft Graph (`https://graph.microsoft.com`). See [email-setup.md](email-setup.md). No inbound mail ports need to be opened on the LEMP host for typical SMTP/Graph send (IMAP poll, if used, is also outbound from the host).
+
+### Outbound: limit the host to SSO + email
+
+Default UFW “allow outgoing” is convenient for install/`apt`, but a hardened production host can deny general internet egress and allow only what you need. Coordinate with IT so package updates still work (HTTP proxy, maintenance window, or temporary allow).
+
+Illustrative pattern (hostnames/ports vary; confirm with your IdP and mail docs):
+
+```bash
+# After install/updates are done — example tighten (adjust to your policy)
+sudo ufw default deny outgoing
+sudo ufw allow out on lo
+sudo ufw allow out to STAFF_WIFI_SUBNET_CIDR   # optional: LAN replies / internal DNS
+# DNS (use your corporate resolvers)
+sudo ufw allow out to CORP_DNS_IP port 53
+# SSO + Graph / general HTTPS to IdP and Microsoft/Google endpoints
+sudo ufw allow out to any port 443 proto tcp
+# SMTP if not using Graph-only mail
+sudo ufw allow out to any port 587 proto tcp
+# sudo ufw allow out to any port 465 proto tcp
+```
+
+Prefer an egress allow-list or corporate proxy over “any:443” when IT can supply destination ranges. Block unnecessary outbound from the app host (no general browsing, no unexpected cloud APIs). Attachment disks that stay on NAS/local mounts need only LAN routes — keep QNAP/SFTP on the internal network; SharePoint Graph is another intentional outbound HTTPS exception if you use that disk.
+
+### Guest QR and Sanctum on WiFi
+
+- Guest Kanban QR URLs are absolute links based on `APP_URL`. Scanners and phones on staff WiFi must resolve and reach that host; if guest QR is unused, set `STOCK_GUEST_ENABLED=false`.
+- Sanctum Bearer clients (mobile/scripts) must use the same reachable base URL and a user with an app role (`admin`, `inventory_manager`, or `scanner`).
+- Printed QR tokens remain bearer credentials for that asset’s stock — rotate/revoke when labels are lost; network restriction does not replace token hygiene.
+
+### Quick checklist (corporate WiFi)
+
+- [ ] Staff WiFi (and phones) can open `APP_URL` for UI, PWA, API, files, and guest QR if enabled
+- [ ] UFW/nginx allow HTTP(S) only from staff subnets; SSH only from admin/jump; MariaDB localhost-only
+- [ ] Hostname/DNS (or mDNS) stable; `APP_URL` matches what browsers use; config cached
+- [ ] SSO redirect URIs registered to that `APP_URL`; host can reach IdP outbound; callbacks return to LAN/split-DNS URL
+- [ ] Email outbound only (SMTP and/or Graph); no needless internet egress from the host
+- [ ] `ALLOW_REGISTRATION=false`; optional `STOCK_GUEST_ENABLED=false`; rest of [Production checklist](#production-checklist)
+
+---
+
 ## Recommended hardening (application changes)
 
 These are the highest-value code/config changes relative to the findings above. Implement in priority order when you are ready to change the app (not all are present today).
 
-### P0 — Close the open door
+### P0 — Close the open door (done)
 
-1. **Disable public registration in production**  
-   - Remove or gate `register` routes (e.g. env `ALLOW_REGISTRATION=false`, or admin-invite only).  
-   - Hide the Register link on the login page when disabled.
-2. **Deny users with zero roles**  
-   - Middleware or gate: authenticated users without `admin` / `inventory_manager` / `scanner` receive 403 on web + API (except maybe profile/logout while an admin assigns a role).
-3. **Either implement `MustVerifyEmail` or stop using `verified` middleware**  
-   - Do not rely on `verified` while `User` omits the interface.
+1. **Disable public registration in production** — `ALLOW_REGISTRATION=false` (default); register returns 404; Register link hidden when disabled. Create users via Admin → Users or `app:install`.
+2. **Deny users with zero roles** — Web dashboard/app group uses `role:admin,inventory_manager,scanner`. Logout remains under plain `auth`.
+3. **Stop using `verified` for access** — Replaced with role middleware. No `MustVerifyEmail` by design (no mail dependency on isolated LAN).
 
-### P1 — Authorize every data path
+### P1 — Authorize every data path (done for scoped items)
 
-4. **API** — Apply `role:admin,inventory_manager,scanner` (or policies) to **all** Sanctum routes, including `GET /assets`, `GET /lists`, and compare. Require a role before issuing tokens in `TokenController`.
-5. **Web mutations** — Align asset create/update/bulk, maintenance logs, scan writes, and file upload/link with the same role rules as destroy/import already use where appropriate.
-6. **Files** — Authorize download/thumbnail/search (manager role, or user can access a linked asset/location). Prefer interstitial warning or host allow-list before `redirect()->away()` for external URLs.
-7. **Feature flags** — Only admins may enable developer features (or assign via Admin → Users). Keep `role:` middleware **inside** feature route groups for all writes.
+4. **API** — Sanctum group + `TokenController` require app roles.
+5. **Web mutations** — Roleless users blocked at the app group; connection/RU writes manager-gated.
+6. **Files** — App-role gate for search/download/thumbnail; URL redirects scheme-checked (`http`/`https` only).
+7. **Feature flags** — Admins only may toggle developer features on profile.
 
 ### P2 — Abuse resistance and SSO
 
 8. Throttle `POST /register` (if kept for non-prod) and `POST /forgot-password` like login/SSO.
 9. Use `Password::defaults()` (consider `uncompromised()`) for admin create/install passwords.
 10. SSO: store provider subject IDs; require verified email claims for Azure comparable to Google; keep domain allow-list non-empty in production.
-11. Guest stock: implement `guestSurfaceEnabled()` via env/config kill-switch; optional token expiry and tighter throttle.
+11. Guest stock kill-switch — **done** (`STOCK_GUEST_ENABLED`); optional token expiry and tighter throttle remain open.
 
 ### P3 — Defence in depth
 
@@ -192,13 +296,15 @@ Use alongside the checklist in the deploy guide.
 
 ### Before go-live
 
-- [ ] Public `/register` disabled (or network-blocked and route removed)
+- [ ] `ALLOW_REGISTRATION=false` (default; leave false in production)
+- [ ] Optional: `STOCK_GUEST_ENABLED=false` if Kanban guest QR is not needed
 - [ ] Only known users exist; each has exactly the roles they need
 - [ ] First admin password rotated; no `admin@example.com` in production
 - [ ] `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` correct
 - [ ] HTTPS + `SESSION_SECURE_COOKIE=true` (or accepted risk documented for HTTP LAN)
 - [ ] MariaDB localhost-only; least-privilege DB user; audit_logs UPDATE/DELETE revoked
-- [ ] UFW / firewall restricts who can reach the host
+- [ ] UFW / firewall restricts who can reach the host (staff WiFi subnets for HTTP/HTTPS; admin-only SSH; no DB on WiFi)
+- [ ] Corporate LAN: `APP_URL` resolvable on staff WiFi; outbound limited to SSO + email (see [Corporate LAN section](#corporate-lan--staff-wifi-deployment))
 - [ ] Nginx docroot is `public/`; `client_max_body_size 25M`; PHP upload limits match
 - [ ] `storage` / `bootstrap/cache` permissions correct; no world-writable code tree
 - [ ] SSO secrets and Graph/QNAP credentials only in `.env`; domain allow-list set if SSO on

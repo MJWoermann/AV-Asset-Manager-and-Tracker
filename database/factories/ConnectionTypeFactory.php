@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\ConnectionType;
+use App\Support\ConnectionTypeIcons;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -22,7 +23,7 @@ class ConnectionTypeFactory extends Factory
             'name' => ucwords($name),
             'slug' => Str::slug($name).'-'.fake()->unique()->numerify('###'),
             'color' => fake()->hexColor(),
-            'icon' => fake()->randomElement(['network', 'hdmi', 'sdi', 'dante', 'custom', 'analog', 'generic']),
+            'icon' => fake()->randomElement(ConnectionTypeIcons::keys()),
             'allows_protocol' => false,
             'sort_order' => fake()->numberBetween(0, 100),
         ];

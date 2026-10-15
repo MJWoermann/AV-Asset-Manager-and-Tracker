@@ -26,6 +26,8 @@ use App\Services\RuVisualiserService;
 use App\Services\StockChartService;
 use App\Services\StockMovementService;
 use App\Support\AssetBrowseFilters;
+use App\Support\AssetHistoryFilters;
+use App\Support\AssetMaintenanceFilters;
 use App\Support\AssetTableColumns;
 use App\Support\EmailIntegrationSettings;
 use App\Support\StockTracking;
@@ -210,9 +212,17 @@ class AssetController extends Controller
             default => 'details',
         };
 
-        $auditLogs = $tab === 'history'
-            ? $asset->auditLogs()->with('user')->paginate(25)->withQueryString()
-            : null;
+        $auditLogs = null;
+        $historyActionOptions = [];
+        $historyUserOptions = collect();
+
+        if ($tab === 'history') {
+            $historyQuery = $asset->auditLogs()->with('user');
+            AssetHistoryFilters::apply($historyQuery, $request);
+            $auditLogs = $historyQuery->paginate(25)->withQueryString();
+            $historyActionOptions = AssetHistoryFilters::actionOptions($asset);
+            $historyUserOptions = AssetHistoryFilters::userOptions($asset);
+        }
 
         $fileRows = $tab === 'files'
             ? $attachments->filesForAsset($asset)
@@ -247,6 +257,43 @@ class AssetController extends Controller
         $ruChildAssetOptions = [];
         $ruUnplacedChildren = collect();
         $ruPlacementsPayload = [];
+        $ruDetailsPreview = null;
+
+        $needsRuPayload = $tab === 'rack'
+            || ($tab === 'details' && $ruVisualiserEnabled && $asset->ruPlacements->isNotEmpty());
+
+        if ($needsRuPayload) {
+            $ruPlacementsPayload = $asset->ruPlacements
+                ->sortBy([
+                    ['face', 'asc'],
+                    ['start_ru', 'asc'],
+                ])
+                ->values()
+                ->map(fn (AssetRuPlacement $placement): array => [
+                    'id' => $placement->id,
+                    'face' => $placement->face->value,
+                    'start_ru' => (int) $placement->start_ru,
+                    'ru_height' => (int) $placement->ru_height,
+                    'full_depth' => (bool) $placement->full_depth,
+                    'kind' => $placement->kind->value,
+                    'child_asset_id' => $placement->child_asset_id ? (string) $placement->child_asset_id : null,
+                    'child_name' => $placement->childAsset?->name,
+                    'child_url' => $placement->childAsset
+                        ? route('assets.show', $placement->childAsset)
+                        : null,
+                    'note' => $placement->note,
+                    'update_url' => route('assets.ru-placements.update', [$asset, $placement]),
+                    'destroy_url' => route('assets.ru-placements.destroy', [$asset, $placement]),
+                ])
+                ->all();
+        }
+
+        if ($tab === 'details' && $ruVisualiserEnabled && $ruPlacementsPayload !== [] && (int) ($asset->ru_height ?? 0) >= 1) {
+            $ruDetailsPreview = [
+                'capacity' => (int) $asset->ru_height,
+                'placements' => $ruPlacementsPayload,
+            ];
+        }
 
         if ($tab === 'rack') {
             $placedChildIds = $asset->ruPlacements
@@ -275,29 +322,6 @@ class AssetController extends Controller
             $ruUnplacedChildren = $asset->children
                 ->filter(fn (Asset $child): bool => ! in_array((int) $child->id, $placedChildIds, true))
                 ->values();
-
-            $ruPlacementsPayload = $asset->ruPlacements
-                ->sortBy([
-                    ['face', 'asc'],
-                    ['start_ru', 'asc'],
-                ])
-                ->values()
-                ->map(fn (AssetRuPlacement $placement): array => [
-                    'id' => $placement->id,
-                    'face' => $placement->face->value,
-                    'start_ru' => (int) $placement->start_ru,
-                    'ru_height' => (int) $placement->ru_height,
-                    'kind' => $placement->kind->value,
-                    'child_asset_id' => $placement->child_asset_id ? (string) $placement->child_asset_id : null,
-                    'child_name' => $placement->childAsset?->name,
-                    'child_url' => $placement->childAsset
-                        ? route('assets.show', $placement->childAsset)
-                        : null,
-                    'note' => $placement->note,
-                    'update_url' => route('assets.ru-placements.update', [$asset, $placement]),
-                    'destroy_url' => route('assets.ru-placements.destroy', [$asset, $placement]),
-                ])
-                ->all();
         }
 
         $stockChartPayload = null;
@@ -317,17 +341,21 @@ class AssetController extends Controller
         }
 
         $maintenanceLogs = collect();
+        $maintenanceUserOptions = collect();
 
         if ($tab === 'maintenance') {
-            $maintenanceLogs = $asset->maintenanceLogs()
-                ->with(['user', 'files'])
-                ->get();
+            $maintenanceQuery = $asset->maintenanceLogs()->with(['user', 'files']);
+            AssetMaintenanceFilters::apply($maintenanceQuery, $request);
+            $maintenanceLogs = $maintenanceQuery->get();
+            $maintenanceUserOptions = AssetMaintenanceFilters::userOptions($asset);
         }
 
         return view('assets.show', [
             'asset' => $asset,
             'tab' => $tab,
             'auditLogs' => $auditLogs,
+            'historyActionOptions' => $historyActionOptions,
+            'historyUserOptions' => $historyUserOptions,
             'fileRows' => $fileRows,
             'connectionPeers' => $connectionPeers,
             'connectionTypes' => $connectionTypes,
@@ -337,12 +365,14 @@ class AssetController extends Controller
             'ruChildAssetOptions' => $ruChildAssetOptions,
             'ruUnplacedChildren' => $ruUnplacedChildren,
             'ruPlacementsPayload' => $ruPlacementsPayload,
+            'ruDetailsPreview' => $ruDetailsPreview,
             'stockEnabled' => $stockEnabled,
             'stockChartPayload' => $stockChartPayload,
             'stockTokens' => $stockTokens,
             'stockReorderMeta' => $stockReorderMeta,
-            'stockAction' => $request->string('action')->toString() ?: null,
+            'stockAction' => $tab === 'stock' ? ($request->string('action')->toString() ?: null) : null,
             'maintenanceLogs' => $maintenanceLogs,
+            'maintenanceUserOptions' => $maintenanceUserOptions,
             'maintenanceLogTypes' => MaintenanceLogType::options(),
             'maintenanceStatuses' => AssetStatus::options(),
             'canDeleteMaintenanceLogs' => $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false,

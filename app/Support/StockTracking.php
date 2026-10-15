@@ -38,11 +38,10 @@ class StockTracking
 
     /**
      * Guest Kanban paths do not use the profile flag; they still require a
-     * stock-tracked asset (and a valid token). Use this when disabling the
-     * feature globally later without rewriting guest controllers.
+     * stock-tracked asset (and a valid token). Controlled by STOCK_GUEST_ENABLED.
      */
     public static function guestSurfaceEnabled(): bool
     {
-        return true;
+        return (bool) config('app.stock_guest_enabled', true);
     }
 }

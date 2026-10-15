@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Support\GitVersion;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,6 +16,7 @@ class GitVersionDisplayTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(RoleSeeder::class);
         GitVersion::flush();
     }
 
@@ -25,11 +27,19 @@ class GitVersionDisplayTest extends TestCase
         parent::tearDown();
     }
 
+    protected function scanner(): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole('scanner');
+
+        return $user;
+    }
+
     public function test_authenticated_pages_show_configured_commit_version(): void
     {
         config(['app.version' => 'abc1234']);
 
-        $user = User::factory()->create();
+        $user = $this->scanner();
 
         $this->actingAs($user)
             ->get(route('assets.index'))

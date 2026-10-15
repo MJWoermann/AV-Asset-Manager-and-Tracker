@@ -110,11 +110,55 @@
             @include('assets.partials.maintenance', [
                 'asset' => $asset,
                 'maintenanceLogs' => $maintenanceLogs ?? collect(),
+                'maintenanceUserOptions' => $maintenanceUserOptions ?? collect(),
                 'maintenanceLogTypes' => $maintenanceLogTypes ?? [],
                 'maintenanceStatuses' => $maintenanceStatuses ?? [],
                 'canDeleteMaintenanceLogs' => $canDeleteMaintenanceLogs ?? false,
             ])
         @elseif($tab === 'history')
+            @php
+                $historyFiltersActive = \App\Support\AssetHistoryFilters::hasActiveFilters(request());
+            @endphp
+            <form
+                method="GET"
+                action="{{ route('assets.show', $asset) }}"
+                class="flex flex-col sm:flex-row flex-wrap gap-3 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
+            >
+                <input type="hidden" name="tab" value="history">
+                <div>
+                    <x-input-label for="date_from" value="From" />
+                    <x-text-input id="date_from" name="date_from" type="date" class="mt-1 block w-full" :value="request('date_from')" />
+                </div>
+                <div>
+                    <x-input-label for="date_to" value="To" />
+                    <x-text-input id="date_to" name="date_to" type="date" class="mt-1 block w-full" :value="request('date_to')" />
+                </div>
+                <div class="min-w-[10rem]">
+                    <x-input-label for="history_action" value="Action" />
+                    <select id="history_action" name="action" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                        <option value="">All</option>
+                        @foreach($historyActionOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(request('action') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="min-w-[10rem]">
+                    <x-input-label for="history_user_id" value="User" />
+                    <select id="history_user_id" name="user_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                        <option value="">All</option>
+                        @foreach($historyUserOptions as $option)
+                            <option value="{{ $option['value'] }}" @selected((string) request('user_id') === (string) $option['value'])>{{ $option['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="flex items-end gap-2 flex-wrap">
+                    <x-primary-button>Filter</x-primary-button>
+                    @if($historyFiltersActive)
+                        <a href="{{ route('assets.show', [$asset, 'tab' => 'history']) }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Clear</a>
+                    @endif
+                </div>
+            </form>
+
             <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
                 <table class="min-w-full text-sm">
                     <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
@@ -168,7 +212,9 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-3 py-6 text-center text-brand-charcoal dark:text-brand-silver">No history recorded yet.</td>
+                                <td colspan="4" class="px-3 py-6 text-center text-brand-charcoal dark:text-brand-silver">
+                                    {{ $historyFiltersActive ? 'No history matches these filters.' : 'No history recorded yet.' }}
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -176,20 +222,39 @@
             </div>
             <div>{{ $auditLogs->links() }}</div>
         @else
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
-                <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div>{{ $asset->description ?: '—' }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div>{{ $asset->status?->label() }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div>{{ $asset->manufacturer }} {{ $asset->model }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">Location</span><div>{{ $asset->location?->breadcrumb() ?? '—' }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">FMI AST#</span><div class="font-mono">{{ $asset->fmi_ast ?: '—' }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">TP Barcode</span><div class="font-mono">{{ $asset->tp_barcode ?: '—' }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">RIG Tag #</span><div class="font-mono">{{ $asset->rig_tag ?: '—' }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">Serial Number</span><div class="font-mono">{{ $asset->serial_number ?: '—' }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">IP / MAC</span><div class="font-mono">{{ $asset->ip_address ?: '—' }} / {{ $asset->mac_address ?: '—' }}</div></div>
-                <div><span class="text-brand-charcoal dark:text-brand-silver">Test &amp; Tag</span><div>{{ $asset->test_tag_expiry?->format('Y-m-d') ?: '—' }}</div></div>
-                @if($asset->parent)
-                    <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Parent</span><div><a class="text-brand" href="{{ route('assets.show', $asset->parent) }}">{{ $asset->parent->name }}</a></div></div>
+            @php $ruDetailsPreview = $ruDetailsPreview ?? null; @endphp
+            <div @class([
+                'grid gap-4 items-start',
+                'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]' => $ruDetailsPreview,
+            ])>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
+                    <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div>{{ $asset->description ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div>{{ $asset->status?->label() }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div>{{ $asset->manufacturer }} {{ $asset->model }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Location</span><div>{{ $asset->location?->breadcrumb() ?? '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">FMI AST#</span><div class="font-mono">{{ $asset->fmi_ast ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">TP Barcode</span><div class="font-mono">{{ $asset->tp_barcode ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">RIG Tag #</span><div class="font-mono">{{ $asset->rig_tag ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Serial Number</span><div class="font-mono">{{ $asset->serial_number ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">IP / MAC</span><div class="font-mono">{{ $asset->ip_address ?: '—' }} / {{ $asset->mac_address ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Test &amp; Tag</span><div>{{ $asset->test_tag_expiry?->format('Y-m-d') ?: '—' }}</div></div>
+                    @if($asset->parent)
+                        <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Parent</span><div><a class="text-brand" href="{{ route('assets.show', $asset->parent) }}">{{ $asset->parent->name }}</a></div></div>
+                    @endif
+                </div>
+
+                @if($ruDetailsPreview)
+                    <div
+                        class="space-y-2"
+                        x-data="ruRackPreview(@js($ruDetailsPreview))"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-semibold">Rack front</h3>
+                            <a href="{{ route('assets.show', [$asset, 'tab' => 'rack']) }}" class="text-xs text-brand">Open Rack</a>
+                        </div>
+                        @include('assets.partials.ru-diagram', ['interactive' => false, 'compact' => true])
+                    </div>
                 @endif
             </div>
 

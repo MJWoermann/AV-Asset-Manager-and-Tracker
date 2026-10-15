@@ -5,7 +5,28 @@
         </div>
     </x-slot>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+    <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4"
+        x-data="{
+            previewOpen: false,
+            previewUrl: '',
+            previewDownloadUrl: '',
+            previewKind: 'image',
+            previewTitle: '',
+            openPreview(url, downloadUrl, kind, title) {
+                this.previewUrl = url;
+                this.previewDownloadUrl = downloadUrl;
+                this.previewKind = kind;
+                this.previewTitle = title;
+                this.previewOpen = true;
+            },
+            closePreview() {
+                this.previewOpen = false;
+                this.previewUrl = '';
+                this.previewDownloadUrl = '';
+            }
+        }"
+    >
         <form method="GET" class="flex flex-col sm:flex-row gap-3 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
             <div class="flex-1">
                 <x-input-label for="q" value="Search" />
@@ -41,20 +62,46 @@
                     @forelse($files as $file)
                         <tr class="border-t border-brand-silver dark:border-brand-charcoal">
                             <td class="px-3 py-2">
-                                <div class="font-medium">{{ $file->title }}</div>
-                                @if($file->original_filename)
-                                    <div class="text-xs text-brand-charcoal dark:text-brand-silver font-mono">{{ $file->original_filename }}</div>
-                                @endif
+                                <div class="flex items-center gap-2">
+                                    @if($file->hasThumbnail())
+                                        <img
+                                            src="{{ route('files.thumbnail', $file) }}"
+                                            alt=""
+                                            class="h-10 w-10 object-cover border border-brand-silver dark:border-brand-charcoal shrink-0"
+                                        >
+                                    @elseif($file->isPreviewableImage() || $file->isPreviewablePdf())
+                                        <span class="inline-flex h-10 w-10 items-center justify-center text-xs font-medium bg-brand-silver/50 dark:bg-brand-charcoal border border-brand-silver dark:border-brand-charcoal shrink-0">
+                                            {{ $file->isPreviewablePdf() ? 'PDF' : 'IMG' }}
+                                        </span>
+                                    @endif
+                                    <div>
+                                        <a href="{{ route('files.show', $file) }}" class="font-medium text-brand hover:underline">{{ $file->title }}</a>
+                                        @if($file->original_filename)
+                                            <div class="text-xs text-brand-charcoal dark:text-brand-silver font-mono">{{ $file->original_filename }}</div>
+                                        @endif
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-3 py-2">{{ $file->category->label() }}</td>
                             <td class="px-3 py-2">{{ $file->source_type->label() }}</td>
-                            <td class="px-3 py-2">{{ $file->links_count }}</td>
+                            <td class="px-3 py-2">
+                                <a href="{{ route('files.show', $file) }}" class="text-brand hover:underline">
+                                    {{ $file->links_count }}{{ $file->links_count === 1 ? ' link' : ' links' }}
+                                </a>
+                            </td>
                             <td class="px-3 py-2">{{ $file->uploader?->name ?? '—' }}</td>
                             <td class="px-3 py-2 text-right whitespace-nowrap">
+                                @if($file->isPreviewable())
+                                    <button
+                                        type="button"
+                                        class="text-brand"
+                                        @click="openPreview(@js(route('files.preview', $file)), @js(route('files.download', $file)), @js($file->isPreviewablePdf() ? 'pdf' : 'image'), @js($file->title))"
+                                    >Preview</button>
+                                @endif
                                 @if($file->isUrl())
-                                    <a href="{{ $file->external_url }}" target="_blank" rel="noopener" class="text-brand">Open</a>
+                                    <a href="{{ $file->external_url }}" target="_blank" rel="noopener" class="text-brand {{ $file->isPreviewable() ? 'ms-2' : '' }}">Open</a>
                                 @else
-                                    <a href="{{ route('files.download', $file) }}" class="text-brand">Download</a>
+                                    <a href="{{ route('files.download', $file) }}" class="text-brand {{ $file->isPreviewable() ? 'ms-2' : '' }}">Download</a>
                                 @endif
                                 <form method="POST" action="{{ route('files.destroy', $file) }}" class="inline ms-2" onsubmit="return confirm('Delete this file from the library? This removes all links.')">
                                     @csrf
@@ -72,5 +119,7 @@
             </table>
         </div>
         <div>{{ $files->links() }}</div>
+
+        @include('files.partials.preview-modal')
     </div>
 </x-app-layout>
