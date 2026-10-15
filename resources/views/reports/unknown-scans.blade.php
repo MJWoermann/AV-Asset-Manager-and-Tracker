@@ -38,10 +38,57 @@
                         method="POST"
                         action="{{ route('reports.unknown-scans.deduplicate') }}"
                         onsubmit="return confirm('Remove duplicate unknown scans, keeping only the latest scan of each code?')"
+                        data-debug-dedupe-form
                     >
                         @csrf
-                        <x-secondary-button>Remove duplicates</x-secondary-button>
+                        <x-secondary-button type="submit" data-debug-dedupe-btn>Remove duplicates</x-secondary-button>
                     </form>
+                    {{-- #region agent log --}}
+                    <script>
+                        (function () {
+                            const form = document.querySelector('[data-debug-dedupe-form]');
+                            const btn = document.querySelector('[data-debug-dedupe-btn]');
+                            const send = (message, data, hypothesisId) => {
+                                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Debug-Session-Id': '5c1253',
+                                    },
+                                    body: JSON.stringify({
+                                        sessionId: '5c1253',
+                                        location: 'unknown-scans.blade.php',
+                                        message,
+                                        data,
+                                        timestamp: Date.now(),
+                                        hypothesisId,
+                                        runId: 'post-fix',
+                                    }),
+                                }).catch(() => {});
+                            };
+                            if (btn) {
+                                send('dedupe_btn_rendered', {
+                                    type: btn.getAttribute('type'),
+                                    tag: btn.tagName,
+                                }, 'A');
+                                btn.addEventListener('click', () => {
+                                    send('dedupe_btn_clicked', {
+                                        type: btn.getAttribute('type'),
+                                        defaultPrevented: false,
+                                    }, 'A');
+                                });
+                            }
+                            if (form) {
+                                form.addEventListener('submit', (event) => {
+                                    send('dedupe_form_submit', {
+                                        defaultPrevented: event.defaultPrevented,
+                                        action: form.getAttribute('action'),
+                                    }, 'B');
+                                });
+                            }
+                        })();
+                    </script>
+                    {{-- #endregion --}}
                     <form
                         method="POST"
                         action="{{ route('reports.unknown-scans.destroy-all') }}"

@@ -6,6 +6,8 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'statuses',
     'locations',
     'itemTypes',
+    'manufacturers' => [],
+    'manufacturerModels' => [],
     'formId' => 'asset-filters',
 ]));
 
@@ -27,6 +29,8 @@ foreach (array_filter(([
     'statuses',
     'locations',
     'itemTypes',
+    'manufacturers' => [],
+    'manufacturerModels' => [],
     'formId' => 'asset-filters',
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
     $$__key = $$__key ?? $__value;
@@ -47,7 +51,15 @@ unset($__defined_vars, $__key, $__value); ?>
 ?>
 
 <tr class="bg-brand-silver/70 dark:bg-brand-charcoal/80">
-    <th class="px-3 py-2 w-10"></th>
+    <th class="px-3 py-2 w-10 align-middle">
+        <input
+            type="checkbox"
+            class="rounded border-brand-charcoal/40"
+            :checked="allPageSelected"
+            @change="toggleAll($event.target.checked)"
+            aria-label="Select all assets on this page"
+        >
+    </th>
     <?php $__currentLoopData = $selectedColumns; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $column): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
         <th class="px-2 py-2 align-bottom font-normal">
             <?php switch($column):
@@ -95,6 +107,42 @@ unset($__defined_vars, $__key, $__value); ?>
                         <?php $__currentLoopData = $itemTypes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $itemType): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                             <option value="<?php echo e($itemType->id); ?>" <?php if((string) request('item_type_id') === (string) $itemType->id): echo 'selected'; endif; ?>>
                                 <?php echo e($itemType->name); ?>
+
+                            </option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </select>
+                    <?php break; ?>
+
+                <?php case ('manufacturer'): ?>
+                    <select
+                        name="manufacturer_id"
+                        id="filter_manufacturer_id"
+                        form="<?php echo e($formId); ?>"
+                        class="<?php echo e($inputClass); ?>"
+                        aria-label="Filter by manufacturer"
+                    >
+                        <option value="">All manufacturers</option>
+                        <?php $__currentLoopData = $manufacturers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $manufacturer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($manufacturer->id); ?>" <?php if((string) request('manufacturer_id') === (string) $manufacturer->id): echo 'selected'; endif; ?>>
+                                <?php echo e($manufacturer->name); ?>
+
+                            </option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </select>
+                    <?php break; ?>
+
+                <?php case ('model'): ?>
+                    <select
+                        name="manufacturer_model_id"
+                        id="filter_manufacturer_model_id"
+                        form="<?php echo e($formId); ?>"
+                        class="<?php echo e($inputClass); ?>"
+                        aria-label="Filter by model"
+                    >
+                        <option value="">All models</option>
+                        <?php $__currentLoopData = $manufacturerModels; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $manufacturerModel): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($manufacturerModel->id); ?>" <?php if((string) request('manufacturer_model_id') === (string) $manufacturerModel->id): echo 'selected'; endif; ?>>
+                                <?php echo e($manufacturerModel->manufacturer?->name); ?> / <?php echo e($manufacturerModel->name); ?>
 
                             </option>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

@@ -56,7 +56,7 @@
                             type="checkbox"
                             class="rounded border-brand-charcoal/40"
                             :checked="allPageSelected"
-                            @click.prevent="toggleAll(!allPageSelected)"
+                            @change="toggleAll($event.target.checked)"
                             aria-label="Select all locations"
                         >
                         <span>Select all</span>

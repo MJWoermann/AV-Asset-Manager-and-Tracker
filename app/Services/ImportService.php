@@ -550,6 +550,16 @@ class ImportService
         }
         $payload['status'] = $payload['status'] ?? AssetStatus::Available->value;
 
+        if (array_key_exists('manufacturer', $payload) || array_key_exists('model', $payload)) {
+            $catalogueIds = app(ManufacturerCatalogueService::class)->resolveFromNames(
+                array_key_exists('manufacturer', $payload) ? (string) ($payload['manufacturer'] ?? '') : null,
+                array_key_exists('model', $payload) ? (string) ($payload['model'] ?? '') : null,
+            );
+            unset($payload['manufacturer'], $payload['model']);
+            $payload['manufacturer_id'] = $catalogueIds['manufacturer_id'];
+            $payload['manufacturer_model_id'] = $catalogueIds['manufacturer_model_id'];
+        }
+
         if ($existing && $replace) {
             $existing = $this->replaceAsset($existing, $payload);
         } elseif ($existing) {
@@ -572,8 +582,8 @@ class ImportService
             'location_id' => null,
             'parent_id' => null,
             'description' => null,
-            'manufacturer' => null,
-            'model' => null,
+            'manufacturer_id' => null,
+            'manufacturer_model_id' => null,
             'serial_number' => null,
             'purchase_date' => null,
             'warranty_expiry' => null,

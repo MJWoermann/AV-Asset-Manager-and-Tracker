@@ -14,12 +14,15 @@ use App\Models\ConnectionType;
 use App\Models\CustomFieldDefinition;
 use App\Models\ItemType;
 use App\Models\Location;
+use App\Models\Manufacturer;
+use App\Models\ManufacturerModel;
 use App\Models\UnknownScan;
 use App\Services\AssetConnectionService;
 use App\Services\AssetInterfaceService;
 use App\Services\BulkAssetUpdateService;
 use App\Services\FileAttachmentService;
 use App\Services\KanbanTagService;
+use App\Services\ManufacturerCatalogueService;
 use App\Services\NotificationDispatchService;
 use App\Services\NotificationFieldCatalog;
 use App\Services\RuVisualiserService;
@@ -44,7 +47,7 @@ class AssetController extends Controller
         $selectedColumns = $request->user()->assetTableColumns();
 
         $assets = Asset::query()
-            ->with(['itemType', 'location', 'parent', 'customFieldValues'])
+            ->with(['itemType', 'location', 'parent', 'manufacturer', 'manufacturerModel', 'customFieldValues'])
             ->whereNull('parent_id');
 
         AssetBrowseFilters::applyToAssetQuery($assets, $request);
@@ -63,6 +66,11 @@ class AssetController extends Controller
             'preservedFilters' => AssetBrowseFilters::hiddenPreservedParams($request, $selectedColumns),
             'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
             'itemTypes' => ItemType::orderBy('name')->get(),
+            'manufacturers' => Manufacturer::query()->orderBy('name')->get(['id', 'name']),
+            'manufacturerModels' => ManufacturerModel::query()
+                ->with('manufacturer:id,name')
+                ->orderBy('name')
+                ->get(['id', 'name', 'manufacturer_id']),
             'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
             'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
         ]);
@@ -190,6 +198,8 @@ class AssetController extends Controller
             'children.itemType',
             'customFieldValues.definition',
             'parent',
+            'manufacturer',
+            'manufacturerModel',
             'ruPlacements.childAsset',
         ]);
 
@@ -234,6 +244,7 @@ class AssetController extends Controller
 
         if ($tab === 'connections') {
             $asset->load([
+                'interfaces.connectionType',
                 'interfaces.connectionsAsA.connectionType',
                 'interfaces.connectionsAsA.interfaceB.asset.itemType',
                 'interfaces.connectionsAsA.interfaceB.asset.location',
@@ -245,11 +256,19 @@ class AssetController extends Controller
             $connectionTypes = ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get();
             $peerAssetOptions = Asset::query()
                 ->whereKeyNot($asset->id)
+                ->with(['interfaces:id,asset_id,connection_type_id'])
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn (Asset $peer): array => [
                     'value' => (string) $peer->id,
                     'label' => $peer->name,
+                    'connection_type_ids' => $peer->interfaces
+                        ->pluck('connection_type_id')
+                        ->filter()
+                        ->map(fn ($id): string => (string) $id)
+                        ->unique()
+                        ->values()
+                        ->all(),
                 ])
                 ->all();
         }
@@ -411,10 +430,24 @@ class AssetController extends Controller
                 ->all();
         }
 
+        $manufacturers = Manufacturer::query()->with(['models' => fn ($q) => $q->orderBy('name')])->orderBy('name')->get();
+
         return array_merge([
             'asset' => $asset,
             'itemTypes' => $itemTypes,
             'locations' => Location::orderBy('name')->get(),
+            'manufacturers' => $manufacturers,
+            'modelsByManufacturer' => $manufacturers
+                ->mapWithKeys(fn (Manufacturer $manufacturer): array => [
+                    (string) $manufacturer->id => $manufacturer->models
+                        ->map(fn (ManufacturerModel $model): array => [
+                            'value' => (string) $model->id,
+                            'label' => $model->name,
+                        ])
+                        ->values()
+                        ->all(),
+                ])
+                ->all(),
             'parents' => Asset::query()
                 ->whereNull('parent_id')
                 ->when($asset->exists, fn ($q) => $q->where('id', '!=', $asset->id))
@@ -483,6 +516,9 @@ class AssetController extends Controller
             ]);
         }
 
+        $creatingManufacturer = $request->input('manufacturer_id') === '__new__';
+        $creatingModel = $request->input('manufacturer_model_id') === '__new__';
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -490,8 +526,24 @@ class AssetController extends Controller
             'location_id' => ['nullable', 'exists:locations,id'],
             'parent_id' => ['nullable', 'exists:assets,id'],
             'status' => ['required', 'in:'.implode(',', array_keys(AssetStatus::options()))],
-            'manufacturer' => ['nullable', 'string', 'max:255'],
-            'model' => ['nullable', 'string', 'max:255'],
+            'manufacturer_id' => ['nullable', function (string $attribute, mixed $value, \Closure $fail) use ($creatingManufacturer) {
+                if ($value === null || $value === '' || $creatingManufacturer) {
+                    return;
+                }
+                if (! Manufacturer::query()->whereKey($value)->exists()) {
+                    $fail('The selected manufacturer is invalid.');
+                }
+            }],
+            'new_manufacturer' => [$creatingManufacturer ? 'required' : 'nullable', 'string', 'max:255'],
+            'manufacturer_model_id' => ['nullable', function (string $attribute, mixed $value, \Closure $fail) use ($creatingModel) {
+                if ($value === null || $value === '' || $creatingModel) {
+                    return;
+                }
+                if (! ManufacturerModel::query()->whereKey($value)->exists()) {
+                    $fail('The selected model is invalid.');
+                }
+            }],
+            'new_manufacturer_model' => [$creatingModel ? 'required' : 'nullable', 'string', 'max:255'],
             'serial_number' => ['nullable', 'string', 'max:255'],
             'purchase_date' => ['nullable', 'date'],
             'warranty_expiry' => ['nullable', 'date'],
@@ -510,6 +562,48 @@ class AssetController extends Controller
             'ru_height' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'ru_rear_enabled' => ['sometimes', 'boolean'],
         ]);
+
+        unset($data['new_manufacturer'], $data['new_manufacturer_model']);
+
+        $catalogue = app(ManufacturerCatalogueService::class);
+        $manufacturer = null;
+
+        if ($creatingManufacturer) {
+            $manufacturer = $catalogue->resolveManufacturer($request->string('new_manufacturer')->toString());
+            $data['manufacturer_id'] = $manufacturer?->id;
+        } elseif (! empty($data['manufacturer_id'])) {
+            $manufacturer = Manufacturer::query()->find((int) $data['manufacturer_id']);
+            $data['manufacturer_id'] = $manufacturer?->id;
+        } else {
+            $data['manufacturer_id'] = null;
+        }
+
+        if ($creatingModel) {
+            if ($manufacturer === null) {
+                throw ValidationException::withMessages([
+                    'manufacturer_id' => 'Choose or create a manufacturer before adding a model.',
+                ]);
+            }
+            $model = $catalogue->resolveModel($manufacturer, $request->string('new_manufacturer_model')->toString());
+            $data['manufacturer_model_id'] = $model?->id;
+            $data['manufacturer_id'] = $manufacturer->id;
+        } elseif (! empty($data['manufacturer_model_id'])) {
+            $model = ManufacturerModel::query()->find((int) $data['manufacturer_model_id']);
+            if ($model === null) {
+                throw ValidationException::withMessages([
+                    'manufacturer_model_id' => 'The selected model is invalid.',
+                ]);
+            }
+            if ($manufacturer !== null && (int) $model->manufacturer_id !== (int) $manufacturer->id) {
+                throw ValidationException::withMessages([
+                    'manufacturer_model_id' => 'The selected model does not belong to the chosen manufacturer.',
+                ]);
+            }
+            $data['manufacturer_model_id'] = $model->id;
+            $data['manufacturer_id'] = $model->manufacturer_id;
+        } else {
+            $data['manufacturer_model_id'] = null;
+        }
 
         if (! array_key_exists('ru_rear_enabled', $data) && $request->has('ru_rear_enabled')) {
             $data['ru_rear_enabled'] = $request->boolean('ru_rear_enabled');

@@ -49,7 +49,7 @@ class ShelfTagPrintController extends Controller
                         'id',
                         $list->items()->whereNotNull('asset_id')->select('asset_id')
                     )
-                    ->with(['itemType', 'location']);
+                    ->with(['itemType', 'location', 'manufacturer', 'manufacturerModel']);
 
                 AssetBrowseFilters::applyToAssetQuery($query, $request, includeQuantity: false);
 

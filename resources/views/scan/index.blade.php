@@ -3,58 +3,62 @@
         <h2 class="font-semibold text-xl">Scan to event</h2>
     </x-slot>
 
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         @unless($session)
             <form method="POST" action="{{ route('scan.start') }}" class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
                 @csrf
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                     Choose the event list to add scanned items to, and optionally an inventory list to check against.
                 </p>
-                <div>
-                    <x-input-label for="event_list_id" value="Event list (add items to)" />
-                    <select id="event_list_id" name="event_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
-                        <option value="" disabled selected>Select event list…</option>
-                        @foreach($eventLists as $list)
-                            <option value="{{ $list->id }}">{{ $list->name }}</option>
-                        @endforeach
-                    </select>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                        <x-input-label for="event_list_id" value="Event list (add items to)" />
+                        <select id="event_list_id" name="event_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
+                            <option value="" disabled selected>Select event list…</option>
+                            @foreach($eventLists as $list)
+                                <option value="{{ $list->id }}">{{ $list->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <x-input-label for="inventory_list_id" value="Inventory list (search against)" />
+                        <select id="inventory_list_id" name="inventory_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                            <option value="">None</option>
+                            @foreach($inventoryLists as $list)
+                                <option value="{{ $list->id }}">{{ $list->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <x-scan.location-field :locations="$locations" />
+                    <x-scan.asset-status-field />
                 </div>
-                <div>
-                    <x-input-label for="inventory_list_id" value="Inventory list (search against)" />
-                    <select id="inventory_list_id" name="inventory_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">None</option>
-                        @foreach($inventoryLists as $list)
-                            <option value="{{ $list->id }}">{{ $list->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <x-scan.location-field :locations="$locations" />
-                <x-scan.asset-status-field />
                 <x-primary-button>Start scanning</x-primary-button>
             </form>
         @else
             <form method="POST" action="{{ route('scan.lists', $session) }}" class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
                 @csrf
                 @method('PATCH')
-                <div>
-                    <x-input-label for="event_list_id" value="Event list (add items to)" />
-                    <select id="event_list_id" name="event_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
-                        @foreach($eventLists as $list)
-                            <option value="{{ $list->id }}" @selected($session->event_list_id == $list->id)>{{ $list->name }}</option>
-                        @endforeach
-                    </select>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                        <x-input-label for="event_list_id" value="Event list (add items to)" />
+                        <select id="event_list_id" name="event_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
+                            @foreach($eventLists as $list)
+                                <option value="{{ $list->id }}" @selected($session->event_list_id == $list->id)>{{ $list->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <x-input-label for="inventory_list_id" value="Inventory list (search against)" />
+                        <select id="inventory_list_id" name="inventory_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                            <option value="">None</option>
+                            @foreach($inventoryLists as $list)
+                                <option value="{{ $list->id }}" @selected($session->inventory_list_id == $list->id)>{{ $list->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <x-scan.location-field :locations="$locations" :selected="$session->location_id" />
+                    <x-scan.asset-status-field :selected="$session->asset_status" />
                 </div>
-                <div>
-                    <x-input-label for="inventory_list_id" value="Inventory list (search against)" />
-                    <select id="inventory_list_id" name="inventory_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">None</option>
-                        @foreach($inventoryLists as $list)
-                            <option value="{{ $list->id }}" @selected($session->inventory_list_id == $list->id)>{{ $list->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <x-scan.location-field :locations="$locations" :selected="$session->location_id" />
-                <x-scan.asset-status-field :selected="$session->asset_status" />
                 <x-primary-button>Update lists</x-primary-button>
             </form>
 
@@ -216,7 +220,15 @@
                 <div class="space-y-2">
                     <div class="flex items-center justify-between gap-2">
                         <h3 class="text-sm font-semibold">On event list</h3>
-                        <span class="text-xs text-brand-charcoal dark:text-brand-silver" x-text="eventItems.length + ' item' + (eventItems.length === 1 ? '' : 's')"></span>
+                        <div class="flex items-center gap-2">
+                            <a
+                                href="{{ route('lists.show', $session->event_list_id) }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-xs text-brand underline"
+                            >Open list</a>
+                            <span class="text-xs text-brand-charcoal dark:text-brand-silver" x-text="eventItems.length + ' item' + (eventItems.length === 1 ? '' : 's')"></span>
+                        </div>
                     </div>
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="eventItems.length === 0" x-cloak>No items on this event list yet.</p>
                     <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal border border-brand-silver dark:border-brand-charcoal max-h-72 overflow-y-auto" x-show="eventItems.length > 0">

@@ -16,6 +16,7 @@ class AssetInterface extends Model
     protected $fillable = [
         'asset_id',
         'name',
+        'connection_type_id',
         'sort_order',
         'item_type_interface_template_id',
         'notes',
@@ -31,6 +32,11 @@ class AssetInterface extends Model
     public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class);
+    }
+
+    public function connectionType(): BelongsTo
+    {
+        return $this->belongsTo(ConnectionType::class);
     }
 
     public function template(): BelongsTo

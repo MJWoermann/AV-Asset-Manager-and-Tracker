@@ -16,6 +16,7 @@ class UpdateAssetInterfaceRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'connection_type_id' => ['required', 'integer', 'exists:connection_types,id'],
             'notes' => ['nullable', 'string'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
         ];

@@ -23,7 +23,7 @@
             @csrf
             @method('PATCH')
             <p class="text-xs text-brand-charcoal dark:text-brand-silver mb-2">Choose columns for asset tables. Saved to your profile.</p>
-            <div class="max-h-64 overflow-y-auto space-y-1">
+            <div class="max-h-64 overflow-y-auto space-y-1 ps-1">
                 @foreach($availableColumns as $key => $label)
                     <label class="flex items-center gap-2 text-sm">
                         <input

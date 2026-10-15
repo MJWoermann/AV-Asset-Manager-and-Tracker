@@ -18,7 +18,7 @@ class ReportController extends Controller
     public function compareForm(): View
     {
         return view('reports.compare', [
-            'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
+            'lists' => AssetList::query()->forCompareSelection()->get(),
             'result' => null,
             'source' => null,
             'target' => null,
@@ -53,7 +53,7 @@ class ReportController extends Controller
         }
 
         return view('reports.compare', [
-            'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
+            'lists' => AssetList::query()->forCompareSelection()->get(),
             'result' => $result,
             'source' => $source,
             'target' => $target,

@@ -19,6 +19,7 @@
         },
     }"
     class="space-y-2"
+    :class="{ 'sm:col-span-2': adding }"
 >
     <x-input-label :for="$id" value="Location for next items" />
     <select

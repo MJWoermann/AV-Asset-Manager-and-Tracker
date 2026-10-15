@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\ItemType;
+use App\Models\Manufacturer;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,19 +42,22 @@ class AssetColumnFilterTest extends TestCase
     {
         $user = $this->user();
 
+        $acme = Manufacturer::factory()->create(['name' => 'Acme']);
+        $other = Manufacturer::factory()->create(['name' => 'OtherCo']);
+
         Asset::create([
             'name' => 'Alpha Fixture',
             'item_type_id' => $this->itemType->id,
             'status' => AssetStatus::Available,
             'tp_barcode' => 'TP-ALPHA-1',
-            'manufacturer' => 'Acme',
+            'manufacturer_id' => $acme->id,
         ]);
         Asset::create([
             'name' => 'Beta Fixture',
             'item_type_id' => $this->itemType->id,
             'status' => AssetStatus::Available,
             'tp_barcode' => 'TP-BETA-9',
-            'manufacturer' => 'OtherCo',
+            'manufacturer_id' => $other->id,
         ]);
 
         $byBarcode = $this->actingAs($user)->get(route('assets.index', [
@@ -66,7 +70,7 @@ class AssetColumnFilterTest extends TestCase
         );
 
         $byManufacturer = $this->actingAs($user)->get(route('assets.index', [
-            'manufacturer' => 'Other',
+            'manufacturer_id' => $other->id,
         ]));
         $byManufacturer->assertOk();
         $this->assertSame(

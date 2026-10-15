@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\Manufacturer;
+use App\Models\ManufacturerModel;
+use App\Services\ManufacturerCatalogueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AssetApiController extends Controller
 {
@@ -14,7 +18,7 @@ class AssetApiController extends Controller
         $q = $request->string('q')->toString() ?: null;
 
         $assets = Asset::query()
-            ->with(['itemType:id,name,slug', 'location:id,name'])
+            ->with(['itemType:id,name,slug', 'location:id,name', 'manufacturer:id,name', 'manufacturerModel:id,name,manufacturer_id'])
             ->search($q)
             ->orderBySearchRelevance($q)
             ->paginate(min($request->integer('per_page', 50), 100));
@@ -24,7 +28,15 @@ class AssetApiController extends Controller
 
     public function show(Asset $asset): JsonResponse
     {
-        $asset->load(['itemType.fieldSets.definitions', 'location', 'children', 'customFieldValues.definition', 'parent']);
+        $asset->load([
+            'itemType.fieldSets.definitions',
+            'location',
+            'children',
+            'customFieldValues.definition',
+            'parent',
+            'manufacturer',
+            'manufacturerModel',
+        ]);
 
         return response()->json($asset);
     }
@@ -33,52 +45,88 @@ class AssetApiController extends Controller
     {
         abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager', 'scanner']), 403);
 
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'item_type_id' => ['required', 'exists:item_types,id'],
-            'location_id' => ['nullable', 'exists:locations,id'],
-            'parent_id' => ['nullable', 'exists:assets,id'],
-            'status' => ['nullable', 'string'],
-            'fmi_ast' => ['nullable', 'string'],
-            'tp_barcode' => ['nullable', 'string'],
-            'rig_tag' => ['nullable', 'string'],
-            'ip_address' => ['nullable', 'string'],
-            'mac_address' => ['nullable', 'string'],
-            'manufacturer' => ['nullable', 'string'],
-            'model' => ['nullable', 'string'],
-            'serial_number' => ['nullable', 'string'],
-        ]);
+        $data = $this->validatedAsset($request);
 
         $asset = Asset::create($data);
 
-        return response()->json($asset, 201);
+        return response()->json($asset->load(['manufacturer', 'manufacturerModel']), 201);
     }
 
     public function update(Request $request, Asset $asset): JsonResponse
     {
         abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager', 'scanner']), 403);
 
+        $data = $this->validatedAsset($request, partial: true);
+
+        $asset->update($data);
+
+        return response()->json($asset->fresh(['manufacturer', 'manufacturerModel']));
+    }
+
+    /** @return array<string, mixed> */
+    protected function validatedAsset(Request $request, bool $partial = false): array
+    {
+        $required = $partial ? 'sometimes' : 'required';
+
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
+            'name' => [$required, 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'item_type_id' => ['sometimes', 'exists:item_types,id'],
+            'item_type_id' => [$partial ? 'sometimes' : 'required', 'exists:item_types,id'],
             'location_id' => ['nullable', 'exists:locations,id'],
             'parent_id' => ['nullable', 'exists:assets,id'],
-            'status' => ['sometimes', 'string'],
+            'status' => [$partial ? 'sometimes' : 'nullable', 'string'],
             'fmi_ast' => ['nullable', 'string'],
             'tp_barcode' => ['nullable', 'string'],
             'rig_tag' => ['nullable', 'string'],
             'ip_address' => ['nullable', 'string'],
             'mac_address' => ['nullable', 'string'],
-            'manufacturer' => ['nullable', 'string'],
-            'model' => ['nullable', 'string'],
+            'manufacturer_id' => ['nullable', 'exists:manufacturers,id'],
+            'manufacturer_model_id' => ['nullable', 'exists:manufacturer_models,id'],
+            'manufacturer' => ['nullable', 'string', 'max:255'],
+            'model' => ['nullable', 'string', 'max:255'],
             'serial_number' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $asset->update($data);
+        if (array_key_exists('manufacturer', $data) || array_key_exists('model', $data)) {
+            $resolved = app(ManufacturerCatalogueService::class)->resolveFromNames(
+                $data['manufacturer'] ?? null,
+                $data['model'] ?? null,
+            );
+            $data['manufacturer_id'] = $resolved['manufacturer_id'];
+            $data['manufacturer_model_id'] = $resolved['manufacturer_model_id'];
+        }
 
-        return response()->json($asset->fresh());
+        unset($data['manufacturer'], $data['model']);
+
+        if (! empty($data['manufacturer_model_id'])) {
+            $model = ManufacturerModel::query()->find((int) $data['manufacturer_model_id']);
+            if ($model === null) {
+                throw ValidationException::withMessages([
+                    'manufacturer_model_id' => 'The selected model is invalid.',
+                ]);
+            }
+
+            if (
+                ! empty($data['manufacturer_id'])
+                && (int) $model->manufacturer_id !== (int) $data['manufacturer_id']
+            ) {
+                throw ValidationException::withMessages([
+                    'manufacturer_model_id' => 'The selected model does not belong to the chosen manufacturer.',
+                ]);
+            }
+
+            $data['manufacturer_id'] = $model->manufacturer_id;
+        } elseif (
+            array_key_exists('manufacturer_id', $data)
+            && $data['manufacturer_id'] !== null
+            && ! Manufacturer::query()->whereKey($data['manufacturer_id'])->exists()
+        ) {
+            throw ValidationException::withMessages([
+                'manufacturer_id' => 'The selected manufacturer is invalid.',
+            ]);
+        }
+
+        return $data;
     }
 }

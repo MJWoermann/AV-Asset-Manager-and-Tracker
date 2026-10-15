@@ -8,8 +8,8 @@
         body { margin: 0; padding: 0; font-family: DejaVu Sans, sans-serif; color: #000; }
         .label {
             position: relative;
-            width: <?php echo e($layout->width_mm); ?>mm;
-            height: <?php echo e($layout->height_mm); ?>mm;
+            width: <?php echo e($layout->displayWidthMm()); ?>mm;
+            height: <?php echo e($layout->displayHeightMm()); ?>mm;
             page-break-after: always;
             overflow: hidden;
         }

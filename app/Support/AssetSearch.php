@@ -16,8 +16,6 @@ class AssetSearch
     public const COLUMNS = [
         'name',
         'description',
-        'manufacturer',
-        'model',
         'serial_number',
         'fmi_ast',
         'tp_barcode',
@@ -26,6 +24,16 @@ class AssetSearch
         'mac_address',
         'supplier',
         'notes',
+    ];
+
+    /**
+     * Relation name fields searched with partial (contains) matching.
+     *
+     * @var array<string, string>
+     */
+    public const RELATION_COLUMNS = [
+        'manufacturer' => 'name',
+        'manufacturerModel' => 'name',
     ];
 
     /**
@@ -51,7 +59,7 @@ class AssetSearch
             'name' => 'Name',
             'description' => 'Description',
             'manufacturer' => 'Manufacturer',
-            'model' => 'Model',
+            'manufacturerModel' => 'Model',
             'serial_number' => 'Serial',
             'fmi_ast' => 'FMI AST#',
             'tp_barcode' => 'TP Barcode',
@@ -101,6 +109,13 @@ class AssetSearch
             $query->where(function (Builder $group) use ($like) {
                 foreach (self::COLUMNS as $column) {
                     $group->orWhereLike($column, $like);
+                }
+
+                foreach (self::RELATION_COLUMNS as $relation => $column) {
+                    $group->orWhereHas(
+                        $relation,
+                        fn (Builder $related) => $related->whereLike($column, $like)
+                    );
                 }
 
                 $group->orWhereHas(
@@ -236,6 +251,31 @@ class AssetSearch
                 $best = [
                     'field' => $column,
                     'label' => self::fieldLabels()[$column] ?? $column,
+                    'value' => $value,
+                    'score' => $rankedScore,
+                ];
+            }
+        }
+
+        foreach (self::RELATION_COLUMNS as $relation => $column) {
+            $value = (string) (data_get($asset, $relation.'.'.$column) ?? '');
+
+            if ($value === '') {
+                continue;
+            }
+
+            $score = self::scoreValue($value, $full, $tokens);
+
+            if ($score === null) {
+                continue;
+            }
+
+            $rankedScore = $score + 1;
+
+            if ($best === null || $rankedScore < $best['score']) {
+                $best = [
+                    'field' => $relation,
+                    'label' => self::fieldLabels()[$relation] ?? $relation,
                     'value' => $value,
                     'score' => $rankedScore,
                 ];

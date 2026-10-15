@@ -24,12 +24,15 @@ use App\Http\Controllers\ConnectionMapController;
 use App\Http\Controllers\ConnectionTypeController;
 use App\Http\Controllers\CustomFieldSetController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardModulePreferenceController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\GuestStockController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\ManufacturerController;
+use App\Http\Controllers\ManufacturerModelController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScanController;
@@ -63,6 +66,8 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::patch('/preferences/asset-columns', [AssetColumnPreferenceController::class, 'update'])
         ->name('preferences.asset-columns');
+    Route::patch('/preferences/dashboard-modules', [DashboardModulePreferenceController::class, 'update'])
+        ->name('preferences.dashboard-modules');
 
     Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
     Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.create');
@@ -83,6 +88,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
 
     Route::get('/files/search', [FileController::class, 'search'])->name('files.search');
     Route::post('/files/upload', [FileController::class, 'storeUpload'])->name('files.upload');
+    Route::post('/files/bulk-upload', [FileController::class, 'storeBulkUpload'])->name('files.bulk-upload');
     Route::post('/files/url', [FileController::class, 'storeUrl'])->name('files.url');
     Route::post('/files/{file}/link', [FileController::class, 'link'])->name('files.link');
     Route::delete('/files/links/{fileLink}', [FileController::class, 'unlink'])->name('files.unlink');
@@ -96,6 +102,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     });
 
     Route::get('/locations', [LocationController::class, 'index'])->name('locations.index');
+    Route::get('/manufacturers', [ManufacturerController::class, 'index'])->name('manufacturers.index');
     Route::middleware('role:admin,inventory_manager')->group(function () {
         Route::get('/locations/create', [LocationController::class, 'create'])->name('locations.create');
         Route::post('/locations', [LocationController::class, 'store'])->name('locations.store');
@@ -103,6 +110,17 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
         Route::get('/locations/{location}/edit', [LocationController::class, 'edit'])->name('locations.edit');
         Route::put('/locations/{location}', [LocationController::class, 'update'])->name('locations.update');
         Route::delete('/locations/{location}', [LocationController::class, 'destroy'])->name('locations.destroy');
+
+        Route::get('/manufacturers/create', [ManufacturerController::class, 'create'])->name('manufacturers.create');
+        Route::post('/manufacturers', [ManufacturerController::class, 'store'])->name('manufacturers.store');
+        Route::get('/manufacturers/{manufacturer}/edit', [ManufacturerController::class, 'edit'])->name('manufacturers.edit');
+        Route::put('/manufacturers/{manufacturer}', [ManufacturerController::class, 'update'])->name('manufacturers.update');
+        Route::delete('/manufacturers/{manufacturer}', [ManufacturerController::class, 'destroy'])->name('manufacturers.destroy');
+        Route::get('/manufacturers/{manufacturer}/models/create', [ManufacturerModelController::class, 'create'])->name('manufacturers.models.create');
+        Route::post('/manufacturers/{manufacturer}/models', [ManufacturerModelController::class, 'store'])->name('manufacturers.models.store');
+        Route::get('/manufacturers/{manufacturer}/models/{manufacturer_model}/edit', [ManufacturerModelController::class, 'edit'])->name('manufacturers.models.edit');
+        Route::put('/manufacturers/{manufacturer}/models/{manufacturer_model}', [ManufacturerModelController::class, 'update'])->name('manufacturers.models.update');
+        Route::delete('/manufacturers/{manufacturer}/models/{manufacturer_model}', [ManufacturerModelController::class, 'destroy'])->name('manufacturers.models.destroy');
 
         Route::resource('item-types', ItemTypeController::class)->except(['show']);
         Route::resource('custom-field-sets', CustomFieldSetController::class)->except(['show']);

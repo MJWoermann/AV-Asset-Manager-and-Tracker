@@ -16,6 +16,9 @@
     );
     $ruHeightValue = old('ru_height', $ruHeightPrefill ?? $asset->ru_height);
     $needsAssetFormAlpine = $ruVisualiserEnabled || $stockTrackingEnabled || ($emailIntegrationEnabled && ! $asset->exists);
+    $modelsByManufacturer = $modelsByManufacturer ?? [];
+    $initialManufacturerId = old('manufacturer_id', $asset->manufacturer_id);
+    $initialModelId = old('manufacturer_model_id', $asset->manufacturer_model_id);
 @endphp
 
 <x-app-layout>
@@ -112,10 +115,85 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div
+                class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                x-data="{
+                    manufacturerId: @js($initialManufacturerId !== null && $initialManufacturerId !== '' ? (string) $initialManufacturerId : ''),
+                    modelId: @js($initialModelId !== null && $initialModelId !== '' ? (string) $initialModelId : ''),
+                    modelsByManufacturer: @js($modelsByManufacturer),
+                    get modelOptions() {
+                        if (! this.manufacturerId || this.manufacturerId === '__new__') {
+                            return [];
+                        }
+                        return this.modelsByManufacturer[this.manufacturerId] || [];
+                    },
+                    onManufacturerChange() {
+                        if (this.manufacturerId === '__new__') {
+                            this.modelId = '__new__';
+                            return;
+                        }
+                        const ids = this.modelOptions.map((row) => row.value);
+                        if (! ids.includes(this.modelId) && this.modelId !== '__new__') {
+                            this.modelId = '';
+                        }
+                    }
+                }"
+            >
+                <div>
+                    <x-input-label for="manufacturer_id" value="Manufacturer" />
+                    <select
+                        id="manufacturer_id"
+                        name="manufacturer_id"
+                        class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                        x-model="manufacturerId"
+                        @change="onManufacturerChange()"
+                    >
+                        <option value="">—</option>
+                        @foreach($manufacturers as $manufacturer)
+                            <option value="{{ $manufacturer->id }}">{{ $manufacturer->name }}</option>
+                        @endforeach
+                        <option value="__new__">+ Add new manufacturer…</option>
+                    </select>
+                    <x-input-error :messages="$errors->get('manufacturer_id')" class="mt-1" />
+                    <div class="mt-2" x-show="manufacturerId === '__new__'" x-cloak>
+                        <x-input-label for="new_manufacturer" value="New manufacturer name" />
+                        <x-text-input
+                            id="new_manufacturer"
+                            name="new_manufacturer"
+                            class="mt-1 block w-full"
+                            :value="old('new_manufacturer')"
+                        />
+                        <x-input-error :messages="$errors->get('new_manufacturer')" class="mt-1" />
+                    </div>
+                </div>
+                <div>
+                    <x-input-label for="manufacturer_model_id" value="Model" />
+                    <select
+                        id="manufacturer_model_id"
+                        name="manufacturer_model_id"
+                        class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                        x-model="modelId"
+                        :disabled="! manufacturerId"
+                    >
+                        <option value="">—</option>
+                        <template x-for="option in modelOptions" :key="option.value">
+                            <option :value="option.value" x-text="option.label" :selected="modelId === option.value"></option>
+                        </template>
+                        <option value="__new__" x-show="manufacturerId">+ Add new model…</option>
+                    </select>
+                    <x-input-error :messages="$errors->get('manufacturer_model_id')" class="mt-1" />
+                    <div class="mt-2" x-show="modelId === '__new__'" x-cloak>
+                        <x-input-label for="new_manufacturer_model" value="New model name" />
+                        <x-text-input
+                            id="new_manufacturer_model"
+                            name="new_manufacturer_model"
+                            class="mt-1 block w-full"
+                            :value="old('new_manufacturer_model')"
+                        />
+                        <x-input-error :messages="$errors->get('new_manufacturer_model')" class="mt-1" />
+                    </div>
+                </div>
                 @foreach([
-                    'manufacturer' => 'Manufacturer',
-                    'model' => 'Model',
                     'serial_number' => 'Serial Number',
                     'supplier' => 'Supplier',
                     'fmi_ast' => 'FMI AST#',

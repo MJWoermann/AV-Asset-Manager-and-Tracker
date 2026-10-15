@@ -88,8 +88,8 @@ class ShelfTagFieldKeys
             'tp_barcode' => (string) ($asset->tp_barcode ?? ''),
             'rig_tag' => (string) ($asset->rig_tag ?? ''),
             'serial_number' => (string) ($asset->serial_number ?? ''),
-            'manufacturer' => (string) ($asset->manufacturer ?? ''),
-            'model' => (string) ($asset->model ?? ''),
+            'manufacturer' => (string) ($asset->manufacturer?->name ?? ''),
+            'model' => (string) ($asset->manufacturerModel?->name ?? ''),
             'location.name' => (string) ($asset->location?->name ?? ''),
             'itemType.name' => (string) ($asset->itemType?->name ?? ''),
             'status' => $asset->status instanceof \BackedEnum

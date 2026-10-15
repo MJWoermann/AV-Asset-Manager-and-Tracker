@@ -7,6 +7,7 @@ use App\Enums\LocationType;
 use App\Models\Asset;
 use App\Models\CustomFieldDefinition;
 use App\Models\ItemType;
+use App\Models\Manufacturer;
 use App\Models\User;
 use App\Services\ImportService;
 use Database\Seeders\RoleSeeder;
@@ -294,6 +295,7 @@ class ImportAssetTest extends TestCase
         Storage::fake('local');
         $user = $this->manager();
         $itemType = ItemType::create(['name' => 'Audio Equipment', 'slug' => 'audio-equipment']);
+        $oldCo = Manufacturer::factory()->create(['name' => 'OldCo']);
 
         $updateMe = Asset::create([
             'name' => 'Old Update',
@@ -301,7 +303,7 @@ class ImportAssetTest extends TestCase
             'status' => AssetStatus::Available,
             'serial_number' => 'DUP-UPDATE',
             'notes' => 'keep-me',
-            'manufacturer' => 'OldCo',
+            'manufacturer_id' => $oldCo->id,
         ]);
         $replaceMe = Asset::create([
             'name' => 'Old Replace',
@@ -309,7 +311,7 @@ class ImportAssetTest extends TestCase
             'status' => AssetStatus::Available,
             'fmi_ast' => 'FMI-1',
             'notes' => 'should-clear',
-            'manufacturer' => 'OldCo',
+            'manufacturer_id' => $oldCo->id,
         ]);
         $skipMe = Asset::create([
             'name' => 'Old Skip',
@@ -324,7 +326,7 @@ class ImportAssetTest extends TestCase
             'status' => AssetStatus::Available,
             'mac_address' => 'AA:BB:CC:DD:EE:11',
             'notes' => 'leave-alone',
-            'manufacturer' => 'OldCo',
+            'manufacturer_id' => $oldCo->id,
         ]);
 
         $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
@@ -376,12 +378,12 @@ class ImportAssetTest extends TestCase
         $updateMe->refresh();
         $this->assertSame('New Update', $updateMe->name);
         $this->assertSame('Updated notes', $updateMe->notes);
-        $this->assertSame('NewCo', $updateMe->manufacturer);
+        $this->assertSame('NewCo', $updateMe->manufacturer?->name);
 
         $replaceMe->refresh();
         $this->assertSame('New Replace', $replaceMe->name);
         $this->assertSame('Replaced notes', $replaceMe->notes);
-        $this->assertSame('NewCo', $replaceMe->manufacturer);
+        $this->assertSame('NewCo', $replaceMe->manufacturer?->name);
 
         $skipMe->refresh();
         $this->assertSame('Old Skip', $skipMe->name);
@@ -390,7 +392,7 @@ class ImportAssetTest extends TestCase
         $falseMatchMe->refresh();
         $this->assertSame('Old False Match', $falseMatchMe->name);
         $this->assertSame('leave-alone', $falseMatchMe->notes);
-        $this->assertSame('OldCo', $falseMatchMe->manufacturer);
+        $this->assertSame('OldCo', $falseMatchMe->manufacturer?->name);
 
         $created = Asset::query()->where('name', 'Brand New Asset')->first();
         $this->assertNotNull($created);

@@ -233,7 +233,7 @@ class BulkUpdateAssetsTest extends TestCase
         $response->assertSee('bulkAssets(', false);
         $response->assertSee('Bulk edit');
         $response->assertSee('data-bulk-asset-id', false);
-        $response->assertSee('toggleAll(!allPageSelected)', false);
+        $response->assertSee('toggleAll($event.target.checked)', false);
         $response->assertSee('setSelected(', false);
     }
 

@@ -58,6 +58,25 @@ class FileAttachmentService
     }
 
     /**
+     * @param  list<array{file: UploadedFile, title: string, category: string, note?: string|null}>  $items
+     * @return list<File>
+     */
+    public function storeBulkUploads(array $items, ?Model $linkable = null): array
+    {
+        $files = [];
+
+        foreach ($items as $item) {
+            $files[] = $this->storeUpload($item['file'], [
+                'title' => $item['title'],
+                'category' => $item['category'],
+                'note' => $item['note'] ?? null,
+            ], $linkable);
+        }
+
+        return $files;
+    }
+
+    /**
      * @param  array{title: string, category: string, note?: string|null}  $attributes
      */
     public function storeUpload(UploadedFile $upload, array $attributes, ?Model $linkable = null): File

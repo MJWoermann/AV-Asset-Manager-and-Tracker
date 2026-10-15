@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             ItemTypeSeeder::class,
             LocationSeeder::class,
+            ManufacturerSeeder::class,
             ConnectionTypeSeeder::class,
             AssetListSeeder::class,
             SampleAssetSeeder::class,

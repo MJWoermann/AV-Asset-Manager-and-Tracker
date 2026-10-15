@@ -353,6 +353,34 @@
                                             Unlinked file: <?php echo e($log->old_values['title'] ?? '—'); ?>
 
                                         </span>
+                                    <?php elseif($log->action === 'connection_created'): ?>
+                                        <?php $vals = $log->new_values ?? []; ?>
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Connected to <?php echo e($vals['peer_asset'] ?? '—'); ?>:
+                                            <?php echo e($vals['local_interface'] ?? '—'); ?> ↔ <?php echo e($vals['peer_interface'] ?? '—'); ?>
+
+                                            <?php if(! empty($vals['connection_type'])): ?>
+                                                (<?php echo e($vals['connection_type']); ?><?php if(! empty($vals['protocol'])): ?> · <?php echo e($vals['protocol']); ?><?php endif; ?>)
+                                            <?php endif; ?>
+                                            <?php if(! empty($vals['label'])): ?>
+                                                — <?php echo e($vals['label']); ?>
+
+                                            <?php endif; ?>
+                                        </span>
+                                    <?php elseif($log->action === 'connection_removed'): ?>
+                                        <?php $vals = $log->old_values ?? []; ?>
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Disconnected from <?php echo e($vals['peer_asset'] ?? '—'); ?>:
+                                            <?php echo e($vals['local_interface'] ?? '—'); ?> ↔ <?php echo e($vals['peer_interface'] ?? '—'); ?>
+
+                                            <?php if(! empty($vals['connection_type'])): ?>
+                                                (<?php echo e($vals['connection_type']); ?><?php if(! empty($vals['protocol'])): ?> · <?php echo e($vals['protocol']); ?><?php endif; ?>)
+                                            <?php endif; ?>
+                                            <?php if(! empty($vals['label'])): ?>
+                                                — <?php echo e($vals['label']); ?>
+
+                                            <?php endif; ?>
+                                        </span>
                                     <?php else: ?>
                                         <?php $keys = $log->changedAttributeKeys(); ?>
                                         <?php if($keys === []): ?>
@@ -394,7 +422,7 @@
                     <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div><?php echo e($asset->description ?: '—'); ?></div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div><?php echo e($asset->itemType?->name); ?></div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div><?php echo e($asset->status?->label()); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div><?php echo e($asset->manufacturer); ?> <?php echo e($asset->model); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div><?php echo e(trim(($asset->manufacturer?->name ?? '').' '.($asset->manufacturerModel?->name ?? '')) ?: '—'); ?></div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Location</span><div><?php echo e($asset->location?->breadcrumb() ?? '—'); ?></div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">FMI AST#</span><div class="font-mono"><?php echo e($asset->fmi_ast ?: '—'); ?></div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">TP Barcode</span><div class="font-mono"><?php echo e($asset->tp_barcode ?: '—'); ?></div></div>

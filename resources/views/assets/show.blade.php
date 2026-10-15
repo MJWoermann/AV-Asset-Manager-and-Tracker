@@ -196,6 +196,30 @@
                                         <span class="text-brand-charcoal dark:text-brand-silver">
                                             Unlinked file: {{ $log->old_values['title'] ?? '—' }}
                                         </span>
+                                    @elseif($log->action === 'connection_created')
+                                        @php $vals = $log->new_values ?? []; @endphp
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Connected to {{ $vals['peer_asset'] ?? '—' }}:
+                                            {{ $vals['local_interface'] ?? '—' }} ↔ {{ $vals['peer_interface'] ?? '—' }}
+                                            @if(! empty($vals['connection_type']))
+                                                ({{ $vals['connection_type'] }}@if(! empty($vals['protocol'])) · {{ $vals['protocol'] }}@endif)
+                                            @endif
+                                            @if(! empty($vals['label']))
+                                                — {{ $vals['label'] }}
+                                            @endif
+                                        </span>
+                                    @elseif($log->action === 'connection_removed')
+                                        @php $vals = $log->old_values ?? []; @endphp
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Disconnected from {{ $vals['peer_asset'] ?? '—' }}:
+                                            {{ $vals['local_interface'] ?? '—' }} ↔ {{ $vals['peer_interface'] ?? '—' }}
+                                            @if(! empty($vals['connection_type']))
+                                                ({{ $vals['connection_type'] }}@if(! empty($vals['protocol'])) · {{ $vals['protocol'] }}@endif)
+                                            @endif
+                                            @if(! empty($vals['label']))
+                                                — {{ $vals['label'] }}
+                                            @endif
+                                        </span>
                                     @else
                                         @php $keys = $log->changedAttributeKeys(); @endphp
                                         @if($keys === [])
@@ -236,7 +260,7 @@
                     <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div>{{ $asset->description ?: '—' }}</div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name }}</div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div>{{ $asset->status?->label() }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div>{{ $asset->manufacturer }} {{ $asset->model }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div>{{ trim(($asset->manufacturer?->name ?? '').' '.($asset->manufacturerModel?->name ?? '')) ?: '—' }}</div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Location</span><div>{{ $asset->location?->breadcrumb() ?? '—' }}</div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">FMI AST#</span><div class="font-mono">{{ $asset->fmi_ast ?: '—' }}</div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">TP Barcode</span><div class="font-mono">{{ $asset->tp_barcode ?: '—' }}</div></div>

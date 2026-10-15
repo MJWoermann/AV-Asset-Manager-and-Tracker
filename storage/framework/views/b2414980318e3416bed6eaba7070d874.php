@@ -35,12 +35,15 @@
 
     <div
         class="max-w-7xl mx-auto px-4 print:max-w-none print:px-0"
-        x-data="shelfTagPrintPreview(<?php echo \Illuminate\Support\Js::from($labels)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from((float) $layout->width_mm)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from((float) $layout->height_mm)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($layout->logoUrl())->toHtml() ?>)"
+        x-data="shelfTagPrintPreview(<?php echo \Illuminate\Support\Js::from($labels)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($layout->displayWidthMm())->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($layout->displayHeightMm())->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($layout->logoUrl())->toHtml() ?>)"
         x-init="renderAll()"
     >
         <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver print:hidden">
             Showing first <?php echo e(count($previewLabels)); ?> of <?php echo e($count); ?> on screen. Print/PDF includes the full batch.
             Select the matching Brother DK size, Actual size, Cut every for continuous.
+            <?php if($layout->isLandscape()): ?>
+                Landscape layout · <?php echo e($layout->displayWidthMm()); ?>×<?php echo e($layout->displayHeightMm()); ?> mm.
+            <?php endif; ?>
         </p>
 
         <div class="space-y-6 print:space-y-0">
@@ -49,6 +52,7 @@
                     class="label-sheet mx-auto border border-brand-silver bg-white shadow-sm print:border-0 print:shadow-none <?php echo e($index >= $previewLimit ? 'hidden print:block' : ''); ?>"
                     style="width: <?php echo e($label['width_mm']); ?>mm; height: <?php echo e($label['height_mm']); ?>mm;"
                     data-label-index="<?php echo e($index); ?>"
+                    data-orientation="<?php echo e($label['orientation'] ?? $layout->orientation); ?>"
                 >
                     <div class="relative w-full h-full overflow-hidden">
                         <?php $__currentLoopData = $label['elements']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $element): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -76,7 +80,7 @@
                 break-after: auto;
             }
             @page {
-                size: <?php echo e($layout->width_mm); ?>mm <?php echo e($layout->height_mm); ?>mm;
+                size: <?php echo e($layout->displayWidthMm()); ?>mm <?php echo e($layout->displayHeightMm()); ?>mm;
                 margin: 0;
             }
             nav, header, .print\\:hidden { display: none !important; }

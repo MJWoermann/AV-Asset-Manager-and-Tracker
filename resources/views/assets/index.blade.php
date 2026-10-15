@@ -58,6 +58,8 @@
                         :statuses="$statuses"
                         :locations="$locations"
                         :item-types="$itemTypes"
+                        :manufacturers="$manufacturers"
+                        :manufacturer-models="$manufacturerModels"
                     />
                 </thead>
                 <tbody>

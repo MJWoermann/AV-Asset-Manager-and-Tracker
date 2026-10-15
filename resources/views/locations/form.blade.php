@@ -4,12 +4,12 @@
         <form method="POST" action="{{ $location->exists ? route('locations.update', $location) : route('locations.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             @if($location->exists) @method('PUT') @endif
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+            <div class="grid grid-cols-1 sm:grid-cols-10 gap-4">
+                <div class="sm:col-span-7">
                     <x-input-label for="name" value="Name" />
                     <x-text-input id="name" name="name" class="mt-1 block w-full" :value="old('name', $location->name)" required />
                 </div>
-                <div>
+                <div class="sm:col-span-3">
                     <x-input-label for="room_code" value="Room code" />
                     <x-text-input id="room_code" name="room_code" class="mt-1 block w-full" :value="old('room_code', $location->room_code)" maxlength="64" />
                 </div>

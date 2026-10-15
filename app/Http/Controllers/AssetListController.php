@@ -7,6 +7,8 @@ use App\Models\Asset;
 use App\Models\AssetList;
 use App\Models\ItemType;
 use App\Models\Location;
+use App\Models\Manufacturer;
+use App\Models\ManufacturerModel;
 use App\Support\AssetBrowseFilters;
 use App\Support\AssetTableColumns;
 use Illuminate\Http\RedirectResponse;
@@ -46,7 +48,14 @@ class AssetListController extends Controller
         $selectedColumns = $request->user()->assetTableColumns();
 
         $items = $list->items()
-            ->with(['asset.itemType', 'asset.location', 'asset.parent', 'asset.customFieldValues'])
+            ->with([
+                'asset.itemType',
+                'asset.location',
+                'asset.parent',
+                'asset.manufacturer',
+                'asset.manufacturerModel',
+                'asset.customFieldValues',
+            ])
             ->whereHas(
                 'asset',
                 fn ($query) => AssetBrowseFilters::applyToAssetQuery($query, $request, includeQuantity: false)
@@ -73,6 +82,11 @@ class AssetListController extends Controller
             'statuses' => AssetStatus::options(),
             'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
             'itemTypes' => ItemType::orderBy('name')->get(),
+            'manufacturers' => Manufacturer::query()->orderBy('name')->get(['id', 'name']),
+            'manufacturerModels' => ManufacturerModel::query()
+                ->with('manufacturer:id,name')
+                ->orderBy('name')
+                ->get(['id', 'name', 'manufacturer_id']),
             'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
             'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
         ]);

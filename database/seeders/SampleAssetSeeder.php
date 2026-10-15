@@ -8,6 +8,7 @@ use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\ItemType;
 use App\Models\Location;
+use App\Services\ManufacturerCatalogueService;
 use Illuminate\Database\Seeder;
 
 class SampleAssetSeeder extends Seeder
@@ -23,6 +24,11 @@ class SampleAssetSeeder extends Seeder
             return;
         }
 
+        $catalogue = app(ManufacturerCatalogueService::class);
+        $tp = $catalogue->resolveFromNames('TP Cases', 'RC-42U');
+        $chauvet = $catalogue->resolveFromNames('Chauvet', 'COLORado');
+        $yamaha = $catalogue->resolveFromNames('Yamaha', 'QL1');
+
         $rack = Asset::firstOrCreate(
             ['tp_barcode' => 'RC-1001'],
             [
@@ -30,8 +36,8 @@ class SampleAssetSeeder extends Seeder
                 'location_id' => $location->id,
                 'name' => 'Road Case Alpha',
                 'status' => AssetStatus::Available,
-                'manufacturer' => 'TP Cases',
-                'model' => 'RC-42U',
+                'manufacturer_id' => $tp['manufacturer_id'],
+                'manufacturer_model_id' => $tp['manufacturer_model_id'],
                 'fmi_ast' => 'FMI-RC-001',
                 'rig_tag' => 'RIG-RC-01',
             ]
@@ -65,8 +71,8 @@ class SampleAssetSeeder extends Seeder
                     'parent_id' => $rack->id,
                     'location_id' => $rack->location_id,
                     'status' => AssetStatus::Available,
-                    'manufacturer' => 'Chauvet',
-                    'model' => 'COLORado',
+                    'manufacturer_id' => $chauvet['manufacturer_id'],
+                    'manufacturer_model_id' => $chauvet['manufacturer_model_id'],
                 ])
             );
         }
@@ -79,8 +85,8 @@ class SampleAssetSeeder extends Seeder
                     'location_id' => $location->id,
                     'name' => 'Digital Mixer',
                     'status' => AssetStatus::InService,
-                    'manufacturer' => 'Yamaha',
-                    'model' => 'QL1',
+                    'manufacturer_id' => $yamaha['manufacturer_id'],
+                    'manufacturer_model_id' => $yamaha['manufacturer_model_id'],
                     'fmi_ast' => 'FMI-AU-001',
                     'serial_number' => 'SN-AU-001',
                     'ip_address' => '10.10.5.50',
@@ -93,16 +99,6 @@ class SampleAssetSeeder extends Seeder
             foreach (Asset::all() as $asset) {
                 AssetListItem::firstOrCreate(
                     ['asset_list_id' => $inventory->id, 'asset_id' => $asset->id],
-                    ['quantity' => 1]
-                );
-            }
-        }
-
-        $stocktake = AssetList::where('name', 'Stocktake 2026')->first();
-        if ($stocktake) {
-            foreach (Asset::whereIn('tp_barcode', ['RC-1001', 'LX-2001', 'AU-3001'])->get() as $asset) {
-                AssetListItem::firstOrCreate(
-                    ['asset_list_id' => $stocktake->id, 'asset_id' => $asset->id],
                     ['quantity' => 1]
                 );
             }

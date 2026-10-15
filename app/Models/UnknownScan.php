@@ -102,6 +102,25 @@ class UnknownScan extends Model
             ->groupBy('scanned_code')
             ->pluck('id');
 
+        // #region agent log
+        $total = static::query()->count();
+        $distinctCodes = static::query()->toBase()->distinct()->count('scanned_code');
+        file_put_contents(base_path('debug-5c1253.log'), json_encode([
+            'sessionId' => '5c1253',
+            'hypothesisId' => 'C',
+            'location' => 'UnknownScan.php:deleteDuplicatesKeepingLatest',
+            'message' => 'dedupe_query_plan',
+            'data' => [
+                'total' => $total,
+                'distinct_codes' => $distinctCodes,
+                'keep_ids_count' => $keepIds->count(),
+                'expected_deletes' => max(0, $total - $keepIds->count()),
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+            'runId' => 'post-fix',
+        ])."\n", FILE_APPEND);
+        // #endregion
+
         if ($keepIds->isEmpty()) {
             return 0;
         }

@@ -26,8 +26,8 @@ class Asset extends Model
         'name',
         'description',
         'status',
-        'manufacturer',
-        'model',
+        'manufacturer_id',
+        'manufacturer_model_id',
         'serial_number',
         'purchase_date',
         'warranty_expiry',
@@ -92,6 +92,16 @@ class Asset extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    public function manufacturer(): BelongsTo
+    {
+        return $this->belongsTo(Manufacturer::class);
+    }
+
+    public function manufacturerModel(): BelongsTo
+    {
+        return $this->belongsTo(ManufacturerModel::class);
     }
 
     public function parent(): BelongsTo

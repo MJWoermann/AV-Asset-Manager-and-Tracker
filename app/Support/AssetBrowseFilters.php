@@ -24,8 +24,6 @@ class AssetBrowseFilters
         'fmi_ast',
         'rig_tag',
         'serial_number',
-        'manufacturer',
-        'model',
         'ip_address',
         'mac_address',
     ];
@@ -46,8 +44,8 @@ class AssetBrowseFilters
             'rig_tag' => 'rig_tag',
             'serial_number' => 'serial_number',
             'location' => 'location_id',
-            'manufacturer' => 'manufacturer',
-            'model' => 'model',
+            'manufacturer' => 'manufacturer_id',
+            'model' => 'manufacturer_model_id',
             'ip_address' => 'ip_address',
             'mac_address' => 'mac_address',
             'quantity' => 'quantity',
@@ -74,6 +72,8 @@ class AssetBrowseFilters
         $term = self::term($request);
         $locationId = $request->integer('location_id') ?: null;
         $itemTypeId = $request->integer('item_type_id') ?: null;
+        $manufacturerId = $request->integer('manufacturer_id') ?: null;
+        $manufacturerModelId = $request->integer('manufacturer_model_id') ?: null;
         $status = $request->string('status')->toString();
 
         $query
@@ -85,7 +85,9 @@ class AssetBrowseFilters
             ->when($locationId, function (Builder $builder) use ($locationId) {
                 $builder->whereIn('location_id', Location::selfAndDescendantIds($locationId));
             })
-            ->when($itemTypeId, fn (Builder $builder) => $builder->where('item_type_id', $itemTypeId));
+            ->when($itemTypeId, fn (Builder $builder) => $builder->where('item_type_id', $itemTypeId))
+            ->when($manufacturerId, fn (Builder $builder) => $builder->where('manufacturer_id', $manufacturerId))
+            ->when($manufacturerModelId, fn (Builder $builder) => $builder->where('manufacturer_model_id', $manufacturerModelId));
 
         foreach (self::TEXT_COLUMNS as $column) {
             $value = trim($request->string($column)->toString());
@@ -119,6 +121,29 @@ class AssetBrowseFilters
             $query->whereDate('test_tag_expiry', $testTagExpiry);
         }
 
+        self::applyDateRangeFilter($query, 'test_tag_expiry', $request);
+        self::applyDateRangeFilter($query, 'warranty_expiry', $request);
+
+        return $query;
+    }
+
+    /**
+     * @param  Builder<Asset>  $query
+     * @return Builder<Asset>
+     */
+    public static function applyDateRangeFilter(Builder $query, string $column, Request $request): Builder
+    {
+        $from = $request->string($column.'_from')->toString();
+        $to = $request->string($column.'_to')->toString();
+
+        if ($from !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) === 1) {
+            $query->whereNotNull($column)->whereDate($column, '>=', $from);
+        }
+
+        if ($to !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to) === 1) {
+            $query->whereNotNull($column)->whereDate($column, '<=', $to);
+        }
+
         return $query;
     }
 
@@ -138,6 +163,21 @@ class AssetBrowseFilters
         return $query;
     }
 
+    /**
+     * Date-range query params used by dashboard expiry modules.
+     *
+     * @return list<string>
+     */
+    public static function dateRangeParams(): array
+    {
+        return [
+            'test_tag_expiry_from',
+            'test_tag_expiry_to',
+            'warranty_expiry_from',
+            'warranty_expiry_to',
+        ];
+    }
+
     public static function hasActiveFilters(Request $request): bool
     {
         if (filled($request->input('q'))) {
@@ -145,6 +185,12 @@ class AssetBrowseFilters
         }
 
         foreach (self::columnParams() as $param) {
+            if (filled($request->input($param))) {
+                return true;
+            }
+        }
+
+        foreach (self::dateRangeParams() as $param) {
             if (filled($request->input($param))) {
                 return true;
             }
@@ -175,6 +221,15 @@ class AssetBrowseFilters
                 continue;
             }
 
+            $value = $request->input($param);
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $preserved[$param] = is_scalar($value) ? (string) $value : '';
+        }
+
+        foreach (self::dateRangeParams() as $param) {
             $value = $request->input($param);
             if ($value === null || $value === '') {
                 continue;

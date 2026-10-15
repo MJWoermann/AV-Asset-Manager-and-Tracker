@@ -13,7 +13,7 @@
 
                     @php
                         $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*', 'reports.connection-map*', 'shelf-tags.*');
-                        $dataActive = request()->routeIs('locations.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
+                        $dataActive = request()->routeIs('locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
                     @endphp
 
                     <x-dropdown align="left" width="48">
@@ -54,6 +54,7 @@
                         </x-slot>
                         <x-slot name="content">
                             <x-dropdown-link :href="route('locations.index')">Locations</x-dropdown-link>
+                            <x-dropdown-link :href="route('manufacturers.index')">Manufacturers</x-dropdown-link>
                             @role('admin|inventory_manager')
                                 <x-dropdown-link :href="route('item-types.index')">Item Types</x-dropdown-link>
                                 <x-dropdown-link :href="route('custom-field-sets.index')">Field sets</x-dropdown-link>
@@ -140,6 +141,7 @@
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Data</div>
             <x-responsive-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">Locations</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('manufacturers.index')" :active="request()->routeIs('manufacturers.*')">Manufacturers</x-responsive-nav-link>
             @role('admin|inventory_manager')
                 <x-responsive-nav-link :href="route('item-types.index')" :active="request()->routeIs('item-types.*')">Item Types</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('custom-field-sets.index')" :active="request()->routeIs('custom-field-sets.*')">Field sets</x-responsive-nav-link>

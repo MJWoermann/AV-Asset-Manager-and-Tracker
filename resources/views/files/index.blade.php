@@ -1,13 +1,30 @@
+@php
+    $bulkUploadHasErrors = $errors->hasAny(['files', 'titles', 'categories', 'notes'])
+        || collect($errors->keys())->contains(function (string $key): bool {
+            return str_starts_with($key, 'files.')
+                || str_starts_with($key, 'titles.')
+                || str_starts_with($key, 'categories.')
+                || str_starts_with($key, 'notes.');
+        });
+@endphp
+
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="font-semibold text-xl">File library</h2>
+            <button
+                type="button"
+                x-data
+                class="px-3 py-2 bg-brand text-white text-sm"
+                @click="$dispatch('toggle-bulk-upload')"
+            >Bulk upload</button>
         </div>
     </x-slot>
 
     <div
         class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4"
         x-data="{
+            bulkOpen: @js($bulkUploadHasErrors),
             previewOpen: false,
             previewUrl: '',
             previewDownloadUrl: '',
@@ -26,7 +43,20 @@
                 this.previewDownloadUrl = '';
             }
         }"
+        @toggle-bulk-upload.window="bulkOpen = !bulkOpen"
     >
+        <div
+            x-show="bulkOpen"
+            x-cloak
+            class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 space-y-3"
+        >
+            <div class="flex items-center justify-between gap-2">
+                <h3 class="font-semibold text-sm">Bulk upload</h3>
+                <button type="button" class="text-sm text-brand-charcoal dark:text-brand-silver" @click="bulkOpen = false">Close</button>
+            </div>
+            <x-file-bulk-upload :categories="$categories" id-prefix="library-bulk" />
+        </div>
+
         <form method="GET" class="flex flex-col sm:flex-row gap-3 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
             <div class="flex-1">
                 <x-input-label for="q" value="Search" />

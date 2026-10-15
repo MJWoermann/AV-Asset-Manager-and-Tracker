@@ -3,6 +3,8 @@
     'statuses',
     'locations',
     'itemTypes',
+    'manufacturers' => [],
+    'manufacturerModels' => [],
     'formId' => 'asset-filters',
 ])
 
@@ -18,7 +20,7 @@
             type="checkbox"
             class="rounded border-brand-charcoal/40"
             :checked="allPageSelected"
-            @click.prevent="toggleAll(!allPageSelected)"
+            @change="toggleAll($event.target.checked)"
             aria-label="Select all assets on this page"
         >
     </th>
@@ -68,6 +70,40 @@
                         @foreach($itemTypes as $itemType)
                             <option value="{{ $itemType->id }}" @selected((string) request('item_type_id') === (string) $itemType->id)>
                                 {{ $itemType->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @break
+
+                @case('manufacturer')
+                    <select
+                        name="manufacturer_id"
+                        id="filter_manufacturer_id"
+                        form="{{ $formId }}"
+                        class="{{ $inputClass }}"
+                        aria-label="Filter by manufacturer"
+                    >
+                        <option value="">All manufacturers</option>
+                        @foreach($manufacturers as $manufacturer)
+                            <option value="{{ $manufacturer->id }}" @selected((string) request('manufacturer_id') === (string) $manufacturer->id)>
+                                {{ $manufacturer->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @break
+
+                @case('model')
+                    <select
+                        name="manufacturer_model_id"
+                        id="filter_manufacturer_model_id"
+                        form="{{ $formId }}"
+                        class="{{ $inputClass }}"
+                        aria-label="Filter by model"
+                    >
+                        <option value="">All models</option>
+                        @foreach($manufacturerModels as $manufacturerModel)
+                            <option value="{{ $manufacturerModel->id }}" @selected((string) request('manufacturer_model_id') === (string) $manufacturerModel->id)>
+                                {{ $manufacturerModel->manufacturer?->name }} / {{ $manufacturerModel->name }}
                             </option>
                         @endforeach
                     </select>

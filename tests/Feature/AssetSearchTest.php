@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\ItemType;
+use App\Models\Manufacturer;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,9 +87,11 @@ class AssetSearchTest extends TestCase
         $user = $this->scanner();
         $itemType = $this->itemType();
 
+        $yamaha = Manufacturer::factory()->create(['name' => 'Yamaha']);
+
         Asset::create([
             'name' => 'FOH Console',
-            'manufacturer' => 'Yamaha',
+            'manufacturer_id' => $yamaha->id,
             'item_type_id' => $itemType->id,
             'status' => AssetStatus::Available,
             'serial_number' => 'SN-9001',
@@ -96,7 +99,7 @@ class AssetSearchTest extends TestCase
 
         Asset::create([
             'name' => 'Yamaha Speaker',
-            'manufacturer' => 'Yamaha',
+            'manufacturer_id' => $yamaha->id,
             'item_type_id' => $itemType->id,
             'status' => AssetStatus::Available,
         ]);

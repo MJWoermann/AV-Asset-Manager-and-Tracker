@@ -122,6 +122,43 @@ class ComparisonReportPdfTest extends TestCase
         $response->assertSee('PDF', false);
     }
 
+    public function test_compare_form_list_options_include_item_count_and_last_updated(): void
+    {
+        $user = $this->scanner();
+        $itemType = ItemType::create([
+            'name' => 'LX Fixture',
+            'slug' => 'lx-fixture',
+        ]);
+        $asset = Asset::create([
+            'name' => 'Fixture One',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'tp_barcode' => 'TP-OPT-1',
+        ]);
+
+        Carbon::setTestNow('2026-10-15 09:30:00');
+
+        $list = AssetList::create([
+            'name' => 'Event Stocktake',
+            'type' => 'event',
+            'created_by' => $user->id,
+        ]);
+
+        Carbon::setTestNow('2026-10-15 14:45:00');
+
+        AssetListItem::create([
+            'asset_list_id' => $list->id,
+            'asset_id' => $asset->id,
+            'quantity' => 1,
+            'added_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('reports.compare'));
+
+        $response->assertOk();
+        $response->assertSee('Event Stocktake (event) — 1 item, updated 2026-10-15 14:45', false);
+    }
+
     public function test_guest_cannot_download_comparison_report_as_pdf(): void
     {
         $response = $this->post(route('reports.compare.run'), [

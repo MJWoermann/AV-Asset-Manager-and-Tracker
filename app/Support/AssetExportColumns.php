@@ -159,6 +159,14 @@ class AssetExportColumns
             $relations[] = 'parent';
         }
 
+        if (in_array('manufacturer', $columns, true)) {
+            $relations[] = 'manufacturer';
+        }
+
+        if (in_array('model', $columns, true)) {
+            $relations[] = 'manufacturerModel';
+        }
+
         return $relations;
     }
 
@@ -169,8 +177,8 @@ class AssetExportColumns
             'description' => (string) ($asset->description ?? ''),
             'item_type' => (string) ($asset->itemType?->name ?? ''),
             'status' => (string) ($asset->status?->value ?? ''),
-            'manufacturer' => (string) ($asset->manufacturer ?? ''),
-            'model' => (string) ($asset->model ?? ''),
+            'manufacturer' => (string) ($asset->manufacturer?->name ?? ''),
+            'model' => (string) ($asset->manufacturerModel?->name ?? ''),
             'serial_number' => (string) ($asset->serial_number ?? ''),
             'fmi_ast' => (string) ($asset->fmi_ast ?? ''),
             'tp_barcode' => (string) ($asset->tp_barcode ?? ''),

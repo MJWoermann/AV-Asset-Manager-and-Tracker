@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\AssetTableColumns;
+use App\Support\DashboardModules;
 use App\Support\DeveloperFeatures;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -58,5 +59,18 @@ class User extends Authenticatable
         $selected = ($this->preferences ?? [])[AssetTableColumns::PREFERENCE_KEY] ?? null;
 
         return AssetTableColumns::resolve(is_array($selected) ? $selected : null);
+    }
+
+    /**
+     * @return list<array{id: string, label: string, enabled: bool}>
+     */
+    public function dashboardModules(): array
+    {
+        $stored = ($this->preferences ?? [])[DashboardModules::PREFERENCE_KEY] ?? null;
+
+        return DashboardModules::resolve(
+            is_array($stored) ? $stored : null,
+            DashboardModules::availableFor($this)
+        );
     }
 }

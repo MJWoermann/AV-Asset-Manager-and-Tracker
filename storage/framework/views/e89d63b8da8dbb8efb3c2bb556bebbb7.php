@@ -105,29 +105,21 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                     <tr>
-                        <th class="px-3 py-2 w-10">
-                            <input
-                                type="checkbox"
-                                class="rounded border-brand-charcoal/40"
-                                :checked="allPageSelected"
-                                @click.prevent="toggleAll(!allPageSelected)"
-                                aria-label="Select all assets on this page"
-                            >
-                        </th>
+                        <th class="px-3 py-2 w-10" aria-hidden="true"></th>
                         <?php $__currentLoopData = $selectedColumns; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $column): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                             <th class="px-3 py-2"><?php echo e(\App\Support\AssetTableColumns::label($column)); ?></th>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </tr>
                     <?php if (isset($component)) { $__componentOriginal1801d267616eb6cd3630dd30196134f2 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal1801d267616eb6cd3630dd30196134f2 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.asset-column-filters','data' => ['selectedColumns' => $selectedColumns,'statuses' => $statuses,'locations' => $locations,'itemTypes' => $itemTypes]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.asset-column-filters','data' => ['selectedColumns' => $selectedColumns,'statuses' => $statuses,'locations' => $locations,'itemTypes' => $itemTypes,'manufacturers' => $manufacturers,'manufacturerModels' => $manufacturerModels]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('asset-column-filters'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['selected-columns' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($selectedColumns),'statuses' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($statuses),'locations' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($locations),'item-types' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($itemTypes)]); ?>
+<?php $component->withAttributes(['selected-columns' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($selectedColumns),'statuses' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($statuses),'locations' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($locations),'item-types' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($itemTypes),'manufacturers' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($manufacturers),'manufacturer-models' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($manufacturerModels)]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal1801d267616eb6cd3630dd30196134f2)): ?>

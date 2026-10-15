@@ -19,6 +19,7 @@ class AssetInterfaceController extends Controller
 
         $asset->interfaces()->create([
             'name' => $data['name'],
+            'connection_type_id' => (int) $data['connection_type_id'],
             'notes' => $data['notes'] ?? null,
             'sort_order' => $sortOrder,
             'item_type_interface_template_id' => null,
@@ -37,6 +38,7 @@ class AssetInterfaceController extends Controller
 
         $interface->update([
             'name' => $data['name'],
+            'connection_type_id' => (int) $data['connection_type_id'],
             'notes' => $data['notes'] ?? null,
             'sort_order' => array_key_exists('sort_order', $data) && $data['sort_order'] !== null
                 ? (int) $data['sort_order']

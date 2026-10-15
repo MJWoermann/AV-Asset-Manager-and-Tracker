@@ -54,7 +54,7 @@ unset($__defined_vars, $__key, $__value); ?>
             <?php echo csrf_field(); ?>
             <?php echo method_field('PATCH'); ?>
             <p class="text-xs text-brand-charcoal dark:text-brand-silver mb-2">Choose columns for asset tables. Saved to your profile.</p>
-            <div class="max-h-64 overflow-y-auto space-y-1">
+            <div class="max-h-64 overflow-y-auto space-y-1 ps-1">
                 <?php $__currentLoopData = $availableColumns; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <label class="flex items-center gap-2 text-sm">
                         <input

@@ -14,6 +14,8 @@ return [
 
     'max_kilobytes' => 25600,
 
+    'max_bulk_files' => 20,
+
     'allowed_mimes' => [
         'jpg', 'jpeg', 'png', 'webp', 'pdf', 'docx', 'xlsx', 'csv',
     ],

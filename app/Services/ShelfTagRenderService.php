@@ -29,6 +29,8 @@ class ShelfTagRenderService
             ->with([
                 'asset.location',
                 'asset.itemType',
+                'asset.manufacturer',
+                'asset.manufacturerModel',
                 'asset.customFieldValues.definition',
             ])
             ->whereNotNull('asset_id')

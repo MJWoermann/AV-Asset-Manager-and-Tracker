@@ -34,4 +34,9 @@ class ConnectionType extends Model
     {
         return $this->hasMany(AssetConnection::class);
     }
+
+    public function interfaces(): HasMany
+    {
+        return $this->hasMany(AssetInterface::class);
+    }
 }

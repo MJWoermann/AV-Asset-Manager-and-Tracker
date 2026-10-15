@@ -162,19 +162,29 @@ class AssetConnectionFeatureTest extends TestCase
         $user = $this->scanner();
         $asset = $this->makeAsset();
         $peer = $this->makeAsset(name: 'Peer');
-        $iface = AssetInterface::factory()->create(['asset_id' => $asset->id, 'name' => 'Port 1']);
-        $peerIface = AssetInterface::factory()->create(['asset_id' => $peer->id, 'name' => 'In 1']);
         $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
+        $iface = AssetInterface::factory()->create([
+            'asset_id' => $asset->id,
+            'name' => 'Port 1',
+            'connection_type_id' => $network->id,
+        ]);
+        $peerIface = AssetInterface::factory()->create([
+            'asset_id' => $peer->id,
+            'name' => 'In 1',
+            'connection_type_id' => $network->id,
+        ]);
 
         $this->actingAs($user)
             ->post(route('assets.interfaces.store', $asset), [
                 'name' => 'HDMI Out',
+                'connection_type_id' => $network->id,
             ])
             ->assertForbidden();
 
         $this->actingAs($user)
             ->put(route('assets.interfaces.update', [$asset, $iface]), [
                 'name' => 'HDMI 1',
+                'connection_type_id' => $network->id,
             ])
             ->assertForbidden();
 
@@ -185,8 +195,8 @@ class AssetConnectionFeatureTest extends TestCase
         $this->actingAs($user)
             ->post(route('assets.connections.store', $asset), [
                 'local_interface_id' => $iface->id,
+                'peer_asset_id' => $peer->id,
                 'peer_interface_id' => $peerIface->id,
-                'connection_type_id' => $network->id,
             ])
             ->assertForbidden();
 
@@ -197,10 +207,13 @@ class AssetConnectionFeatureTest extends TestCase
     {
         $user = $this->manager();
         $asset = $this->makeAsset();
+        $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+        $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
 
         $this->actingAs($user)
             ->post(route('assets.interfaces.store', $asset), [
                 'name' => 'HDMI Out',
+                'connection_type_id' => $hdmi->id,
                 'notes' => 'Front',
             ])
             ->assertRedirect(route('assets.show', [$asset, 'tab' => 'connections']));
@@ -208,15 +221,18 @@ class AssetConnectionFeatureTest extends TestCase
         $interface = $asset->interfaces()->where('name', 'HDMI Out')->first();
         $this->assertNotNull($interface);
         $this->assertNull($interface->item_type_interface_template_id);
+        $this->assertSame($hdmi->id, $interface->connection_type_id);
 
         $this->actingAs($user)
             ->put(route('assets.interfaces.update', [$asset, $interface]), [
                 'name' => 'HDMI 1',
+                'connection_type_id' => $network->id,
                 'sort_order' => 5,
             ])
             ->assertRedirect(route('assets.show', [$asset, 'tab' => 'connections']));
 
         $this->assertSame('HDMI 1', $interface->fresh()->name);
+        $this->assertSame($network->id, $interface->fresh()->connection_type_id);
 
         $this->actingAs($user)
             ->delete(route('assets.interfaces.destroy', [$asset, $interface]))
@@ -225,21 +241,39 @@ class AssetConnectionFeatureTest extends TestCase
         $this->assertDatabaseMissing('asset_interfaces', ['id' => $interface->id]);
     }
 
-    public function test_connection_create_uses_canonical_ordering_and_allows_multi_link(): void
+    public function test_connection_create_uses_canonical_ordering_and_derives_type_from_interface(): void
     {
         $user = $this->manager();
         $assetA = $this->makeAsset(name: 'Switch');
         $assetB = $this->makeAsset(name: 'Encoder');
-        $ifaceA = AssetInterface::factory()->create(['asset_id' => $assetA->id, 'name' => 'Port 1']);
-        $ifaceB = AssetInterface::factory()->create(['asset_id' => $assetB->id, 'name' => 'In 1']);
         $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
         $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+        $ifaceA = AssetInterface::factory()->create([
+            'asset_id' => $assetA->id,
+            'name' => 'Port 1',
+            'connection_type_id' => $network->id,
+        ]);
+        $ifaceB = AssetInterface::factory()->create([
+            'asset_id' => $assetB->id,
+            'name' => 'In 1',
+            'connection_type_id' => $network->id,
+        ]);
+        $ifaceAHdmi = AssetInterface::factory()->create([
+            'asset_id' => $assetA->id,
+            'name' => 'HDMI Out',
+            'connection_type_id' => $hdmi->id,
+        ]);
+        $ifaceBHdmi = AssetInterface::factory()->create([
+            'asset_id' => $assetB->id,
+            'name' => 'HDMI In',
+            'connection_type_id' => $hdmi->id,
+        ]);
 
         $this->actingAs($user)
             ->post(route('assets.connections.store', $assetA), [
                 'local_interface_id' => $ifaceA->id,
+                'peer_asset_id' => $assetB->id,
                 'peer_interface_id' => $ifaceB->id,
-                'connection_type_id' => $network->id,
                 'label' => 'Primary',
             ])
             ->assertRedirect(route('assets.show', [$assetA, 'tab' => 'connections']));
@@ -248,16 +282,52 @@ class AssetConnectionFeatureTest extends TestCase
         $this->assertNotNull($first);
         $this->assertSame(min($ifaceA->id, $ifaceB->id), $first->interface_a_id);
         $this->assertSame(max($ifaceA->id, $ifaceB->id), $first->interface_b_id);
+        $this->assertSame($network->id, $first->connection_type_id);
 
         $this->actingAs($user)
             ->post(route('assets.connections.store', $assetA), [
-                'local_interface_id' => $ifaceA->id,
-                'peer_interface_id' => $ifaceB->id,
-                'connection_type_id' => $hdmi->id,
+                'local_interface_id' => $ifaceAHdmi->id,
+                'peer_asset_id' => $assetB->id,
+                'peer_interface_id' => $ifaceBHdmi->id,
             ])
             ->assertRedirect(route('assets.show', [$assetA, 'tab' => 'connections']));
 
         $this->assertSame(2, AssetConnection::query()->count());
+        $this->assertDatabaseHas('asset_connections', [
+            'connection_type_id' => $hdmi->id,
+        ]);
+    }
+
+    public function test_connection_can_create_missing_peer_interface(): void
+    {
+        $user = $this->manager();
+        $assetA = $this->makeAsset(name: 'Switch');
+        $assetB = $this->makeAsset(name: 'Encoder');
+        $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
+        $ifaceA = AssetInterface::factory()->create([
+            'asset_id' => $assetA->id,
+            'name' => 'Port 1',
+            'connection_type_id' => $network->id,
+        ]);
+
+        $this->assertSame(0, $assetB->interfaces()->count());
+
+        $this->actingAs($user)
+            ->post(route('assets.connections.store', $assetA), [
+                'local_interface_id' => $ifaceA->id,
+                'peer_asset_id' => $assetB->id,
+                'new_peer_interface_name' => 'Uplink',
+                'label' => 'Trunk',
+            ])
+            ->assertRedirect(route('assets.show', [$assetA, 'tab' => 'connections']));
+
+        $peerIface = $assetB->interfaces()->where('name', 'Uplink')->first();
+        $this->assertNotNull($peerIface);
+        $this->assertSame($network->id, $peerIface->connection_type_id);
+        $this->assertDatabaseHas('asset_connections', [
+            'connection_type_id' => $network->id,
+            'label' => 'Trunk',
+        ]);
     }
 
     public function test_custom_protocol_is_required_when_type_allows_protocol(): void
@@ -265,24 +335,30 @@ class AssetConnectionFeatureTest extends TestCase
         $user = $this->manager();
         $assetA = $this->makeAsset(name: 'A');
         $assetB = $this->makeAsset(name: 'B');
-        $ifaceA = AssetInterface::factory()->create(['asset_id' => $assetA->id]);
-        $ifaceB = AssetInterface::factory()->create(['asset_id' => $assetB->id]);
         $custom = ConnectionType::query()->where('slug', 'custom-protocol')->firstOrFail();
+        $ifaceA = AssetInterface::factory()->create([
+            'asset_id' => $assetA->id,
+            'connection_type_id' => $custom->id,
+        ]);
+        $ifaceB = AssetInterface::factory()->create([
+            'asset_id' => $assetB->id,
+            'connection_type_id' => $custom->id,
+        ]);
 
         $this->actingAs($user)
             ->from(route('assets.show', [$assetA, 'tab' => 'connections']))
             ->post(route('assets.connections.store', $assetA), [
                 'local_interface_id' => $ifaceA->id,
+                'peer_asset_id' => $assetB->id,
                 'peer_interface_id' => $ifaceB->id,
-                'connection_type_id' => $custom->id,
             ])
             ->assertSessionHasErrors('protocol');
 
         $this->actingAs($user)
             ->post(route('assets.connections.store', $assetA), [
                 'local_interface_id' => $ifaceA->id,
+                'peer_asset_id' => $assetB->id,
                 'peer_interface_id' => $ifaceB->id,
-                'connection_type_id' => $custom->id,
                 'protocol' => 'NDI|HX',
             ])
             ->assertRedirect(route('assets.show', [$assetA, 'tab' => 'connections']));
@@ -374,9 +450,17 @@ class AssetConnectionFeatureTest extends TestCase
         $user = $this->scanner();
         $assetA = $this->makeAsset(name: 'Display');
         $assetB = $this->makeAsset(name: 'Matrix');
-        $ifaceA = AssetInterface::factory()->create(['asset_id' => $assetA->id, 'name' => 'HDMI In']);
-        $ifaceB = AssetInterface::factory()->create(['asset_id' => $assetB->id, 'name' => 'Out 3']);
         $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+        $ifaceA = AssetInterface::factory()->create([
+            'asset_id' => $assetA->id,
+            'name' => 'HDMI In',
+            'connection_type_id' => $hdmi->id,
+        ]);
+        $ifaceB = AssetInterface::factory()->create([
+            'asset_id' => $assetB->id,
+            'name' => 'Out 3',
+            'connection_type_id' => $hdmi->id,
+        ]);
 
         app(AssetConnectionService::class)->create($ifaceA, $ifaceB, $hdmi, ['label' => 'Program']);
 
@@ -386,7 +470,230 @@ class AssetConnectionFeatureTest extends TestCase
             ->assertSee('Matrix', false)
             ->assertSee('Out 3', false)
             ->assertSee('Program', false)
-            ->assertSee(route('assets.show', [$assetB, 'tab' => 'connections']), false);
+            ->assertSee('Create new peer interface', false)
+            ->assertSee(route('assets.show', [$assetB, 'tab' => 'connections']), false)
+            ->assertSee('View connection map', false)
+            ->assertSee(route('reports.connection-map', ['asset_id' => $assetA->id]), false);
+    }
+
+    public function test_connections_tab_hides_map_link_without_connections(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->makeAsset(name: 'Lonely');
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [$asset, 'tab' => 'connections']))
+            ->assertOk()
+            ->assertDontSee('View connection map', false);
+    }
+
+    public function test_map_filters_to_connected_component_from_asset(): void
+    {
+        $user = $this->manager();
+        $type = $this->makeItemType();
+        $assetA = $this->makeAsset($type, name: 'Focus Hub');
+        $assetB = $this->makeAsset($type, name: 'Peer One');
+        $assetC = $this->makeAsset($type, name: 'Peer Two');
+        $assetD = $this->makeAsset($type, name: 'Other Island');
+        $assetE = $this->makeAsset($type, name: 'Other Peer');
+
+        $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+        $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
+
+        $ifaceA1 = AssetInterface::factory()->create(['asset_id' => $assetA->id, 'name' => 'Out 1']);
+        $ifaceA2 = AssetInterface::factory()->create(['asset_id' => $assetA->id, 'name' => 'Out 2']);
+        $ifaceB = AssetInterface::factory()->create(['asset_id' => $assetB->id, 'name' => 'In']);
+        $ifaceC = AssetInterface::factory()->create(['asset_id' => $assetC->id, 'name' => 'In']);
+        $ifaceD = AssetInterface::factory()->create(['asset_id' => $assetD->id, 'name' => 'LAN']);
+        $ifaceE = AssetInterface::factory()->create(['asset_id' => $assetE->id, 'name' => 'LAN']);
+
+        $service = app(AssetConnectionService::class);
+        $service->create($ifaceA1, $ifaceB, $hdmi);
+        $service->create($ifaceA2, $ifaceC, $hdmi);
+        $service->create($ifaceD, $ifaceE, $network);
+
+        $response = $this->actingAs($user)->get(route('reports.connection-map', [
+            'asset_id' => $assetA->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Focus Hub', false);
+        $response->assertSee('Peer One', false);
+        $response->assertSee('Peer Two', false);
+        $response->assertSee('Focused on', false);
+        $response->assertDontSee('Other Island', false);
+        $response->assertDontSee('Other Peer', false);
+
+        $graph = $service->buildGraph(['asset_id' => $assetA->id]);
+        $this->assertSame($assetA->id, $graph['focus_asset_id']);
+        $this->assertSame(3, $graph['asset_count']);
+        $this->assertCount(3, $graph['nodes']);
+        $this->assertCount(2, $graph['edges']);
+        $focusNode = collect($graph['nodes'])->first(
+            fn (array $node): bool => (int) $node['data']['asset_id'] === $assetA->id
+                && ($node['data']['kind'] ?? null) === 'asset'
+        );
+        $this->assertNotNull($focusNode);
+        $this->assertTrue($focusNode['data']['focus']);
+        $this->assertSame('focus', $focusNode['classes'] ?? null);
+    }
+
+    public function test_build_graph_uses_compound_nodes_when_asset_has_multiple_connection_types(): void
+    {
+        $type = $this->makeItemType();
+        $hub = $this->makeAsset($type, name: 'Multi Hub');
+        $hdmiPeer = $this->makeAsset($type, name: 'HDMI Peer');
+        $netPeer = $this->makeAsset($type, name: 'Net Peer');
+
+        $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+        $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
+
+        $hubHdmi = AssetInterface::factory()->create(['asset_id' => $hub->id, 'name' => 'HDMI Out']);
+        $hubNet = AssetInterface::factory()->create(['asset_id' => $hub->id, 'name' => 'LAN']);
+        $peerHdmi = AssetInterface::factory()->create(['asset_id' => $hdmiPeer->id, 'name' => 'In']);
+        $peerNet = AssetInterface::factory()->create(['asset_id' => $netPeer->id, 'name' => 'LAN']);
+
+        $service = app(AssetConnectionService::class);
+        $service->create($hubHdmi, $peerHdmi, $hdmi);
+        $service->create($hubNet, $peerNet, $network);
+
+        $graph = $service->buildGraph();
+        $this->assertSame(3, $graph['asset_count']);
+        $this->assertCount(2, $graph['edges']);
+
+        $hubNodes = collect($graph['nodes'])->filter(
+            fn (array $node): bool => (int) $node['data']['asset_id'] === $hub->id
+        );
+        $this->assertCount(3, $hubNodes);
+
+        $parent = $hubNodes->first(fn (array $node): bool => ($node['data']['kind'] ?? null) === 'asset');
+        $this->assertNotNull($parent);
+        $this->assertTrue($parent['data']['compound']);
+        $this->assertSame('asset-'.$hub->id, $parent['data']['id']);
+
+        $ports = $hubNodes->filter(fn (array $node): bool => ($node['data']['kind'] ?? null) === 'type-port');
+        $this->assertCount(2, $ports);
+        $this->assertTrue($ports->every(
+            fn (array $node): bool => ($node['data']['parent'] ?? null) === 'asset-'.$hub->id
+        ));
+
+        $edgeSources = collect($graph['edges'])->pluck('data.source')->all();
+        $edgeTargets = collect($graph['edges'])->pluck('data.target')->all();
+        $this->assertContains('asset-'.$hub->id.'-type-'.$hdmi->id, [...$edgeSources, ...$edgeTargets]);
+        $this->assertContains('asset-'.$hub->id.'-type-'.$network->id, [...$edgeSources, ...$edgeTargets]);
+    }
+
+    public function test_connection_create_and_remove_appear_on_both_asset_histories(): void
+    {
+        $user = $this->manager();
+        $assetA = $this->makeAsset(name: 'Display');
+        $assetB = $this->makeAsset(name: 'Matrix');
+        $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+        $ifaceA = AssetInterface::factory()->create([
+            'asset_id' => $assetA->id,
+            'name' => 'HDMI In',
+            'connection_type_id' => $hdmi->id,
+        ]);
+        $ifaceB = AssetInterface::factory()->create([
+            'asset_id' => $assetB->id,
+            'name' => 'Out 3',
+            'connection_type_id' => $hdmi->id,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('assets.connections.store', $assetA), [
+                'local_interface_id' => $ifaceA->id,
+                'peer_asset_id' => $assetB->id,
+                'peer_interface_id' => $ifaceB->id,
+                'label' => 'Program',
+            ])
+            ->assertRedirect(route('assets.show', [$assetA, 'tab' => 'connections']));
+
+        $connection = AssetConnection::query()->first();
+        $this->assertNotNull($connection);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_type' => Asset::class,
+            'auditable_id' => $assetA->id,
+            'action' => 'connection_created',
+            'user_id' => $user->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_type' => Asset::class,
+            'auditable_id' => $assetB->id,
+            'action' => 'connection_created',
+            'user_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [$assetA, 'tab' => 'history']))
+            ->assertOk()
+            ->assertSee('connection created', false)
+            ->assertSee('Connected to Matrix', false)
+            ->assertSee('HDMI In', false)
+            ->assertSee('Out 3', false)
+            ->assertSee('Program', false);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [$assetB, 'tab' => 'history']))
+            ->assertOk()
+            ->assertSee('Connected to Display', false);
+
+        $this->actingAs($user)
+            ->delete(route('assets.connections.destroy', [$assetA, $connection]))
+            ->assertRedirect(route('assets.show', [$assetA, 'tab' => 'connections']));
+
+        $this->assertDatabaseMissing('asset_connections', ['id' => $connection->id]);
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_type' => Asset::class,
+            'auditable_id' => $assetA->id,
+            'action' => 'connection_removed',
+            'user_id' => $user->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_type' => Asset::class,
+            'auditable_id' => $assetB->id,
+            'action' => 'connection_removed',
+            'user_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [$assetA, 'tab' => 'history']))
+            ->assertOk()
+            ->assertSee('connection removed', false)
+            ->assertSee('Disconnected from Matrix', false);
+    }
+
+    public function test_peer_interfaces_endpoint_prioritises_matching_connection_type(): void
+    {
+        $user = $this->manager();
+        $asset = $this->makeAsset(name: 'Local');
+        $peer = $this->makeAsset(name: 'Peer');
+        $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
+        $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+
+        $hdmiIface = AssetInterface::factory()->create([
+            'asset_id' => $peer->id,
+            'name' => 'HDMI Port',
+            'connection_type_id' => $hdmi->id,
+            'sort_order' => 10,
+        ]);
+        $networkIface = AssetInterface::factory()->create([
+            'asset_id' => $peer->id,
+            'name' => 'LAN',
+            'connection_type_id' => $network->id,
+            'sort_order' => 20,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(
+            route('assets.peer-interfaces', [$asset, $peer]).'?connection_type_id='.$network->id
+        );
+
+        $response->assertOk();
+        $ids = collect($response->json('interfaces'))->pluck('id')->all();
+        $this->assertSame([$networkIface->id, $hdmiIface->id], $ids);
+        $this->assertTrue($response->json('interfaces.0.matches_type'));
+        $this->assertFalse($response->json('interfaces.1.matches_type'));
     }
 
     public function test_sync_missing_templates_for_existing_assets(): void

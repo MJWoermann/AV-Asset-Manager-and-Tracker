@@ -919,19 +919,159 @@ Alpine.data('ruVisualiser', (config = {}) => ({
 }));
 
 Alpine.data('assetConnectionsForm', (config = {}) => ({
-    peerAssetId: '',
-    peerInterfaceId: '',
+    localInterfaceId: config.old?.local_interface_id || '',
+    peerAssetId: config.old?.peer_asset_id || '',
+    peerInterfaceId: config.old?.peer_interface_id || '',
     peerInterfaces: [],
     peerLoading: false,
-    connectionTypeId: '',
+    createPeerInterface: Boolean(config.old?.create_peer_interface),
+    newPeerInterfaceName: config.old?.new_peer_interface_name || '',
     allowsProtocolByType: config.allowsProtocolByType || {},
     peerInterfacesUrl: config.peerInterfacesUrl || '',
+    localInterfaces: Array.isArray(config.localInterfaces) ? config.localInterfaces : [],
+    peerAssets: Array.isArray(config.peerAssets) ? config.peerAssets : [],
+    peerOpen: false,
+    peerQuery: '',
+    peerHighlight: -1,
 
-    get needsProtocol() {
-        return Boolean(this.allowsProtocolByType[String(this.connectionTypeId)]);
+    init() {
+        if (this.peerAssetId) {
+            this.loadPeerInterfaces({ preserveSelection: true });
+        }
     },
 
-    async loadPeerInterfaces() {
+    get selectedLocalTypeId() {
+        const local = this.localInterfaces.find((iface) => String(iface.id) === String(this.localInterfaceId));
+        return local?.connection_type_id ? String(local.connection_type_id) : '';
+    },
+
+    get needsProtocol() {
+        return Boolean(this.allowsProtocolByType[this.selectedLocalTypeId]);
+    },
+
+    get peerSelectedLabel() {
+        const opt = this.peerAssets.find((o) => String(o.value) === String(this.peerAssetId));
+        return opt ? opt.label : 'Select…';
+    },
+
+    sortedPeerAssets() {
+        const typeId = this.selectedLocalTypeId;
+
+        return [...this.peerAssets]
+            .map((option) => {
+                const typeIds = Array.isArray(option.connection_type_ids)
+                    ? option.connection_type_ids.map(String)
+                    : [];
+                const matches = typeId !== '' && typeIds.includes(typeId);
+
+                return {
+                    value: String(option.value),
+                    label: String(option.label ?? ''),
+                    connection_type_ids: typeIds,
+                    matches_type: matches,
+                };
+            })
+            .sort((a, b) => {
+                if (a.matches_type !== b.matches_type) {
+                    return a.matches_type ? -1 : 1;
+                }
+
+                return a.label.localeCompare(b.label);
+            });
+    },
+
+    get filteredPeerAssets() {
+        const options = this.sortedPeerAssets();
+        const q = this.peerQuery.trim();
+
+        if (!q) {
+            return options;
+        }
+
+        return options
+            .map((option) => ({ option, score: matchScore(option.label, q) }))
+            .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
+            .sort((a, b) => {
+                if (a.option.matches_type !== b.option.matches_type) {
+                    return a.option.matches_type ? -1 : 1;
+                }
+
+                return a.score - b.score || a.option.label.localeCompare(b.option.label);
+            })
+            .map((entry) => entry.option);
+    },
+
+    highlightedPeerLabel(label) {
+        return highlightSearchTerm(label, this.peerQuery);
+    },
+
+    openPeerList() {
+        this.peerOpen = true;
+        this.peerHighlight = -1;
+        this.$nextTick(() => this.$refs.peerSearch?.focus());
+    },
+
+    closePeerList() {
+        this.peerOpen = false;
+        this.peerQuery = '';
+        this.peerHighlight = -1;
+    },
+
+    selectPeerAsset(option) {
+        this.peerAssetId = option.value;
+        this.closePeerList();
+        this.createPeerInterface = false;
+        this.newPeerInterfaceName = '';
+        this.loadPeerInterfaces();
+    },
+
+    onPeerKeydown(event) {
+        if (!this.peerOpen) {
+            if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                this.openPeerList();
+            }
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            this.closePeerList();
+            return;
+        }
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            this.peerHighlight = Math.min(this.peerHighlight + 1, this.filteredPeerAssets.length - 1);
+            return;
+        }
+
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            this.peerHighlight = Math.max(this.peerHighlight - 1, 0);
+            return;
+        }
+
+        if (event.key === 'Enter' && this.peerHighlight >= 0 && this.filteredPeerAssets[this.peerHighlight]) {
+            event.preventDefault();
+            this.selectPeerAsset(this.filteredPeerAssets[this.peerHighlight]);
+        }
+    },
+
+    onLocalInterfaceChange() {
+        if (this.peerAssetId) {
+            this.loadPeerInterfaces();
+        }
+    },
+
+    onCreatePeerToggle() {
+        if (this.createPeerInterface) {
+            this.peerInterfaceId = '';
+        }
+    },
+
+    async loadPeerInterfaces({ preserveSelection = false } = {}) {
+        const previous = preserveSelection ? this.peerInterfaceId : '';
         this.peerInterfaces = [];
         this.peerInterfaceId = '';
 
@@ -940,12 +1080,26 @@ Alpine.data('assetConnectionsForm', (config = {}) => ({
         }
 
         this.peerLoading = true;
-        const url = this.peerInterfacesUrl.replace('__PEER__', encodeURIComponent(this.peerAssetId));
+        let url = this.peerInterfacesUrl.replace('__PEER__', encodeURIComponent(this.peerAssetId));
+        if (this.selectedLocalTypeId) {
+            url += (url.includes('?') ? '&' : '?') + 'connection_type_id=' + encodeURIComponent(this.selectedLocalTypeId);
+        }
 
         try {
             const res = await fetch(url, { headers: { Accept: 'application/json' } });
             const data = await res.json().catch(() => ({}));
             this.peerInterfaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+
+            const usable = this.peerInterfaces.filter(
+                (iface) => iface.matches_type || !iface.connection_type_id
+            );
+            if (!this.createPeerInterface && usable.length === 0 && this.selectedLocalTypeId) {
+                this.createPeerInterface = true;
+            }
+
+            if (previous && this.peerInterfaces.some((iface) => String(iface.id) === String(previous))) {
+                this.peerInterfaceId = String(previous);
+            }
         } catch (_) {
             this.peerInterfaces = [];
         } finally {
@@ -954,9 +1108,90 @@ Alpine.data('assetConnectionsForm', (config = {}) => ({
     },
 }));
 
-Alpine.data('connectionMap', (graph = { nodes: [], edges: [] }) => ({
+const CONNECTION_MAP_DISPLAY_KEY = 'av_connection_map_display';
+const CONNECTION_TYPE_ICON_PATHS = {
+    network: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M5.5 4.5h13v15h-13z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8.25 8.25h7.5v5.5c0 1.1-.9 2-2 2h-3.5c-1.1 0-2-.9-2-2v-5.5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9.4 8.5v2.5M11.15 8.5v2.5M12.85 8.5v2.5M14.6 8.5v2.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.5 15.75h3"/>',
+    wireless: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4.5 9.75a10.5 10.5 0 0115 0M7.25 12.75a6.5 6.5 0 019.5 0M10 15.75a2.75 2.75 0 014 0M12 18.25h.01"/>',
+    hdmi: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 8.5h16v7H4zM8 15.5v2M16 15.5v2M7 11.5h2M11 11.5h2M15 11.5h2"/>',
+    sdi: '<circle cx="12" cy="12" r="7.25" stroke-width="1.75"/><circle cx="12" cy="12" r="2.5" stroke-width="1.75"/>',
+    dante: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4.5 12h3l2-4 3 8 2-4h5"/>',
+    custom: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M7 7l2.1 2.1M14.9 14.9 17 17M17 7l-2.1 2.1M9.1 14.9 7 17"/>',
+    analog: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 14c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/>',
+    generic: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 12h8M12 8v8M5 5h14v14H5z"/>',
+};
+
+function connectionTypeIconDataUri(iconKey, stroke = '#ffffff') {
+    const paths = CONNECTION_TYPE_ICON_PATHS[iconKey] || CONNECTION_TYPE_ICON_PATHS.generic;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="${stroke}" viewBox="0 0 24 24">${paths}</svg>`;
+
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function defaultConnectionMapDisplay() {
+    return {
+        mapName: true,
+        mapItemType: false,
+        mapLocation: false,
+        mapTypeName: false,
+        showEdgeLabels: true,
+        showTypeIcons: true,
+        popupItemType: true,
+        popupLocation: true,
+        popupTypeName: true,
+        popupProtocol: true,
+        popupConnectionLabel: true,
+        popupInterfaces: true,
+        popupNotes: true,
+        popupLink: true,
+    };
+}
+
+function loadConnectionMapDisplay() {
+    const defaults = defaultConnectionMapDisplay();
+    try {
+        const raw = localStorage.getItem(CONNECTION_MAP_DISPLAY_KEY);
+        if (!raw) {
+            return defaults;
+        }
+        return { ...defaults, ...JSON.parse(raw) };
+    } catch (_) {
+        return defaults;
+    }
+}
+
+Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: null }) => ({
     selection: null,
     cy: null,
+    displayOpen: false,
+    display: loadConnectionMapDisplay(),
+    _onResize: null,
+
+    layoutOptions(elements) {
+        const focusId = graph.focus_asset_id ? Number(graph.focus_asset_id) : null;
+        const rootSelector = focusId ? `#asset-${focusId}` : null;
+        const hasFocusRoot = rootSelector
+            && (graph.nodes || []).some((node) => (
+                Number(node?.data?.asset_id) === focusId && node?.data?.kind === 'asset'
+            ));
+
+        if (hasFocusRoot) {
+            return {
+                name: 'breadthfirst',
+                directed: false,
+                roots: rootSelector,
+                padding: 40,
+                spacingFactor: 1.35,
+                animate: false,
+                avoidOverlap: true,
+            };
+        }
+
+        return {
+            name: elements.length > 40 ? 'cose' : 'circle',
+            animate: false,
+            padding: 40,
+        };
+    },
 
     async init() {
         const elements = [...(graph.nodes || []), ...(graph.edges || [])];
@@ -969,15 +1204,99 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [] }) => ({
                 {
                     selector: 'node',
                     style: {
-                        label: 'data(label)',
-                        'background-color': '#00adb7',
+                        label: 'data(map_label)',
+                        'background-color': 'data(color)',
                         color: '#111827',
                         'text-valign': 'bottom',
                         'text-halign': 'center',
                         'font-size': 10,
                         'text-margin-y': 6,
+                        'text-wrap': 'wrap',
+                        'text-max-width': 90,
                         width: 28,
                         height: 28,
+                        'background-fit': 'contain',
+                        'background-clip': 'node',
+                        'background-width': '58%',
+                        'background-height': '58%',
+                    },
+                },
+                {
+                    selector: 'node:parent',
+                    style: {
+                        label: 'data(map_label)',
+                        'background-color': '#e5e7eb',
+                        'background-opacity': 0.55,
+                        'border-width': 1.5,
+                        'border-color': '#6b7280',
+                        'text-valign': 'top',
+                        'text-halign': 'center',
+                        'text-margin-y': -6,
+                        padding: 14,
+                        shape: 'roundrectangle',
+                        color: '#111827',
+                        'font-size': 11,
+                        'font-weight': '600',
+                        'background-image': 'none',
+                    },
+                },
+                {
+                    selector: 'node.type-port',
+                    style: {
+                        'background-color': 'data(color)',
+                        width: 24,
+                        height: 24,
+                        'font-size': 8,
+                        'text-max-width': 56,
+                    },
+                },
+                {
+                    selector: 'node.focus',
+                    style: {
+                        'border-width': 3,
+                        'border-color': '#111827',
+                        width: 36,
+                        height: 36,
+                        'font-size': 11,
+                        'font-weight': 'bold',
+                    },
+                },
+                {
+                    selector: 'node:parent.focus',
+                    style: {
+                        'border-width': 3,
+                        'border-color': '#111827',
+                        'background-color': '#d1d5db',
+                    },
+                },
+                {
+                    selector: 'node.selected',
+                    style: {
+                        width: 42,
+                        height: 42,
+                        'font-size': 11,
+                        'font-weight': 'bold',
+                        'border-width': 3,
+                        'border-color': '#111827',
+                        'text-margin-y': 8,
+                    },
+                },
+                {
+                    selector: 'node:parent.selected',
+                    style: {
+                        'border-width': 3,
+                        'border-color': '#007a82',
+                        'background-color': '#cfd8dc',
+                        'background-opacity': 0.7,
+                    },
+                },
+                {
+                    selector: 'node.type-port.selected',
+                    style: {
+                        width: 30,
+                        height: 30,
+                        'border-width': 3,
+                        'border-color': '#111827',
                     },
                 },
                 {
@@ -987,33 +1306,35 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [] }) => ({
                         'line-color': 'data(color)',
                         'target-arrow-color': 'data(color)',
                         'curve-style': 'bezier',
-                        label: 'data(label)',
+                        label: 'data(edge_label)',
                         'font-size': 9,
                         color: '#4b5563',
                         'text-rotation': 'autorotate',
+                        'text-background-color': '#ffffff',
+                        'text-background-opacity': 0.75,
+                        'text-background-padding': 2,
                     },
                 },
             ],
-            layout: {
-                name: elements.length > 40 ? 'cose' : 'circle',
-                animate: false,
-                padding: 24,
-            },
+            layout: this.layoutOptions(elements),
         });
+
+        this.applyDisplayOptions();
 
         this.cy.on('tap', 'node', (event) => {
             const data = event.target.data();
             this.selection = {
-                kind: 'node',
                 ...data,
+                kind: 'node',
+                node_kind: data.kind || 'asset',
             };
         });
 
         this.cy.on('tap', 'edge', (event) => {
             const data = event.target.data();
             this.selection = {
-                kind: 'edge',
                 ...data,
+                kind: 'edge',
             };
         });
 
@@ -1022,6 +1343,135 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [] }) => ({
                 this.selection = null;
             }
         });
+
+        this.$watch('selection', () => this.syncSelectedNode());
+        this.$watch('display', () => {
+            this.persistDisplayOptions();
+            this.applyDisplayOptions();
+        }, { deep: true });
+
+        this._onResize = () => {
+            if (!this.cy) {
+                return;
+            }
+            this.cy.resize();
+        };
+        window.addEventListener('resize', this._onResize);
+        requestAnimationFrame(() => {
+            this._onResize();
+            if (this.cy && elements.length) {
+                const focusId = graph.focus_asset_id ? Number(graph.focus_asset_id) : null;
+                const focusNode = focusId ? this.cy.$id(`asset-${focusId}`) : null;
+                if (focusNode && focusNode.nonempty()) {
+                    this.cy.center(focusNode);
+                    this.cy.fit(undefined, 40);
+                } else {
+                    this.cy.fit(undefined, 40);
+                }
+            }
+        });
+    },
+
+    mapLabelForNode(data) {
+        if (data.kind === 'type-port') {
+            if (this.display.mapTypeName && data.type_name) {
+                return data.type_name;
+            }
+            return '';
+        }
+
+        const parts = [];
+        if (this.display.mapName && data.name) {
+            parts.push(data.name);
+        }
+        if (this.display.mapItemType && data.item_type) {
+            parts.push(data.item_type);
+        }
+        if (this.display.mapLocation && data.location) {
+            parts.push(data.location);
+        }
+        if (this.display.mapTypeName && data.type_name && !data.compound) {
+            parts.push(data.type_name);
+        }
+
+        return parts.join('\n');
+    },
+
+    applyDisplayOptions() {
+        if (!this.cy) {
+            return;
+        }
+
+        this.cy.batch(() => {
+            this.cy.nodes().forEach((node) => {
+                const data = node.data();
+                node.data('map_label', this.mapLabelForNode(data));
+
+                const canShowIcon = this.display.showTypeIcons
+                    && data.kind !== undefined
+                    && (data.kind === 'type-port' || (data.kind === 'asset' && !data.compound));
+
+                if (canShowIcon && data.icon) {
+                    node.data('icon_url', connectionTypeIconDataUri(data.icon));
+                    node.style('background-image', node.data('icon_url'));
+                } else {
+                    node.style('background-image', 'none');
+                }
+            });
+
+            this.cy.edges().forEach((edge) => {
+                edge.data(
+                    'edge_label',
+                    this.display.showEdgeLabels ? (edge.data('label') || '') : '',
+                );
+            });
+        });
+    },
+
+    persistDisplayOptions() {
+        try {
+            localStorage.setItem(CONNECTION_MAP_DISPLAY_KEY, JSON.stringify(this.display));
+        } catch (_) {
+            // Ignore quota / private mode failures.
+        }
+    },
+
+    syncSelectedNode() {
+        if (!this.cy) {
+            return;
+        }
+
+        this.cy.nodes().removeClass('selected');
+
+        if (this.selection?.kind !== 'node' || !this.selection.id) {
+            return;
+        }
+
+        const node = this.cy.$id(String(this.selection.id));
+        if (!node.nonempty()) {
+            return;
+        }
+
+        node.addClass('selected');
+
+        const parentId = node.data('parent');
+        if (parentId) {
+            const parent = this.cy.$id(String(parentId));
+            if (parent.nonempty()) {
+                parent.addClass('selected');
+            }
+        }
+    },
+
+    destroy() {
+        if (this._onResize) {
+            window.removeEventListener('resize', this._onResize);
+            this._onResize = null;
+        }
+        if (this.cy) {
+            this.cy.destroy();
+            this.cy = null;
+        }
     },
 }));
 
@@ -1131,6 +1581,39 @@ Alpine.data('customFieldSetForm', (initialFields = []) => ({
     },
 }));
 
+Alpine.data('dashboardModules', (initialModules = []) => ({
+    open: false,
+    modules: (initialModules || []).map((module) => ({
+        id: module.id,
+        label: module.label,
+        enabled: Boolean(module.enabled),
+    })),
+
+    moveUp(index) {
+        if (index <= 0) {
+            return;
+        }
+
+        const modules = [...this.modules];
+        const previous = modules[index - 1];
+        modules[index - 1] = modules[index];
+        modules[index] = previous;
+        this.modules = modules;
+    },
+
+    moveDown(index) {
+        if (index >= this.modules.length - 1) {
+            return;
+        }
+
+        const modules = [...this.modules];
+        const next = modules[index + 1];
+        modules[index + 1] = modules[index];
+        modules[index] = next;
+        this.modules = modules;
+    },
+}));
+
 Alpine.data('bulkAssets', () => ({
     selected: {},
     panelOpen: false,
@@ -1180,7 +1663,7 @@ Alpine.data('bulkAssets', () => ({
                             },
                             body: JSON.stringify({
                                 sessionId: 'c8166a',
-                                runId: 'pre-fix',
+                                runId: 'post-fix',
                                 hypothesisId: 'A',
                                 location: 'app.js:bulkAssets.init.click',
                                 message: 'Native click on select-all',
@@ -1204,7 +1687,7 @@ Alpine.data('bulkAssets', () => ({
                 },
                 body: JSON.stringify({
                     sessionId: 'c8166a',
-                    runId: 'pre-fix',
+                    runId: 'post-fix',
                     hypothesisId: 'A',
                     location: 'app.js:bulkAssets.init',
                     message: 'bulkAssets init select-all probe',
@@ -1259,7 +1742,7 @@ Alpine.data('bulkAssets', () => ({
             },
             body: JSON.stringify({
                 sessionId: 'c8166a',
-                runId: 'pre-fix',
+                runId: 'post-fix',
                 hypothesisId: 'E',
                 location: 'app.js:bulkAssets.setSelected',
                 message: 'Row checkbox setSelected',
@@ -1288,7 +1771,7 @@ Alpine.data('bulkAssets', () => ({
             },
             body: JSON.stringify({
                 sessionId: 'c8166a',
-                runId: 'pre-fix',
+                runId: 'post-fix',
                 hypothesisId: 'B',
                 location: 'app.js:bulkAssets.toggleAll',
                 message: 'toggleAll invoked',
@@ -1321,7 +1804,7 @@ Alpine.data('bulkAssets', () => ({
                 },
                 body: JSON.stringify({
                     sessionId: 'c8166a',
-                    runId: 'pre-fix',
+                    runId: 'post-fix',
                     hypothesisId: 'C',
                     location: 'app.js:bulkAssets.toggleAll.after',
                     message: 'toggleAll after state',
