@@ -31,18 +31,86 @@ return new class extends Migration
             $table->unique('event_key');
         });
 
-        Schema::create('notification_template_recipient', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('notification_template_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('notification_recipient_id')->constrained()->cascadeOnDelete();
-            $table->json('required_fields')->nullable();
-            $table->timestamps();
+        // #region agent log
+        $autoFkRecipient = 'notification_template_recipient_notification_recipient_id_foreign';
+        $shortFks = [
+            'ntr_template_id_fk' => 'notification_template_id',
+            'ntr_recipient_id_fk' => 'notification_recipient_id',
+        ];
+        $logPath = base_path('debug-b5626b.log');
+        file_put_contents($logPath, json_encode([
+            'sessionId' => 'b5626b',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'A',
+            'location' => '2026_10_15_110000_create_email_integration_tables.php:before-pivot',
+            'message' => 'Using short FK names under MySQL 64-char limit',
+            'data' => [
+                'driver' => \Illuminate\Support\Facades\DB::getDriverName(),
+                'mysql_limit' => 64,
+                'auto_fk_recipient' => $autoFkRecipient,
+                'auto_fk_recipient_len' => strlen($autoFkRecipient),
+                'auto_fk_recipient_over_limit' => strlen($autoFkRecipient) > 64,
+                'short_fks' => array_map(fn (string $name): array => [
+                    'name' => $name,
+                    'len' => strlen($name),
+                    'over_limit' => strlen($name) > 64,
+                ], array_keys($shortFks)),
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
+        // #endregion
 
-            $table->unique(
-                ['notification_template_id', 'notification_recipient_id'],
-                'notif_template_recipient_unique'
-            );
-        });
+        try {
+            Schema::create('notification_template_recipient', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('notification_template_id');
+                $table->foreignId('notification_recipient_id');
+                $table->json('required_fields')->nullable();
+                $table->timestamps();
+
+                $table->foreign('notification_template_id', 'ntr_template_id_fk')
+                    ->references('id')
+                    ->on('notification_templates')
+                    ->cascadeOnDelete();
+                $table->foreign('notification_recipient_id', 'ntr_recipient_id_fk')
+                    ->references('id')
+                    ->on('notification_recipients')
+                    ->cascadeOnDelete();
+
+                $table->unique(
+                    ['notification_template_id', 'notification_recipient_id'],
+                    'notif_template_recipient_unique'
+                );
+            });
+            // #region agent log
+            file_put_contents($logPath, json_encode([
+                'sessionId' => 'b5626b',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'A',
+                'location' => '2026_10_15_110000_create_email_integration_tables.php:pivot-ok',
+                'message' => 'notification_template_recipient created successfully',
+                'data' => ['ok' => true],
+                'timestamp' => (int) (microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+            // #endregion
+        } catch (\Throwable $e) {
+            // #region agent log
+            file_put_contents($logPath, json_encode([
+                'sessionId' => 'b5626b',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'A',
+                'location' => '2026_10_15_110000_create_email_integration_tables.php:pivot-catch',
+                'message' => 'notification_template_recipient create failed',
+                'data' => [
+                    'exception' => $e::class,
+                    'error' => $e->getMessage(),
+                    'sqlstate_1059' => str_contains($e->getMessage(), '1059'),
+                ],
+                'timestamp' => (int) (microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+            // #endregion
+            throw $e;
+        }
 
         Schema::create('outbound_email_threads', function (Blueprint $table) {
             $table->id();
