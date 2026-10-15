@@ -1,9 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl">Inbound email review</h2>
+        <h2 class="font-semibold text-xl">Email</h2>
     </x-slot>
 
     <div class="max-w-7xl mx-auto px-4 space-y-4">
+        <x-email-tabs />
+
         @if (session('status'))
             <p class="text-sm text-brand">{{ session('status') }}</p>
         @endif

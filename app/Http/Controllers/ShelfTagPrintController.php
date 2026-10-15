@@ -76,7 +76,7 @@ class ShelfTagPrintController extends Controller
             $preselectedIds = [];
         }
 
-        return view('shelf-tags.print.create', [
+        return view('shelf-tags.index', [
             'lists' => $lists,
             'layouts' => $layouts,
             'selectedListId' => $selectedListId,
@@ -117,7 +117,7 @@ class ShelfTagPrintController extends Controller
         $job = $this->jobFromSession($request);
         if ($job === null) {
             return redirect()
-                ->route('shelf-tags.print.create')
+                ->route('shelf-tags.index')
                 ->withErrors(['shelf_tag_layout_id' => 'Choose a layout and list to preview shelf tags.']);
         }
 
@@ -138,7 +138,7 @@ class ShelfTagPrintController extends Controller
         $job = $this->jobFromSession($request);
         if ($job === null) {
             return redirect()
-                ->route('shelf-tags.print.create')
+                ->route('shelf-tags.index')
                 ->withErrors(['shelf_tag_layout_id' => 'Choose a layout and list before downloading PDF.']);
         }
 

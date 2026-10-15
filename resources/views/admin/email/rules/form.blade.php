@@ -3,7 +3,9 @@
         <h2 class="font-semibold text-xl">{{ $rule->exists ? 'Edit inbound rule' : 'New inbound rule' }}</h2>
     </x-slot>
 
-    <div class="max-w-3xl mx-auto px-4">
+    <div class="max-w-3xl mx-auto px-4 space-y-4">
+        <x-email-tabs />
+
         <form method="POST" action="{{ $rule->exists ? route('admin.email.rules.update', $rule) : route('admin.email.rules.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             @if($rule->exists) @method('PUT') @endif

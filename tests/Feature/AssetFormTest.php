@@ -44,4 +44,19 @@ class AssetFormTest extends TestCase
         $response->assertSee('name="location_id"', false);
         $response->assertSee('name="parent_id"', false);
     }
+
+    public function test_create_form_marks_required_fields(): void
+    {
+        $user = $this->manager();
+
+        $response = $this->actingAs($user)->get(route('assets.create'));
+
+        $response->assertOk();
+        $response->assertSee('Required field', false);
+        $this->assertSame(
+            3,
+            substr_count($response->getContent(), 'sr-only">(required)'),
+            'Name, Item type, and Status should each show a required marker'
+        );
+    }
 }

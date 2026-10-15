@@ -17,6 +17,7 @@ use App\Http\Controllers\AssetInterfaceController;
 use App\Http\Controllers\AssetListController;
 use App\Http\Controllers\AssetMaintenanceLogController;
 use App\Http\Controllers\AssetRuPlacementController;
+use App\Http\Controllers\AssetShelfTagPrintController;
 use App\Http\Controllers\AssetStockController;
 use App\Http\Controllers\AssetStockTokenController;
 use App\Http\Controllers\ConnectionMapController;
@@ -233,11 +234,22 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
             ->name('assets.kanban-tags.print');
     });
 
+    Route::middleware(['feature:shelf_tag_generator', 'role:admin,inventory_manager'])->group(function () {
+        Route::get('/assets/{asset}/shelf-tag', [AssetShelfTagPrintController::class, 'show'])
+            ->name('assets.shelf-tag');
+        Route::get('/assets/{asset}/shelf-tag/pdf', [AssetShelfTagPrintController::class, 'pdf'])
+            ->name('assets.shelf-tag.pdf');
+    });
+
     Route::middleware(['feature:shelf_tag_generator', 'role:admin,inventory_manager'])
         ->prefix('shelf-tags')
         ->name('shelf-tags.')
         ->group(function () {
+            Route::get('/', [ShelfTagPrintController::class, 'create'])->name('index');
+
             Route::get('/layouts', [ShelfTagLayoutController::class, 'index'])->name('layouts.index');
+            Route::get('/layouts/import', [ShelfTagLayoutController::class, 'importForm'])->name('layouts.import');
+            Route::post('/layouts/import', [ShelfTagLayoutController::class, 'import'])->name('layouts.import.store');
             Route::get('/layouts/create', [ShelfTagLayoutController::class, 'create'])->name('layouts.create');
             Route::post('/layouts', [ShelfTagLayoutController::class, 'store'])->name('layouts.store');
             Route::get('/layouts/{layout}/edit', [ShelfTagLayoutController::class, 'edit'])->name('layouts.edit');

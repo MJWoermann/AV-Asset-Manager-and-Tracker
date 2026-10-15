@@ -6,6 +6,66 @@ class ShelfTagPaperPresets
 {
     public const DEFAULT = 'continuous_62';
 
+    /** Typical Brother continuous cut length bounds (mm). */
+    public const CONTINUOUS_LENGTH_MIN_MM = 29.0;
+
+    public const CONTINUOUS_LENGTH_MAX_MM = 300.0;
+
+    public const LENGTH_MODE_FIXED = 'fixed';
+
+    public const LENGTH_MODE_AUTO = 'auto';
+
+    /** @return list<string> */
+    public static function lengthModes(): array
+    {
+        return [self::LENGTH_MODE_FIXED, self::LENGTH_MODE_AUTO];
+    }
+
+    /**
+     * Default layout-editor viewport settings (shared on the template).
+     *
+     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float}
+     */
+    public static function defaultEditorSettings(): array
+    {
+        return [
+            'show_grid' => true,
+            'snap_to_grid' => false,
+            'grid_size_mm' => 5.0,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $settings
+     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float}
+     */
+    public static function normalizeEditorSettings(?array $settings): array
+    {
+        $defaults = self::defaultEditorSettings();
+        if ($settings === null) {
+            return $defaults;
+        }
+
+        $gridSize = (float) ($settings['grid_size_mm'] ?? $defaults['grid_size_mm']);
+        if (! in_array($gridSize, [2.5, 5.0, 10.0], true)) {
+            $gridSize = $defaults['grid_size_mm'];
+        }
+
+        return [
+            'show_grid' => (bool) ($settings['show_grid'] ?? $defaults['show_grid']),
+            'snap_to_grid' => (bool) ($settings['snap_to_grid'] ?? $defaults['snap_to_grid']),
+            'grid_size_mm' => $gridSize,
+        ];
+    }
+
+    public static function clampContinuousLength(float $heightMm): float
+    {
+        return round(
+            min(self::CONTINUOUS_LENGTH_MAX_MM, max(self::CONTINUOUS_LENGTH_MIN_MM, $heightMm)),
+            1
+        );
+    }
+
     /**
      * Brother QL / DK paper presets in millimetres.
      *
@@ -27,7 +87,7 @@ class ShelfTagPaperPresets
                 'height_mm' => null,
                 'continuous' => true,
                 'printers' => ['QL-700', 'QL-1100'],
-                'notes' => 'Default. Set label length in the layout (e.g. 29–100 mm).',
+                'notes' => 'Default. Set label length in the layout (e.g. 29–300 mm).',
             ],
             'continuous_102' => [
                 'label' => '102 mm continuous (wide)',

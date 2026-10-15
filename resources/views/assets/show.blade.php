@@ -7,6 +7,11 @@
                     <a href="http://{{ $asset->ip_address }}" target="_blank" rel="noopener" class="px-3 py-2 bg-brand text-white text-sm">Open IP</a>
                 @endif
                 <a href="{{ route('assets.edit', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
+                @role('admin|inventory_manager')
+                    @feature('shelf_tag_generator')
+                        <a href="{{ route('assets.shelf-tag', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
+                    @endfeature
+                @endrole
             </div>
         </div>
     </x-slot>

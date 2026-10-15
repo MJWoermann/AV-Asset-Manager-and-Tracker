@@ -2,25 +2,48 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ImportShelfTagLbxRequest;
 use App\Http\Requests\StoreShelfTagLayoutRequest;
 use App\Http\Requests\UpdateShelfTagLayoutRequest;
 use App\Models\ShelfTagLayout;
+use App\Services\ShelfTagLbxImporter;
 use App\Support\ShelfTagFieldKeys;
 use App\Support\ShelfTagPaperPresets;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 class ShelfTagLayoutController extends Controller
 {
-    public function index(): View
+    public function index(): RedirectResponse
     {
-        $layouts = ShelfTagLayout::query()
-            ->orderBy('name')
-            ->get();
+        return redirect()->route('shelf-tags.index');
+    }
 
-        return view('shelf-tags.layouts.index', compact('layouts'));
+    public function importForm(): View
+    {
+        return view('shelf-tags.layouts.import');
+    }
+
+    public function import(ImportShelfTagLbxRequest $request, ShelfTagLbxImporter $importer): RedirectResponse
+    {
+        try {
+            $result = $importer->import($request->file('lbx'), $request->user());
+        } catch (InvalidArgumentException $exception) {
+            return back()
+                ->withInput()
+                ->withErrors(['lbx' => $exception->getMessage()]);
+        }
+
+        $status = 'Imported P-touch layout. Review field bindings and tweak in the designer.';
+        $warnings = $result['warnings'];
+
+        return redirect()
+            ->route('shelf-tags.layouts.edit', $result['layout'])
+            ->with('status', $status)
+            ->with('import_warnings', $warnings);
     }
 
     public function create(): View
@@ -30,7 +53,9 @@ class ShelfTagLayoutController extends Controller
             'width_mm' => ShelfTagPaperPresets::defaultWidthMm(ShelfTagPaperPresets::DEFAULT),
             'height_mm' => ShelfTagPaperPresets::defaultHeightMm(ShelfTagPaperPresets::DEFAULT),
             'orientation' => 'portrait',
+            'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
             'elements' => [],
+            'editor_settings' => ShelfTagPaperPresets::defaultEditorSettings(),
         ]);
 
         return view('shelf-tags.layouts.form', $this->formData($layout));
@@ -83,7 +108,7 @@ class ShelfTagLayoutController extends Controller
         $layout->delete();
 
         return redirect()
-            ->route('shelf-tags.layouts.index')
+            ->route('shelf-tags.index')
             ->with('status', 'Shelf tag layout deleted.');
     }
 

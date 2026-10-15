@@ -28,14 +28,17 @@
         </div>
     <?php elseif($type === 'barcode'): ?>
         <?php if(!empty($forPdf) && !empty($element['image_data_uri'])): ?>
-            <img src="<?php echo e($element['image_data_uri']); ?>" alt="" style="width:100%;height:100%;object-fit:contain;">
+            <img src="<?php echo e($element['image_data_uri']); ?>" alt="" style="width:100%;height:100%;object-fit:contain;object-position:center;">
         <?php else: ?>
-            <svg
-                class="w-full h-full shelf-tag-barcode"
-                data-value="<?php echo e($value); ?>"
-                data-symbology="<?php echo e($props['symbology'] ?? 'code128'); ?>"
-                data-show-text="<?php echo e(!empty($props['showText']) ? '1' : '0'); ?>"
-            ></svg>
+            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                <svg
+                    class="shelf-tag-barcode"
+                    style="width:100%;height:100%;"
+                    data-value="<?php echo e($value); ?>"
+                    data-symbology="<?php echo e($props['symbology'] ?? 'code128'); ?>"
+                    data-show-text="<?php echo e(!empty($props['showText']) ? '1' : '0'); ?>"
+                ></svg>
+            </div>
         <?php endif; ?>
     <?php elseif($type === 'qr'): ?>
         <?php if(!empty($forPdf) && !empty($element['image_data_uri'])): ?>

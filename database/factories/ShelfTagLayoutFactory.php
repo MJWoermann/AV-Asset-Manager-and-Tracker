@@ -23,7 +23,9 @@ class ShelfTagLayoutFactory extends Factory
             'width_mm' => 62.0,
             'height_mm' => 40.0,
             'orientation' => 'portrait',
+            'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
             'elements' => self::sampleElements(),
+            'editor_settings' => ShelfTagPaperPresets::defaultEditorSettings(),
             'logo_path' => null,
             'created_by' => User::factory(),
         ];

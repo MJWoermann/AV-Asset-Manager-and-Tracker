@@ -3,7 +3,9 @@
         <h2 class="font-semibold text-xl">{{ $recipient->exists ? 'Edit recipient' : 'New recipient' }}</h2>
     </x-slot>
 
-    <div class="max-w-3xl mx-auto px-4">
+    <div class="max-w-3xl mx-auto px-4 space-y-4">
+        <x-email-tabs />
+
         <form method="POST" action="{{ $recipient->exists ? route('admin.email.recipients.update', $recipient) : route('admin.email.recipients.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             @if($recipient->exists) @method('PUT') @endif

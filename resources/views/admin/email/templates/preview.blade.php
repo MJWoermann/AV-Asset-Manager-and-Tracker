@@ -4,6 +4,8 @@
     </x-slot>
 
     <div class="max-w-3xl mx-auto px-4 space-y-4">
+        <x-email-tabs />
+
         <form method="GET" action="{{ route('admin.email.templates.preview', $template) }}" class="bg-white dark:bg-brand-slate border p-4 flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[12rem]">
                 <x-input-label for="asset_id" value="Sample asset" />

@@ -26,7 +26,7 @@
             @feature('shelf_tag_generator')
                 @role('admin|inventory_manager')
                     @if($currentList)
-                        <form method="GET" action="{{ route('shelf-tags.print.create') }}" class="inline">
+                        <form method="GET" action="{{ route('shelf-tags.index') }}" class="inline">
                             <input type="hidden" name="asset_list_id" value="{{ $currentList->id }}">
                             <template x-for="id in selectedIds" :key="'shelf-'+id">
                                 <input type="hidden" name="asset_ids[]" :value="id">

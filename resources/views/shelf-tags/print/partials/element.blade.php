@@ -27,14 +27,17 @@
         </div>
     @elseif($type === 'barcode')
         @if(!empty($forPdf) && !empty($element['image_data_uri']))
-            <img src="{{ $element['image_data_uri'] }}" alt="" style="width:100%;height:100%;object-fit:contain;">
+            <img src="{{ $element['image_data_uri'] }}" alt="" style="width:100%;height:100%;object-fit:contain;object-position:center;">
         @else
-            <svg
-                class="w-full h-full shelf-tag-barcode"
-                data-value="{{ $value }}"
-                data-symbology="{{ $props['symbology'] ?? 'code128' }}"
-                data-show-text="{{ !empty($props['showText']) ? '1' : '0' }}"
-            ></svg>
+            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                <svg
+                    class="shelf-tag-barcode"
+                    style="width:100%;height:100%;"
+                    data-value="{{ $value }}"
+                    data-symbology="{{ $props['symbology'] ?? 'code128' }}"
+                    data-show-text="{{ !empty($props['showText']) ? '1' : '0' }}"
+                ></svg>
+            </div>
         @endif
     @elseif($type === 'qr')
         @if(!empty($forPdf) && !empty($element['image_data_uri']))

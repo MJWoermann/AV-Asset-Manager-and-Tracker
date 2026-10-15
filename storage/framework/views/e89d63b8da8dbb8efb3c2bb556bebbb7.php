@@ -37,7 +37,7 @@
 <?php endif; ?>
                 <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
                     <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
-                        <a href="<?php echo e(route('shelf-tags.print.create', ['asset_list_id' => $list->id])); ?>" class="px-3 py-2 border text-sm">Shelf tags</a>
+                        <a href="<?php echo e(route('shelf-tags.index', ['asset_list_id' => $list->id])); ?>" class="px-3 py-2 border text-sm">Shelf tags</a>
                     <?php endif; ?>
                     <a href="<?php echo e(route('export.list', [$list, 'format' => 'xlsx'])); ?>" class="px-3 py-2 border text-sm">Export</a>
                     <a href="<?php echo e(route('lists.edit', $list)); ?>" class="px-3 py-2 border text-sm">Edit</a>

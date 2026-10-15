@@ -49,6 +49,7 @@ class ScanController extends Controller
             'session' => $active,
             'eventListItems' => $eventListItems,
             'unknownScans' => $unknownScans,
+            'clearScanRecent' => (bool) $request->session()->pull('clear_scan_recent', false),
             'eventLists' => AssetList::where('type', 'event')->orderBy('name')->get(),
             'inventoryLists' => AssetList::where('type', 'inventory')->orderBy('name')->get(),
             'locations' => Location::orderBy('name')->get(),
@@ -86,18 +87,22 @@ class ScanController extends Controller
         $data = $this->validatedSessionLists($request);
         $scan->update($data);
 
+        $eventListChanged = (int) $previousEventListId !== (int) ($data['event_list_id'] ?? 0);
+
         // #region agent log
         file_put_contents(
             base_path('debug-67bc37.log'),
             json_encode([
                 'sessionId' => '67bc37',
+                'runId' => 'post-fix',
                 'location' => 'ScanController.php:updateLists',
                 'message' => 'updateLists called',
                 'data' => [
                     'scanId' => $scan->id,
                     'previousEventListId' => $previousEventListId,
                     'newEventListId' => $data['event_list_id'] ?? null,
-                    'eventListChanged' => (int) $previousEventListId !== (int) ($data['event_list_id'] ?? 0),
+                    'eventListChanged' => $eventListChanged,
+                    'clearScanRecent' => $eventListChanged,
                     'inventoryListId' => $data['inventory_list_id'] ?? null,
                 ],
                 'timestamp' => (int) (microtime(true) * 1000),
@@ -107,7 +112,10 @@ class ScanController extends Controller
         );
         // #endregion
 
-        return redirect()->route('scan.index')->with('status', 'Scan lists updated.');
+        return redirect()
+            ->route('scan.index')
+            ->with('status', 'Scan lists updated.')
+            ->with('clear_scan_recent', $eventListChanged);
     }
 
     public function updateLocation(Request $request, ScanSession $scan): RedirectResponse

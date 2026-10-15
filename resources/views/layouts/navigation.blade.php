@@ -12,8 +12,8 @@
                     <x-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-nav-link>
 
                     @php
-                        $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*', 'reports.connection-map*');
-                        $dataActive = request()->routeIs('locations.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*', 'shelf-tags.*');
+                        $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*', 'reports.connection-map*', 'shelf-tags.*');
+                        $dataActive = request()->routeIs('locations.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
                     @endphp
 
                     <x-dropdown align="left" width="48">
@@ -32,6 +32,11 @@
                             <x-dropdown-link :href="route('reports.unknown-scans')">Unknown scans</x-dropdown-link>
                             @feature('asset_connections')
                                 <x-dropdown-link :href="route('reports.connection-map')">Connection map</x-dropdown-link>
+                            @endfeature
+                            @feature('shelf_tag_generator')
+                                @role('admin|inventory_manager')
+                                    <x-dropdown-link :href="route('shelf-tags.index')">Shelf tags</x-dropdown-link>
+                                @endrole
                             @endfeature
                         </x-slot>
                     </x-dropdown>
@@ -55,10 +60,6 @@
                                 <x-dropdown-link :href="route('files.index')">Files</x-dropdown-link>
                                 @feature('asset_connections')
                                     <x-dropdown-link :href="route('connection-types.index')">Connection types</x-dropdown-link>
-                                @endfeature
-                                @feature('shelf_tag_generator')
-                                    <x-dropdown-link :href="route('shelf-tags.layouts.index')">Shelf tag layouts</x-dropdown-link>
-                                    <x-dropdown-link :href="route('shelf-tags.print.create')">Print shelf tags</x-dropdown-link>
                                 @endfeature
                             @endrole
                         </x-slot>
@@ -89,13 +90,7 @@
                             <x-dropdown-link :href="route('admin.storage.edit')">Storage</x-dropdown-link>
                             <x-dropdown-link :href="route('admin.sso.edit')">SSO</x-dropdown-link>
                             @feature('email_integration')
-                                <div class="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-brand-silver/70">Email</div>
-                                <x-dropdown-link :href="route('admin.email.edit')">Settings</x-dropdown-link>
-                                <x-dropdown-link :href="route('admin.email.recipients.index')">Recipients</x-dropdown-link>
-                                <x-dropdown-link :href="route('admin.email.templates.index')">Templates</x-dropdown-link>
-                                <x-dropdown-link :href="route('admin.email.rules.index')">Rules</x-dropdown-link>
-                                <x-dropdown-link :href="route('admin.email.inbound.index')">Inbound</x-dropdown-link>
-                                <x-dropdown-link :href="route('admin.email.outbound.index')">Outbound</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.email.edit')">Email</x-dropdown-link>
                             @endfeature
                         @endrole
 
@@ -103,9 +98,7 @@
                             @role('inventory_manager')
                                 @unlessrole('admin')
                                     <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
-                                    <div class="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-brand-silver/70">Email</div>
-                                    <x-dropdown-link :href="route('admin.email.inbound.index')">Inbound</x-dropdown-link>
-                                    <x-dropdown-link :href="route('admin.email.outbound.index')">Outbound</x-dropdown-link>
+                                    <x-dropdown-link :href="route('admin.email.inbound.index')">Email</x-dropdown-link>
                                 @endunlessrole
                             @endrole
                         @endfeature
@@ -143,6 +136,11 @@
             @feature('asset_connections')
                 <x-responsive-nav-link :href="route('reports.connection-map')" :active="request()->routeIs('reports.connection-map*')">Connection map</x-responsive-nav-link>
             @endfeature
+            @feature('shelf_tag_generator')
+                @role('admin|inventory_manager')
+                    <x-responsive-nav-link :href="route('shelf-tags.index')" :active="request()->routeIs('shelf-tags.*')">Shelf tags</x-responsive-nav-link>
+                @endrole
+            @endfeature
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Data</div>
             <x-responsive-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">Locations</x-responsive-nav-link>
@@ -152,10 +150,6 @@
                 <x-responsive-nav-link :href="route('files.index')" :active="request()->routeIs('files.index')">Files</x-responsive-nav-link>
                 @feature('asset_connections')
                     <x-responsive-nav-link :href="route('connection-types.index')" :active="request()->routeIs('connection-types.*')">Connection types</x-responsive-nav-link>
-                @endfeature
-                @feature('shelf_tag_generator')
-                    <x-responsive-nav-link :href="route('shelf-tags.layouts.index')" :active="request()->routeIs('shelf-tags.layouts.*')">Shelf tag layouts</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('shelf-tags.print.create')" :active="request()->routeIs('shelf-tags.print.*')">Print shelf tags</x-responsive-nav-link>
                 @endfeature
             @endrole
 
@@ -173,22 +167,14 @@
                 <x-responsive-nav-link :href="route('admin.storage.edit')" :active="request()->routeIs('admin.storage.*')">Storage</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.sso.edit')" :active="request()->routeIs('admin.sso.*')">SSO</x-responsive-nav-link>
                 @feature('email_integration')
-                    <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Email</div>
-                    <x-responsive-nav-link :href="route('admin.email.edit')" :active="request()->routeIs('admin.email.edit', 'admin.email.update', 'admin.email.test')">Settings</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.email.recipients.index')" :active="request()->routeIs('admin.email.recipients.*')">Recipients</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.email.templates.index')" :active="request()->routeIs('admin.email.templates.*')">Templates</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.email.rules.index')" :active="request()->routeIs('admin.email.rules.*')">Rules</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.inbound.*')">Inbound</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.email.outbound.index')" :active="request()->routeIs('admin.email.outbound.*')">Outbound</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('admin.email.edit')" :active="request()->routeIs('admin.email.*')">Email</x-responsive-nav-link>
                 @endfeature
             @endrole
 
             @feature('email_integration')
                 @role('inventory_manager')
                     @unlessrole('admin')
-                        <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Email</div>
-                        <x-responsive-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.inbound.*')">Inbound</x-responsive-nav-link>
-                        <x-responsive-nav-link :href="route('admin.email.outbound.index')" :active="request()->routeIs('admin.email.outbound.*')">Outbound</x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.*')">Email</x-responsive-nav-link>
                     @endunlessrole
                 @endrole
             @endfeature

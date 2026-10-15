@@ -1,14 +1,24 @@
 <?php
+    use App\Support\ShelfTagPaperPresets;
+
+    $editorSettingsRaw = old('editor_settings', $layout->editor_settings);
+    if (is_string($editorSettingsRaw)) {
+        $editorSettingsRaw = json_decode($editorSettingsRaw, true);
+    }
     $initial = [
         'name' => old('name', $layout->name),
         'paper_preset' => old('paper_preset', $layout->paper_preset),
         'width_mm' => (float) old('width_mm', $layout->width_mm),
         'height_mm' => (float) old('height_mm', $layout->height_mm),
         'orientation' => old('orientation', $layout->orientation ?: 'portrait'),
+        'length_mode' => old('length_mode', $layout->length_mode ?: ShelfTagPaperPresets::LENGTH_MODE_FIXED),
         'elements' => old('elements')
             ? (is_string(old('elements')) ? json_decode(old('elements'), true) : old('elements'))
             : ($layout->elements ?? []),
         'logo_url' => $layout->logoUrl(),
+        'editor_settings' => ShelfTagPaperPresets::normalizeEditorSettings(
+            is_array($editorSettingsRaw) ? $editorSettingsRaw : null
+        ),
     ];
     if (! is_array($initial['elements'])) {
         $initial['elements'] = [];
@@ -28,16 +38,28 @@
      <?php $__env->slot('header', null, []); ?> 
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="font-semibold text-xl"><?php echo e($layout->exists ? 'Edit shelf tag layout' : 'New shelf tag layout'); ?></h2>
-            <a href="<?php echo e(route('shelf-tags.layouts.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to layouts</a>
+            <a href="<?php echo e(route('shelf-tags.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to shelf tags</a>
         </div>
      <?php $__env->endSlot(); ?>
 
     <div
         class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8"
         x-data="shelfTagDesigner(<?php echo \Illuminate\Support\Js::from($initial)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($presets)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($fieldOptions)->toHtml() ?>)"
+        @keydown.window="onKeyDown($event)"
+        @keyup.window="onKeyUp($event)"
     >
         <?php if(session('status')): ?>
             <p class="mb-3 text-sm text-brand"><?php echo e(session('status')); ?></p>
+        <?php endif; ?>
+        <?php if(session('import_warnings')): ?>
+            <div class="mb-3 border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-900 dark:text-amber-100 space-y-1">
+                <p class="font-medium">Import notes</p>
+                <ul class="list-disc pl-5 space-y-0.5">
+                    <?php $__currentLoopData = (array) session('import_warnings'); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $warning): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <li><?php echo e($warning); ?></li>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </ul>
+            </div>
         <?php endif; ?>
         <?php if($errors->any()): ?>
             <div class="mb-3 text-sm text-red-700 space-y-1">
@@ -52,11 +74,13 @@
             enctype="multipart/form-data"
             action="<?php echo e($layout->exists ? route('shelf-tags.layouts.update', $layout) : route('shelf-tags.layouts.store')); ?>"
             class="space-y-4"
-            @submit="syncElementsJson()"
+            @submit="syncFormFields()"
         >
             <?php echo csrf_field(); ?>
             <?php if($layout->exists): ?> <?php echo method_field('PUT'); ?> <?php endif; ?>
             <input type="hidden" name="elements" x-ref="elementsInput" :value="elementsJson">
+            <input type="hidden" name="editor_settings" x-ref="editorSettingsInput" :value="editorSettingsJson">
+            <input type="hidden" name="length_mode" :value="lengthMode">
 
             <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
                 <div class="xl:col-span-3 space-y-3 bg-white dark:bg-brand-slate border p-3">
@@ -202,14 +226,14 @@
 <?php endif; ?>
                             <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal18c21970322f9e5c938bc954620c12bb = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => 'height_mm','name' => 'height_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','xModel.number' => 'heightMm','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => 'height_mm','name' => 'height_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','xModel.number' => 'heightMm','xOn:change' => 'onHeightManualEdit()','xBind:readonly' => 'isContinuous && lengthMode === "auto"','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('text-input'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['id' => 'height_mm','name' => 'height_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','x-model.number' => 'heightMm','required' => true]); ?>
+<?php $component->withAttributes(['id' => 'height_mm','name' => 'height_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','x-model.number' => 'heightMm','x-on:change' => 'onHeightManualEdit()','x-bind:readonly' => 'isContinuous && lengthMode === "auto"','required' => true]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal18c21970322f9e5c938bc954620c12bb)): ?>
@@ -221,6 +245,41 @@
 <?php unset($__componentOriginal18c21970322f9e5c938bc954620c12bb); ?>
 <?php endif; ?>
                         </div>
+                    </div>
+                    <div x-show="isContinuous" x-cloak>
+                        <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'length_mode_ui','value' => 'Label length']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['for' => 'length_mode_ui','value' => 'Label length']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                        <select
+                            id="length_mode_ui"
+                            class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                            x-model="lengthMode"
+                            @change="onLengthModeChange()"
+                        >
+                            <option value="fixed">Fixed</option>
+                            <option value="auto">Auto (fit content)</option>
+                        </select>
+                        <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">
+                            Auto sizes length from the lowest element (+<?php echo e(2); ?> mm pad), clamped <?php echo e(ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_MM); ?>–<?php echo e(ShelfTagPaperPresets::CONTINUOUS_LENGTH_MAX_MM); ?> mm.
+                            Dragging past the bottom also extends the label.
+                        </p>
                     </div>
                     <div>
                         <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
@@ -351,76 +410,136 @@
                             </label>
                         </div>
 
-                        <div class="overflow-auto rounded border-2 border-brand-charcoal dark:border-brand-black bg-brand-charcoal dark:bg-black p-5 shadow-inner">
-                            <div
-                                class="relative bg-white shadow-md mx-auto ring-1 ring-black/20"
-                                :style="canvasStyle"
-                                @pointerdown.self="selectedId = null"
-                            >
+                        <div class="flex flex-wrap items-center gap-2 mb-3 text-sm border-t border-brand-silver dark:border-brand-charcoal pt-3">
+                            <span class="text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver mr-1">Zoom</span>
+                            <button type="button" class="px-2 py-1 border" @click="zoomOut()" title="Zoom out">−</button>
+                            <button type="button" class="px-2 py-1 border min-w-[4.5rem]" @click="resetZoom()" x-text="zoomPercent + '%'"></button>
+                            <button type="button" class="px-2 py-1 border" @click="zoomIn()" title="Zoom in">+</button>
+                            <button type="button" class="px-2 py-1 border text-xs" @click="centerView()">Centre</button>
+                            <span class="text-xs text-brand-charcoal dark:text-brand-silver ml-1">Ctrl+wheel · Space+drag / middle-click to pan</span>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 mb-3 text-sm border-t border-brand-silver dark:border-brand-charcoal pt-3">
+                            <span class="text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver mr-1">Align</span>
+                            <div class="inline-flex border overflow-hidden">
+                                <button type="button" class="px-2 py-1 text-xs" :class="alignTarget === 'group' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'group'">Selection</button>
+                                <button type="button" class="px-2 py-1 text-xs border-l" :class="alignTarget === 'biggest' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'biggest'">Biggest</button>
+                                <button type="button" class="px-2 py-1 text-xs border-l" :class="alignTarget === 'page' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'page'">Page</button>
+                            </div>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('left')" title="Align left">⇤</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('center')" title="Align centre H">↔</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('right')" title="Align right">⇥</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('top')" title="Align top">⤒</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('middle')" title="Align middle V">↕</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('bottom')" title="Align bottom">⤓</button>
+                            <span class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="selectedCount > 0" x-text="selectedCount + ' selected'"></span>
+                            <span class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="alignTarget !== 'page' && selectedCount === 1">Shift-click or marquee for multi-select</span>
+                        </div>
+
+                        <div
+                            class="overflow-hidden rounded border-2 border-brand-charcoal dark:border-brand-black bg-brand-charcoal dark:bg-black shadow-inner relative h-[min(70vh,560px)]"
+                            x-ref="viewport"
+                            :style="{ cursor: viewportCursor }"
+                            @wheel="onViewportWheel($event)"
+                            @pointerdown="onViewportPointerDown($event)"
+                        >
+                            <div class="absolute top-0 left-0" :style="viewportTransformStyle">
                                 <div
-                                    x-show="showGrid"
-                                    class="absolute inset-0 pointer-events-none z-[1]"
-                                    :style="gridOverlayStyle"
-                                    aria-hidden="true"
+                                    class="relative bg-white shadow-md ring-1 ring-black/20"
+                                    x-ref="canvas"
+                                    :style="canvasStyle"
+                                    @pointerdown.stop="onCanvasPointerDown($event)"
                                 >
-                                    <div class="absolute top-0 bottom-0 w-px bg-brand" :style="centerCrosshairStyleX"></div>
-                                    <div class="absolute left-0 right-0 h-px bg-brand" :style="centerCrosshairStyleY"></div>
-                                </div>
-                                <template x-for="el in sortedElements" :key="el.id">
                                     <div
-                                        class="absolute border border-transparent select-none z-[2]"
-                                        :data-el-id="el.id"
-                                        :class="selectedId === el.id ? 'ring-2 ring-brand border-brand' : 'hover:border-brand-charcoal/40'"
-                                        :style="elementStyle(el)"
-                                        @pointerdown.stop="startDrag($event, el)"
+                                        x-show="showGrid"
+                                        class="absolute inset-0 pointer-events-none z-[1]"
+                                        :style="gridOverlayStyle"
+                                        aria-hidden="true"
                                     >
-                                        <div class="w-full h-full overflow-hidden text-black" :style="elementInnerStyle(el)">
-                                            <template x-if="el.type === 'text' || el.type === 'field'">
-                                                <span x-text="previewText(el)"></span>
-                                            </template>
-                                            <template x-if="el.type === 'barcode'">
-                                                <svg class="w-full h-full" x-ref="'barcode-' + el.id" x-init="$nextTick(() => renderBarcode(el, $el))"></svg>
-                                            </template>
-                                            <template x-if="el.type === 'qr'">
-                                                <canvas class="w-full h-full" x-init="$nextTick(() => renderQr(el, $el))"></canvas>
-                                            </template>
-                                            <template x-if="el.type === 'logo'">
-                                                <template x-if="logoUrl">
-                                                    <img :src="logoUrl" alt="Logo" class="w-full h-full object-contain">
-                                                </template>
-                                                <template x-if="!logoUrl">
-                                                    <span class="text-[10px] text-brand-charcoal">Logo</span>
-                                                </template>
-                                            </template>
-                                            <template x-if="el.type === 'rect'">
-                                                <div class="w-full h-full" :style="rectStyle(el)"></div>
-                                            </template>
-                                            <template x-if="el.type === 'line'">
-                                                <div class="w-full" :style="lineStyle(el)"></div>
-                                            </template>
-                                        </div>
-                                        <div
-                                            class="absolute right-0 bottom-0 h-3 w-3 bg-brand cursor-se-resize"
-                                            x-show="selectedId === el.id"
-                                            @pointerdown.stop="startResize($event, el)"
-                                        ></div>
+                                        <div class="absolute top-0 bottom-0 w-px bg-brand" :style="centerCrosshairStyleX"></div>
+                                        <div class="absolute left-0 right-0 h-px bg-brand" :style="centerCrosshairStyleY"></div>
                                     </div>
-                                </template>
+                                    <div
+                                        x-show="marquee"
+                                        class="absolute z-[4] border border-brand bg-brand/10 pointer-events-none"
+                                        :style="marqueeStyle"
+                                    ></div>
+                                    <template x-for="el in sortedElements" :key="el.id">
+                                        <div
+                                            class="absolute border border-transparent select-none z-[2]"
+                                            :data-el-id="el.id"
+                                            :class="isSelected(el) ? 'ring-2 ring-brand border-brand' : 'hover:border-brand-charcoal/40'"
+                                            :style="elementStyle(el)"
+                                            @pointerdown.stop="startDrag($event, el)"
+                                        >
+                                            <div class="w-full h-full overflow-hidden text-black" :style="elementInnerStyle(el)">
+                                                <template x-if="el.type === 'text' || el.type === 'field'">
+                                                    <span x-text="previewText(el)"></span>
+                                                </template>
+                                                <template x-if="el.type === 'barcode'">
+                                                    <div class="w-full h-full flex items-center justify-center overflow-hidden">
+                                                        <svg
+                                                            class="shelf-tag-designer-barcode"
+                                                            x-init="$watch(() => [el.width, el.height, el.props.symbology, el.props.showText, el.props.fieldKey], () => renderBarcode(el, $el)); $nextTick(() => renderBarcode(el, $el))"
+                                                        ></svg>
+                                                    </div>
+                                                </template>
+                                                <template x-if="el.type === 'qr'">
+                                                    <div class="w-full h-full flex items-center justify-center overflow-hidden">
+                                                        <canvas x-init="$watch(() => [el.width, el.height, el.props.fieldKey, el.props.content], () => renderQr(el, $el)); $nextTick(() => renderQr(el, $el))"></canvas>
+                                                    </div>
+                                                </template>
+                                                <template x-if="el.type === 'logo'">
+                                                    <template x-if="logoUrl">
+                                                        <img :src="logoUrl" alt="Logo" class="w-full h-full object-contain">
+                                                    </template>
+                                                    <template x-if="!logoUrl">
+                                                        <span class="text-[10px] text-brand-charcoal">Logo</span>
+                                                    </template>
+                                                </template>
+                                                <template x-if="el.type === 'rect'">
+                                                    <div class="w-full h-full" :style="rectStyle(el)"></div>
+                                                </template>
+                                                <template x-if="el.type === 'line'">
+                                                    <div class="w-full" :style="lineStyle(el)"></div>
+                                                </template>
+                                            </div>
+                                            <div
+                                                class="absolute right-0 bottom-0 h-3 w-3 bg-brand cursor-se-resize"
+                                                x-show="selectedCount === 1 && isSelected(el)"
+                                                @pointerdown.stop="startResize($event, el)"
+                                            ></div>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                         <p class="mt-2 text-xs text-brand-charcoal dark:text-brand-silver">
-                            Canvas scale: <span x-text="scale.toFixed(1)"></span>px per mm.
-                            Grid originates from the label centre.
-                            Drag to move, corner handle to resize.
-                            <span x-show="snapToGrid">Snapping to <span x-text="gridSizeMm"></span> mm grid.</span>
-                            <span x-show="showGrid && !snapToGrid">Grid shown as guides only.</span>
+                            Zoom <span x-text="zoomPercent"></span>% · base <span x-text="scale.toFixed(1)"></span>px/mm.
+                            Grid from label centre. Shift-click or drag-marquee to multi-select.
+                            <span x-show="snapToGrid">Snapping to <span x-text="gridSizeMm"></span> mm.</span>
+                            <span x-show="showGrid && !snapToGrid">Grid guides only.</span>
+                            Barcodes scale to fit their box without cropping.
                         </p>
                     </div>
                 </div>
 
                 <div class="xl:col-span-2 space-y-3 bg-white dark:bg-brand-slate border p-3">
-                    <h3 class="font-medium text-sm">Selected element</h3>
-                    <template x-if="!selected">
+                    <h3 class="font-medium text-sm">
+                        <template x-if="selectedCount > 1">
+                            <span x-text="selectedCount + ' elements'"></span>
+                        </template>
+                        <template x-if="selectedCount <= 1">
+                            <span>Selected element</span>
+                        </template>
+                    </h3>
+                    <template x-if="selectedCount > 1">
+                        <div class="space-y-2 text-sm">
+                            <p class="text-brand-charcoal dark:text-brand-silver">Use Align tools above. Delete removes all selected.</p>
+                            <button type="button" class="px-2 py-1 border text-xs text-red-700" @click="removeSelected()">Delete selected</button>
+                        </div>
+                    </template>
+                    <template x-if="selectedCount === 0">
                         <p class="text-sm text-brand-charcoal dark:text-brand-silver">Select an element on the canvas.</p>
                     </template>
                     <template x-if="selected">
@@ -428,16 +547,16 @@
                             <div class="text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver" x-text="selected.type"></div>
                             <div class="grid grid-cols-2 gap-2">
                                 <label>X
-                                    <input type="number" step="0.1" class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal" x-model.number="selected.x">
+                                    <input type="number" step="0.1" class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal" x-model.number="selected.x" @change="afterGeometryChange([selected])">
                                 </label>
                                 <label>Y
-                                    <input type="number" step="0.1" class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal" x-model.number="selected.y">
+                                    <input type="number" step="0.1" class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal" x-model.number="selected.y" @change="afterGeometryChange([selected])">
                                 </label>
                                 <label>W
-                                    <input type="number" step="0.1" class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal" x-model.number="selected.width">
+                                    <input type="number" step="0.1" class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal" x-model.number="selected.width" @change="afterGeometryChange([selected])">
                                 </label>
                                 <label>H
-                                    <input type="number" step="0.1" class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal" x-model.number="selected.height">
+                                    <input type="number" step="0.1" class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal" x-model.number="selected.height" @change="afterGeometryChange([selected])">
                                 </label>
                             </div>
 
@@ -554,7 +673,7 @@
 <?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
 <?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
 <?php endif; ?>
-                <a href="<?php echo e(route('shelf-tags.layouts.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
+                <a href="<?php echo e(route('shelf-tags.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
             </div>
         </form>
     </div>

@@ -91,6 +91,78 @@ async function loadJsBarcode() {
     return jsBarcodeModulePromise;
 }
 
+/**
+ * Scale a JsBarcode SVG to fill its box without cropping (object-fit: contain).
+ */
+function fitBarcodeSvgToBox(node) {
+    if (!node) {
+        return;
+    }
+    const attrW = parseFloat(node.getAttribute('width'));
+    const attrH = parseFloat(node.getAttribute('height'));
+    if (!node.getAttribute('viewBox') && Number.isFinite(attrW) && Number.isFinite(attrH) && attrW > 0 && attrH > 0) {
+        node.setAttribute('viewBox', `0 0 ${attrW} ${attrH}`);
+    }
+    node.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    node.setAttribute('width', '100%');
+    node.setAttribute('height', '100%');
+    node.style.width = '100%';
+    node.style.height = '100%';
+    node.style.maxWidth = '100%';
+    node.style.maxHeight = '100%';
+    node.style.display = 'block';
+}
+
+/**
+ * Render a 1D barcode into an SVG, sized to fill boxW×boxH without clipping.
+ */
+async function renderBarcodeSvgFit(node, value, { symbology = 'code128', showText = false, boxW = 120, boxH = 40 } = {}) {
+    if (!node) {
+        return;
+    }
+    const JsBarcode = await loadJsBarcode();
+    const format = symbology === 'code39' ? 'CODE39' : 'CODE128';
+    const text = value || 'SAMPLE';
+    const widthPx = Math.max(16, Number(boxW) || 120);
+    const heightPx = Math.max(16, Number(boxH) || 40);
+    const show = Boolean(showText);
+    const textSpace = show ? Math.min(16, Math.max(10, heightPx * 0.28)) : 0;
+    const barHeight = Math.max(8, heightPx - textSpace);
+    const quiet = 4;
+
+    node.innerHTML = '';
+    JsBarcode(node, text, {
+        format,
+        displayValue: show,
+        margin: quiet,
+        width: 1,
+        height: barHeight,
+        fontSize: Math.max(8, Math.min(12, textSpace || 10)),
+        textMargin: show ? 2 : 0,
+    });
+
+    let naturalW = 0;
+    try {
+        naturalW = node.getBBox().width;
+    } catch (_) {
+        naturalW = parseFloat(node.getAttribute('width')) || widthPx;
+    }
+    const moduleWidth = Math.max(0.5, Math.min(4, (widthPx - quiet * 2) / Math.max(1, naturalW - quiet * 2)));
+
+    node.innerHTML = '';
+    JsBarcode(node, text, {
+        format,
+        displayValue: show,
+        margin: quiet,
+        width: moduleWidth,
+        height: barHeight,
+        fontSize: Math.max(8, Math.min(12, textSpace || 10)),
+        textMargin: show ? 2 : 0,
+    });
+
+    fitBarcodeSvgToBox(node);
+}
+
 async function loadHtml5Qrcode() {
     if (!html5QrcodeModulePromise) {
         html5QrcodeModulePromise = import('html5-qrcode').then((mod) => {
@@ -1303,6 +1375,7 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     widthMm: Number(initial.width_mm) || 62,
     heightMm: Number(initial.height_mm) || 40,
     orientation: initial.orientation || 'portrait',
+    lengthMode: initial.length_mode === 'auto' ? 'auto' : 'fixed',
     elements: Array.isArray(initial.elements) ? initial.elements.map((el) => ({
         ...el,
         props: { ...(el.props || {}) },
@@ -1310,16 +1383,76 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     logoUrl: initial.logo_url || null,
     presets,
     fieldOptions,
-    selectedId: null,
+    selectedIds: [],
     scale: 4,
+    viewZoom: 1,
+    panX: 0,
+    panY: 0,
     drag: null,
     resize: null,
-    showGrid: true,
-    snapToGrid: false,
-    gridSizeMm: 5,
+    pan: null,
+    marquee: null,
+    spaceDown: false,
+    alignTarget: 'group',
+    showGrid: initial.editor_settings?.show_grid ?? true,
+    snapToGrid: initial.editor_settings?.snap_to_grid ?? false,
+    gridSizeMm: Number(initial.editor_settings?.grid_size_mm) || 5,
+    autoPaddingMm: 2,
+    continuousMinMm: 29,
+    continuousMaxMm: 300,
+    viewReady: false,
+
+    init() {
+        const allowed = [2.5, 5, 10];
+        if (!allowed.includes(Number(this.gridSizeMm))) {
+            this.gridSizeMm = 5;
+        }
+        // #region agent log
+        this.$watch('orientation', (value, oldValue) => {
+            this._dbgCanvasOrient = null;
+            const style = this.canvasStyle;
+            const expectedW = `${this.displayWidthMm * this.scale}px`;
+            const expectedH = `${this.displayHeightMm * this.scale}px`;
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'50748a'},body:JSON.stringify({sessionId:'50748a',runId:'post-fix',hypothesisId:'A',location:'app.js:shelfTagDesigner.orientationWatch',message:'orientation changed',data:{oldValue,value,widthMm:this.widthMm,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,canvasStyle:style,expectedW,expectedH,canvasMatchesExpected:style.width===expectedW&&style.height===expectedH,isLandscape:this.isLandscape},timestamp:Date.now()})}).catch(()=>{});
+            this.$nextTick(() => this.centerView());
+        });
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'50748a'},body:JSON.stringify({sessionId:'50748a',runId:'post-fix',hypothesisId:'B',location:'app.js:shelfTagDesigner.init',message:'designer init orientation state',data:{orientation:this.orientation,widthMm:this.widthMm,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,canvasStyle:this.canvasStyle,isLandscape:this.isLandscape},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        this.$nextTick(() => {
+            this.centerView();
+            this.viewReady = true;
+            if (this.lengthMode === 'auto' && this.isContinuous) {
+                this.syncAutoHeight();
+            }
+        });
+    },
 
     get selected() {
-        return this.elements.find((el) => el.id === this.selectedId) || null;
+        if (this.selectedIds.length !== 1) {
+            return null;
+        }
+        return this.elements.find((el) => el.id === this.selectedIds[0]) || null;
+    },
+
+    get selectedElements() {
+        const set = new Set(this.selectedIds);
+        return this.elements.filter((el) => set.has(el.id));
+    },
+
+    get selectedCount() {
+        return this.selectedIds.length;
+    },
+
+    get canAlignRelative() {
+        return this.selectedCount >= 2;
+    },
+
+    get canAlignPage() {
+        return this.selectedCount >= 1;
+    },
+
+    get canAlign() {
+        return this.alignTarget === 'page' ? this.canAlignPage : this.canAlignRelative;
     },
 
     get sortedElements() {
@@ -1330,19 +1463,95 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         return JSON.stringify(this.elements);
     },
 
+    get editorSettingsJson() {
+        return JSON.stringify({
+            show_grid: Boolean(this.showGrid),
+            snap_to_grid: Boolean(this.snapToGrid),
+            grid_size_mm: Number(this.gridSizeMm) || 5,
+        });
+    },
+
     get presetNotes() {
         return this.presets[this.paperPreset]?.notes || '';
     },
 
+    get isContinuous() {
+        return Boolean(this.presets[this.paperPreset]?.continuous);
+    },
+
+    get zoomPercent() {
+        return Math.round(this.viewZoom * 100);
+    },
+
+    get effectiveScale() {
+        return this.scale * this.viewZoom;
+    },
+
+    get isLandscape() {
+        return this.orientation === 'landscape';
+    },
+
+    /** Visual canvas width in mm (length along feed when landscape). */
+    get displayWidthMm() {
+        return this.isLandscape ? this.heightMm : this.widthMm;
+    },
+
+    /** Visual canvas height in mm (tape width when landscape). */
+    get displayHeightMm() {
+        return this.isLandscape ? this.widthMm : this.heightMm;
+    },
+
     get canvasStyle() {
+        const cssW = `${this.displayWidthMm * this.scale}px`;
+        const cssH = `${this.displayHeightMm * this.scale}px`;
+        // #region agent log
+        if (this._dbgCanvasOrient !== this.orientation) {
+            this._dbgCanvasOrient = this.orientation;
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'50748a'},body:JSON.stringify({sessionId:'50748a',runId:'post-fix',hypothesisId:'C',location:'app.js:shelfTagDesigner.canvasStyle',message:'canvasStyle computed',data:{orientation:this.orientation,widthMm:this.widthMm,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,cssWidth:cssW,cssHeight:cssH,orientationRead:true,orientationUsedInReturn:true},timestamp:Date.now()})}).catch(()=>{});
+        }
+        // #endregion
         return {
-            width: `${this.widthMm * this.scale}px`,
-            height: `${this.heightMm * this.scale}px`,
+            width: cssW,
+            height: cssH,
         };
+    },
+
+    /**
+     * Logical label plane (widthMm × heightMm). Landscape rotates it so length runs horizontally.
+     */
+    get labelContentStyle() {
+        const s = this.scale;
+        const style = {
+            width: `${this.widthMm * s}px`,
+            height: `${this.heightMm * s}px`,
+            position: 'absolute',
+            top: '0',
+            left: '0',
+        };
+        if (this.isLandscape) {
+            style.transform = `translateY(${this.widthMm * s}px) rotate(-90deg)`;
+            style.transformOrigin = 'top left';
+        }
+        return style;
+    },
+
+    get viewportTransformStyle() {
+        return {
+            transform: `translate(${this.panX}px, ${this.panY}px) scale(${this.viewZoom})`,
+            transformOrigin: '0 0',
+        };
+    },
+
+    get viewportCursor() {
+        if (this.pan || this.spaceDown) {
+            return this.pan ? 'grabbing' : 'grab';
+        }
+        return 'default';
     },
 
     get gridOverlayStyle() {
         const stepPx = Math.max(0.5, Number(this.gridSizeMm) || 5) * this.scale;
+        // Grid lives on the logical (pre-rotate) plane.
         const centerX = (this.widthMm / 2) * this.scale;
         const centerY = (this.heightMm / 2) * this.scale;
         return {
@@ -1363,6 +1572,26 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         return { top: `${(this.heightMm / 2) * this.scale}px` };
     },
 
+    get marqueeStyle() {
+        if (!this.marquee) {
+            return { display: 'none' };
+        }
+        const x = Math.min(this.marquee.x0, this.marquee.x1);
+        const y = Math.min(this.marquee.y0, this.marquee.y1);
+        const w = Math.abs(this.marquee.x1 - this.marquee.x0);
+        const h = Math.abs(this.marquee.y1 - this.marquee.y0);
+        return {
+            left: `${x * this.scale}px`,
+            top: `${y * this.scale}px`,
+            width: `${w * this.scale}px`,
+            height: `${h * this.scale}px`,
+        };
+    },
+
+    isSelected(el) {
+        return this.selectedIds.includes(el.id);
+    },
+
     snapToCenterGrid(value, sizeMm) {
         const step = Math.max(0.5, Number(this.gridSizeMm) || 5);
         const center = sizeMm / 2;
@@ -1370,10 +1599,156 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         return Math.round(snapped * 1000) / 1000;
     },
 
-    syncElementsJson() {
+    roundMm(value) {
+        return Math.round(value * 10) / 10;
+    },
+
+    clampContinuousHeight(heightMm) {
+        return this.roundMm(Math.min(this.continuousMaxMm, Math.max(this.continuousMinMm, heightMm)));
+    },
+
+    contentBottomMm() {
+        if (!this.elements.length) {
+            return this.continuousMinMm;
+        }
+        return Math.max(...this.elements.map((el) => Number(el.y) + Number(el.height)));
+    },
+
+    syncAutoHeight() {
+        if (!this.isContinuous || this.lengthMode !== 'auto') {
+            return;
+        }
+        const needed = this.elements.length
+            ? this.contentBottomMm() + this.autoPaddingMm
+            : this.continuousMinMm;
+        this.heightMm = this.clampContinuousHeight(needed);
+    },
+
+    maybeExtendForBottom(bottomMm) {
+        if (!this.isContinuous) {
+            return;
+        }
+        if (this.lengthMode === 'auto') {
+            this.syncAutoHeight();
+            return;
+        }
+        if (bottomMm > this.heightMm) {
+            this.heightMm = this.clampContinuousHeight(bottomMm);
+        }
+    },
+
+    afterGeometryChange(els = null) {
+        const list = els && els.length ? els : this.elements;
+        const bottom = list.length
+            ? Math.max(...list.map((el) => Number(el.y) + Number(el.height)))
+            : 0;
+        this.maybeExtendForBottom(bottom);
+        if (this.lengthMode === 'auto') {
+            this.syncAutoHeight();
+        }
+    },
+
+    applyCoord(value, axisSize) {
+        if (this.snapToGrid) {
+            return Math.max(0, this.snapToCenterGrid(value, axisSize));
+        }
+        return Math.max(0, this.roundMm(value));
+    },
+
+    syncFormFields() {
         if (this.$refs.elementsInput) {
             this.$refs.elementsInput.value = this.elementsJson;
         }
+        if (this.$refs.editorSettingsInput) {
+            this.$refs.editorSettingsInput.value = this.editorSettingsJson;
+        }
+    },
+
+    syncElementsJson() {
+        this.syncFormFields();
+    },
+
+    centerView() {
+        const vp = this.$refs.viewport;
+        if (!vp) {
+            return;
+        }
+        const cw = this.displayWidthMm * this.scale * this.viewZoom;
+        const ch = this.displayHeightMm * this.scale * this.viewZoom;
+        this.panX = (vp.clientWidth - cw) / 2;
+        this.panY = Math.max(16, (vp.clientHeight - ch) / 2);
+    },
+
+    setZoom(nextZoom, focusX = null, focusY = null) {
+        const vp = this.$refs.viewport;
+        const oldZoom = this.viewZoom;
+        const zoom = Math.min(4, Math.max(0.25, nextZoom));
+        if (!vp || focusX === null || focusY === null) {
+            this.viewZoom = zoom;
+            return;
+        }
+        const worldX = (focusX - this.panX) / oldZoom;
+        const worldY = (focusY - this.panY) / oldZoom;
+        this.viewZoom = zoom;
+        this.panX = focusX - worldX * zoom;
+        this.panY = focusY - worldY * zoom;
+    },
+
+    zoomBy(factor) {
+        const vp = this.$refs.viewport;
+        if (!vp) {
+            this.setZoom(this.viewZoom * factor);
+            return;
+        }
+        this.setZoom(this.viewZoom * factor, vp.clientWidth / 2, vp.clientHeight / 2);
+    },
+
+    zoomIn() {
+        this.zoomBy(1.15);
+    },
+
+    zoomOut() {
+        this.zoomBy(1 / 1.15);
+    },
+
+    resetZoom() {
+        this.viewZoom = 1;
+        this.$nextTick(() => this.centerView());
+    },
+
+    onViewportWheel(event) {
+        if (!event.ctrlKey && !event.metaKey) {
+            return;
+        }
+        event.preventDefault();
+        const vp = this.$refs.viewport;
+        if (!vp) {
+            return;
+        }
+        const rect = vp.getBoundingClientRect();
+        const factor = event.deltaY > 0 ? 1 / 1.1 : 1.1;
+        this.setZoom(this.viewZoom * factor, event.clientX - rect.left, event.clientY - rect.top);
+    },
+
+    onKeyDown(event) {
+        if (event.code === 'Space' && !event.repeat && !this.isTypingTarget(event.target)) {
+            this.spaceDown = true;
+            event.preventDefault();
+        }
+    },
+
+    onKeyUp(event) {
+        if (event.code === 'Space') {
+            this.spaceDown = false;
+        }
+    },
+
+    isTypingTarget(target) {
+        if (!target || !target.tagName) {
+            return false;
+        }
+        const tag = target.tagName.toLowerCase();
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
     },
 
     onPresetChange() {
@@ -1382,9 +1757,33 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             return;
         }
         this.widthMm = Number(preset.width_mm) || this.widthMm;
-        if (!preset.continuous && preset.height_mm) {
-            this.heightMm = Number(preset.height_mm);
+        if (!preset.continuous) {
+            this.lengthMode = 'fixed';
+            if (preset.height_mm) {
+                this.heightMm = Number(preset.height_mm);
+            }
+        } else if (this.lengthMode === 'auto') {
+            this.syncAutoHeight();
         }
+        this.$nextTick(() => this.centerView());
+    },
+
+    onLengthModeChange() {
+        if (!this.isContinuous) {
+            this.lengthMode = 'fixed';
+            return;
+        }
+        if (this.lengthMode === 'auto') {
+            this.syncAutoHeight();
+        }
+    },
+
+    onHeightManualEdit() {
+        if (!this.isContinuous) {
+            return;
+        }
+        this.lengthMode = 'fixed';
+        this.heightMm = this.clampContinuousHeight(Number(this.heightMm) || this.continuousMinMm);
     },
 
     newId() {
@@ -1414,7 +1813,8 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             props: { ...base.props },
         };
         this.elements.push(el);
-        this.selectedId = el.id;
+        this.selectedIds = [el.id];
+        this.afterGeometryChange([el]);
         this.$nextTick(() => {
             if (type === 'barcode') {
                 const node = this.$el.querySelector(`[data-el-id="${el.id}"] svg`);
@@ -1428,11 +1828,13 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     },
 
     removeSelected() {
-        if (!this.selectedId) {
+        if (!this.selectedIds.length) {
             return;
         }
-        this.elements = this.elements.filter((el) => el.id !== this.selectedId);
-        this.selectedId = null;
+        const remove = new Set(this.selectedIds);
+        this.elements = this.elements.filter((el) => !remove.has(el.id));
+        this.selectedIds = [];
+        this.afterGeometryChange();
     },
 
     nudgeZ(delta) {
@@ -1440,6 +1842,18 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             return;
         }
         this.selected.z = Math.max(0, (this.selected.z || 0) + delta);
+    },
+
+    clearSelection() {
+        this.selectedIds = [];
+    },
+
+    toggleSelect(id) {
+        if (this.selectedIds.includes(id)) {
+            this.selectedIds = this.selectedIds.filter((item) => item !== id);
+        } else {
+            this.selectedIds = [...this.selectedIds, id];
+        }
     },
 
     elementStyle(el) {
@@ -1493,15 +1907,11 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             return;
         }
         try {
-            const JsBarcode = await loadJsBarcode();
-            node.innerHTML = '';
-            JsBarcode(node, el.props.fieldKey || 'SAMPLE', {
-                format: el.props.symbology === 'code39' ? 'CODE39' : 'CODE128',
-                displayValue: Boolean(el.props.showText),
-                margin: 0,
-                width: 1.5,
-                height: Math.max(20, el.height * this.scale - (el.props.showText ? 14 : 0)),
-                fontSize: 10,
+            await renderBarcodeSvgFit(node, el.props.fieldKey || 'SAMPLE', {
+                symbology: el.props.symbology || 'code128',
+                showText: Boolean(el.props.showText),
+                boxW: Math.max(16, el.width * this.scale),
+                boxH: Math.max(16, el.height * this.scale),
             });
         } catch (_) {}
     },
@@ -1512,37 +1922,174 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         }
         try {
             const QRCode = await loadQRCode();
+            const size = Math.max(16, Math.floor(Math.min(el.width, el.height) * this.scale));
+            node.style.width = `${size}px`;
+            node.style.height = `${size}px`;
+            node.style.maxWidth = '100%';
+            node.style.maxHeight = '100%';
             await QRCode.toCanvas(node, el.props.fieldKey || el.props.content || 'SAMPLE', {
-                width: Math.max(16, Math.floor(Math.min(el.width, el.height) * this.scale)),
+                width: size,
                 margin: 0,
             });
         } catch (_) {}
     },
 
-    startDrag(event, el) {
-        this.selectedId = el.id;
-        this.drag = {
-            id: el.id,
+    canvasPointFromEvent(event) {
+        const canvas = this.$refs.canvas;
+        if (!canvas) {
+            return { x: 0, y: 0 };
+        }
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) {
+            return { x: 0, y: 0 };
+        }
+        // Map into display mm space (outer canvas), then invert landscape rotate if needed.
+        const displayXmm = ((event.clientX - rect.left) / rect.width) * this.displayWidthMm;
+        const displayYmm = ((event.clientY - rect.top) / rect.height) * this.displayHeightMm;
+        if (!this.isLandscape) {
+            return { x: displayXmm, y: displayYmm };
+        }
+        // Forward: (lx, ly) → display (ly, widthMm - lx). Inverse:
+        return {
+            x: this.widthMm - displayYmm,
+            y: displayXmm,
+        };
+    },
+
+    bindPointerSession(onMove, onUp) {
+        const move = (e) => onMove(e);
+        const up = (e) => {
+            onUp(e);
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+    },
+
+    onViewportPointerDown(event) {
+        if (event.button === 1 || this.spaceDown || (event.button === 0 && event.target === this.$refs.viewport)) {
+            event.preventDefault();
+            this.startPan(event);
+        }
+    },
+
+    startPan(event) {
+        this.pan = {
             startX: event.clientX,
             startY: event.clientY,
-            origX: el.x,
-            origY: el.y,
+            origX: this.panX,
+            origY: this.panY,
         };
-        el._pointerId = event.pointerId;
+        this.bindPointerSession(
+            (e) => {
+                if (!this.pan) return;
+                this.panX = this.pan.origX + (e.clientX - this.pan.startX);
+                this.panY = this.pan.origY + (e.clientY - this.pan.startY);
+            },
+            () => {
+                this.pan = null;
+            }
+        );
+    },
+
+    onCanvasPointerDown(event) {
+        if (this.spaceDown || event.button === 1) {
+            event.preventDefault();
+            this.startPan(event);
+            return;
+        }
+        if (event.button !== 0) {
+            return;
+        }
+        const point = this.canvasPointFromEvent(event);
+        this.marquee = { x0: point.x, y0: point.y, x1: point.x, y1: point.y, additive: event.shiftKey };
+        if (!event.shiftKey) {
+            this.clearSelection();
+        }
+        this.bindPointerSession(
+            (e) => {
+                if (!this.marquee) return;
+                const p = this.canvasPointFromEvent(e);
+                this.marquee.x1 = p.x;
+                this.marquee.y1 = p.y;
+            },
+            () => {
+                this.finishMarquee();
+            }
+        );
+    },
+
+    finishMarquee() {
+        if (!this.marquee) {
+            return;
+        }
+        const x0 = Math.min(this.marquee.x0, this.marquee.x1);
+        const y0 = Math.min(this.marquee.y0, this.marquee.y1);
+        const x1 = Math.max(this.marquee.x0, this.marquee.x1);
+        const y1 = Math.max(this.marquee.y0, this.marquee.y1);
+        const tiny = Math.abs(x1 - x0) < 0.4 && Math.abs(y1 - y0) < 0.4;
+        if (!tiny) {
+            const hit = this.elements
+                .filter((el) => {
+                    const right = el.x + el.width;
+                    const bottom = el.y + el.height;
+                    return el.x < x1 && right > x0 && el.y < y1 && bottom > y0;
+                })
+                .map((el) => el.id);
+            this.selectedIds = this.marquee.additive
+                ? [...new Set([...this.selectedIds, ...hit])]
+                : hit;
+        }
+        this.marquee = null;
+    },
+
+    startDrag(event, el) {
+        if (this.spaceDown || event.button === 1) {
+            event.preventDefault();
+            this.startPan(event);
+            return;
+        }
+        if (event.shiftKey) {
+            this.toggleSelect(el.id);
+            return;
+        }
+        if (!this.selectedIds.includes(el.id)) {
+            this.selectedIds = [el.id];
+        }
+        const ids = [...this.selectedIds];
+        const orig = {};
+        ids.forEach((id) => {
+            const item = this.elements.find((entry) => entry.id === id);
+            if (item) {
+                orig[id] = { x: item.x, y: item.y };
+            }
+        });
+        this.drag = {
+            ids,
+            startX: event.clientX,
+            startY: event.clientY,
+            orig,
+        };
         event.currentTarget.setPointerCapture?.(event.pointerId);
-        const onMove = (e) => this.onPointerMove(e);
-        const onUp = (e) => {
-            this.drag = null;
-            this.resize = null;
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
+        this.bindPointerSession(
+            (e) => this.onPointerMove(e),
+            () => {
+                if (this.drag) {
+                    const moved = this.elements.filter((item) => this.drag.ids.includes(item.id));
+                    this.afterGeometryChange(moved);
+                }
+                this.drag = null;
+                this.resize = null;
+            }
+        );
     },
 
     startResize(event, el) {
-        this.selectedId = el.id;
+        if (event.shiftKey || this.spaceDown) {
+            return;
+        }
+        this.selectedIds = [el.id];
         this.resize = {
             id: el.id,
             startX: event.clientX,
@@ -1550,48 +2097,119 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             origW: el.width,
             origH: el.height,
         };
-        const onMove = (e) => this.onPointerMove(e);
-        const onUp = () => {
-            this.drag = null;
-            this.resize = null;
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
+        this.bindPointerSession(
+            (e) => this.onPointerMove(e),
+            () => {
+                if (this.resize) {
+                    const item = this.elements.find((entry) => entry.id === this.resize.id);
+                    if (item) {
+                        this.afterGeometryChange([item]);
+                    }
+                }
+                this.drag = null;
+                this.resize = null;
+            }
+        );
     },
 
     onPointerMove(event) {
         if (this.drag) {
-            const el = this.elements.find((item) => item.id === this.drag.id);
-            if (!el) return;
-            const dx = (event.clientX - this.drag.startX) / this.scale;
-            const dy = (event.clientY - this.drag.startY) / this.scale;
-            const rawX = Math.max(0, this.drag.origX + dx);
-            const rawY = Math.max(0, this.drag.origY + dy);
-            if (this.snapToGrid) {
-                el.x = Math.max(0, this.snapToCenterGrid(rawX, this.widthMm));
-                el.y = Math.max(0, this.snapToCenterGrid(rawY, this.heightMm));
-            } else {
-                el.x = Math.round(rawX * 10) / 10;
-                el.y = Math.round(rawY * 10) / 10;
-            }
+            const dx = (event.clientX - this.drag.startX) / this.effectiveScale;
+            const dy = (event.clientY - this.drag.startY) / this.effectiveScale;
+            this.drag.ids.forEach((id) => {
+                const el = this.elements.find((item) => item.id === id);
+                const orig = this.drag.orig[id];
+                if (!el || !orig) return;
+                el.x = this.applyCoord(orig.x + dx, this.widthMm);
+                el.y = this.applyCoord(Math.max(0, orig.y + dy), this.heightMm);
+            });
+            const moved = this.elements.filter((item) => this.drag.ids.includes(item.id));
+            this.afterGeometryChange(moved);
         }
         if (this.resize) {
             const el = this.elements.find((item) => item.id === this.resize.id);
             if (!el) return;
-            const dx = (event.clientX - this.resize.startX) / this.scale;
-            const dy = (event.clientY - this.resize.startY) / this.scale;
+            const dx = (event.clientX - this.resize.startX) / this.effectiveScale;
+            const dy = (event.clientY - this.resize.startY) / this.effectiveScale;
             if (this.snapToGrid) {
                 const snappedRight = this.snapToCenterGrid(el.x + this.resize.origW + dx, this.widthMm);
                 const snappedBottom = this.snapToCenterGrid(el.y + this.resize.origH + dy, this.heightMm);
                 el.width = Math.max(2, Math.round((snappedRight - el.x) * 1000) / 1000);
                 el.height = Math.max(2, Math.round((snappedBottom - el.y) * 1000) / 1000);
             } else {
-                el.width = Math.max(2, Math.round((this.resize.origW + dx) * 10) / 10);
-                el.height = Math.max(2, Math.round((this.resize.origH + dy) * 10) / 10);
+                el.width = Math.max(2, this.roundMm(this.resize.origW + dx));
+                el.height = Math.max(2, this.roundMm(this.resize.origH + dy));
             }
+            this.afterGeometryChange([el]);
         }
+    },
+
+    selectionBounds(els) {
+        const left = Math.min(...els.map((el) => el.x));
+        const top = Math.min(...els.map((el) => el.y));
+        const right = Math.max(...els.map((el) => el.x + el.width));
+        const bottom = Math.max(...els.map((el) => el.y + el.height));
+        return { left, top, right, bottom, width: right - left, height: bottom - top };
+    },
+
+    biggestElement(els) {
+        return [...els].sort((a, b) => (b.width * b.height) - (a.width * a.height))[0] || null;
+    },
+
+    alignReference() {
+        const els = this.selectedElements;
+        if (!els.length) {
+            return null;
+        }
+        if (this.alignTarget === 'page') {
+            return { left: 0, top: 0, right: this.widthMm, bottom: this.heightMm, width: this.widthMm, height: this.heightMm };
+        }
+        if (this.alignTarget === 'biggest') {
+            const big = this.biggestElement(els);
+            if (!big) {
+                return null;
+            }
+            return {
+                left: big.x,
+                top: big.y,
+                right: big.x + big.width,
+                bottom: big.y + big.height,
+                width: big.width,
+                height: big.height,
+                anchorId: big.id,
+            };
+        }
+        return this.selectionBounds(els);
+    },
+
+    align(edge) {
+        if (!this.canAlign) {
+            return;
+        }
+        const ref = this.alignReference();
+        if (!ref) {
+            return;
+        }
+        const els = this.selectedElements;
+        els.forEach((el) => {
+            if (this.alignTarget === 'biggest' && ref.anchorId === el.id) {
+                return;
+            }
+            if (edge === 'left') {
+                el.x = this.applyCoord(ref.left, this.widthMm);
+            } else if (edge === 'center') {
+                el.x = this.applyCoord(ref.left + ref.width / 2 - el.width / 2, this.widthMm);
+            } else if (edge === 'right') {
+                el.x = this.applyCoord(ref.right - el.width, this.widthMm);
+            } else if (edge === 'top') {
+                el.y = this.applyCoord(ref.top, this.heightMm);
+            } else if (edge === 'middle') {
+                el.y = this.applyCoord(ref.top + ref.height / 2 - el.height / 2, this.heightMm);
+            } else if (edge === 'bottom') {
+                el.y = this.applyCoord(ref.bottom - el.height, this.heightMm);
+            }
+        });
+        this.afterGeometryChange(els);
     },
 }));
 
@@ -1704,14 +2322,15 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
                     return;
                 }
                 try {
-                    JsBarcode(node, value, {
-                        format: node.getAttribute('data-symbology') === 'code39' ? 'CODE39' : 'CODE128',
-                        displayValue: node.getAttribute('data-show-text') === '1',
-                        margin: 0,
-                        width: 1.4,
-                        height: 40,
-                        fontSize: 10,
-                    });
+                    const parent = node.parentElement;
+                    const boxW = Math.max(16, parent?.clientWidth || node.clientWidth || 120);
+                    const boxH = Math.max(16, parent?.clientHeight || node.clientHeight || 40);
+                    renderBarcodeSvgFit(node, value, {
+                        symbology: node.getAttribute('data-symbology') || 'code128',
+                        showText: node.getAttribute('data-show-text') === '1',
+                        boxW,
+                        boxH,
+                    }).catch(() => {});
                 } catch (_) {}
             });
         }
@@ -1734,7 +2353,7 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
     },
 }));
 
-Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = []) => ({
+Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = [], clearRecent = false) => ({
     scanning: false,
     code: '',
     quantity: 1,
@@ -1766,21 +2385,95 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                 index
             )
         );
-        const stored = this.loadRecent();
-        const unknownIds = new Set(this.serverUnknowns.map((entry) => entry.unknown_scan?.id).filter(Boolean));
-        const storedWithoutDupUnknowns = stored.filter(
-            (entry) => !entry.unknown || !unknownIds.has(entry.unknown_scan?.id)
-        );
-        this.recent = [...this.serverUnknowns, ...storedWithoutDupUnknowns].slice(0, 50);
-        this.persistRecent();
+
+        let storedLen = 0;
+        let storedAfterDedup = 0;
+        let seededFromServer = false;
+        let initMode = 'seed';
+
+        if (clearRecent) {
+            initMode = 'force-clear';
+            this.clearRecentList({ markCleared: true, wipeAllKeys: true });
+        } else if (this.isRecentCleared()) {
+            // Reset previously dismissed server-seeded history; keep only client-stored rows.
+            initMode = 'cleared-stored-only';
+            const stored = this.loadRecent();
+            storedLen = stored.length;
+            storedAfterDedup = stored.length;
+            this.recent = stored.slice(0, 50);
+            this.persistRecent();
+        } else {
+            const stored = this.loadRecent();
+            storedLen = stored.length;
+            const unknownIds = new Set(this.serverUnknowns.map((entry) => entry.unknown_scan?.id).filter(Boolean));
+            const storedWithoutDupUnknowns = stored.filter(
+                (entry) => !entry.unknown || !unknownIds.has(entry.unknown_scan?.id)
+            );
+            storedAfterDedup = storedWithoutDupUnknowns.length;
+            this.recent = [...this.serverUnknowns, ...storedWithoutDupUnknowns].slice(0, 50);
+            seededFromServer = this.serverUnknowns.length > 0;
+            this.persistRecent();
+        }
+
         // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67bc37'},body:JSON.stringify({sessionId:'67bc37',location:'app.js:barcodeScanner.init',message:'scan recent init',data:{eventListId:this.eventListId,storedLen:stored.length,storedAfterDedup:storedWithoutDupUnknowns.length,serverUnknownsLen:this.serverUnknowns.length,recentLen:this.recent.length,storageKey:this.storageKey(),recentUnknownCount:this.recent.filter((e)=>e.unknown).length,recentKnownCount:this.recent.filter((e)=>!e.unknown).length},timestamp:Date.now(),hypothesisId:'A,C,D'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67bc37'},body:JSON.stringify({sessionId:'67bc37',runId:'post-fix',location:'app.js:barcodeScanner.init',message:'scan recent init',data:{eventListId:this.eventListId,clearRecent:Boolean(clearRecent),initMode,storedLen,storedAfterDedup,serverUnknownsLen:this.serverUnknowns.length,recentLen:this.recent.length,seededFromServer,storageKey:this.storageKey(),recentUnknownCount:this.recent.filter((e)=>e.unknown).length,recentKnownCount:this.recent.filter((e)=>!e.unknown).length},timestamp:Date.now(),hypothesisId:'A,C,D'})}).catch(()=>{});
         // #endregion
         this.$nextTick(() => this.focusInput());
     },
 
     storageKey() {
         return `av-scan-recent-${this.eventListId ?? 'none'}`;
+    },
+
+    clearedKey() {
+        return `av-scan-recent-cleared-${this.eventListId ?? 'none'}`;
+    },
+
+    isRecentCleared() {
+        try {
+            return sessionStorage.getItem(this.clearedKey()) === '1';
+        } catch (_) {
+            return false;
+        }
+    },
+
+    markRecentCleared() {
+        try {
+            sessionStorage.setItem(this.clearedKey(), '1');
+        } catch (_) {}
+    },
+
+    clearRecentClearedFlag() {
+        try {
+            sessionStorage.removeItem(this.clearedKey());
+        } catch (_) {}
+    },
+
+    wipeScanRecentStorage({ allKeys = false } = {}) {
+        try {
+            if (allKeys) {
+                const keys = [];
+                for (let i = 0; i < sessionStorage.length; i += 1) {
+                    const key = sessionStorage.key(i);
+                    if (key && (key.startsWith('av-scan-recent-') || key.startsWith('av-scan-recent-cleared-'))) {
+                        keys.push(key);
+                    }
+                }
+                keys.forEach((key) => sessionStorage.removeItem(key));
+                return;
+            }
+            sessionStorage.removeItem(this.storageKey());
+        } catch (_) {}
+    },
+
+    clearRecentList({ markCleared = true, wipeAllKeys = false } = {}) {
+        this.recent = [];
+        this.serverUnknowns = [];
+        this.wipeScanRecentStorage({ allKeys: wipeAllKeys });
+        this.persistRecent();
+        if (markCleared) {
+            this.markRecentCleared();
+        }
     },
 
     loadRecent() {
@@ -1811,10 +2504,9 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         const beforeKnown = this.recent.filter((e) => !e.unknown).length;
         const beforeUnknown = this.recent.filter((e) => e.unknown).length;
         // #endregion
-        this.recent = [...this.serverUnknowns];
-        this.persistRecent();
+        this.clearRecentList({ markCleared: true, wipeAllKeys: true });
         // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67bc37'},body:JSON.stringify({sessionId:'67bc37',location:'app.js:barcodeScanner.resetRecent',message:'resetRecent called',data:{beforeLen,beforeKnown,beforeUnknown,afterLen:this.recent.length,serverUnknownsLen:this.serverUnknowns.length,eventListId:this.eventListId,storageKey:this.storageKey()},timestamp:Date.now(),hypothesisId:'A,B,E'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67bc37'},body:JSON.stringify({sessionId:'67bc37',runId:'post-fix',location:'app.js:barcodeScanner.resetRecent',message:'resetRecent called',data:{beforeLen,beforeKnown,beforeUnknown,afterLen:this.recent.length,serverUnknownsLen:this.serverUnknowns.length,eventListId:this.eventListId,storageKey:this.storageKey()},timestamp:Date.now(),hypothesisId:'A,B,E'})}).catch(()=>{});
         // #endregion
     },
 

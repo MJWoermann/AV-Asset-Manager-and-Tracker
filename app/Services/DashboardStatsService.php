@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Enums\AssetStatus;
+use App\Enums\InboundEmailActionStatus;
 use App\Models\Asset;
 use App\Models\AuditLog;
+use App\Models\InboundEmailAction;
+use App\Models\User;
 use Illuminate\Support\Collection;
 
 class DashboardStatsService
@@ -13,10 +16,11 @@ class DashboardStatsService
      * @return array{
      *     byStatus: list<array{value: string, label: string, count: int}>,
      *     byType: list<array{id: int, name: string, count: int}>,
-     *     latestChanges: Collection<int, AuditLog>
+     *     latestChanges: Collection<int, AuditLog>,
+     *     pendingInboundEmails: int|null
      * }
      */
-    public function stats(): array
+    public function stats(?User $user = null): array
     {
         $statusCounts = Asset::query()
             ->selectRaw('status, count(*) as aggregate')
@@ -58,6 +62,20 @@ class DashboardStatsService
             'byStatus' => $byStatus,
             'byType' => $byType,
             'latestChanges' => $latestChanges,
+            'pendingInboundEmails' => $this->pendingInboundEmailCount($user),
         ];
+    }
+
+    private function pendingInboundEmailCount(?User $user): ?int
+    {
+        if ($user === null
+            || ! $user->hasFeature('email_integration')
+            || ! $user->hasAnyRole(['admin', 'inventory_manager'])) {
+            return null;
+        }
+
+        return InboundEmailAction::query()
+            ->where('status', InboundEmailActionStatus::Pending)
+            ->count();
     }
 }

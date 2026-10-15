@@ -1,9 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl">Outbound email threads</h2>
+        <h2 class="font-semibold text-xl">Email</h2>
     </x-slot>
 
     <div class="max-w-7xl mx-auto px-4 space-y-4">
+        <x-email-tabs />
+
         <p class="text-sm text-brand-charcoal dark:text-brand-silver">
             Sent notifications used for inbound reply matching.
         </p>

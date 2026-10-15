@@ -92,7 +92,7 @@
             @endphp
 
             <div
-                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans))"
+                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false))"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
                 <div class="flex gap-2">

@@ -61,7 +61,7 @@ unset($__defined_vars, $__key, $__value); ?>
             <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
                 <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
                     <?php if($currentList): ?>
-                        <form method="GET" action="<?php echo e(route('shelf-tags.print.create')); ?>" class="inline">
+                        <form method="GET" action="<?php echo e(route('shelf-tags.index')); ?>" class="inline">
                             <input type="hidden" name="asset_list_id" value="<?php echo e($currentList->id); ?>">
                             <template x-for="id in selectedIds" :key="'shelf-'+id">
                                 <input type="hidden" name="asset_ids[]" :value="id">

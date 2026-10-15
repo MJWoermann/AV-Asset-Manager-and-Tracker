@@ -102,6 +102,10 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $user = $this->manager(feature: false);
 
         $this->actingAs($user)
+            ->get(route('shelf-tags.index'))
+            ->assertNotFound();
+
+        $this->actingAs($user)
             ->get(route('shelf-tags.layouts.index'))
             ->assertNotFound();
 
@@ -112,13 +116,16 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('Shelf tag layouts', false)
-            ->assertDontSee('Print shelf tags', false);
+            ->assertDontSee(route('shelf-tags.index', [], false), false);
     }
 
     public function test_scanner_with_flag_on_gets_forbidden(): void
     {
         $user = $this->scanner(feature: true);
+
+        $this->actingAs($user)
+            ->get(route('shelf-tags.index'))
+            ->assertForbidden();
 
         $this->actingAs($user)
             ->get(route('shelf-tags.layouts.index'))
@@ -143,7 +150,9 @@ class ShelfTagGeneratorFeatureTest extends TestCase
             'width_mm' => 62,
             'height_mm' => 40,
             'orientation' => 'portrait',
+            'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
             'elements' => json_encode(ShelfTagLayoutFactory::sampleElements()),
+            'editor_settings' => json_encode(ShelfTagPaperPresets::defaultEditorSettings()),
             'logo' => UploadedFile::fake()->image('logo.png', 80, 40),
         ]);
 
@@ -161,7 +170,9 @@ class ShelfTagGeneratorFeatureTest extends TestCase
                 'width_mm' => 62,
                 'height_mm' => 45,
                 'orientation' => 'portrait',
+                'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
                 'elements' => json_encode(ShelfTagLayoutFactory::sampleElements()),
+                'editor_settings' => json_encode(ShelfTagPaperPresets::defaultEditorSettings()),
             ])
             ->assertRedirect(route('shelf-tags.layouts.edit', $layout));
 
@@ -170,7 +181,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
 
         $this->actingAs($user)
             ->delete(route('shelf-tags.layouts.destroy', $layout))
-            ->assertRedirect(route('shelf-tags.layouts.index'));
+            ->assertRedirect(route('shelf-tags.index'));
 
         $this->assertDatabaseMissing('shelf_tag_layouts', ['id' => $layout->id]);
     }
@@ -186,6 +197,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
                 'width_mm' => 62,
                 'height_mm' => 40,
                 'orientation' => 'portrait',
+                'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
                 'elements' => json_encode([]),
             ])
             ->assertSessionHasErrors('paper_preset');
@@ -202,6 +214,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
                 'width_mm' => 62,
                 'height_mm' => 40,
                 'orientation' => 'portrait',
+                'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
                 'elements' => json_encode([]),
             ])
             ->assertSessionHasErrors('paper_preset');
@@ -433,17 +446,41 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $this->actingAs($disabled)
             ->get(route('lists.show', $list))
             ->assertOk()
-            ->assertDontSee(route('shelf-tags.print.create', ['asset_list_id' => $list->id], false), false);
+            ->assertDontSee(route('shelf-tags.index', ['asset_list_id' => $list->id], false), false);
     }
 
-    public function test_nav_shows_shelf_tag_links_for_enabled_manager(): void
+    public function test_nav_shows_shelf_tag_link_under_reports_for_enabled_manager(): void
     {
         $user = $this->manager();
 
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Shelf tag layouts', false)
-            ->assertSee('Print shelf tags', false);
+            ->assertSee(route('shelf-tags.index', [], false), false)
+            ->assertSee('Shelf tags', false)
+            ->assertDontSee('Shelf tag layouts', false)
+            ->assertDontSee('Print shelf tags', false);
+    }
+
+    public function test_hub_shows_layouts_and_print_panels(): void
+    {
+        $user = $this->manager();
+        $layout = ShelfTagLayout::factory()->create([
+            'name' => 'Hub Layout',
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('shelf-tags.index'))
+            ->assertOk()
+            ->assertSee('Hub Layout', false)
+            ->assertSee('Layouts', false)
+            ->assertSee('Print', false)
+            ->assertSee('Preview labels', false)
+            ->assertViewIs('shelf-tags.index');
+
+        $this->actingAs($user)
+            ->get(route('shelf-tags.layouts.index'))
+            ->assertRedirect(route('shelf-tags.index'));
     }
 }

@@ -8,7 +8,9 @@
         <h2 class="font-semibold text-xl">{{ $template->exists ? 'Edit template' : 'New template' }}</h2>
     </x-slot>
 
-    <div class="max-w-4xl mx-auto px-4">
+    <div class="max-w-4xl mx-auto px-4 space-y-4">
+        <x-email-tabs />
+
         <form method="POST" action="{{ $template->exists ? route('admin.email.templates.update', $template) : route('admin.email.templates.store') }}" class="space-y-4 bg-white dark:bg-brand-slate border p-4">
             @csrf
             @if($template->exists) @method('PUT') @endif

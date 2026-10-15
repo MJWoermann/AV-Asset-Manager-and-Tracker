@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ShelfTagPaperPresets;
 use Database\Factories\ShelfTagLayoutFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,9 @@ class ShelfTagLayout extends Model
         'width_mm',
         'height_mm',
         'orientation',
+        'length_mode',
         'elements',
+        'editor_settings',
         'logo_path',
         'created_by',
     ];
@@ -30,6 +33,7 @@ class ShelfTagLayout extends Model
             'width_mm' => 'float',
             'height_mm' => 'float',
             'elements' => 'array',
+            'editor_settings' => 'array',
         ];
     }
 
@@ -66,5 +70,20 @@ class ShelfTagLayout extends Model
         }
 
         return Storage::disk('public')->path($this->logo_path);
+    }
+
+    /**
+     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float}
+     */
+    public function normalizedEditorSettings(): array
+    {
+        return ShelfTagPaperPresets::normalizeEditorSettings(
+            is_array($this->editor_settings) ? $this->editor_settings : null
+        );
+    }
+
+    public function isAutoLength(): bool
+    {
+        return $this->length_mode === ShelfTagPaperPresets::LENGTH_MODE_AUTO;
     }
 }

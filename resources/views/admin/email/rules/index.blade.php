@@ -1,12 +1,14 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center gap-3">
-            <h2 class="font-semibold text-xl">Inbound email rules</h2>
-            <a href="{{ route('admin.email.rules.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add</a>
+            <h2 class="font-semibold text-xl">Email</h2>
+            <a href="{{ route('admin.email.rules.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add rule</a>
         </div>
     </x-slot>
 
     <div class="max-w-7xl mx-auto px-4 space-y-3">
+        <x-email-tabs />
+
         @if (session('status'))
             <p class="text-sm text-brand">{{ session('status') }}</p>
         @endif

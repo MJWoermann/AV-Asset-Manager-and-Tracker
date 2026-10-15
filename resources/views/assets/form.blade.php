@@ -51,8 +51,12 @@
                 </p>
             @endif
 
+            <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                <span class="text-red-600 dark:text-red-400" aria-hidden="true">*</span> Required field
+            </p>
+
             <div>
-                <x-input-label for="name" value="Name" />
+                <x-input-label for="name" value="Name" required />
                 <x-text-input id="name" name="name" class="mt-1 block w-full" :value="old('name', $asset->name)" required />
                 <x-input-error :messages="$errors->get('name')" class="mt-1" />
             </div>
@@ -65,7 +69,7 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <x-input-label for="item_type_id" value="Item type" />
+                    <x-input-label for="item_type_id" value="Item type" required />
                     <x-searchable-select
                         name="item_type_id"
                         id="item_type_id"
@@ -77,7 +81,7 @@
                     <x-input-error :messages="$errors->get('item_type_id')" class="mt-1" />
                 </div>
                 <div>
-                    <x-input-label for="status" value="Status" />
+                    <x-input-label for="status" value="Status" required />
                     <select id="status" name="status" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
                         @foreach($statuses as $value => $label)
                             <option value="{{ $value }}" @selected(old('status', $asset->status?->value) === $value)>{{ $label }}</option>
@@ -109,24 +113,6 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {{-- #region agent log --}}
-                @php
-                    file_put_contents(base_path('debug-94d1bc.log'), json_encode([
-                        'sessionId' => '94d1bc',
-                        'runId' => 'post-fix',
-                        'hypothesisId' => 'A',
-                        'location' => 'assets/form.blade.php:identifier-grid',
-                        'message' => 'Compiled view still contains literal x-text-input tags',
-                        'data' => [
-                            'compiledViewPath' => __FILE__,
-                            'literalXTextInputInCompiled' => str_contains((string) @file_get_contents(__FILE__), '<x-text-input'),
-                            'emailIntegrationEnabled' => (bool) ($emailIntegrationEnabled ?? false),
-                            'assetExists' => (bool) $asset->exists,
-                        ],
-                        'timestamp' => (int) round(microtime(true) * 1000),
-                    ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-                @endphp
-                {{-- #endregion --}}
                 @foreach([
                     'manufacturer' => 'Manufacturer',
                     'model' => 'Model',
@@ -140,7 +126,7 @@
                 ] as $field => $label)
                     <div>
                         <x-input-label :for="$field" :value="$label" />
-                        {{-- @if inside a component tag prevents Blade from compiling it to <input> --}}
+                        {{-- Keep @if outside the component tag so Blade compiles it to <input> --}}
                         @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
                             <x-text-input
                                 :id="$field"
@@ -366,38 +352,5 @@
                 <a href="{{ $asset->exists ? route('assets.show', $asset) : route('assets.index') }}" class="px-4 py-2 text-sm border border-brand-charcoal dark:border-white">Cancel</a>
             </div>
         </form>
-        {{-- #region agent log --}}
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                const fields = ['name', 'manufacturer', 'model', 'serial_number', 'mac_address', 'purchase_date'];
-                const byId = {};
-                fields.forEach((id) => {
-                    const el = document.getElementById(id);
-                    byId[id] = el ? { tag: el.tagName, type: el.getAttribute('type'), display: getComputedStyle(el).display, height: getComputedStyle(el).height } : null;
-                });
-                const payload = {
-                    sessionId: '94d1bc',
-                    runId: 'post-fix',
-                    hypothesisId: 'A',
-                    location: 'assets/form.blade.php:dom-probe',
-                    message: 'DOM probe for missing identifier inputs',
-                    data: {
-                        nameInputPresent: !!document.querySelector('input#name'),
-                        manufacturerInputPresent: !!document.querySelector('input#manufacturer'),
-                        literalXTextInputCount: document.querySelectorAll('x-text-input').length,
-                        manufacturerNamedTag: document.querySelector('[name="manufacturer"]')?.tagName ?? null,
-                        alpineErrorLikely: typeof window.Alpine === 'undefined',
-                        byId,
-                    },
-                    timestamp: Date.now(),
-                };
-                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '94d1bc' },
-                    body: JSON.stringify(payload),
-                }).catch(() => {});
-            });
-        </script>
-        {{-- #endregion --}}
     </div>
 </x-app-layout>

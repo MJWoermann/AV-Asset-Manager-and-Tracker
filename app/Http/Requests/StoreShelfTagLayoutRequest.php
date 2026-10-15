@@ -22,10 +22,32 @@ class StoreShelfTagLayoutRequest extends FormRequest
             'width_mm' => ['required', 'numeric', 'min:10', 'max:200'],
             'height_mm' => ['required', 'numeric', 'min:10', 'max:300'],
             'orientation' => ['required', 'string', Rule::in(['portrait', 'landscape'])],
+            'length_mode' => ['required', 'string', Rule::in(ShelfTagPaperPresets::lengthModes())],
             'elements' => ['required'],
+            'editor_settings' => ['nullable'],
+            'show_grid' => ['sometimes', 'boolean'],
+            'snap_to_grid' => ['sometimes', 'boolean'],
+            'grid_size_mm' => ['sometimes', 'numeric', Rule::in([2.5, 5, 10])],
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
             'remove_logo' => ['sometimes', 'boolean'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $merge = [
+            'length_mode' => $this->input('length_mode', ShelfTagPaperPresets::LENGTH_MODE_FIXED),
+        ];
+
+        if ($this->has('show_grid')) {
+            $merge['show_grid'] = filter_var($this->input('show_grid'), FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($this->has('snap_to_grid')) {
+            $merge['snap_to_grid'] = filter_var($this->input('snap_to_grid'), FILTER_VALIDATE_BOOLEAN);
+        }
+
+        $this->merge($merge);
     }
 
     public function withValidator(Validator $validator): void
@@ -42,6 +64,13 @@ class StoreShelfTagLayoutRequest extends FormRequest
                     $validator->errors()->add(
                         'paper_preset',
                         'Die-cut size must match the selected Brother DK preset.'
+                    );
+                }
+
+                if ($this->input('length_mode') === ShelfTagPaperPresets::LENGTH_MODE_AUTO) {
+                    $validator->errors()->add(
+                        'length_mode',
+                        'Auto length is only available for continuous paper presets.'
                     );
                 }
             }
@@ -108,16 +137,54 @@ class StoreShelfTagLayoutRequest extends FormRequest
         return array_values($decoded);
     }
 
+    /**
+     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float}
+     */
+    public function resolvedEditorSettings(): array
+    {
+        $raw = $this->input('editor_settings');
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return ShelfTagPaperPresets::normalizeEditorSettings($decoded);
+            }
+        }
+
+        if (is_array($raw)) {
+            return ShelfTagPaperPresets::normalizeEditorSettings($raw);
+        }
+
+        return ShelfTagPaperPresets::normalizeEditorSettings([
+            'show_grid' => $this->boolean('show_grid'),
+            'snap_to_grid' => $this->boolean('snap_to_grid'),
+            'grid_size_mm' => (float) $this->input('grid_size_mm', 5),
+        ]);
+    }
+
     /** @return array<string, mixed> */
     public function layoutAttributes(): array
     {
+        $preset = (string) $this->validated('paper_preset');
+        $lengthMode = (string) $this->validated('length_mode');
+        $heightMm = (float) $this->validated('height_mm');
+
+        if (ShelfTagPaperPresets::isContinuous($preset)) {
+            $heightMm = ShelfTagPaperPresets::clampContinuousLength($heightMm);
+        }
+
+        if (! ShelfTagPaperPresets::isContinuous($preset)) {
+            $lengthMode = ShelfTagPaperPresets::LENGTH_MODE_FIXED;
+        }
+
         return [
             'name' => $this->validated('name'),
-            'paper_preset' => $this->validated('paper_preset'),
+            'paper_preset' => $preset,
             'width_mm' => (float) $this->validated('width_mm'),
-            'height_mm' => (float) $this->validated('height_mm'),
+            'height_mm' => $heightMm,
             'orientation' => $this->validated('orientation'),
+            'length_mode' => $lengthMode,
             'elements' => $this->decodedElements() ?? [],
+            'editor_settings' => $this->resolvedEditorSettings(),
         ];
     }
 }

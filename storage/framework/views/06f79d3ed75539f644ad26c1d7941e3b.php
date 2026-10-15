@@ -36,7 +36,7 @@
         <section class="space-y-4" aria-labelledby="dashboard-overview-heading">
             <h3 id="dashboard-overview-heading" class="font-semibold text-lg text-brand-black dark:text-white">Overview</h3>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                 <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
                     <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
                         <h4 class="text-sm font-semibold uppercase tracking-wide text-brand">Assets by status</h4>
@@ -78,6 +78,27 @@
                         </ul>
                     <?php endif; ?>
                 </div>
+
+                <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'email_integration')): ?>
+                    <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
+                                <h4 class="text-sm font-semibold uppercase tracking-wide text-brand">Inbound emails</h4>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <li>
+                                    <a
+                                        href="<?php echo e(route('admin.email.inbound.index', ['status' => 'pending'])); ?>"
+                                        class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                    >
+                                        <span>Pending review</span>
+                                        <span class="font-mono tabular-nums"><?php echo e($pendingInboundEmails ?? 0); ?></span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
             </div>
 
             <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
