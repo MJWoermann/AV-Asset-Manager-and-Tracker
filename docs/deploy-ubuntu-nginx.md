@@ -70,6 +70,7 @@ npm ci
 npm run build
 # Runs migrations (incl. users.preferences), seeds, and creates the first admin
 php artisan app:install --email=admin@your.org --password='ChooseAStrongPassword'
+# If the prior command fails use php artisan db:wipe --force to celar the data and try again
 php artisan storage:link
 sudo chown -R www-data:www-data storage bootstrap/cache
 sudo chmod -R ug+rwx storage bootstrap/cache

@@ -1659,18 +1659,45 @@ Alpine.data('bulkAssets', () => ({
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-Debug-Session-Id': 'c8166a',
+                                'X-Debug-Session-Id': 'e131a9',
                             },
                             body: JSON.stringify({
-                                sessionId: 'c8166a',
-                                runId: 'post-fix',
+                                sessionId: 'e131a9',
+                                runId: 'pre-fix',
                                 hypothesisId: 'A',
                                 location: 'app.js:bulkAssets.init.click',
                                 message: 'Native click on select-all',
                                 data: {
                                     defaultPrevented: e.defaultPrevented,
                                     targetTag: e.target?.tagName,
-                                    pointerType: e.pointerType || null,
+                                    checkedAtClick: !!e.target?.checked,
+                                    allPageSelected: this.allPageSelected,
+                                },
+                                timestamp: Date.now(),
+                            }),
+                        }).catch(() => {});
+                    },
+                    true
+                );
+                selectAll.addEventListener(
+                    'change',
+                    (e) => {
+                        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Debug-Session-Id': 'e131a9',
+                            },
+                            body: JSON.stringify({
+                                sessionId: 'e131a9',
+                                runId: 'pre-fix',
+                                hypothesisId: 'C',
+                                location: 'app.js:bulkAssets.init.nativeChange',
+                                message: 'Native change on select-all',
+                                data: {
+                                    checked: !!e.target.checked,
+                                    allPageSelected: this.allPageSelected,
+                                    selectedCount: this.selectedIds.length,
                                 },
                                 timestamp: Date.now(),
                             }),
@@ -1683,11 +1710,11 @@ Alpine.data('bulkAssets', () => ({
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Debug-Session-Id': 'c8166a',
+                    'X-Debug-Session-Id': 'e131a9',
                 },
                 body: JSON.stringify({
-                    sessionId: 'c8166a',
-                    runId: 'post-fix',
+                    sessionId: 'e131a9',
+                    runId: 'pre-fix',
                     hypothesisId: 'A',
                     location: 'app.js:bulkAssets.init',
                     message: 'bulkAssets init select-all probe',
@@ -1695,6 +1722,7 @@ Alpine.data('bulkAssets', () => ({
                         hasSelectAll: !!selectAll,
                         boxCount: boxes.length,
                         boxIdsSample: boxes.slice(0, 10),
+                        elTag: this.$el ? this.$el.tagName : null,
                         overlay,
                         selectAllDisabled: selectAll ? !!selectAll.disabled : null,
                         selectAllRect: selectAll
@@ -1738,12 +1766,12 @@ Alpine.data('bulkAssets', () => ({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Debug-Session-Id': 'c8166a',
+                'X-Debug-Session-Id': 'e131a9',
             },
             body: JSON.stringify({
-                sessionId: 'c8166a',
-                runId: 'post-fix',
-                hypothesisId: 'E',
+                sessionId: 'e131a9',
+                runId: 'pre-fix',
+                hypothesisId: 'D',
                 location: 'app.js:bulkAssets.setSelected',
                 message: 'Row checkbox setSelected',
                 data: { id, checked: !!checked },
@@ -1767,11 +1795,11 @@ Alpine.data('bulkAssets', () => ({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Debug-Session-Id': 'c8166a',
+                'X-Debug-Session-Id': 'e131a9',
             },
             body: JSON.stringify({
-                sessionId: 'c8166a',
-                runId: 'post-fix',
+                sessionId: 'e131a9',
+                runId: 'pre-fix',
                 hypothesisId: 'B',
                 location: 'app.js:bulkAssets.toggleAll',
                 message: 'toggleAll invoked',
@@ -1796,16 +1824,19 @@ Alpine.data('bulkAssets', () => ({
         this.$nextTick(() => {
             const afterBoxes = this.pageCheckboxes();
             const selectAll = this.$el.querySelector('input[aria-label="Select all assets on this page"]');
+            const rowCheckedCount = [...this.$el.querySelectorAll('[data-bulk-asset-id]')].filter(
+                (el) => el.checked
+            ).length;
             fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Debug-Session-Id': 'c8166a',
+                    'X-Debug-Session-Id': 'e131a9',
                 },
                 body: JSON.stringify({
-                    sessionId: 'c8166a',
-                    runId: 'post-fix',
-                    hypothesisId: 'C',
+                    sessionId: 'e131a9',
+                    runId: 'pre-fix',
+                    hypothesisId: 'D',
                     location: 'app.js:bulkAssets.toggleAll.after',
                     message: 'toggleAll after state',
                     data: {
@@ -1813,6 +1844,7 @@ Alpine.data('bulkAssets', () => ({
                         allPageSelectedAfter:
                             afterBoxes.length > 0 && afterBoxes.every((id) => !!this.selected[id]),
                         domChecked: selectAll ? !!selectAll.checked : null,
+                        rowCheckedCount,
                         selectedKeysSample: Object.keys(this.selected).slice(0, 10),
                     },
                     timestamp: Date.now(),

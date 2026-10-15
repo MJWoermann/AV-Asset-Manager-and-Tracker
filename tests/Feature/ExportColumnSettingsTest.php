@@ -3,11 +3,16 @@
 namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
+use App\Enums\LocationType;
 use App\Exports\AssetsExport;
 use App\Models\Asset;
+use App\Models\AssetCustomFieldValue;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
+use App\Models\CustomFieldDefinition;
+use App\Models\CustomFieldSet;
 use App\Models\ItemType;
+use App\Models\Location;
 use App\Models\User;
 use App\Support\AssetExportColumns;
 use Database\Seeders\RoleSeeder;
@@ -53,9 +58,21 @@ class ExportColumnSettingsTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_admin_can_view_export_column_settings(): void
+    public function test_admin_can_view_export_column_settings_including_location_and_custom_sets(): void
     {
         $admin = $this->admin();
+
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Network Details',
+            'slug' => 'network-details',
+        ]);
+        CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'VLAN',
+            'slug' => 'vlan',
+            'type' => 'text',
+            'sort_order' => 1,
+        ]);
 
         $response = $this->actingAs($admin)->get(route('admin.export-columns.edit'));
 
@@ -65,21 +82,38 @@ class ExportColumnSettingsTest extends TestCase
         $response->assertSee('List exports');
         $response->assertSee('Description');
         $response->assertSee('Location');
+        $response->assertSee('Location: Level');
+        $response->assertSee('Parent');
+        $response->assertSee('Network Details');
+        $response->assertSee('VLAN');
     }
 
-    public function test_admin_can_save_export_columns(): void
+    public function test_admin_can_save_export_columns_including_custom_fields(): void
     {
         $admin = $this->admin();
 
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Network Details',
+            'slug' => 'network-details',
+        ]);
+        $definition = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'VLAN',
+            'slug' => 'vlan',
+            'type' => 'text',
+            'sort_order' => 1,
+        ]);
+        $customKey = AssetExportColumns::CUSTOM_PREFIX.$definition->id;
+
         $response = $this->actingAs($admin)->put(route('admin.export-columns.update'), [
-            'asset_columns' => ['name', 'tp_barcode', 'location'],
+            'asset_columns' => ['name', 'tp_barcode', 'location', $customKey],
             'list_columns' => ['name', 'fmi_ast', 'quantity'],
         ]);
 
         $response->assertRedirect(route('admin.export-columns.edit'));
         $response->assertSessionHas('status', 'Export columns saved.');
 
-        $this->assertSame(['name', 'tp_barcode', 'location'], AssetExportColumns::forAssets());
+        $this->assertSame(['name', 'tp_barcode', 'location', $customKey], AssetExportColumns::forAssets());
         $this->assertSame(['name', 'fmi_ast', 'quantity'], AssetExportColumns::forLists());
     }
 
@@ -145,6 +179,110 @@ class ExportColumnSettingsTest extends TestCase
         $listExport = new AssetsExport($list->id);
         $this->assertSame(['Name', 'Quantity', 'FMI AST#'], $listExport->headings());
         $this->assertSame([['Speaker', '3', 'FMI-42']], $listExport->collection()->values()->all());
+    }
+
+    public function test_asset_export_includes_selected_location_parent_and_custom_fields(): void
+    {
+        $level = Location::create([
+            'name' => 'Level 1',
+            'type' => LocationType::Level,
+        ]);
+        $room = Location::create([
+            'name' => 'Room A',
+            'type' => LocationType::Room,
+            'parent_id' => $level->id,
+        ]);
+        $rack = Location::create([
+            'name' => 'Rack 1',
+            'type' => LocationType::Rack,
+            'parent_id' => $room->id,
+        ]);
+
+        $type = ItemType::create(['name' => 'Audio', 'slug' => 'audio']);
+        $parent = Asset::create([
+            'name' => 'Parent Rack',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Available,
+            'fmi_ast' => 'FMI-PARENT',
+            'tp_barcode' => 'TP-PARENT',
+            'location_id' => $rack->id,
+            'quantity' => 1,
+        ]);
+
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Network Details',
+            'slug' => 'network-details',
+        ]);
+        $definition = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'VLAN',
+            'slug' => 'vlan',
+            'type' => 'text',
+            'sort_order' => 1,
+        ]);
+        $customKey = AssetExportColumns::CUSTOM_PREFIX.$definition->id;
+
+        $child = Asset::create([
+            'name' => 'Child Switch',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Available,
+            'fmi_ast' => 'FMI-CHILD',
+            'tp_barcode' => 'TP-CHILD',
+            'parent_id' => $parent->id,
+            'location_id' => $rack->id,
+            'quantity' => 1,
+            'notes' => 'Spare unit',
+        ]);
+
+        AssetCustomFieldValue::create([
+            'asset_id' => $child->id,
+            'custom_field_definition_id' => $definition->id,
+            'value' => '100',
+        ]);
+
+        AssetExportColumns::putAssets([
+            'name',
+            'location',
+            'location_level',
+            'location_room',
+            'location_rack',
+            'parent',
+            'parent_fmi_ast',
+            'parent_tp_barcode',
+            'notes',
+            $customKey,
+        ]);
+
+        $export = new AssetsExport;
+        $headings = $export->headings();
+        $rows = $export->collection()->keyBy(fn (array $row) => $row[0]);
+
+        $this->assertSame([
+            'Name',
+            'Location',
+            'Location: Level',
+            'Location: Room',
+            'Location: Rack',
+            'Parent',
+            'Parent FMI AST#',
+            'Parent TP Barcode',
+            'Notes',
+            'VLAN (Network Details)',
+        ], $headings);
+
+        $childRow = $rows->get('Child Switch');
+        $this->assertNotNull($childRow);
+
+        $byHeading = array_combine($headings, $childRow);
+        $this->assertSame('Level 1 / Room A / Rack 1', $byHeading['Location']);
+        $this->assertSame('Level 1', $byHeading['Location: Level']);
+        $this->assertSame('Room A', $byHeading['Location: Room']);
+        $this->assertSame('Rack 1', $byHeading['Location: Rack']);
+        $this->assertSame('Parent Rack', $byHeading['Parent']);
+        $this->assertSame('FMI-PARENT', $byHeading['Parent FMI AST#']);
+        $this->assertSame('TP-PARENT', $byHeading['Parent TP Barcode']);
+        $this->assertSame('Spare unit', $byHeading['Notes']);
+        $this->assertSame('100', $byHeading['VLAN (Network Details)']);
     }
 
     public function test_exports_default_to_legacy_columns_when_unset(): void

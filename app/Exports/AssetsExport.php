@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Asset;
 use App\Models\AssetListItem;
+use App\Models\CustomFieldDefinition;
 use App\Support\AssetExportColumns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -15,11 +16,18 @@ class AssetsExport implements FromCollection, WithHeadings
     /** @var list<string> */
     protected array $columns;
 
+    /** @var Collection<int, CustomFieldDefinition> */
+    protected Collection $customDefinitions;
+
     public function __construct(public ?int $listId = null)
     {
         $this->columns = $this->listId
             ? AssetExportColumns::forLists()
             : AssetExportColumns::forAssets();
+
+        $this->customDefinitions = AssetExportColumns::needsCustomFields($this->columns)
+            ? AssetExportColumns::customFieldDefinitions()
+            : collect();
     }
 
     public function collection(): Collection
@@ -51,6 +59,6 @@ class AssetsExport implements FromCollection, WithHeadings
 
     public function headings(): array
     {
-        return AssetExportColumns::headings($this->columns);
+        return AssetExportColumns::headings($this->columns, $this->customDefinitions);
     }
 }
