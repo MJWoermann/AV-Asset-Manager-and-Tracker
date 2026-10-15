@@ -154,6 +154,8 @@ Optional TLS: use Certbot (`sudo apt install certbot python3-certbot-nginx`) if 
 
 ## 5. PHP-FPM tuning (20 concurrent users)
 
+Recommended host CPU/RAM/disk for ~10k assets and this concurrency target: [hardware-sizing.md](hardware-sizing.md).
+
 In `/etc/php/8.5/fpm/pool.d/www.conf` consider:
 
 ```ini

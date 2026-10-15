@@ -88,6 +88,7 @@ class ShelfTagRenderService
      *     asset_id: int,
      *     width_mm: float,
      *     height_mm: float,
+     *     orientation: string,
      *     elements: list<array<string, mixed>>
      * }>
      */
@@ -104,8 +105,9 @@ class ShelfTagRenderService
 
             $labels[] = [
                 'asset_id' => $asset->id,
-                'width_mm' => (float) $layout->width_mm,
-                'height_mm' => (float) $layout->height_mm,
+                'width_mm' => $layout->displayWidthMm(),
+                'height_mm' => $layout->displayHeightMm(),
+                'orientation' => $layout->isLandscape() ? 'landscape' : 'portrait',
                 'elements' => $elements,
             ];
         }

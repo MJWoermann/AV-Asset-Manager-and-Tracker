@@ -13,7 +13,15 @@
 @endphp
 
 <tr class="bg-brand-silver/70 dark:bg-brand-charcoal/80">
-    <th class="px-3 py-2 w-10"></th>
+    <th class="px-3 py-2 w-10 align-middle">
+        <input
+            type="checkbox"
+            class="rounded border-brand-charcoal/40"
+            :checked="allPageSelected"
+            @click.prevent="toggleAll(!allPageSelected)"
+            aria-label="Select all assets on this page"
+        >
+    </th>
     @foreach($selectedColumns as $column)
         <th class="px-2 py-2 align-bottom font-normal">
             @switch($column)

@@ -5,6 +5,7 @@
             <div class="flex gap-2 items-center">
                 <x-asset-column-picker :available-columns="$availableColumns" :selected-columns="$selectedColumns" />
                 @role('admin|inventory_manager')
+                    <a href="{{ route('import.create') }}" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Import</a>
                     <a href="{{ route('export.assets', ['format' => 'xlsx']) }}" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Export</a>
                 @endrole
                 <a href="{{ route('assets.create') }}" class="text-sm px-3 py-2 bg-brand text-white">Add asset</a>
@@ -47,15 +48,7 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                     <tr>
-                        <th class="px-3 py-2 w-10">
-                            <input
-                                type="checkbox"
-                                class="rounded border-brand-charcoal/40"
-                                :checked="allPageSelected"
-                                @click.prevent="toggleAll(!allPageSelected)"
-                                aria-label="Select all assets on this page"
-                            >
-                        </th>
+                        <th class="px-3 py-2 w-10" aria-hidden="true"></th>
                         @foreach($selectedColumns as $column)
                             <th class="px-3 py-2">{{ \App\Support\AssetTableColumns::label($column) }}</th>
                         @endforeach

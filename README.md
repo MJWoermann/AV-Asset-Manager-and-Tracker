@@ -55,6 +55,12 @@ Staff-oriented overview of use cases, roles, and day-to-day workflows: [docs/fea
 
 See [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md). Production hardening and security review notes: [docs/security-hardening.md](docs/security-hardening.md).
 
+## Hardware sizing
+
+For a typical LAN LEMP host with **~10,000 assets** and **~20 concurrent users**: **4 vCPU, 16 GB RAM, ~100 GB SSD** system disk, plus separate attachment/backup storage (often NAS). Disk is driven by manuals and backup retention, not asset row count.
+
+Full assumptions, minimum/comfortable tiers, and PHP/MariaDB tuning notes: [docs/hardware-sizing.md](docs/hardware-sizing.md).
+
 ## Roles
 
 | Role | Capabilities |

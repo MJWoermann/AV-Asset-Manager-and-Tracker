@@ -1150,6 +1150,84 @@ Alpine.data('bulkAssets', () => ({
         clear_notes: false,
     },
 
+    init() {
+        // #region agent log
+        this.$nextTick(() => {
+            const selectAll = this.$el.querySelector('input[aria-label="Select all assets on this page"]');
+            const boxes = this.pageCheckboxes();
+            let overlay = null;
+            if (selectAll) {
+                const rect = selectAll.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+                const midY = rect.top + rect.height / 2;
+                const topEl = document.elementFromPoint(midX, midY);
+                overlay = topEl
+                    ? {
+                          tag: topEl.tagName,
+                          aria: topEl.getAttribute('aria-label'),
+                          className: typeof topEl.className === 'string' ? topEl.className.slice(0, 120) : '',
+                          isSelectAll: topEl === selectAll,
+                      }
+                    : null;
+                selectAll.addEventListener(
+                    'click',
+                    (e) => {
+                        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Debug-Session-Id': 'c8166a',
+                            },
+                            body: JSON.stringify({
+                                sessionId: 'c8166a',
+                                runId: 'pre-fix',
+                                hypothesisId: 'A',
+                                location: 'app.js:bulkAssets.init.click',
+                                message: 'Native click on select-all',
+                                data: {
+                                    defaultPrevented: e.defaultPrevented,
+                                    targetTag: e.target?.tagName,
+                                    pointerType: e.pointerType || null,
+                                },
+                                timestamp: Date.now(),
+                            }),
+                        }).catch(() => {});
+                    },
+                    true
+                );
+            }
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Debug-Session-Id': 'c8166a',
+                },
+                body: JSON.stringify({
+                    sessionId: 'c8166a',
+                    runId: 'pre-fix',
+                    hypothesisId: 'A',
+                    location: 'app.js:bulkAssets.init',
+                    message: 'bulkAssets init select-all probe',
+                    data: {
+                        hasSelectAll: !!selectAll,
+                        boxCount: boxes.length,
+                        boxIdsSample: boxes.slice(0, 10),
+                        overlay,
+                        selectAllDisabled: selectAll ? !!selectAll.disabled : null,
+                        selectAllRect: selectAll
+                            ? {
+                                  w: selectAll.getBoundingClientRect().width,
+                                  h: selectAll.getBoundingClientRect().height,
+                              }
+                            : null,
+                    },
+                    timestamp: Date.now(),
+                }),
+            }).catch(() => {});
+        });
+        // #endregion
+    },
+
     get selectedIds() {
         return Object.keys(this.selected)
             .filter((id) => this.selected[id])
@@ -1172,15 +1250,93 @@ Alpine.data('bulkAssets', () => ({
     },
 
     setSelected(id, checked) {
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Debug-Session-Id': 'c8166a',
+            },
+            body: JSON.stringify({
+                sessionId: 'c8166a',
+                runId: 'pre-fix',
+                hypothesisId: 'E',
+                location: 'app.js:bulkAssets.setSelected',
+                message: 'Row checkbox setSelected',
+                data: { id, checked: !!checked },
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {});
+        // #endregion
         this.selected = { ...this.selected, [id]: !!checked };
     },
 
     toggleAll(checked) {
+        // #region agent log
+        let boxes = [];
+        let err = null;
+        try {
+            boxes = this.pageCheckboxes();
+        } catch (e) {
+            err = String(e && e.message ? e.message : e);
+        }
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Debug-Session-Id': 'c8166a',
+            },
+            body: JSON.stringify({
+                sessionId: 'c8166a',
+                runId: 'pre-fix',
+                hypothesisId: 'B',
+                location: 'app.js:bulkAssets.toggleAll',
+                message: 'toggleAll invoked',
+                data: {
+                    checked: !!checked,
+                    boxCount: boxes.length,
+                    boxIdsSample: boxes.slice(0, 10),
+                    allPageSelectedBefore: boxes.length > 0 && boxes.every((id) => !!this.selected[id]),
+                    selectedCountBefore: this.selectedIds.length,
+                    pageCheckboxesError: err,
+                },
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {});
+        // #endregion
         const next = { ...this.selected };
         this.pageCheckboxes().forEach((id) => {
             next[id] = !!checked;
         });
         this.selected = next;
+        // #region agent log
+        this.$nextTick(() => {
+            const afterBoxes = this.pageCheckboxes();
+            const selectAll = this.$el.querySelector('input[aria-label="Select all assets on this page"]');
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Debug-Session-Id': 'c8166a',
+                },
+                body: JSON.stringify({
+                    sessionId: 'c8166a',
+                    runId: 'pre-fix',
+                    hypothesisId: 'C',
+                    location: 'app.js:bulkAssets.toggleAll.after',
+                    message: 'toggleAll after state',
+                    data: {
+                        selectedCountAfter: this.selectedIds.length,
+                        allPageSelectedAfter:
+                            afterBoxes.length > 0 && afterBoxes.every((id) => !!this.selected[id]),
+                        domChecked: selectAll ? !!selectAll.checked : null,
+                        selectedKeysSample: Object.keys(this.selected).slice(0, 10),
+                    },
+                    timestamp: Date.now(),
+                }),
+            }).catch(() => {});
+        });
+        // #endregion
     },
 
     clearSelection() {
@@ -1408,15 +1564,30 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             this.gridSizeMm = 5;
         }
         // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'D',location:'app.js:shelfTagDesigner.init',message:'designer build fingerprint',data:{orientation:this.orientation,labelContentTransform:this.labelContentStyle.transform||null,hasRotateTransform:Boolean(this.labelContentStyle.transform&&String(this.labelContentStyle.transform).includes('rotate')),contentW:this.labelContentStyle.width,contentH:this.labelContentStyle.height,canvasW:this.canvasStyle.width,canvasH:this.canvasStyle.height,buildTag:'no-plane-rotate-v2'},timestamp:Date.now()})}).catch(()=>{});
         this.$watch('orientation', (value, oldValue) => {
-            this._dbgCanvasOrient = null;
-            const style = this.canvasStyle;
-            const expectedW = `${this.displayWidthMm * this.scale}px`;
-            const expectedH = `${this.displayHeightMm * this.scale}px`;
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'50748a'},body:JSON.stringify({sessionId:'50748a',runId:'post-fix',hypothesisId:'A',location:'app.js:shelfTagDesigner.orientationWatch',message:'orientation changed',data:{oldValue,value,widthMm:this.widthMm,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,canvasStyle:style,expectedW,expectedH,canvasMatchesExpected:style.width===expectedW&&style.height===expectedH,isLandscape:this.isLandscape},timestamp:Date.now()})}).catch(()=>{});
-            this.$nextTick(() => this.centerView());
+            const content = this.labelContentStyle;
+            const sample = this.elements.slice(0, 3).map((el) => ({
+                id: el.id,
+                type: el.type,
+                x: el.x,
+                y: el.y,
+                width: el.width,
+                height: el.height,
+                rotation: el.rotation || 0,
+                styleTransform: this.elementStyle(el).transform || null,
+            }));
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'A',location:'app.js:shelfTagDesigner.orientationWatch',message:'orientation changed — content vs elements',data:{oldValue,value,isLandscape:this.isLandscape,widthMm:this.widthMm,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,canvasStyle:this.canvasStyle,labelContentTransform:content.transform||null,labelContentSize:{w:content.width,h:content.height},elementCount:this.elements.length,sampleElements:sample},timestamp:Date.now()})}).catch(()=>{});
+            this.$nextTick(() => {
+                const plane = this.$el.querySelector('[data-label-content-plane]');
+                const firstEl = this.$el.querySelector('[data-el-id]');
+                const planeCs = plane ? getComputedStyle(plane) : null;
+                const elCs = firstEl ? getComputedStyle(firstEl) : null;
+                const planeIsIdentity = !planeCs?.transform || planeCs.transform === 'none';
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'B',location:'app.js:shelfTagDesigner.orientationWatch.nextTick',message:'DOM computed transforms after orientation',data:{orientation:this.orientation,planeTransform:planeCs?.transform||null,planeIsIdentity,firstElTransform:elCs?.transform||null,firstElLeft:elCs?.left||null,firstElTop:elCs?.top||null,sampleDataUnchanged:sample},timestamp:Date.now()})}).catch(()=>{});
+                this.centerView();
+            });
         });
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'50748a'},body:JSON.stringify({sessionId:'50748a',runId:'post-fix',hypothesisId:'B',location:'app.js:shelfTagDesigner.init',message:'designer init orientation state',data:{orientation:this.orientation,widthMm:this.widthMm,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,canvasStyle:this.canvasStyle,isLandscape:this.isLandscape},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
         this.$nextTick(() => {
             this.centerView();
@@ -1507,7 +1678,7 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         // #region agent log
         if (this._dbgCanvasOrient !== this.orientation) {
             this._dbgCanvasOrient = this.orientation;
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'50748a'},body:JSON.stringify({sessionId:'50748a',runId:'post-fix',hypothesisId:'C',location:'app.js:shelfTagDesigner.canvasStyle',message:'canvasStyle computed',data:{orientation:this.orientation,widthMm:this.widthMm,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,cssWidth:cssW,cssHeight:cssH,orientationRead:true,orientationUsedInReturn:true},timestamp:Date.now()})}).catch(()=>{});
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'D',location:'app.js:shelfTagDesigner.canvasStyle',message:'canvas outer box dimensions',data:{orientation:this.orientation,cssWidth:cssW,cssHeight:cssH,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,logicalWidthMm:this.widthMm,logicalHeightMm:this.heightMm},timestamp:Date.now()})}).catch(()=>{});
         }
         // #endregion
         return {
@@ -1517,21 +1688,24 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     },
 
     /**
-     * Logical label plane (widthMm × heightMm). Landscape rotates it so length runs horizontally.
+     * Label content plane matches the visible canvas. Landscape only swaps aspect —
+     * elements keep upright positions (no CSS rotate of the whole plane).
      */
     get labelContentStyle() {
         const s = this.scale;
         const style = {
-            width: `${this.widthMm * s}px`,
-            height: `${this.heightMm * s}px`,
+            width: `${this.displayWidthMm * s}px`,
+            height: `${this.displayHeightMm * s}px`,
             position: 'absolute',
             top: '0',
             left: '0',
         };
-        if (this.isLandscape) {
-            style.transform = `translateY(${this.widthMm * s}px) rotate(-90deg)`;
-            style.transformOrigin = 'top left';
+        // #region agent log
+        if (this._dbgContentOrient !== this.orientation) {
+            this._dbgContentOrient = this.orientation;
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'A',location:'app.js:shelfTagDesigner.labelContentStyle',message:'labelContentStyle transform applied',data:{orientation:this.orientation,isLandscape:this.isLandscape,hasRotateTransform:Boolean(style.transform&&String(style.transform).includes('rotate')),transform:style.transform||null,planeW:style.width,planeH:style.height},timestamp:Date.now()})}).catch(()=>{});
         }
+        // #endregion
         return style;
     },
 
@@ -1551,9 +1725,8 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
 
     get gridOverlayStyle() {
         const stepPx = Math.max(0.5, Number(this.gridSizeMm) || 5) * this.scale;
-        // Grid lives on the logical (pre-rotate) plane.
-        const centerX = (this.widthMm / 2) * this.scale;
-        const centerY = (this.heightMm / 2) * this.scale;
+        const centerX = (this.displayWidthMm / 2) * this.scale;
+        const centerY = (this.displayHeightMm / 2) * this.scale;
         return {
             backgroundImage: [
                 'linear-gradient(to right, rgba(0,0,0,0.14) 1px, transparent 1px)',
@@ -1565,11 +1738,11 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     },
 
     get centerCrosshairStyleX() {
-        return { left: `${(this.widthMm / 2) * this.scale}px` };
+        return { left: `${(this.displayWidthMm / 2) * this.scale}px` };
     },
 
     get centerCrosshairStyleY() {
-        return { top: `${(this.heightMm / 2) * this.scale}px` };
+        return { top: `${(this.displayHeightMm / 2) * this.scale}px` };
     },
 
     get marqueeStyle() {
@@ -1943,16 +2116,9 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         if (rect.width <= 0 || rect.height <= 0) {
             return { x: 0, y: 0 };
         }
-        // Map into display mm space (outer canvas), then invert landscape rotate if needed.
-        const displayXmm = ((event.clientX - rect.left) / rect.width) * this.displayWidthMm;
-        const displayYmm = ((event.clientY - rect.top) / rect.height) * this.displayHeightMm;
-        if (!this.isLandscape) {
-            return { x: displayXmm, y: displayYmm };
-        }
-        // Forward: (lx, ly) → display (ly, widthMm - lx). Inverse:
         return {
-            x: this.widthMm - displayYmm,
-            y: displayXmm,
+            x: ((event.clientX - rect.left) / rect.width) * this.displayWidthMm,
+            y: ((event.clientY - rect.top) / rect.height) * this.displayHeightMm,
         };
     },
 
@@ -2120,8 +2286,8 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
                 const el = this.elements.find((item) => item.id === id);
                 const orig = this.drag.orig[id];
                 if (!el || !orig) return;
-                el.x = this.applyCoord(orig.x + dx, this.widthMm);
-                el.y = this.applyCoord(Math.max(0, orig.y + dy), this.heightMm);
+                el.x = this.applyCoord(orig.x + dx, this.displayWidthMm);
+                el.y = this.applyCoord(Math.max(0, orig.y + dy), this.displayHeightMm);
             });
             const moved = this.elements.filter((item) => this.drag.ids.includes(item.id));
             this.afterGeometryChange(moved);
@@ -2132,8 +2298,8 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             const dx = (event.clientX - this.resize.startX) / this.effectiveScale;
             const dy = (event.clientY - this.resize.startY) / this.effectiveScale;
             if (this.snapToGrid) {
-                const snappedRight = this.snapToCenterGrid(el.x + this.resize.origW + dx, this.widthMm);
-                const snappedBottom = this.snapToCenterGrid(el.y + this.resize.origH + dy, this.heightMm);
+                const snappedRight = this.snapToCenterGrid(el.x + this.resize.origW + dx, this.displayWidthMm);
+                const snappedBottom = this.snapToCenterGrid(el.y + this.resize.origH + dy, this.displayHeightMm);
                 el.width = Math.max(2, Math.round((snappedRight - el.x) * 1000) / 1000);
                 el.height = Math.max(2, Math.round((snappedBottom - el.y) * 1000) / 1000);
             } else {
@@ -2162,7 +2328,14 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             return null;
         }
         if (this.alignTarget === 'page') {
-            return { left: 0, top: 0, right: this.widthMm, bottom: this.heightMm, width: this.widthMm, height: this.heightMm };
+            return {
+                left: 0,
+                top: 0,
+                right: this.displayWidthMm,
+                bottom: this.displayHeightMm,
+                width: this.displayWidthMm,
+                height: this.displayHeightMm,
+            };
         }
         if (this.alignTarget === 'biggest') {
             const big = this.biggestElement(els);
@@ -2196,17 +2369,17 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
                 return;
             }
             if (edge === 'left') {
-                el.x = this.applyCoord(ref.left, this.widthMm);
+                el.x = this.applyCoord(ref.left, this.displayWidthMm);
             } else if (edge === 'center') {
-                el.x = this.applyCoord(ref.left + ref.width / 2 - el.width / 2, this.widthMm);
+                el.x = this.applyCoord(ref.left + ref.width / 2 - el.width / 2, this.displayWidthMm);
             } else if (edge === 'right') {
-                el.x = this.applyCoord(ref.right - el.width, this.widthMm);
+                el.x = this.applyCoord(ref.right - el.width, this.displayWidthMm);
             } else if (edge === 'top') {
-                el.y = this.applyCoord(ref.top, this.heightMm);
+                el.y = this.applyCoord(ref.top, this.displayHeightMm);
             } else if (edge === 'middle') {
-                el.y = this.applyCoord(ref.top + ref.height / 2 - el.height / 2, this.heightMm);
+                el.y = this.applyCoord(ref.top + ref.height / 2 - el.height / 2, this.displayHeightMm);
             } else if (edge === 'bottom') {
-                el.y = this.applyCoord(ref.bottom - el.height, this.heightMm);
+                el.y = this.applyCoord(ref.bottom - el.height, this.displayHeightMm);
             }
         });
         this.afterGeometryChange(els);

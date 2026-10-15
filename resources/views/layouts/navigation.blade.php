@@ -64,10 +64,6 @@
                             @endrole
                         </x-slot>
                     </x-dropdown>
-
-                    @role('admin|inventory_manager')
-                        <x-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-nav-link>
-                    @endrole
                 </div>
             </div>
 
@@ -151,10 +147,6 @@
                 @feature('asset_connections')
                     <x-responsive-nav-link :href="route('connection-types.index')" :active="request()->routeIs('connection-types.*')">Connection types</x-responsive-nav-link>
                 @endfeature
-            @endrole
-
-            @role('admin|inventory_manager')
-                <x-responsive-nav-link :href="route('import.create')" :active="request()->routeIs('import.*')">Import</x-responsive-nav-link>
             @endrole
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>

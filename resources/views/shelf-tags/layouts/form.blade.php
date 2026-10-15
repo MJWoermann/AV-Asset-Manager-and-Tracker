@@ -222,32 +222,6 @@
                             </label>
                         </div>
 
-                        <div class="flex flex-wrap items-center gap-2 mb-3 text-sm border-t border-brand-silver dark:border-brand-charcoal pt-3">
-                            <span class="text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver mr-1">Zoom</span>
-                            <button type="button" class="px-2 py-1 border" @click="zoomOut()" title="Zoom out">−</button>
-                            <button type="button" class="px-2 py-1 border min-w-[4.5rem]" @click="resetZoom()" x-text="zoomPercent + '%'"></button>
-                            <button type="button" class="px-2 py-1 border" @click="zoomIn()" title="Zoom in">+</button>
-                            <button type="button" class="px-2 py-1 border text-xs" @click="centerView()">Centre</button>
-                            <span class="text-xs text-brand-charcoal dark:text-brand-silver ml-1">Ctrl+wheel · Space+drag / middle-click to pan</span>
-                        </div>
-
-                        <div class="flex flex-wrap items-center gap-2 mb-3 text-sm border-t border-brand-silver dark:border-brand-charcoal pt-3">
-                            <span class="text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver mr-1">Align</span>
-                            <div class="inline-flex border overflow-hidden">
-                                <button type="button" class="px-2 py-1 text-xs" :class="alignTarget === 'group' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'group'">Selection</button>
-                                <button type="button" class="px-2 py-1 text-xs border-l" :class="alignTarget === 'biggest' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'biggest'">Biggest</button>
-                                <button type="button" class="px-2 py-1 text-xs border-l" :class="alignTarget === 'page' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'page'">Page</button>
-                            </div>
-                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('left')" title="Align left">⇤</button>
-                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('center')" title="Align centre H">↔</button>
-                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('right')" title="Align right">⇥</button>
-                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('top')" title="Align top">⤒</button>
-                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('middle')" title="Align middle V">↕</button>
-                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('bottom')" title="Align bottom">⤓</button>
-                            <span class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="selectedCount > 0" x-text="selectedCount + ' selected'"></span>
-                            <span class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="alignTarget !== 'page' && selectedCount === 1">Shift-click or marquee for multi-select</span>
-                        </div>
-
                         <div
                             class="overflow-hidden rounded border-2 border-brand-charcoal dark:border-brand-black bg-brand-charcoal dark:bg-black shadow-inner relative h-[min(70vh,560px)]"
                             x-ref="viewport"
@@ -262,7 +236,7 @@
                                     :style="canvasStyle"
                                     @pointerdown.stop="onCanvasPointerDown($event)"
                                 >
-                                    <div class="relative" :style="labelContentStyle">
+                                    <div class="relative" data-label-content-plane :style="labelContentStyle">
                                     <div
                                         x-show="showGrid"
                                         class="absolute inset-0 pointer-events-none z-[1]"
@@ -327,9 +301,26 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div
+                                class="absolute bottom-2 right-2 z-10 group"
+                                @pointerdown.stop
+                            >
+                                <div class="flex items-center gap-0.5 rounded border border-brand-charcoal/30 dark:border-brand-silver/30 bg-white/90 dark:bg-brand-slate/90 px-1 py-0.5 shadow text-[10px] leading-none text-brand-charcoal dark:text-brand-silver backdrop-blur-sm">
+                                    <button type="button" class="px-1.5 py-1 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal/60" @click="zoomOut()" title="Zoom out">−</button>
+                                    <button type="button" class="px-1.5 py-1 min-w-[2.75rem] hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal/60 tabular-nums" @click="resetZoom()" x-text="zoomPercent + '%'"></button>
+                                    <button type="button" class="px-1.5 py-1 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal/60" @click="zoomIn()" title="Zoom in">+</button>
+                                    <button type="button" class="px-1.5 py-1 border-l border-brand-charcoal/20 dark:border-brand-silver/20 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal/60" @click="centerView()">Centre</button>
+                                </div>
+                                <div
+                                    class="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden w-52 rounded border border-brand-charcoal/20 bg-white px-2 py-1.5 text-[10px] leading-snug text-brand-charcoal shadow-md group-hover:block dark:border-brand-silver/20 dark:bg-brand-slate dark:text-brand-silver"
+                                    role="tooltip"
+                                >
+                                    Ctrl+wheel to zoom. Space+drag or middle-click to pan. Click % to reset zoom.
+                                </div>
+                            </div>
                         </div>
                         <p class="mt-2 text-xs text-brand-charcoal dark:text-brand-silver">
-                            Zoom <span x-text="zoomPercent"></span>% · base <span x-text="scale.toFixed(1)"></span>px/mm.
                             Grid from label centre. Shift-click or drag-marquee to multi-select.
                             <span x-show="snapToGrid">Snapping to <span x-text="gridSizeMm"></span> mm.</span>
                             <span x-show="showGrid && !snapToGrid">Grid guides only.</span>
@@ -349,7 +340,7 @@
                     </h3>
                     <template x-if="selectedCount > 1">
                         <div class="space-y-2 text-sm">
-                            <p class="text-brand-charcoal dark:text-brand-silver">Use Align tools above. Delete removes all selected.</p>
+                            <p class="text-brand-charcoal dark:text-brand-silver">Use Align tools below. Delete removes all selected.</p>
                             <button type="button" class="px-2 py-1 border text-xs text-red-700" @click="removeSelected()">Delete selected</button>
                         </div>
                     </template>
@@ -464,6 +455,25 @@
                             </div>
                         </div>
                     </template>
+
+                    <div class="space-y-2 border-t border-brand-silver dark:border-brand-charcoal pt-3">
+                        <h3 class="font-medium text-sm">Align</h3>
+                        <div class="inline-flex border overflow-hidden w-full">
+                            <button type="button" class="flex-1 px-1 py-1 text-[10px]" :class="alignTarget === 'group' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'group'">Selection</button>
+                            <button type="button" class="flex-1 px-1 py-1 text-[10px] border-l" :class="alignTarget === 'biggest' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'biggest'">Biggest</button>
+                            <button type="button" class="flex-1 px-1 py-1 text-[10px] border-l" :class="alignTarget === 'page' ? 'bg-brand-charcoal text-white' : ''" @click="alignTarget = 'page'">Page</button>
+                        </div>
+                        <div class="flex flex-wrap gap-1">
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('left')" title="Align left">⇤</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('center')" title="Align centre H">↔</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('right')" title="Align right">⇥</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('top')" title="Align top">⤒</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('middle')" title="Align middle V">↕</button>
+                            <button type="button" class="px-2 py-1 border text-xs" :disabled="!canAlign" :class="!canAlign && 'opacity-40 cursor-not-allowed'" @click="align('bottom')" title="Align bottom">⤓</button>
+                        </div>
+                        <p class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="selectedCount > 0" x-text="selectedCount + ' selected'"></p>
+                        <p class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="alignTarget !== 'page' && selectedCount === 1">Shift-click or marquee for multi-select</p>
+                    </div>
                 </div>
             </div>
 

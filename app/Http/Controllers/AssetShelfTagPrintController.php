@@ -56,7 +56,12 @@ class AssetShelfTagPrintController extends Controller
         $pdf = Pdf::loadView('shelf-tags.print.pdf', [
             'layout' => $layout,
             'labels' => $labels,
-        ])->setPaper([0, 0, $this->mmToPoints((float) $layout->width_mm), $this->mmToPoints((float) $layout->height_mm)]);
+        ])->setPaper([
+            0,
+            0,
+            $this->mmToPoints($layout->displayWidthMm()),
+            $this->mmToPoints($layout->displayHeightMm()),
+        ]);
 
         $filename = 'shelf-tag-'.$asset->id.'-'.now()->format('Ymd-His').'.pdf';
 

@@ -4,7 +4,7 @@
     $props = is_array($element['props'] ?? null) ? $element['props'] : [];
     $value = (string) ($element['value'] ?? '');
     $style = sprintf(
-        'left:%smm;top:%smm;width:%smm;height:%smm;z-index:%d;transform:rotate(%sdeg);',
+        'position:absolute;overflow:hidden;left:%smm;top:%smm;width:%smm;height:%smm;z-index:%d;transform:rotate(%sdeg);',
         $element['x'] ?? 0,
         $element['y'] ?? 0,
         $element['width'] ?? 10,
@@ -20,7 +20,7 @@
     $color = in_array($color, ['#000000', '#444444', '#888888'], true) ? $color : '#000000';
 @endphp
 
-<div class="absolute overflow-hidden" style="{{ $style }}">
+<div class="el" style="{{ $style }}">
     @if(in_array($type, ['text', 'field'], true))
         <div style="font-size: {{ $fontSize }}pt; font-weight: {{ $weight }}; text-align: {{ $align }}; color: {{ $color }}; line-height: 1.1; width: 100%; height: 100%;">
             {{ $value }}

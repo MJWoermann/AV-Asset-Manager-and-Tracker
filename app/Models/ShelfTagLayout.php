@@ -86,4 +86,25 @@ class ShelfTagLayout extends Model
     {
         return $this->length_mode === ShelfTagPaperPresets::LENGTH_MODE_AUTO;
     }
+
+    public function isLandscape(): bool
+    {
+        return $this->orientation === 'landscape';
+    }
+
+    /**
+     * Print/preview width in mm (length along feed when landscape).
+     */
+    public function displayWidthMm(): float
+    {
+        return $this->isLandscape() ? (float) $this->height_mm : (float) $this->width_mm;
+    }
+
+    /**
+     * Print/preview height in mm (tape width when landscape).
+     */
+    public function displayHeightMm(): float
+    {
+        return $this->isLandscape() ? (float) $this->width_mm : (float) $this->height_mm;
+    }
 }

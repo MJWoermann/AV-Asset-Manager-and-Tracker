@@ -23,12 +23,15 @@
 
     <div
         class="max-w-7xl mx-auto px-4 print:max-w-none print:px-0"
-        x-data="shelfTagPrintPreview(@js($labels), @js((float) $layout->width_mm), @js((float) $layout->height_mm), @js($layout->logoUrl()))"
+        x-data="shelfTagPrintPreview(@js($labels), @js($layout->displayWidthMm()), @js($layout->displayHeightMm()), @js($layout->logoUrl()))"
         x-init="renderAll()"
     >
         <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver print:hidden">
             Showing first {{ count($previewLabels) }} of {{ $count }} on screen. Print/PDF includes the full batch.
             Select the matching Brother DK size, Actual size, Cut every for continuous.
+            @if($layout->isLandscape())
+                Landscape layout · {{ $layout->displayWidthMm() }}×{{ $layout->displayHeightMm() }} mm.
+            @endif
         </p>
 
         <div class="space-y-6 print:space-y-0">
@@ -37,6 +40,7 @@
                     class="label-sheet mx-auto border border-brand-silver bg-white shadow-sm print:border-0 print:shadow-none {{ $index >= $previewLimit ? 'hidden print:block' : '' }}"
                     style="width: {{ $label['width_mm'] }}mm; height: {{ $label['height_mm'] }}mm;"
                     data-label-index="{{ $index }}"
+                    data-orientation="{{ $label['orientation'] ?? $layout->orientation }}"
                 >
                     <div class="relative w-full h-full overflow-hidden">
                         @foreach($label['elements'] as $element)
@@ -64,7 +68,7 @@
                 break-after: auto;
             }
             @page {
-                size: {{ $layout->width_mm }}mm {{ $layout->height_mm }}mm;
+                size: {{ $layout->displayWidthMm() }}mm {{ $layout->displayHeightMm() }}mm;
                 margin: 0;
             }
             nav, header, .print\\:hidden { display: none !important; }

@@ -8,8 +8,8 @@
         body { margin: 0; padding: 0; font-family: DejaVu Sans, sans-serif; color: #000; }
         .label {
             position: relative;
-            width: {{ $layout->width_mm }}mm;
-            height: {{ $layout->height_mm }}mm;
+            width: {{ $layout->displayWidthMm() }}mm;
+            height: {{ $layout->displayHeightMm() }}mm;
             page-break-after: always;
             overflow: hidden;
         }

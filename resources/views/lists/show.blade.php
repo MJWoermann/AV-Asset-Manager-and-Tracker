@@ -64,15 +64,7 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                     <tr>
-                        <th class="px-3 py-2 w-10">
-                            <input
-                                type="checkbox"
-                                class="rounded border-brand-charcoal/40"
-                                :checked="allPageSelected"
-                                @click.prevent="toggleAll(!allPageSelected)"
-                                aria-label="Select all assets on this page"
-                            >
-                        </th>
+                        <th class="px-3 py-2 w-10" aria-hidden="true"></th>
                         @foreach($selectedColumns as $column)
                             <th class="px-3 py-2">{{ \App\Support\AssetTableColumns::label($column) }}</th>
                         @endforeach
