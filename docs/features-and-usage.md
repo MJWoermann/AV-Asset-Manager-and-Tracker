@@ -1,5 +1,7 @@
 # Features and usage
 
+> Staff documentation lives in the [project wiki](https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki).
+
 A practical guide for staff evaluating or using **AV Asset Manager** — what it is for, who uses which parts, and how everyday work fits together.
 
 This document is written for inventory managers, scanners, and admins. Technical notes are kept short and appear where they help you understand limits or setup.

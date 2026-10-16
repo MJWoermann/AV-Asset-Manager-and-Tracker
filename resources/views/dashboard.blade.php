@@ -73,6 +73,15 @@
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <p class="text-brand-charcoal dark:text-brand-silver">AV equipment stocktake and asset management.</p>
+        <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+            Help &amp; training:
+            <a
+                href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-brand hover:underline"
+            >project wiki</a>
+        </p>
 
         @if (session('status'))
             <div class="text-sm text-brand">{{ session('status') }}</div>
