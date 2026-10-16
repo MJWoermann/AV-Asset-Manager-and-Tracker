@@ -35,6 +35,10 @@ use App\Http\Controllers\ManufacturerController;
 use App\Http\Controllers\ManufacturerModelController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RigEventController;
+use App\Http\Controllers\RiggingCalculationLogController;
+use App\Http\Controllers\RiggingCalculatorController;
+use App\Http\Controllers\RiggingController;
 use App\Http\Controllers\ScanController;
 use App\Http\Controllers\ShelfTagLayoutController;
 use App\Http\Controllers\ShelfTagPrintController;
@@ -285,6 +289,24 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
             Route::get('/print/preview', [ShelfTagPrintController::class, 'show'])->name('print.show');
             Route::get('/print/pdf', [ShelfTagPrintController::class, 'pdf'])->name('print.pdf');
         });
+
+    Route::middleware('feature:rigging')->prefix('rigging')->name('rigging.')->group(function () {
+        Route::get('/', [RiggingController::class, 'index'])->name('index');
+
+        Route::resource('events', RigEventController::class);
+        Route::post('events/{event}/sign-off', [RigEventController::class, 'signOff'])->name('events.sign-off');
+        Route::put('events/{event}/checklist', [RigEventController::class, 'updateChecklist'])->name('events.checklist');
+        Route::put('events/{event}/motor-patches', [RigEventController::class, 'syncMotorPatches'])->name('events.motor-patches.sync');
+        Route::post('events/{event}/calculations', [RiggingCalculationLogController::class, 'attach'])->name('events.calculations.attach');
+        Route::delete('events/{event}/calculations/{log}', [RiggingCalculationLogController::class, 'detach'])->name('events.calculations.detach');
+
+        Route::prefix('calculators')->name('calculators.')->group(function () {
+            Route::get('/', [RiggingCalculatorController::class, 'index'])->name('index');
+            Route::get('/{calculator}', [RiggingCalculatorController::class, 'show'])->name('show');
+            Route::post('/{calculator}/compute', [RiggingCalculatorController::class, 'compute'])->name('compute');
+            Route::post('/{calculator}/logs', [RiggingCalculationLogController::class, 'store'])->name('logs.store');
+        });
+    });
 });
 
 require __DIR__.'/auth.php';

@@ -11,6 +11,7 @@ use App\Models\File;
 use App\Models\FileLink;
 use App\Models\ItemType;
 use App\Models\Location;
+use App\Models\RigEvent;
 use App\Models\StockMovement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
@@ -34,6 +35,7 @@ class FileAttachmentService
             'item_type' => ItemType::class,
             'stock_movement' => StockMovement::class,
             'maintenance_log' => AssetMaintenanceLog::class,
+            'rig_event' => RigEvent::class,
             default => throw new InvalidArgumentException('Unsupported linkable type.'),
         };
     }
@@ -53,6 +55,7 @@ class FileAttachmentService
             ItemType::class => 'item_type',
             StockMovement::class => 'stock_movement',
             AssetMaintenanceLog::class => 'maintenance_log',
+            RigEvent::class => 'rig_event',
             default => throw new InvalidArgumentException('Unsupported linkable model.'),
         };
     }
@@ -129,6 +132,33 @@ class FileAttachmentService
 
             return $file;
         });
+    }
+
+    /**
+     * Copy an already-stored file (e.g. a processed import) into the file library.
+     *
+     * @param  array{title: string, category: string, note?: string|null}  $attributes
+     */
+    public function storeFromAbsolutePath(
+        string $absolutePath,
+        string $originalFilename,
+        array $attributes,
+        ?Model $linkable = null,
+        ?string $mimeType = null,
+    ): File {
+        if (! is_file($absolutePath)) {
+            throw new RuntimeException('Unable to archive file; source path is missing.');
+        }
+
+        $upload = new UploadedFile(
+            $absolutePath,
+            $originalFilename,
+            $mimeType,
+            null,
+            true,
+        );
+
+        return $this->storeUpload($upload, $attributes, $linkable);
     }
 
     /**

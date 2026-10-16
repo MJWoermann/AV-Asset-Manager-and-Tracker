@@ -10,17 +10,23 @@ return new class extends Migration
     {
         Schema::create('manufacturer_model_interface_templates', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('manufacturer_model_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('manufacturer_model_id');
             $table->string('name');
             $table->unsignedInteger('sort_order')->default(0);
             $table->text('notes')->nullable();
-            $table->foreignId('connection_type_id')
-                ->nullable()
-                ->constrained('connection_types')
-                ->nullOnDelete();
+            $table->foreignId('connection_type_id')->nullable();
             $table->timestamps();
 
-            $table->index(['manufacturer_model_id', 'sort_order']);
+            // Explicit short names: auto {table}_{column}_foreign exceeds MySQL's 64-char limit.
+            $table->foreign('manufacturer_model_id', 'mm_iface_tpl_model_id_fk')
+                ->references('id')
+                ->on('manufacturer_models')
+                ->cascadeOnDelete();
+            $table->foreign('connection_type_id', 'mm_iface_tpl_conn_type_fk')
+                ->references('id')
+                ->on('connection_types')
+                ->nullOnDelete();
+            $table->index(['manufacturer_model_id', 'sort_order'], 'mm_iface_tpl_model_sort_idx');
         });
     }
 

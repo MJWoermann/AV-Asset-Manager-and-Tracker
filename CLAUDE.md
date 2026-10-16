@@ -40,6 +40,7 @@ Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset manage
 7. Brand: black/white primary; turquoise `#00adb7` sparingly for emphasis. Use Heroicons-style SVG or simple icons; Tailwind utilities with `brand-*` colours.
 8. Match existing Laravel structure: controllers thin, services for scan/compare, Form Request validation where already used.
 9. Admin settings / sub-pages (`/admin/*`) go in the profile dropdown (and mobile Account/Admin section), not the top-level nav. Keep operational links (Import, Data, Reports) in the main bar.
+10. MySQL/MariaDB identifiers max **64** characters. For long table/column pairs, use explicit short FK/index names (see `.cursor/rules/mysql-identifier-length.mdc`); do not rely on Laravel’s auto `{table}_{column}_foreign` when it would exceed 64.
 
 ## Key paths
 

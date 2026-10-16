@@ -21,6 +21,8 @@ class ItemType extends Model
         'description',
         'supports_ru_visualiser',
         'supports_stock_tracking',
+        'supports_rigging_calculator',
+        'rigging_weight_kg',
     ];
 
     protected function casts(): array
@@ -28,6 +30,8 @@ class ItemType extends Model
         return [
             'supports_ru_visualiser' => 'boolean',
             'supports_stock_tracking' => 'boolean',
+            'supports_rigging_calculator' => 'boolean',
+            'rigging_weight_kg' => 'float',
         ];
     }
 

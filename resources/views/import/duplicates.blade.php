@@ -1,6 +1,13 @@
 <x-app-layout>
     <x-slot name="header"><h2 class="font-semibold text-xl">Resolve import duplicates</h2></x-slot>
-    <div class="max-w-5xl mx-auto px-4" x-data="{ bulk: 'update' }">
+    <div
+        class="max-w-5xl mx-auto px-4"
+        x-data="{
+            bulk: 'update',
+            listDestination: '{{ old('list_destination', 'none') }}',
+            includeUpdated: {{ old('include_updated_in_list', false) ? 'true' : 'false' }},
+        }"
+    >
         <form method="POST" action="{{ route('import.process') }}" class="space-y-4">
             @csrf
 
@@ -105,6 +112,98 @@
                     No duplicates found. All prepared rows will be created as new assets.
                 </div>
             @endif
+
+            <div class="bg-white dark:bg-brand-slate border p-4 space-y-3 text-sm">
+                <h3 class="font-semibold text-base">Add imported assets to a list</h3>
+                <p class="text-gray-600 dark:text-brand-silver">
+                    Optionally add assets from this import to an inventory or event list. New assets are always included when a list is selected.
+                </p>
+
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2">
+                        <input type="radio" name="list_destination" value="none" x-model="listDestination" class="text-brand">
+                        <span>Do not add to a list</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input type="radio" name="list_destination" value="existing" x-model="listDestination" class="text-brand">
+                        <span>Add to an existing list</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input type="radio" name="list_destination" value="new" x-model="listDestination" class="text-brand">
+                        <span>Create a new list from this import</span>
+                    </label>
+                </div>
+
+                <div x-show="listDestination === 'existing'" x-cloak class="space-y-2 pt-1">
+                    <x-input-label for="asset_list_id" value="Existing list" />
+                    <select
+                        id="asset_list_id"
+                        name="asset_list_id"
+                        class="mt-1 w-full max-w-md rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                    >
+                        <option value="">Select a list…</option>
+                        @foreach($lists as $listOption)
+                            <option value="{{ $listOption->id }}" @selected((string) old('asset_list_id') === (string) $listOption->id)>
+                                {{ $listOption->name }} ({{ $listOption->type }})
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('asset_list_id')
+                        <p class="text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div x-show="listDestination === 'new'" x-cloak class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 max-w-2xl">
+                    <div>
+                        <x-input-label for="new_list_name" value="New list name" />
+                        <x-text-input
+                            id="new_list_name"
+                            name="new_list_name"
+                            class="mt-1 block w-full"
+                            :value="old('new_list_name')"
+                            placeholder="e.g. Warehouse stocktake import"
+                        />
+                        @error('new_list_name')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <x-input-label for="new_list_type" value="List type" />
+                        <select
+                            id="new_list_type"
+                            name="new_list_type"
+                            class="mt-1 w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                        >
+                            <option value="inventory" @selected(old('new_list_type', 'inventory') === 'inventory')>Inventory</option>
+                            <option value="event" @selected(old('new_list_type') === 'event')>Event</option>
+                        </select>
+                        @error('new_list_type')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
+                <label
+                    class="inline-flex items-start gap-2 pt-1"
+                    x-show="listDestination !== 'none'"
+                    x-cloak
+                >
+                    <input
+                        type="checkbox"
+                        name="include_updated_in_list"
+                        value="1"
+                        class="mt-0.5 rounded text-brand"
+                        x-model="includeUpdated"
+                    >
+                    <span>
+                        Also include existing assets that are updated or replaced
+                        <span class="block text-gray-600 dark:text-brand-silver">Skipped matches are never added.</span>
+                    </span>
+                </label>
+                @error('list_destination')
+                    <p class="text-sm text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
 
             <div class="bg-white dark:bg-brand-slate border p-4 space-y-3">
                 <label class="inline-flex items-center gap-2 text-sm">

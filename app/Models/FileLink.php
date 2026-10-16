@@ -38,6 +38,7 @@ class FileLink extends Model
             ItemType::class => 'Item type',
             AssetMaintenanceLog::class => 'Maintenance log',
             StockMovement::class => 'Stock movement',
+            RigEvent::class => 'Rig event',
             default => class_basename((string) $this->linkable_type) ?: 'Unknown',
         };
     }
@@ -75,6 +76,10 @@ class FileLink extends Model
 
         if ($linkable instanceof Location) {
             return route('locations.edit', $linkable);
+        }
+
+        if ($linkable instanceof RigEvent) {
+            return route('rigging.events.show', $linkable);
         }
 
         if ($linkable instanceof ItemType) {

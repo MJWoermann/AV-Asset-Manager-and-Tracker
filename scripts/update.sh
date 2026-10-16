@@ -37,7 +37,14 @@ run_as_deploy() {
 echo "==> Enabling maintenance mode"
 # Run as root (this script requires sudo). Deploy-user artisan cannot always
 # write storage/framework after those dirs are chowned to www-data.
-php artisan down --retry=60 || true
+# --render prerenders errors/503 before Composer/npm run so visitors always
+# see the branded page (even mid-update). --redirect=/ sends all paths there.
+php artisan down \
+  --redirect=/ \
+  --render="errors.503" \
+  --retry=60 \
+  --refresh=15 \
+  || true
 
 cleanup() {
   # Always leave the site up — a leftover maintenance.php is a permanent 503

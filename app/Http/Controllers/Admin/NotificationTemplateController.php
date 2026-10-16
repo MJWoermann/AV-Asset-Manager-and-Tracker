@@ -12,7 +12,6 @@ use App\Models\NotificationTemplate;
 use App\Services\NotificationFieldCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\View\View;
 
 class NotificationTemplateController extends Controller
@@ -27,54 +26,6 @@ class NotificationTemplateController extends Controller
 
     public function create(NotificationFieldCatalog $catalog): View
     {
-        // #region agent log
-        $debugLog = base_path('debug-f3be50.log');
-        $writeDebug = static function (string $hypothesisId, string $message, array $data) use ($debugLog): void {
-            file_put_contents($debugLog, json_encode([
-                'sessionId' => 'f3be50',
-                'hypothesisId' => $hypothesisId,
-                'location' => 'NotificationTemplateController.php:create',
-                'message' => $message,
-                'data' => $data,
-                'timestamp' => (int) (microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        };
-        $writeDebug('C', 'create() entered', ['path' => 'admin/email/templates/create']);
-        $snippets = [
-            'A' => "{{ '{{asset.name}}' }}",
-            'A_escaped' => '@{{asset.name}}',
-            'B' => "{{ '{{custom.mac_address_2}}' }}",
-            'B_escaped' => '@{{custom.mac_address_2}}',
-        ];
-        foreach ($snippets as $id => $src) {
-            $compiled = Blade::compileString($src);
-            $writeDebug($id[0], 'snippet compiled', ['id' => $id, 'src' => $src, 'compiled' => $compiled]);
-            try {
-                ob_start();
-                eval('?>'.$compiled);
-                $rendered = ob_get_clean();
-                $writeDebug($id[0], 'snippet eval ok', ['id' => $id, 'rendered' => $rendered]);
-            } catch (\Throwable $e) {
-                ob_end_clean();
-                $writeDebug($id[0], 'snippet eval fail', [
-                    'id' => $id,
-                    'error' => $e->getMessage(),
-                    'class' => $e::class,
-                ]);
-            }
-        }
-        $formCompiled = Blade::compileString((string) file_get_contents(resource_path('views/admin/email/templates/form.blade.php')));
-        $writeDebug('E', 'full form compiled length', ['bytes' => strlen($formCompiled)]);
-        $helpLine = null;
-        foreach (explode("\n", $formCompiled) as $i => $line) {
-            if (str_contains($line, 'asset.name') || str_contains($line, 'mac_address_2') || str_contains($line, 'placeholders')) {
-                $helpLine = ['line' => $i + 1, 'php' => $line];
-                break;
-            }
-        }
-        $writeDebug('A', 'compiled help-line excerpt', ['excerpt' => $helpLine]);
-        // #endregion
-
         return view('admin.email.templates.form', $this->formData($catalog, new NotificationTemplate([
             'is_active' => true,
             'selected_fields' => ['asset.name', 'asset.mac_address'],

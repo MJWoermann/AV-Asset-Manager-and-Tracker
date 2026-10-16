@@ -17,3 +17,4 @@ alwaysApply: true
 - Prefer services (`ScanService`, `ListComparisonService`) for stocktake logic. Keep controllers thin.
 - No secrets in commits. Validate uploads (xlsx/csv/jpg/png/pdf/docx, 25MB).
 - Follow existing naming: Asset, AssetList, ScanSession, custom field sets on ItemType.
+- MySQL/MariaDB identifiers max 64 chars — for long table/column pairs, give FKs/indexes explicit short names (see `.cursor/rules/mysql-identifier-length.mdc`).

@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
+use App\Enums\FileCategory;
 use App\Enums\LocationType;
 use App\Models\Asset;
+use App\Models\AssetList;
+use App\Models\AssetListItem;
 use App\Models\CustomFieldDefinition;
+use App\Models\File;
 use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\Manufacturer;
@@ -493,5 +497,219 @@ class ImportAssetTest extends TestCase
         $this->assertContains('mac_address', $rows[0]['matched_on']);
         $this->assertNotNull($rows[1]['existing_id']);
         $this->assertContains('rig_tag', $rows[1]['matched_on']);
+    }
+
+    public function test_import_can_create_new_list_and_add_created_assets(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
+            'Name,Type,Serial',
+            'List Speaker,Audio Equipment,SN-LIST-1',
+            'List Mic,Audio Equipment,SN-LIST-2',
+        ]));
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+        $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Name' => 'name',
+                'Type' => 'item_type',
+                'Serial' => 'serial_number',
+            ],
+        ])->assertOk()->assertSee('Add imported assets to a list');
+
+        $response = $this->actingAs($user)->post(route('import.process'), [
+            'bulk_action' => 'update',
+            'list_destination' => 'new',
+            'new_list_name' => 'Import Event List',
+            'new_list_type' => 'event',
+        ]);
+
+        $list = AssetList::query()->where('name', 'Import Event List')->first();
+        $this->assertNotNull($list);
+        $this->assertSame('event', $list->type);
+        $this->assertSame($user->id, $list->created_by);
+        $response->assertRedirect(route('lists.show', $list));
+
+        $this->assertSame(2, AssetListItem::query()->where('asset_list_id', $list->id)->count());
+        $this->assertDatabaseHas('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => Asset::query()->where('serial_number', 'SN-LIST-1')->value('id'),
+        ]);
+        $this->assertDatabaseHas('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => Asset::query()->where('serial_number', 'SN-LIST-2')->value('id'),
+        ]);
+    }
+
+    public function test_import_adds_updated_assets_to_existing_list_when_requested(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+        $itemType = ItemType::create(['name' => 'Audio Equipment', 'slug' => 'audio-equipment']);
+        $existing = Asset::create([
+            'name' => 'Old Name',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'serial_number' => 'SN-EXISTING',
+        ]);
+        $list = AssetList::create([
+            'name' => 'Warehouse Inventory',
+            'type' => 'inventory',
+            'created_by' => $user->id,
+        ]);
+
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
+            'Name,Type,Serial',
+            'Updated Existing,Audio Equipment,SN-EXISTING',
+            'Brand New,Audio Equipment,SN-BRAND-NEW',
+        ]));
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+        $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Name' => 'name',
+                'Type' => 'item_type',
+                'Serial' => 'serial_number',
+            ],
+        ])->assertOk();
+
+        $prepared = session('import.prepared');
+        $actions = [];
+        foreach ($prepared as $row) {
+            if ($row['existing_id'] === $existing->id) {
+                $actions[$row['index']] = 'update';
+            }
+        }
+
+        $response = $this->actingAs($user)->post(route('import.process'), [
+            'actions' => $actions,
+            'bulk_action' => 'update',
+            'list_destination' => 'existing',
+            'asset_list_id' => $list->id,
+            'include_updated_in_list' => '1',
+        ]);
+
+        $response->assertRedirect(route('lists.show', $list));
+        $this->assertSame(2, AssetListItem::query()->where('asset_list_id', $list->id)->count());
+        $this->assertDatabaseHas('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => $existing->id,
+        ]);
+        $this->assertDatabaseHas('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => Asset::query()->where('serial_number', 'SN-BRAND-NEW')->value('id'),
+        ]);
+    }
+
+    public function test_import_excludes_updated_assets_from_list_unless_requested(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+        $itemType = ItemType::create(['name' => 'Audio Equipment', 'slug' => 'audio-equipment']);
+        $existing = Asset::create([
+            'name' => 'Old Name',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'serial_number' => 'SN-EXISTING-2',
+        ]);
+        $list = AssetList::create([
+            'name' => 'Event Only New',
+            'type' => 'event',
+            'created_by' => $user->id,
+        ]);
+
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
+            'Name,Type,Serial',
+            'Updated Existing,Audio Equipment,SN-EXISTING-2',
+            'Brand New Only,Audio Equipment,SN-ONLY-NEW',
+        ]));
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+        $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Name' => 'name',
+                'Type' => 'item_type',
+                'Serial' => 'serial_number',
+            ],
+        ])->assertOk();
+
+        $this->actingAs($user)->post(route('import.process'), [
+            'bulk_action' => 'update',
+            'list_destination' => 'existing',
+            'asset_list_id' => $list->id,
+        ])->assertRedirect(route('lists.show', $list));
+
+        $this->assertSame(1, AssetListItem::query()->where('asset_list_id', $list->id)->count());
+        $this->assertDatabaseMissing('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => $existing->id,
+        ]);
+        $this->assertDatabaseHas('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => Asset::query()->where('serial_number', 'SN-ONLY-NEW')->value('id'),
+        ]);
+    }
+
+    public function test_successful_import_archives_file_in_library(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+        $csv = UploadedFile::fake()->createWithContent('warehouse-stock.csv', implode("\n", [
+            'Name,Type,Serial',
+            'Archive Me,Audio Equipment,SN-ARCHIVE-1',
+        ]));
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+        $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Name' => 'name',
+                'Type' => 'item_type',
+                'Serial' => 'serial_number',
+            ],
+        ])->assertOk();
+
+        $response = $this->actingAs($user)->post(route('import.process'), [
+            'bulk_action' => 'update',
+        ]);
+
+        $response->assertRedirect(route('assets.index'));
+        $this->assertStringContainsString('Import file saved to the file library.', session('status'));
+
+        $file = File::query()->where('original_filename', 'warehouse-stock.csv')->first();
+        $this->assertNotNull($file);
+        $this->assertSame(FileCategory::Import, $file->category);
+        $this->assertSame('Asset import: warehouse-stock.csv', $file->title);
+        $this->assertSame($user->id, $file->uploaded_by);
+        $this->assertTrue(Storage::disk($file->disk)->exists($file->path));
+        $this->assertFalse(session()->has('import.path'));
+    }
+
+    public function test_dry_run_does_not_archive_import_file(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+        $csv = UploadedFile::fake()->createWithContent('dry-run.csv', implode("\n", [
+            'Name,Type,Serial',
+            'Dry Run Asset,Audio Equipment,SN-DRY-1',
+        ]));
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+        $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Name' => 'name',
+                'Type' => 'item_type',
+                'Serial' => 'serial_number',
+            ],
+        ])->assertOk();
+
+        $this->actingAs($user)->post(route('import.process'), [
+            'bulk_action' => 'update',
+            'dry_run' => '1',
+        ])->assertRedirect(route('assets.index'));
+
+        $this->assertSame(0, File::query()->count());
+        $this->assertTrue(session()->has('import.path'));
+        $this->assertDatabaseMissing('assets', ['serial_number' => 'SN-DRY-1']);
     }
 }

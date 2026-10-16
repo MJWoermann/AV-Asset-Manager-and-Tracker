@@ -2,17 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FileCategory;
 use App\Http\Requests\ImportUploadRequest;
+use App\Models\AssetList;
+use App\Services\FileAttachmentService;
 use App\Services\ImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Throwable;
 
 class ImportController extends Controller
 {
-    public function __construct(protected ImportService $imports) {}
+    public function __construct(
+        protected ImportService $imports,
+        protected FileAttachmentService $attachments,
+    ) {}
 
     public function create(): View
     {
@@ -36,6 +44,7 @@ class ImportController extends Controller
         session([
             'import.path' => $path,
             'import.columns' => $columns,
+            'import.original_filename' => $uploaded->getClientOriginalName(),
         ]);
         session()->forget(['import.mapping', 'import.prepared']);
 
@@ -71,7 +80,7 @@ class ImportController extends Controller
             $rows = $this->imports->readRows(Storage::path($path));
         } catch (ValidationException $e) {
             Storage::delete($path);
-            session()->forget(['import.path', 'import.columns', 'import.mapping', 'import.prepared']);
+            session()->forget(['import.path', 'import.columns', 'import.original_filename', 'import.mapping', 'import.prepared']);
 
             return redirect()->route('import.create')->withErrors($e->errors());
         }
@@ -93,6 +102,7 @@ class ImportController extends Controller
             'newCount' => $newCount,
             'totalCount' => count($prepared),
             'fieldLabels' => ImportService::ASSET_FIELDS,
+            'lists' => AssetList::query()->orderBy('type')->orderBy('name')->get(['id', 'name', 'type']),
         ]);
     }
 
@@ -110,19 +120,49 @@ class ImportController extends Controller
             'actions.*' => ['in:update,replace,skip,create'],
             'bulk_action' => ['nullable', 'in:update,replace,skip,create'],
             'dry_run' => ['nullable', 'boolean'],
+            'list_destination' => ['nullable', Rule::in(['none', 'existing', 'new'])],
+            'asset_list_id' => [
+                'nullable',
+                Rule::requiredIf(fn () => $request->input('list_destination') === 'existing'),
+                'exists:asset_lists,id',
+            ],
+            'new_list_name' => [
+                'nullable',
+                Rule::requiredIf(fn () => $request->input('list_destination') === 'new'),
+                'string',
+                'max:255',
+            ],
+            'new_list_type' => [
+                'nullable',
+                Rule::requiredIf(fn () => $request->input('list_destination') === 'new'),
+                Rule::in(['inventory', 'event']),
+            ],
+            'include_updated_in_list' => ['nullable', 'boolean'],
         ]);
 
         $dryRun = $request->boolean('dry_run');
+        $listDestination = $data['list_destination'] ?? 'none';
         $counts = $this->imports->commit(
             $prepared,
             $data['actions'] ?? [],
             $dryRun,
             $data['bulk_action'] ?? 'update',
+            [
+                'destination' => $listDestination,
+                'asset_list_id' => isset($data['asset_list_id']) ? (int) $data['asset_list_id'] : null,
+                'new_list_name' => $data['new_list_name'] ?? null,
+                'new_list_type' => $data['new_list_type'] ?? null,
+                'include_updated' => $request->boolean('include_updated_in_list'),
+            ],
+            $request->user()?->id,
         );
 
+        $archivedToLibrary = false;
+
         if (! $dryRun) {
+            $archivedToLibrary = $this->archiveProcessedImport($path);
             Storage::delete($path);
-            session()->forget(['import.path', 'import.columns', 'import.mapping', 'import.prepared']);
+            session()->forget(['import.path', 'import.columns', 'import.original_filename', 'import.mapping', 'import.prepared']);
         }
 
         $message = sprintf(
@@ -134,6 +174,55 @@ class ImportController extends Controller
             $counts['skipped'],
         );
 
+        if ($listDestination !== 'none') {
+            $message .= sprintf(
+                $dryRun
+                    ? ' %d would be added to a list.'
+                    : ' %d added to list%s.',
+                $counts['added_to_list'],
+                $counts['list_name'] ? ' "'.$counts['list_name'].'"' : '',
+            );
+        }
+
+        if (! $dryRun) {
+            $message .= $archivedToLibrary
+                ? ' Import file saved to the file library.'
+                : ' Import file could not be saved to the file library.';
+        }
+
+        if (! $dryRun && $counts['list_id']) {
+            return redirect()
+                ->route('lists.show', $counts['list_id'])
+                ->with('status', $message);
+        }
+
         return redirect()->route('assets.index')->with('status', $message);
+    }
+
+    protected function archiveProcessedImport(string $path): bool
+    {
+        if (! Storage::exists($path)) {
+            return false;
+        }
+
+        $originalFilename = (string) (session('import.original_filename') ?: basename($path));
+
+        try {
+            $this->attachments->storeFromAbsolutePath(
+                Storage::path($path),
+                $originalFilename,
+                [
+                    'title' => 'Asset import: '.$originalFilename,
+                    'category' => FileCategory::Import->value,
+                    'note' => 'Archived from a successful asset import.',
+                ],
+            );
+
+            return true;
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 }

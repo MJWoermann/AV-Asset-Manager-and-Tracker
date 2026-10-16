@@ -73,6 +73,43 @@
                 </label>
             @enddeveloperFeature
 
+            @developerFeature('rigging')
+                <div class="space-y-3 border border-brand-silver dark:border-brand-charcoal p-3">
+                    <label for="supports_rigging_calculator" class="flex items-start gap-2 text-sm">
+                        <input type="hidden" name="supports_rigging_calculator" value="0">
+                        <input
+                            id="supports_rigging_calculator"
+                            type="checkbox"
+                            name="supports_rigging_calculator"
+                            value="1"
+                            class="rounded text-brand mt-0.5"
+                            @checked(old('supports_rigging_calculator', $itemType->supports_rigging_calculator))
+                        >
+                        <span>
+                            <span class="font-medium">Supports Rigging calculator</span>
+                            <span class="block text-xs text-brand-charcoal dark:text-brand-silver mt-0.5">
+                                Makes this type available as a catalogue weight line in UDL and related calculators.
+                            </span>
+                        </span>
+                    </label>
+                    <div>
+                        <x-input-label for="rigging_weight_kg" value="Catalogue weight (kg)" />
+                        <x-text-input
+                            id="rigging_weight_kg"
+                            name="rigging_weight_kg"
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            class="mt-1 block w-full"
+                            :value="old('rigging_weight_kg', $itemType->rigging_weight_kg)"
+                        />
+                        <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">
+                            Reference weight for calculators — not live asset weight. Leave blank if users must enter weight manually.
+                        </p>
+                    </div>
+                </div>
+            @enddeveloperFeature
+
             <fieldset>
                 <legend class="text-sm font-semibold mb-2">Custom field sets</legend>
                 <p class="text-xs text-brand-charcoal dark:text-brand-silver mb-2">

@@ -24,7 +24,7 @@ class StoreFileUploadRequest extends FormRequest
             'category' => ['required', Rule::enum(FileCategory::class)],
             'note' => ['nullable', 'string', 'max:255'],
             'file' => ['required', 'file', 'max:'.$maxKb, 'mimes:'.$mimes],
-            'linkable_type' => ['nullable', Rule::in(['asset', 'location', 'item_type', 'maintenance_log'])],
+            'linkable_type' => ['nullable', Rule::in(['asset', 'location', 'item_type', 'maintenance_log', 'rig_event'])],
             'linkable_id' => ['required_with:linkable_type', 'nullable', 'integer'],
         ];
     }

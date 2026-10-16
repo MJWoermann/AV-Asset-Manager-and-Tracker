@@ -85,6 +85,13 @@ class File extends Model
             ->withTimestamps();
     }
 
+    public function rigEvents(): MorphToMany
+    {
+        return $this->morphedByMany(RigEvent::class, 'linkable', 'file_links')
+            ->withPivot(['id', 'note'])
+            ->withTimestamps();
+    }
+
     public function isUpload(): bool
     {
         return $this->source_type === FileSourceType::Upload;

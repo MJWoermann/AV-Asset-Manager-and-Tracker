@@ -147,34 +147,6 @@ class ShelfTagPrintController extends Controller
 
         $paperW = $layout->displayWidthMm();
         $paperH = $layout->displayHeightMm();
-        // #region agent log
-        file_put_contents(base_path('debug-541961.log'), json_encode([
-            'sessionId' => '541961',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'A',
-            'location' => 'ShelfTagPrintController.php:pdf',
-            'message' => 'PDF paper and label dims',
-            'data' => [
-                'orientation' => $layout->orientation,
-                'physicalW' => (float) $layout->width_mm,
-                'physicalH' => (float) $layout->height_mm,
-                'paperW' => $paperW,
-                'paperH' => $paperH,
-                'labelCount' => count($labels),
-                'firstLabelW' => $labels[0]['width_mm'] ?? null,
-                'firstLabelH' => $labels[0]['height_mm'] ?? null,
-                'firstElementHasAbsolute' => str_contains(
-                    view('shelf-tags.print.partials.element', [
-                        'element' => $labels[0]['elements'][0] ?? ['type' => 'text', 'x' => 0, 'y' => 0, 'width' => 10, 'height' => 10, 'rotation' => 0, 'z' => 1, 'props' => [], 'value' => ''],
-                        'logoUrl' => null,
-                        'forPdf' => true,
-                    ])->render(),
-                    'position:absolute'
-                ),
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ])."\n", FILE_APPEND);
-        // #endregion
 
         $pdf = Pdf::loadView('shelf-tags.print.pdf', [
             'layout' => $layout,

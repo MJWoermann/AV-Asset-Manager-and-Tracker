@@ -19,6 +19,7 @@ class DeveloperFeatures
             'shelf_tag_generator' => 'Label generator',
             'stock_consumables' => 'Stock / consumables',
             'email_integration' => 'Email integration',
+            'rigging' => 'Rigging',
         ];
     }
 

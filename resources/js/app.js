@@ -1698,113 +1698,6 @@ Alpine.data('bulkAssets', () => ({
         clear_notes: false,
     },
 
-    init() {
-        // #region agent log
-        this.$nextTick(() => {
-            const selectAll = this.$root.querySelector('input[aria-label="Select all assets on this page"]');
-            const boxes = this.pageCheckboxes();
-            let overlay = null;
-            if (selectAll) {
-                const rect = selectAll.getBoundingClientRect();
-                const midX = rect.left + rect.width / 2;
-                const midY = rect.top + rect.height / 2;
-                const topEl = document.elementFromPoint(midX, midY);
-                overlay = topEl
-                    ? {
-                          tag: topEl.tagName,
-                          aria: topEl.getAttribute('aria-label'),
-                          className: typeof topEl.className === 'string' ? topEl.className.slice(0, 120) : '',
-                          isSelectAll: topEl === selectAll,
-                      }
-                    : null;
-                selectAll.addEventListener(
-                    'click',
-                    (e) => {
-                        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Debug-Session-Id': 'e131a9',
-                            },
-                            body: JSON.stringify({
-                                sessionId: 'e131a9',
-                                runId: 'post-fix',
-                                hypothesisId: 'A',
-                                location: 'app.js:bulkAssets.init.click',
-                                message: 'Native click on select-all',
-                                data: {
-                                    defaultPrevented: e.defaultPrevented,
-                                    targetTag: e.target?.tagName,
-                                    checkedAtClick: !!e.target?.checked,
-                                    allPageSelected: this.allPageSelected,
-                                },
-                                timestamp: Date.now(),
-                            }),
-                        }).catch(() => {});
-                    },
-                    true
-                );
-                selectAll.addEventListener(
-                    'change',
-                    (e) => {
-                        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Debug-Session-Id': 'e131a9',
-                            },
-                            body: JSON.stringify({
-                                sessionId: 'e131a9',
-                                runId: 'post-fix',
-                                hypothesisId: 'C',
-                                location: 'app.js:bulkAssets.init.nativeChange',
-                                message: 'Native change on select-all',
-                                data: {
-                                    checked: !!e.target.checked,
-                                    allPageSelected: this.allPageSelected,
-                                    selectedCount: this.selectedIds.length,
-                                },
-                                timestamp: Date.now(),
-                            }),
-                        }).catch(() => {});
-                    },
-                    true
-                );
-            }
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Debug-Session-Id': 'e131a9',
-                },
-                body: JSON.stringify({
-                    sessionId: 'e131a9',
-                    runId: 'post-fix',
-                    hypothesisId: 'A',
-                    location: 'app.js:bulkAssets.init',
-                    message: 'bulkAssets init select-all probe',
-                    data: {
-                        hasSelectAll: !!selectAll,
-                        boxCount: boxes.length,
-                        boxIdsSample: boxes.slice(0, 10),
-                        elTag: this.$el ? this.$el.tagName : null,
-                        rootTag: this.$root ? this.$root.tagName : null,
-                        overlay,
-                        selectAllDisabled: selectAll ? !!selectAll.disabled : null,
-                        selectAllRect: selectAll
-                            ? {
-                                  w: selectAll.getBoundingClientRect().width,
-                                  h: selectAll.getBoundingClientRect().height,
-                              }
-                            : null,
-                    },
-                    timestamp: Date.now(),
-                }),
-            }).catch(() => {});
-        });
-        // #endregion
-    },
-
     get selectedIds() {
         return Object.keys(this.selected)
             .filter((id) => this.selected[id])
@@ -1828,99 +1721,15 @@ Alpine.data('bulkAssets', () => ({
     },
 
     setSelected(id, checked) {
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Debug-Session-Id': 'e131a9',
-            },
-            body: JSON.stringify({
-                sessionId: 'e131a9',
-                runId: 'post-fix',
-                hypothesisId: 'D',
-                location: 'app.js:bulkAssets.setSelected',
-                message: 'Row checkbox setSelected',
-                data: { id, checked: !!checked },
-                timestamp: Date.now(),
-            }),
-        }).catch(() => {});
-        // #endregion
         this.selected = { ...this.selected, [id]: !!checked };
     },
 
     toggleAll(checked) {
-        // #region agent log
-        let boxes = [];
-        let err = null;
-        try {
-            boxes = this.pageCheckboxes();
-        } catch (e) {
-            err = String(e && e.message ? e.message : e);
-        }
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Debug-Session-Id': 'e131a9',
-            },
-            body: JSON.stringify({
-                sessionId: 'e131a9',
-                runId: 'post-fix',
-                hypothesisId: 'B',
-                location: 'app.js:bulkAssets.toggleAll',
-                message: 'toggleAll invoked',
-                data: {
-                    checked: !!checked,
-                    boxCount: boxes.length,
-                    boxIdsSample: boxes.slice(0, 10),
-                    elTag: this.$el ? this.$el.tagName : null,
-                    rootTag: this.$root ? this.$root.tagName : null,
-                    allPageSelectedBefore: boxes.length > 0 && boxes.every((id) => !!this.selected[id]),
-                    selectedCountBefore: this.selectedIds.length,
-                    pageCheckboxesError: err,
-                },
-                timestamp: Date.now(),
-            }),
-        }).catch(() => {});
-        // #endregion
         const next = { ...this.selected };
         this.pageCheckboxes().forEach((id) => {
             next[id] = !!checked;
         });
         this.selected = next;
-        // #region agent log
-        this.$nextTick(() => {
-            const afterBoxes = this.pageCheckboxes();
-            const selectAll = this.$root.querySelector('input[aria-label="Select all assets on this page"]');
-            const rowCheckedCount = [...this.$root.querySelectorAll('[data-bulk-asset-id]')].filter(
-                (el) => el.checked
-            ).length;
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Debug-Session-Id': 'e131a9',
-                },
-                body: JSON.stringify({
-                    sessionId: 'e131a9',
-                    runId: 'post-fix',
-                    hypothesisId: 'D',
-                    location: 'app.js:bulkAssets.toggleAll.after',
-                    message: 'toggleAll after state',
-                    data: {
-                        selectedCountAfter: this.selectedIds.length,
-                        allPageSelectedAfter:
-                            afterBoxes.length > 0 && afterBoxes.every((id) => !!this.selected[id]),
-                        domChecked: selectAll ? !!selectAll.checked : null,
-                        rowCheckedCount,
-                        selectedKeysSample: Object.keys(this.selected).slice(0, 10),
-                    },
-                    timestamp: Date.now(),
-                }),
-            }).catch(() => {});
-        });
-        // #endregion
     },
 
     clearSelection() {
@@ -1990,29 +1799,6 @@ Alpine.data('bulkLocations', () => ({
         clear_parent: false,
     },
 
-    init() {
-        // #region agent log
-        this.$nextTick(() => {
-            const selectAll = this.$el.querySelector('input[aria-label="Select all locations"]');
-            let boxCount = 0;
-            let elTag = null;
-            let err = null;
-            try {
-                elTag = this.$el ? this.$el.tagName : null;
-                boxCount = this.pageCheckboxes().length;
-            } catch (e) {
-                err = String(e && e.message ? e.message : e);
-            }
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'F',location:'app.js:bulkLocations.init',message:'bulkLocations init probe',data:{hasSelectAll:!!selectAll,boxCount,elTag,err,docBoxCount:document.querySelectorAll('[data-bulk-location-id]').length},timestamp:Date.now()})}).catch(()=>{});
-            if (selectAll) {
-                selectAll.addEventListener('change', (e) => {
-                    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'G',location:'app.js:bulkLocations.nativeChange',message:'Native change on select-all',data:{checked:!!e.target.checked},timestamp:Date.now()})}).catch(()=>{});
-                }, true);
-            }
-        });
-        // #endregion
-    },
-
     get selectedIds() {
         return Object.keys(this.selected)
             .filter((id) => this.selected[id])
@@ -2036,67 +1822,30 @@ Alpine.data('bulkLocations', () => ({
     },
 
     setSelected(id, checked) {
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'H',location:'app.js:bulkLocations.setSelected',message:'Row checkbox setSelected',data:{id,checked:!!checked},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         this.selected = { ...this.selected, [id]: !!checked };
     },
 
     toggleAll(checked) {
-        // #region agent log
-        let boxes = [];
-        let err = null;
-        try {
-            boxes = this.pageCheckboxes();
-        } catch (e) {
-            err = String(e && e.message ? e.message : e);
-        }
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'G',location:'app.js:bulkLocations.toggleAll',message:'toggleAll invoked',data:{checked:!!checked,boxCount:boxes.length,boxIdsSample:boxes.slice(0,8),selectedCountBefore:this.selectedIds.length,err},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const next = { ...this.selected };
         this.pageCheckboxes().forEach((id) => {
             next[id] = !!checked;
         });
         this.selected = next;
-        // #region agent log
-        this.$nextTick(() => {
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'G',location:'app.js:bulkLocations.toggleAll.after',message:'toggleAll after state',data:{selectedCountAfter:this.selectedIds.length,allPageSelected:this.allPageSelected,selectedKeysSample:Object.keys(this.selected).slice(0,8)},timestamp:Date.now()})}).catch(()=>{});
-        });
-        // #endregion
     },
 
     selectDuplicateNames(names) {
-        // #region agent log
-        const _boxes = [...this.$el.querySelectorAll('[data-bulk-location-id]')];
-        const _sampleDom = _boxes.slice(0, 5).map((el) => ({
-            id: el.getAttribute('data-bulk-location-id'),
-            name: el.getAttribute('data-bulk-location-name'),
-        }));
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'B',location:'app.js:selectDuplicateNames:entry',message:'selectDuplicateNames entered',data:{namesType:typeof names,isArray:Array.isArray(names),namesCount:Array.isArray(names)?names.length:null,namesSample:Array.isArray(names)?names.slice(0,3):names,boxCount:_boxes.length,sampleDom:_sampleDom},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const normalized = new Set(
             (names || []).map((name) => String(name).trim().toLowerCase())
         );
         const next = {};
-        let matched = 0;
-        let unmatchedSample = [];
         [...this.$el.querySelectorAll('[data-bulk-location-id]')].forEach((el) => {
             const name = (el.getAttribute('data-bulk-location-name') || '').trim().toLowerCase();
             if (normalized.has(name)) {
                 next[Number(el.getAttribute('data-bulk-location-id'))] = true;
-                matched++;
-            } else if (unmatchedSample.length < 5) {
-                unmatchedSample.push(name);
             }
         });
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'C',location:'app.js:selectDuplicateNames:match',message:'duplicate name match result',data:{normalizedCount:normalized.size,normalizedSample:[...normalized].slice(0,5),matched,selectedKeys:Object.keys(next).length,unmatchedSample},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         this.selected = next;
         this.panelOpen = true;
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2afa3b'},body:JSON.stringify({sessionId:'2afa3b',runId:'pre-fix',hypothesisId:'D',location:'app.js:selectDuplicateNames:exit',message:'selection applied',data:{selectedCount:this.selectedIds.length,panelOpen:this.panelOpen},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
     },
 
     clearSelection() {
@@ -2208,32 +1957,11 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         if (!allowed.includes(Number(this.gridSizeMm))) {
             this.gridSizeMm = 5;
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'D',location:'app.js:shelfTagDesigner.init',message:'designer build fingerprint',data:{orientation:this.orientation,labelContentTransform:this.labelContentStyle.transform||null,hasRotateTransform:Boolean(this.labelContentStyle.transform&&String(this.labelContentStyle.transform).includes('rotate')),contentW:this.labelContentStyle.width,contentH:this.labelContentStyle.height,canvasW:this.canvasStyle.width,canvasH:this.canvasStyle.height,buildTag:'no-plane-rotate-v2'},timestamp:Date.now()})}).catch(()=>{});
-        this.$watch('orientation', (value, oldValue) => {
-            const content = this.labelContentStyle;
-            const sample = this.elements.slice(0, 3).map((el) => ({
-                id: el.id,
-                type: el.type,
-                x: el.x,
-                y: el.y,
-                width: el.width,
-                height: el.height,
-                rotation: el.rotation || 0,
-                styleTransform: this.elementStyle(el).transform || null,
-            }));
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'A',location:'app.js:shelfTagDesigner.orientationWatch',message:'orientation changed — content vs elements',data:{oldValue,value,isLandscape:this.isLandscape,widthMm:this.widthMm,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,canvasStyle:this.canvasStyle,labelContentTransform:content.transform||null,labelContentSize:{w:content.width,h:content.height},elementCount:this.elements.length,sampleElements:sample},timestamp:Date.now()})}).catch(()=>{});
+        this.$watch('orientation', () => {
             this.$nextTick(() => {
-                const plane = this.$el.querySelector('[data-label-content-plane]');
-                const firstEl = this.$el.querySelector('[data-el-id]');
-                const planeCs = plane ? getComputedStyle(plane) : null;
-                const elCs = firstEl ? getComputedStyle(firstEl) : null;
-                const planeIsIdentity = !planeCs?.transform || planeCs.transform === 'none';
-                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'B',location:'app.js:shelfTagDesigner.orientationWatch.nextTick',message:'DOM computed transforms after orientation',data:{orientation:this.orientation,planeTransform:planeCs?.transform||null,planeIsIdentity,firstElTransform:elCs?.transform||null,firstElLeft:elCs?.left||null,firstElTop:elCs?.top||null,sampleDataUnchanged:sample},timestamp:Date.now()})}).catch(()=>{});
                 this.centerView();
             });
         });
-        // #endregion
         this.$nextTick(() => {
             this.centerView();
             this.viewReady = true;
@@ -2320,12 +2048,7 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     get canvasStyle() {
         const cssW = `${this.displayWidthMm * this.scale}px`;
         const cssH = `${this.displayHeightMm * this.scale}px`;
-        // #region agent log
-        if (this._dbgCanvasOrient !== this.orientation) {
-            this._dbgCanvasOrient = this.orientation;
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'D',location:'app.js:shelfTagDesigner.canvasStyle',message:'canvas outer box dimensions',data:{orientation:this.orientation,cssWidth:cssW,cssHeight:cssH,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm,logicalWidthMm:this.widthMm,logicalHeightMm:this.heightMm},timestamp:Date.now()})}).catch(()=>{});
-        }
-        // #endregion
+
         return {
             width: cssW,
             height: cssH,
@@ -2345,12 +2068,7 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             top: '0',
             left: '0',
         };
-        // #region agent log
-        if (this._dbgContentOrient !== this.orientation) {
-            this._dbgContentOrient = this.orientation;
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'541961'},body:JSON.stringify({sessionId:'541961',runId:'post-fix',hypothesisId:'A',location:'app.js:shelfTagDesigner.labelContentStyle',message:'labelContentStyle transform applied',data:{orientation:this.orientation,isLandscape:this.isLandscape,hasRotateTransform:Boolean(style.transform&&String(style.transform).includes('rotate')),transform:style.transform||null,planeW:style.width,planeH:style.height},timestamp:Date.now()})}).catch(()=>{});
-        }
-        // #endregion
+
         return style;
     },
 
@@ -3205,38 +2923,23 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
             )
         );
 
-        let storedLen = 0;
-        let storedAfterDedup = 0;
-        let seededFromServer = false;
-        let initMode = 'seed';
-
         if (clearRecent) {
-            initMode = 'force-clear';
             this.clearRecentList({ markCleared: true, wipeAllKeys: true });
         } else if (this.isRecentCleared()) {
             // Reset previously dismissed server-seeded history; keep only client-stored rows.
-            initMode = 'cleared-stored-only';
             const stored = this.loadRecent();
-            storedLen = stored.length;
-            storedAfterDedup = stored.length;
             this.recent = stored.slice(0, 50);
             this.persistRecent();
         } else {
             const stored = this.loadRecent();
-            storedLen = stored.length;
             const unknownIds = new Set(this.serverUnknowns.map((entry) => entry.unknown_scan?.id).filter(Boolean));
             const storedWithoutDupUnknowns = stored.filter(
                 (entry) => !entry.unknown || !unknownIds.has(entry.unknown_scan?.id)
             );
-            storedAfterDedup = storedWithoutDupUnknowns.length;
             this.recent = [...this.serverUnknowns, ...storedWithoutDupUnknowns].slice(0, 50);
-            seededFromServer = this.serverUnknowns.length > 0;
             this.persistRecent();
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67bc37'},body:JSON.stringify({sessionId:'67bc37',runId:'post-fix',location:'app.js:barcodeScanner.init',message:'scan recent init',data:{eventListId:this.eventListId,clearRecent:Boolean(clearRecent),initMode,storedLen,storedAfterDedup,serverUnknownsLen:this.serverUnknowns.length,recentLen:this.recent.length,seededFromServer,storageKey:this.storageKey(),recentUnknownCount:this.recent.filter((e)=>e.unknown).length,recentKnownCount:this.recent.filter((e)=>!e.unknown).length},timestamp:Date.now(),hypothesisId:'A,C,D'})}).catch(()=>{});
-        // #endregion
         this.$nextTick(() => this.focusInput());
     },
 
@@ -3318,15 +3021,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     },
 
     resetRecent() {
-        // #region agent log
-        const beforeLen = this.recent.length;
-        const beforeKnown = this.recent.filter((e) => !e.unknown).length;
-        const beforeUnknown = this.recent.filter((e) => e.unknown).length;
-        // #endregion
         this.clearRecentList({ markCleared: true, wipeAllKeys: true });
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67bc37'},body:JSON.stringify({sessionId:'67bc37',runId:'post-fix',location:'app.js:barcodeScanner.resetRecent',message:'resetRecent called',data:{beforeLen,beforeKnown,beforeUnknown,afterLen:this.recent.length,serverUnknownsLen:this.serverUnknowns.length,eventListId:this.eventListId,storageKey:this.storageKey()},timestamp:Date.now(),hypothesisId:'A,B,E'})}).catch(()=>{});
-        // #endregion
     },
 
     focusInput() {
@@ -3708,6 +3403,301 @@ document.addEventListener(
 );
 
 restoreScrollPosition();
+
+function defaultRiggingInputs(calculator) {
+    switch (calculator) {
+        case 'two_point_hang':
+            return { W: 100, L: 10, x: 4 };
+        case 'lever':
+            return { class: 'I', Fr: 100, dr: 1, de: 2 };
+        case 'bridle_two_leg':
+            return { W: 200, span: 4, drop: 2, offset: 2 };
+        case 'bridle_multi_leg':
+            return { W: 200, legs: 4, angle_from_vertical_deg: 30 };
+        case 'sling_angle_factor':
+            return { W: 100, angle_from_vertical_deg: 30, wll: 500 };
+        case 'dead_hang':
+            return { W: 100, wll: 500 };
+        case 'beam_point_load':
+            return { L: 10, loads: [{ W: 100, x: 4 }] };
+        case 'udl_multi_point':
+            return {
+                point_count: 4,
+                distribution_mode: 'continuous_beam',
+                hoist_self_weight_kg: 0,
+                weight_lines: [{ label: 'Truss', weight_kg: 200, quantity: 1, item_type_id: '' }],
+                custom_percents: [25, 25, 25, 25],
+            };
+        case 'projector_lens':
+            return {
+                mode: 'width_from_ratio_distance',
+                aspect: '16:9',
+                custom_aspect: 1.777,
+                throw_ratio: 1.5,
+                throw_distance: 6,
+                image_width: null,
+                zoom_min: null,
+                zoom_max: null,
+            };
+        case 'unit_convert':
+            return { value: 100, from: 'kg', to: 'lb' };
+        default:
+            return {};
+    }
+}
+
+function buildRiggingDiagram(calculator, inputs, results) {
+    const stroke = '#00adb7';
+    const ink = '#111111';
+    if (!results) {
+        return `<svg viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg"><text x="16" y="64" fill="${ink}" font-size="12">Enter inputs and update</text></svg>`;
+    }
+
+    if (calculator === 'two_point_hang') {
+        const L = Number(inputs.L) || 10;
+        const x = Number(inputs.x) || 0;
+        const px = 40 + (240 * x) / L;
+        return `<svg viewBox="0 0 320 140" xmlns="http://www.w3.org/2000/svg">
+            <line x1="40" y1="40" x2="280" y2="40" stroke="${ink}" stroke-width="3"/>
+            <circle cx="40" cy="40" r="5" fill="${stroke}"/><text x="28" y="28" font-size="11">A</text>
+            <circle cx="280" cy="40" r="5" fill="${stroke}"/><text x="268" y="28" font-size="11">B</text>
+            <line x1="${px}" y1="40" x2="${px}" y2="100" stroke="${stroke}" stroke-width="2"/>
+            <rect x="${px - 12}" y="100" width="24" height="16" fill="${stroke}"/>
+            <text x="40" y="130" font-size="11">RA ${results.RA}</text>
+            <text x="220" y="130" font-size="11">RB ${results.RB}</text>
+        </svg>`;
+    }
+
+    if (calculator === 'lever') {
+        const cls = inputs.class || 'I';
+        const labels = cls === 'I' ? ['E', 'F', 'L'] : cls === 'II' ? ['E', 'L', 'F'] : ['L', 'E', 'F'];
+        return `<svg viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg">
+            <line x1="40" y1="50" x2="280" y2="50" stroke="${ink}" stroke-width="3"/>
+            <polygon points="160,50 150,70 170,70" fill="${stroke}"/>
+            <text x="50" y="40" font-size="12">${labels[0]}</text>
+            <text x="150" y="40" font-size="12">${labels[1]}</text>
+            <text x="250" y="40" font-size="12">${labels[2]}</text>
+            <text x="40" y="100" font-size="11">Fe ${results.Fe_kg} kg · Fulcrum ${results.fulcrum_kg} kg</text>
+        </svg>`;
+    }
+
+    if (calculator === 'bridle_two_leg') {
+        return `<svg viewBox="0 0 320 140" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="40" cy="30" r="5" fill="${stroke}"/><circle cx="280" cy="30" r="5" fill="${stroke}"/>
+            <line x1="40" y1="30" x2="160" y2="110" stroke="${ink}" stroke-width="2"/>
+            <line x1="280" y1="30" x2="160" y2="110" stroke="${ink}" stroke-width="2"/>
+            <rect x="148" y="110" width="24" height="16" fill="${stroke}"/>
+            <text x="20" y="130" font-size="11">T1 ${results.T1}</text>
+            <text x="220" y="130" font-size="11">T2 ${results.T2}</text>
+        </svg>`;
+    }
+
+    if (calculator === 'udl_multi_point' && Array.isArray(results.points)) {
+        const pts = results.points;
+        const max = Math.max(...pts.map((p) => Number(p.total_kg) || 0), 1);
+        const bars = pts.map((p, i) => {
+            const x = 30 + i * (260 / Math.max(pts.length, 1));
+            const h = (80 * (Number(p.total_kg) || 0)) / max;
+            return `<rect x="${x}" y="${100 - h}" width="16" height="${h}" fill="${stroke}"/><text x="${x}" y="114" font-size="9">${i + 1}</text>`;
+        }).join('');
+        return `<svg viewBox="0 0 320 130" xmlns="http://www.w3.org/2000/svg"><line x1="20" y1="100" x2="300" y2="100" stroke="${ink}"/>${bars}</svg>`;
+    }
+
+    if (calculator === 'projector_lens') {
+        const w = Math.min(120, 40 + (Number(results.image_width) || 1) * 20);
+        return `<svg viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="50" width="28" height="20" fill="${stroke}"/>
+            <line x1="48" y1="60" x2="220" y2="60" stroke="${ink}" stroke-width="2"/>
+            <rect x="220" y="${60 - w / 4}" width="8" height="${w / 2}" fill="${ink}"/>
+            <text x="60" y="40" font-size="11">TR ${results.throw_ratio} · ${results.throw_distance} m → ${results.image_width} m</text>
+        </svg>`;
+    }
+
+    if (calculator === 'beam_point_load') {
+        return `<svg viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg">
+            <line x1="40" y1="50" x2="280" y2="50" stroke="${ink}" stroke-width="3"/>
+            <text x="40" y="90" font-size="11">RA ${results.RA}</text>
+            <text x="220" y="90" font-size="11">RB ${results.RB}</text>
+        </svg>`;
+    }
+
+    const summary = Object.entries(results).slice(0, 4).map(([k, v]) => `${k}: ${typeof v === 'object' ? '…' : v}`).join(' · ');
+    return `<svg viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg"><text x="16" y="55" font-size="12" fill="${ink}">${summary}</text></svg>`;
+}
+
+Alpine.data('riggingCalculator', (config = {}) => ({
+    calculator: config.calculator,
+    computeUrl: config.computeUrl,
+    saveUrl: config.saveUrl,
+    csrf: config.csrf,
+    events: config.events || [],
+    itemTypes: config.itemTypes || [],
+    inputs: defaultRiggingInputs(config.calculator),
+    results: null,
+    error: '',
+    title: '',
+    rigEventId: '',
+    diagramSvg: buildRiggingDiagram(config.calculator, defaultRiggingInputs(config.calculator), null),
+    init() {
+        this.title = this.calculator.replace(/_/g, ' ');
+        this.recompute();
+    },
+    get resultEntries() {
+        if (!this.results) {
+            return [];
+        }
+        return Object.entries(this.results).filter(([, v]) => typeof v !== 'object' || v === null);
+    },
+    formatValue(value) {
+        if (typeof value === 'boolean') {
+            return value ? 'yes' : 'no';
+        }
+        return value;
+    },
+    async recompute() {
+        this.error = '';
+        try {
+            const response = await fetch(this.computeUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': this.csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ inputs: this.payloadInputs() }),
+            });
+            const json = await response.json();
+            if (!response.ok) {
+                this.results = null;
+                this.error = json.message || 'Could not compute.';
+                this.diagramSvg = buildRiggingDiagram(this.calculator, this.inputs, null);
+                return;
+            }
+            this.results = json.results;
+            this.diagramSvg = buildRiggingDiagram(this.calculator, this.inputs, this.results);
+        } catch (e) {
+            this.error = 'Network error computing results.';
+        }
+    },
+    payloadInputs() {
+        const raw = JSON.parse(JSON.stringify(this.inputs));
+        if (this.calculator === 'udl_multi_point') {
+            raw.weight_lines = (raw.weight_lines || []).map((line) => ({
+                ...line,
+                item_type_id: line.item_type_id === '' || line.item_type_id === null ? null : Number(line.item_type_id),
+            }));
+        }
+        if (this.calculator === 'sling_angle_factor' && (raw.wll === '' || raw.wll === null || Number.isNaN(raw.wll))) {
+            delete raw.wll;
+        }
+        return raw;
+    },
+    prepareSave(event) {
+        if (!this.results) {
+            event.preventDefault();
+            this.error = 'Compute a valid result before saving.';
+        }
+    },
+    addBeamLoad() {
+        this.inputs.loads.push({ W: 50, x: 1 });
+        this.recompute();
+    },
+    removeBeamLoad(idx) {
+        this.inputs.loads.splice(idx, 1);
+        this.recompute();
+    },
+    addWeightLine() {
+        this.inputs.weight_lines.push({ label: '', weight_kg: null, quantity: 1, item_type_id: '' });
+    },
+    removeWeightLine(idx) {
+        this.inputs.weight_lines.splice(idx, 1);
+        this.recompute();
+    },
+    applyItemType(idx) {
+        const line = this.inputs.weight_lines[idx];
+        const type = this.itemTypes.find((t) => String(t.id) === String(line.item_type_id));
+        if (type) {
+            line.label = type.name;
+            if (type.rigging_weight_kg != null) {
+                line.weight_kg = Number(type.rigging_weight_kg);
+            }
+        }
+        this.recompute();
+    },
+    onPointCountChange() {
+        const n = Math.max(1, Math.min(32, Number(this.inputs.point_count) || 1));
+        this.inputs.point_count = n;
+        const equal = 100 / n;
+        this.inputs.custom_percents = Array.from({ length: n }, () => equal);
+        this.recompute();
+    },
+}));
+
+Alpine.data('rigEventMotorPatches', (initial = []) => ({
+    rows: (initial || []).map((row) => ({
+        motor_label: row.motor_label || '',
+        patch_to: row.patch_to || '',
+        notes: row.notes || '',
+        sort_order: row.sort_order || 0,
+    })),
+    addRow() {
+        this.rows.push({ motor_label: '', patch_to: '', notes: '', sort_order: this.rows.length });
+    },
+    removeRow(idx) {
+        this.rows.splice(idx, 1);
+    },
+}));
+
+Alpine.data('rigEventSignOff', () => ({
+    drawing: false,
+    init() {
+        const canvas = this.$refs.pad;
+        if (!canvas) {
+            return;
+        }
+        const ctx = canvas.getContext('2d');
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        this._ctx = ctx;
+    },
+    pointerPos(event) {
+        const canvas = this.$refs.pad;
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+            y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+        };
+    },
+    startStroke(event) {
+        this.drawing = true;
+        const p = this.pointerPos(event);
+        this._ctx.beginPath();
+        this._ctx.moveTo(p.x, p.y);
+        event.target.setPointerCapture?.(event.pointerId);
+    },
+    drawStroke(event) {
+        if (!this.drawing) {
+            return;
+        }
+        const p = this.pointerPos(event);
+        this._ctx.lineTo(p.x, p.y);
+        this._ctx.stroke();
+    },
+    endStroke() {
+        this.drawing = false;
+    },
+    clearPad() {
+        const canvas = this.$refs.pad;
+        this._ctx.clearRect(0, 0, canvas.width, canvas.height);
+    },
+    beforeSubmit() {
+        if (this.$refs.signatureData && this.$refs.pad) {
+            this.$refs.signatureData.value = this.$refs.pad.toDataURL('image/png');
+        }
+    },
+}));
 
 Alpine.start();
 

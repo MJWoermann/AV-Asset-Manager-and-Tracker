@@ -228,7 +228,7 @@ One-shot update (recommended):
 sudo bash /var/www/av-asset-manager/scripts/update.sh
 ```
 
-That script pulls the latest code, installs PHP/JS deps, builds assets, runs `migrate --force`, rebuilds config/route/view caches, fixes `storage` / `bootstrap/cache` / SQLite permissions, and reloads PHP-FPM. Override defaults if needed:
+That script puts the app in maintenance mode (redirecting visitors to a branded **Server maintenance** page at `/`), pulls the latest code, installs PHP/JS deps, builds assets, runs `migrate --force`, rebuilds config/route/view caches, fixes `storage` / `bootstrap/cache` / SQLite permissions, reloads PHP-FPM, then brings the site back up. Override defaults if needed:
 
 ```bash
 sudo WEB_USER=www-data PHP_FPM_SERVICE=php8.5-fpm bash /var/www/av-asset-manager/scripts/update.sh

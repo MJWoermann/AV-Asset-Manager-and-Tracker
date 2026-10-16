@@ -1,0 +1,40 @@
+---
+description: Keep MySQL/MariaDB index and foreign-key names ≤64 characters
+globs: database/migrations/**/*.php
+alwaysApply: false
+---
+
+# MySQL identifier length (64 chars)
+
+MySQL/MariaDB limit **all** identifiers (table, column, index, foreign key) to **64 characters**.
+
+Laravel’s default FK/index names are `{table}_{column(s)}_foreign` / `{table}_{column(s)}_index`. Long table + column names exceed 64 and fail migrate with:
+
+`SQLSTATE[42000]: ... 1059 Identifier name '…' is too long`
+
+## Before every migration that adds FKs or indexes
+
+1. Compute the auto-generated name length: `strlen("{table}_{column}_foreign")` (or joined columns + `_index`).
+2. If **> 64**, do **not** use `->constrained()` / anonymous `->index()` alone.
+3. Use explicit short names (same pattern as `notification_template_recipient` in `2026_10_15_110000_create_email_integration_tables.php`).
+
+```php
+// ❌ BAD — auto name too long
+$table->foreignId('manufacturer_model_id')->constrained()->cascadeOnDelete();
+$table->index(['manufacturer_model_id', 'sort_order']);
+
+// ✅ GOOD — explicit short names (keep under 64)
+$table->foreignId('manufacturer_model_id');
+$table->foreign('manufacturer_model_id', 'mm_iface_tpl_model_id_fk')
+    ->references('id')->on('manufacturer_models')->cascadeOnDelete();
+$table->index(['manufacturer_model_id', 'sort_order'], 'mm_iface_tpl_model_sort_idx');
+```
+
+## Checklist
+
+- [ ] Every new FK name ≤ 64 chars
+- [ ] Every new index/unique name ≤ 64 chars
+- [ ] `down()` drops FKs/indexes by the **same** short name (`dropForeign('…')`, not only `dropConstrainedForeignId` when a custom name was used)
+- [ ] Prefer shortening the **constraint/index** name first; only rename the table if product naming allows
+
+SQLite (tests) is lenient; **always** check as if targeting MariaDB/MySQL production.

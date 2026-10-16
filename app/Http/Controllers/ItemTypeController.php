@@ -54,6 +54,11 @@ class ItemTypeController extends Controller
             $attributes['supports_stock_tracking'] = (bool) ($data['supports_stock_tracking'] ?? false);
         }
 
+        if ($request->user()?->hasDeveloperFeature('rigging')) {
+            $attributes['supports_rigging_calculator'] = (bool) ($data['supports_rigging_calculator'] ?? false);
+            $attributes['rigging_weight_kg'] = $data['rigging_weight_kg'] ?? null;
+        }
+
         $itemType = ItemType::create($attributes);
         $itemType->fieldSets()->sync($data['field_sets'] ?? []);
 
@@ -117,6 +122,11 @@ class ItemTypeController extends Controller
             $attributes['supports_stock_tracking'] = (bool) ($data['supports_stock_tracking'] ?? false);
         }
 
+        if ($request->user()?->hasDeveloperFeature('rigging')) {
+            $attributes['supports_rigging_calculator'] = (bool) ($data['supports_rigging_calculator'] ?? false);
+            $attributes['rigging_weight_kg'] = $data['rigging_weight_kg'] ?? null;
+        }
+
         $itemType->update($attributes);
         $itemType->fieldSets()->sync($data['field_sets'] ?? []);
 
@@ -158,6 +168,12 @@ class ItemTypeController extends Controller
             ]);
         }
 
+        if ($request->has('supports_rigging_calculator')) {
+            $request->merge([
+                'supports_rigging_calculator' => $request->boolean('supports_rigging_calculator'),
+            ]);
+        }
+
         $rules = [
             'name' => $nameRule,
             'description' => ['nullable', 'string'],
@@ -171,6 +187,11 @@ class ItemTypeController extends Controller
 
         if ($request->user()?->hasDeveloperFeature('stock_consumables')) {
             $rules['supports_stock_tracking'] = ['sometimes', 'boolean'];
+        }
+
+        if ($request->user()?->hasDeveloperFeature('rigging')) {
+            $rules['supports_rigging_calculator'] = ['sometimes', 'boolean'];
+            $rules['rigging_weight_kg'] = ['nullable', 'numeric', 'min:0'];
         }
 
         if ($request->user()?->hasFeature('asset_connections')) {

@@ -14,6 +14,7 @@
                     @php
                         $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*', 'reports.connection-map*', 'labels.*');
                         $dataActive = request()->routeIs('locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
+                        $riggingActive = request()->routeIs('rigging.*');
                     @endphp
 
                     <x-dropdown align="left" width="48">
@@ -65,6 +66,25 @@
                             @endrole
                         </x-slot>
                     </x-dropdown>
+
+                    @feature('rigging')
+                        <x-dropdown align="left" width="48">
+                            <x-slot name="trigger">
+                                <button type="button" @class([
+                                    'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium border-b-2',
+                                    'text-brand border-brand' => $riggingActive,
+                                    'text-brand-silver hover:text-white border-transparent' => ! $riggingActive,
+                                ])>
+                                    Rigging
+                                    <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link :href="route('rigging.events.index')">Rig Events</x-dropdown-link>
+                                <x-dropdown-link :href="route('rigging.calculators.index')">Calculators</x-dropdown-link>
+                            </x-slot>
+                        </x-dropdown>
+                    @endfeature
                 </div>
             </div>
 
@@ -155,6 +175,12 @@
                     <x-responsive-nav-link :href="route('connection-types.index')" :active="request()->routeIs('connection-types.*')">Connection types</x-responsive-nav-link>
                 @endfeature
             @endrole
+
+            @feature('rigging')
+                <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Rigging</div>
+                <x-responsive-nav-link :href="route('rigging.events.index')" :active="request()->routeIs('rigging.events.*')">Rig Events</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('rigging.calculators.index')" :active="request()->routeIs('rigging.calculators.*')">Calculators</x-responsive-nav-link>
+            @endfeature
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
             <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>

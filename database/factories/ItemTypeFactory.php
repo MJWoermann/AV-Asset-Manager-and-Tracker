@@ -23,6 +23,8 @@ class ItemTypeFactory extends Factory
             'slug' => Str::slug($name).'-'.fake()->unique()->numerify('###'),
             'description' => null,
             'supports_stock_tracking' => false,
+            'supports_rigging_calculator' => false,
+            'rigging_weight_kg' => null,
         ];
     }
 
@@ -30,6 +32,14 @@ class ItemTypeFactory extends Factory
     {
         return $this->state(fn (): array => [
             'supports_stock_tracking' => true,
+        ]);
+    }
+
+    public function riggingCatalogue(?float $weightKg = 10.0): static
+    {
+        return $this->state(fn (): array => [
+            'supports_rigging_calculator' => true,
+            'rigging_weight_kg' => $weightKg,
         ]);
     }
 }

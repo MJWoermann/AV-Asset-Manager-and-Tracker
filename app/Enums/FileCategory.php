@@ -10,6 +10,8 @@ enum FileCategory: string
     case Floorplan = 'floorplan';
     case Invoice = 'invoice';
     case Maintenance = 'maintenance';
+    case RiggingPlan = 'rigging_plan';
+    case Import = 'import';
     case Other = 'other';
 
     public function label(): string
@@ -21,6 +23,8 @@ enum FileCategory: string
             self::Floorplan => 'Floorplan',
             self::Invoice => 'Invoice',
             self::Maintenance => 'Maintenance',
+            self::RiggingPlan => 'Rigging plan',
+            self::Import => 'Import',
             self::Other => 'Other',
         };
     }

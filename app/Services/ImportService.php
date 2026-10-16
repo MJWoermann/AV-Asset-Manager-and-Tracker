@@ -7,6 +7,8 @@ use App\Enums\LocationType;
 use App\Imports\AssetImport;
 use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
+use App\Models\AssetList;
+use App\Models\AssetListItem;
 use App\Models\CustomFieldDefinition;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
@@ -456,13 +458,56 @@ class ImportService
     /**
      * @param  list<array<string, mixed>>  $prepared
      * @param  array<int|string, string>  $actions  row index => update|replace|skip|create
-     * @return array{created: int, updated: int, replaced: int, skipped: int}
+     * @param  array{
+     *     destination?: 'none'|'existing'|'new',
+     *     asset_list_id?: int|null,
+     *     new_list_name?: string|null,
+     *     new_list_type?: 'inventory'|'event'|null,
+     *     include_updated?: bool,
+     * }  $listOptions
+     * @return array{
+     *     created: int,
+     *     updated: int,
+     *     replaced: int,
+     *     skipped: int,
+     *     added_to_list: int,
+     *     list_id: ?int,
+     *     list_name: ?string
+     * }
      */
-    public function commit(array $prepared, array $actions = [], bool $dryRun = false, string $defaultDuplicateAction = 'update'): array
-    {
-        $counts = ['created' => 0, 'updated' => 0, 'replaced' => 0, 'skipped' => 0];
+    public function commit(
+        array $prepared,
+        array $actions = [],
+        bool $dryRun = false,
+        string $defaultDuplicateAction = 'update',
+        array $listOptions = [],
+        ?int $userId = null,
+    ): array {
+        $counts = [
+            'created' => 0,
+            'updated' => 0,
+            'replaced' => 0,
+            'skipped' => 0,
+            'added_to_list' => 0,
+            'list_id' => null,
+            'list_name' => null,
+        ];
+        $assetsForList = [];
+        $includeUpdated = (bool) ($listOptions['include_updated'] ?? false);
+        $listDestination = $listOptions['destination'] ?? 'none';
 
-        $runner = function () use ($prepared, $actions, $dryRun, $defaultDuplicateAction, &$counts): void {
+        $runner = function () use (
+            $prepared,
+            $actions,
+            $dryRun,
+            $defaultDuplicateAction,
+            $listOptions,
+            $listDestination,
+            $includeUpdated,
+            $userId,
+            &$counts,
+            &$assetsForList,
+        ): void {
             foreach ($prepared as $row) {
                 $existingId = $row['existing_id'] ?? null;
 
@@ -482,18 +527,23 @@ class ImportService
                     if ($action === 'create') {
                         if ($dryRun) {
                             $counts['created']++;
+                            $assetsForList[] = ['id' => null, 'kind' => 'created'];
 
                             continue;
                         }
 
-                        $this->applyRow(null, $row, false);
+                        $asset = $this->applyRow(null, $row, false);
                         $counts['created']++;
+                        $assetsForList[] = ['id' => $asset->id, 'kind' => 'created'];
 
                         continue;
                     }
 
                     if ($dryRun) {
                         $counts[$action === 'replace' ? 'replaced' : 'updated']++;
+                        if ($includeUpdated) {
+                            $assetsForList[] = ['id' => (int) $existingId, 'kind' => 'updated'];
+                        }
 
                         continue;
                     }
@@ -505,21 +555,49 @@ class ImportService
                         continue;
                     }
 
-                    $this->applyRow($asset, $row, $action === 'replace');
+                    $asset = $this->applyRow($asset, $row, $action === 'replace');
                     $counts[$action === 'replace' ? 'replaced' : 'updated']++;
+                    if ($includeUpdated) {
+                        $assetsForList[] = ['id' => $asset->id, 'kind' => 'updated'];
+                    }
 
                     continue;
                 }
 
                 if ($dryRun) {
                     $counts['created']++;
+                    $assetsForList[] = ['id' => null, 'kind' => 'created'];
 
                     continue;
                 }
 
-                $this->applyRow(null, $row, false);
+                $asset = $this->applyRow(null, $row, false);
                 $counts['created']++;
+                $assetsForList[] = ['id' => $asset->id, 'kind' => 'created'];
             }
+
+            if ($listDestination === 'none' || $assetsForList === []) {
+                return;
+            }
+
+            if ($dryRun) {
+                $counts['added_to_list'] = count($assetsForList);
+
+                return;
+            }
+
+            $list = $this->resolveImportTargetList($listOptions, $userId);
+            if (! $list) {
+                return;
+            }
+
+            $counts['list_id'] = $list->id;
+            $counts['list_name'] = $list->name;
+            $counts['added_to_list'] = $this->addAssetsToList(
+                $list,
+                array_values(array_filter(array_column($assetsForList, 'id'))),
+                $userId,
+            );
         };
 
         if ($dryRun) {
@@ -529,6 +607,81 @@ class ImportService
         }
 
         return $counts;
+    }
+
+    /**
+     * @param  array{
+     *     destination?: 'none'|'existing'|'new',
+     *     asset_list_id?: int|null,
+     *     new_list_name?: string|null,
+     *     new_list_type?: 'inventory'|'event'|null,
+     * }  $listOptions
+     */
+    protected function resolveImportTargetList(array $listOptions, ?int $userId): ?AssetList
+    {
+        $destination = $listOptions['destination'] ?? 'none';
+
+        if ($destination === 'existing') {
+            $listId = (int) ($listOptions['asset_list_id'] ?? 0);
+
+            return $listId > 0 ? AssetList::query()->find($listId) : null;
+        }
+
+        if ($destination === 'new') {
+            $name = trim((string) ($listOptions['new_list_name'] ?? ''));
+            $type = $listOptions['new_list_type'] ?? null;
+
+            if ($name === '' || ! in_array($type, ['inventory', 'event'], true)) {
+                return null;
+            }
+
+            return AssetList::create([
+                'name' => $name,
+                'type' => $type,
+                'created_by' => $userId,
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<int>  $assetIds
+     */
+    protected function addAssetsToList(AssetList $list, array $assetIds, ?int $userId): int
+    {
+        $assetIds = array_values(array_unique(array_map('intval', $assetIds)));
+        if ($assetIds === []) {
+            return 0;
+        }
+
+        $assets = Asset::query()->whereIn('id', $assetIds)->get()->keyBy('id');
+        $added = 0;
+
+        foreach ($assetIds as $assetId) {
+            $asset = $assets->get($assetId);
+            if (! $asset) {
+                continue;
+            }
+
+            $item = AssetListItem::query()->firstOrCreate(
+                [
+                    'asset_list_id' => $list->id,
+                    'asset_id' => $asset->id,
+                ],
+                [
+                    'quantity' => max(1, (int) ($asset->quantity ?? 1)),
+                    'is_child_expand' => (bool) $asset->parent_id,
+                    'added_by' => $userId,
+                ]
+            );
+
+            if ($item->wasRecentlyCreated) {
+                $added++;
+            }
+        }
+
+        return $added;
     }
 
     /**
@@ -701,34 +854,6 @@ class ImportService
         $parentId = null;
         $resolvedId = null;
 
-        // #region agent log
-        $sameNameLevels = $level
-            ? Location::query()->where('name', $level)->where('type', LocationType::Level->value)->get(['id', 'name', 'type', 'parent_id'])->toArray()
-            : [];
-        $sameNameAny = $level
-            ? Location::query()->whereRaw('LOWER(name) = ?', [Str::lower($level)])->get(['id', 'name', 'type', 'parent_id'])->toArray()
-            : [];
-        file_put_contents(
-            base_path('debug-ebc14c.log'),
-            json_encode([
-                'sessionId' => 'ebc14c',
-                'hypothesisId' => 'A,B,C',
-                'location' => 'ImportService.php:resolveLocation',
-                'message' => 'resolveLocation entry',
-                'data' => [
-                    'level' => $level,
-                    'room' => $room,
-                    'rack' => $rack,
-                    'sameNameLevels' => $sameNameLevels,
-                    'sameNameCaseInsensitive' => $sameNameAny,
-                    'totalLocations' => Location::query()->count(),
-                ],
-                'timestamp' => (int) (microtime(true) * 1000),
-            ])."\n",
-            FILE_APPEND
-        );
-        // #endregion
-
         if ($level) {
             $location = $this->firstOrCreateLocation($level, LocationType::Level, $parentId);
             $parentId = $location->id;
@@ -745,21 +870,6 @@ class ImportService
             $location = $this->firstOrCreateLocation($rack, LocationType::Rack, $parentId);
             $resolvedId = $location->id;
         }
-
-        // #region agent log
-        file_put_contents(
-            base_path('debug-ebc14c.log'),
-            json_encode([
-                'sessionId' => 'ebc14c',
-                'hypothesisId' => 'A',
-                'location' => 'ImportService.php:resolveLocation:exit',
-                'message' => 'resolveLocation exit',
-                'data' => ['resolvedId' => $resolvedId, 'finalParentChain' => $resolvedId],
-                'timestamp' => (int) (microtime(true) * 1000),
-            ])."\n",
-            FILE_APPEND
-        );
-        // #endregion
 
         return $resolvedId;
     }
@@ -778,46 +888,12 @@ class ImportService
         }
 
         $existing = $exactQuery->first();
-        $matchedVia = $existing ? 'exact_parent' : null;
 
         // Import maps Level/Room/Rack only (no Site). Levels often live under a Site, so
         // when no parent is known, reuse an existing name+type match anywhere in the tree.
         if (! $existing && $parentId === null) {
             $existing = (clone $baseQuery)->orderBy('id')->first();
-            $matchedVia = $existing ? 'hierarchy_fallback' : null;
         }
-
-        // #region agent log
-        $nameMatchesIgnoringParent = (clone $baseQuery)->get(['id', 'name', 'type', 'parent_id'])->toArray();
-        $caseInsensitiveMatches = Location::query()
-            ->whereRaw('LOWER(name) = ?', [Str::lower($name)])
-            ->where('type', $type->value)
-            ->get(['id', 'name', 'type', 'parent_id'])
-            ->toArray();
-        file_put_contents(
-            base_path('debug-ebc14c.log'),
-            json_encode([
-                'sessionId' => 'ebc14c',
-                'runId' => 'post-fix',
-                'hypothesisId' => $existing ? 'reuse' : 'A,B,C,D',
-                'location' => 'ImportService.php:firstOrCreateLocation',
-                'message' => $existing ? 'reused existing location' : 'creating new location',
-                'data' => [
-                    'lookupName' => $name,
-                    'lookupType' => $type->value,
-                    'lookupParentId' => $parentId,
-                    'requireNullParent' => $parentId === null,
-                    'foundId' => $existing?->id,
-                    'matchedVia' => $matchedVia,
-                    'nameMatchesIgnoringParent' => $nameMatchesIgnoringParent,
-                    'caseInsensitiveMatches' => $caseInsensitiveMatches,
-                    'willCreate' => $existing === null,
-                ],
-                'timestamp' => (int) (microtime(true) * 1000),
-            ])."\n",
-            FILE_APPEND
-        );
-        // #endregion
 
         if ($existing) {
             return $existing;
