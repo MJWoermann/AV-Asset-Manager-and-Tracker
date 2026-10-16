@@ -8,7 +8,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="manufacturerCatalogue()">
         @if (session('status'))
             <div class="mb-4 text-sm text-brand">{{ session('status') }}</div>
         @endif
@@ -24,6 +24,18 @@
         @if ($manufacturers->isEmpty())
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">No manufacturers yet.</p>
         @else
+            <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver"
+                    @click="expandAll()"
+                >Expand all</button>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver"
+                    @click="collapseAll()"
+                >Collapse all</button>
+            </div>
             <ul class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal text-sm overflow-hidden">
                 @foreach ($manufacturers as $index => $manufacturer)
                     @include('manufacturers.partials.node', [

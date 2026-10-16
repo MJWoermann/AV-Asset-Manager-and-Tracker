@@ -138,7 +138,7 @@ LOG_LEVEL=warning
 - Rotate the install admin password immediately; use unique emails.
 - Prefer SSO ([sso-setup.md](sso-setup.md)) with a strict domain allow-list for staff mailboxes; keep password login for break-glass admins only if needed.
 - Graph / Google / Azure client secrets and QNAP SFTP/S3 keys: `.env` or OS secret store only; rotate on staff change.
-- Sanctum tokens: treat like passwords; revoke on device loss (`DELETE /api/auth/token` or delete `personal_access_tokens` rows).
+- Sanctum tokens: treat like passwords; create/revoke from Profile → API tokens or `POST`/`DELETE /api/auth/token`; scope with abilities (see [api.md](api.md)); on device loss revoke via Profile, `DELETE /api/auth/token`, or delete `personal_access_tokens` rows.
 
 ### Password complexity
 

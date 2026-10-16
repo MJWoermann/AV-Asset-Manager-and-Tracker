@@ -39,6 +39,19 @@
                     @endforeach
                 </select>
             </div>
+            <div>
+                <label class="block text-xs text-brand-charcoal dark:text-brand-silver">Stock status</label>
+                <select name="stock_status" class="border border-brand-silver dark:border-brand-charcoal px-2 py-1">
+                    <option value="">All</option>
+                    @foreach(\App\Enums\SparePartStockStatus::options() as $value => $label)
+                        <option value="{{ $value }}" @selected(($stockStatus ?? null) === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <label class="flex items-center gap-2 pb-1">
+                <input type="checkbox" name="below_min" value="1" @checked($belowMin ?? false)>
+                <span>Below minimum</span>
+            </label>
             <label class="flex items-center gap-2 pb-1">
                 <input type="checkbox" name="include_eol" value="1" @checked($includeEol)>
                 <span>Include EOL / superseded</span>

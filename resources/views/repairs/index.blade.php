@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center gap-3">
             <h2 class="font-semibold text-xl">Repairs</h2>
-            <a href="{{ route('data.index') }}" class="px-3 py-2 border text-sm">Data</a>
+            <a href="{{ route('maintenance.index') }}" class="px-3 py-2 border text-sm">Maintenance</a>
         </div>
     </x-slot>
 

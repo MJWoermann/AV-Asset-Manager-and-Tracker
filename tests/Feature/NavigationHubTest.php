@@ -29,11 +29,12 @@ class NavigationHubTest extends TestCase
     public function test_guest_is_redirected_from_hub_routes(): void
     {
         $this->get(route('data.index'))->assertRedirect(route('login'));
+        $this->get(route('maintenance.index'))->assertRedirect(route('login'));
         $this->get(route('reports.index'))->assertRedirect(route('login'));
         $this->get(route('admin.index'))->assertRedirect(route('login'));
     }
 
-    public function test_authenticated_users_can_view_data_and_reports_hubs(): void
+    public function test_authenticated_users_can_view_data_reports_and_maintenance_hubs(): void
     {
         $user = $this->userWithRole('scanner');
 
@@ -41,10 +42,20 @@ class NavigationHubTest extends TestCase
             ->assertOk()
             ->assertSee('Locations')
             ->assertSee('Manufacturers')
-            ->assertSee('Spares')
-            ->assertSee('Repairs')
+            ->assertSee('Reference data used across assets, lists, and scanning.')
+            ->assertDontSee('Critical spares register, kits, and usage history.')
+            ->assertDontSee('Open and completed repair work orders linked to faults.')
             ->assertDontSee('Item Types')
             ->assertDontSee('Repair procedures');
+
+        $this->actingAs($user)->get(route('maintenance.index'))
+            ->assertOk()
+            ->assertSee('Repairs, procedures, and critical spares.')
+            ->assertSee('Repairs')
+            ->assertSee('Spares')
+            ->assertSee('Critical spares register, kits, and usage history.')
+            ->assertSee('Open and completed repair work orders linked to faults.')
+            ->assertDontSee('Reusable SOP checklists scoped to models, types, or spares.');
 
         $this->actingAs($user)->get(route('reports.index'))
             ->assertOk()
@@ -52,7 +63,7 @@ class NavigationHubTest extends TestCase
             ->assertSee('Unknown scans');
     }
 
-    public function test_inventory_manager_sees_manager_data_links(): void
+    public function test_inventory_manager_sees_manager_data_and_maintenance_links(): void
     {
         $user = $this->userWithRole('inventory_manager');
 
@@ -61,7 +72,14 @@ class NavigationHubTest extends TestCase
             ->assertSee('Item Types')
             ->assertSee('Field sets')
             ->assertSee('Files')
-            ->assertSee('Repair procedures');
+            ->assertDontSee('Reusable SOP checklists scoped to models, types, or spares.');
+
+        $this->actingAs($user)->get(route('maintenance.index'))
+            ->assertOk()
+            ->assertSee('Repairs')
+            ->assertSee('Spares')
+            ->assertSee('Repair procedures')
+            ->assertSee('Reusable SOP checklists scoped to models, types, or spares.');
     }
 
     public function test_admin_can_view_admin_hub(): void
@@ -91,6 +109,7 @@ class NavigationHubTest extends TestCase
 
         $response->assertOk();
         $response->assertSee(route('data.index'), false);
+        $response->assertSee(route('maintenance.index'), false);
         $response->assertSee(route('reports.index'), false);
         $response->assertSee(route('admin.index'), false);
 
@@ -105,10 +124,85 @@ class NavigationHubTest extends TestCase
         $mobileNav = $matches[0];
 
         $this->assertStringContainsString(route('data.index'), $mobileNav);
+        $this->assertStringContainsString(route('maintenance.index'), $mobileNav);
         $this->assertStringContainsString(route('reports.index'), $mobileNav);
         $this->assertStringContainsString(route('admin.index'), $mobileNav);
         $this->assertStringNotContainsString(route('locations.index'), $mobileNav);
+        $this->assertStringNotContainsString(route('repairs.index'), $mobileNav);
+        $this->assertStringNotContainsString(route('spares.index'), $mobileNav);
         $this->assertStringNotContainsString(route('reports.compare'), $mobileNav);
         $this->assertStringNotContainsString(route('admin.users.index'), $mobileNav);
+    }
+
+    public function test_department_controls_live_on_profile_not_navigation(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $dashboard = $this->actingAs($admin)->get(route('dashboard'));
+        $dashboard->assertOk();
+        $dashboard->assertDontSee('Active department', false);
+        $dashboard->assertDontSee('Departments to show', false);
+        $dashboard->assertDontSee(route('preferences.active-department'), false);
+        $dashboard->assertDontSee(route('preferences.department-visibility'), false);
+
+        $profile = $this->actingAs($admin)->get(route('profile.edit'));
+        $profile->assertOk();
+        $profile->assertSee('Active department', false);
+        $profile->assertSee('Departments to show', false);
+        $profile->assertSee('Clear all to show every department', false);
+        $profile->assertSee(route('preferences.active-department'), false);
+        $profile->assertSee(route('preferences.department-visibility'), false);
+    }
+
+    public function test_non_admin_sees_active_department_on_profile_without_visibility(): void
+    {
+        $user = $this->userWithRole('scanner');
+
+        $profile = $this->actingAs($user)->get(route('profile.edit'));
+        $profile->assertOk();
+        $profile->assertSee('Active department', false);
+        $profile->assertDontSee('Departments to show', false);
+        $profile->assertDontSee(route('preferences.department-visibility'), false);
+        $profile->assertDontSee(
+            'No Department configured for your profile. Please request an assignment from your IT support.',
+            false
+        );
+    }
+
+    public function test_non_admin_without_departments_sees_assignment_notice(): void
+    {
+        $user = $this->userWithRole('scanner');
+        $this->actingAs($user);
+        $user->departments()->sync([]);
+
+        $message = 'No Department configured for your profile. Please request an assignment from your IT support.';
+
+        $dashboard = $this->get(route('dashboard'));
+        $dashboard->assertOk();
+        $dashboard->assertSee($message, false);
+
+        $profile = $this->get(route('profile.edit'));
+        $profile->assertOk();
+        $profile->assertSee($message, false);
+        $profile->assertDontSee('Active department', false);
+        $profile->assertDontSee(route('preferences.active-department'), false);
+    }
+
+    public function test_admin_never_sees_no_department_notice(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->actingAs($admin);
+        $admin->departments()->sync([]);
+
+        $message = 'No Department configured for your profile. Please request an assignment from your IT support.';
+
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee($message, false);
+
+        $this->get(route('profile.edit'))
+            ->assertOk()
+            ->assertDontSee($message, false)
+            ->assertSee('Departments to show', false);
     }
 }

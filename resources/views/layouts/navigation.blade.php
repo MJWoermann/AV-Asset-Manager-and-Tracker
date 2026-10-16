@@ -13,7 +13,8 @@
 
                     @php
                         $reportsActive = request()->routeIs('reports.*', 'labels.*');
-                        $dataActive = request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'spares.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
+                        $maintenanceActive = request()->routeIs('maintenance.*', 'repairs.*', 'repair-procedures.*', 'spares.*');
+                        $dataActive = request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
                         $riggingActive = request()->routeIs('rigging.*');
                     @endphp
 
@@ -46,6 +47,26 @@
                         <x-slot name="trigger">
                             <button type="button" @class([
                                 'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium border-b-2',
+                                'text-brand border-brand' => $maintenanceActive,
+                                'text-brand-silver hover:text-white border-transparent' => ! $maintenanceActive,
+                            ])>
+                                Maintenance
+                                <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </x-slot>
+                        <x-slot name="content">
+                            <x-dropdown-link :href="route('repairs.index')">Repairs</x-dropdown-link>
+                            @role('admin|inventory_manager')
+                                <x-dropdown-link :href="route('repair-procedures.index')">Repair procedures</x-dropdown-link>
+                            @endrole
+                            <x-dropdown-link :href="route('spares.index')">Spares</x-dropdown-link>
+                        </x-slot>
+                    </x-dropdown>
+
+                    <x-dropdown align="left" width="48">
+                        <x-slot name="trigger">
+                            <button type="button" @class([
+                                'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium border-b-2',
                                 'text-brand border-brand' => $dataActive,
                                 'text-brand-silver hover:text-white border-transparent' => ! $dataActive,
                             ])>
@@ -56,7 +77,6 @@
                         <x-slot name="content">
                             <x-dropdown-link :href="route('locations.index')">Locations</x-dropdown-link>
                             <x-dropdown-link :href="route('manufacturers.index')">Manufacturers</x-dropdown-link>
-                            <x-dropdown-link :href="route('spares.index')">Spares</x-dropdown-link>
                             @role('admin|inventory_manager')
                                 <x-dropdown-link :href="route('item-types.index')">Item Types</x-dropdown-link>
                                 <x-dropdown-link :href="route('custom-field-sets.index')">Field sets</x-dropdown-link>
@@ -98,8 +118,6 @@
                         </button>
                     </x-slot>
                     <x-slot name="content">
-                        <x-department-controls />
-
                         <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
                         <x-dropdown-link
                             href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"
@@ -160,15 +178,18 @@
                 :active="request()->routeIs('reports.*', 'labels.*')"
             >Reports</x-responsive-nav-link>
             <x-responsive-nav-link
+                :href="route('maintenance.index')"
+                :active="request()->routeIs('maintenance.*', 'repairs.*', 'repair-procedures.*', 'spares.*')"
+            >Maintenance</x-responsive-nav-link>
+            <x-responsive-nav-link
                 :href="route('data.index')"
-                :active="request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'spares.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*')"
+                :active="request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*')"
             >Data</x-responsive-nav-link>
             @feature('rigging')
                 <x-responsive-nav-link :href="route('rigging.index')" :active="request()->routeIs('rigging.*')">Rigging</x-responsive-nav-link>
             @endfeature
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
-            <x-department-controls variant="mobile" />
             <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>
             <x-responsive-nav-link
                 href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"

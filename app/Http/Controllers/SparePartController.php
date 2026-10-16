@@ -26,9 +26,11 @@ class SparePartController extends Controller
     public function index(Request $request): View
     {
         $includeEol = $request->boolean('include_eol');
+        $belowMin = $request->boolean('below_min');
         $term = trim((string) $request->query('q', ''));
         $kind = $request->query('kind');
         $severity = $request->query('severity');
+        $stockStatus = $request->query('stock_status');
 
         $query = SparePart::query()
             ->with(['manufacturer', 'manufacturerModel', 'location', 'supersededBy'])
@@ -54,6 +56,15 @@ class SparePartController extends Controller
             $query->where('severity', $severity);
         }
 
+        if (filled($stockStatus)) {
+            $query->where('stock_status', $stockStatus);
+        }
+
+        if ($belowMin) {
+            $query->whereNotNull('min_holding')
+                ->whereColumn('quantity_on_hand', '<', 'min_holding');
+        }
+
         $parts = $query->paginate(25)->withQueryString();
 
         return view('spares.index', [
@@ -61,20 +72,65 @@ class SparePartController extends Controller
             'term' => $term,
             'kind' => $kind,
             'severity' => $severity,
+            'stockStatus' => $stockStatus,
+            'belowMin' => $belowMin,
             'includeEol' => $includeEol,
         ]);
     }
 
     public function create(): View
     {
-        return view('spares.form', $this->formData(new SparePart([
+        $formData = $this->formData(new SparePart([
             'code' => SparePartLuhn::generate(),
-        ])));
+        ]));
+
+        // #region agent log
+        $logPath = base_path('debug-b15581.log');
+        file_put_contents($logPath, json_encode([
+            'sessionId' => 'b15581',
+            'hypothesisId' => 'H1_H4',
+            'location' => 'SparePartController.php:create',
+            'runId' => 'post-fix',
+            'message' => 'Spare create form data shape',
+            'data' => [
+                'hasModelsByManufacturer' => array_key_exists('modelsByManufacturer', $formData),
+                'modelsByManufacturerKeys' => array_key_exists('modelsByManufacturer', $formData)
+                    ? count($formData['modelsByManufacturer'])
+                    : null,
+                'manufacturerCount' => is_countable($formData['manufacturers'] ?? null) ? count($formData['manufacturers']) : null,
+                'flatModelCount' => is_countable($formData['models'] ?? null) ? count($formData['models']) : null,
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
+        // #endregion
+
+        return view('spares.form', $formData);
     }
 
     public function store(StoreSparePartRequest $request, SparePartService $service): RedirectResponse
     {
-        $data = $request->validated();
+        $data = $request->spareAttributes();
+
+        // #region agent log
+        $logPath = base_path('debug-b15581.log');
+        file_put_contents($logPath, json_encode([
+            'sessionId' => 'b15581',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'H2_H3',
+            'location' => 'SparePartController.php:store',
+            'message' => 'Spare store after catalogue resolve',
+            'data' => [
+                'raw_manufacturer_id' => $request->input('manufacturer_id'),
+                'raw_manufacturer_model_id' => $request->input('manufacturer_model_id'),
+                'resolved_manufacturer_id' => $data['manufacturer_id'] ?? null,
+                'resolved_manufacturer_model_id' => $data['manufacturer_model_id'] ?? null,
+                'has_new_manufacturer' => $request->filled('new_manufacturer'),
+                'has_new_manufacturer_model' => $request->filled('new_manufacturer_model'),
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
+        // #endregion
+
         $part = $service->create(
             $data,
             $data['compatible_model_ids'] ?? [],
@@ -206,7 +262,7 @@ class SparePartController extends Controller
 
     public function update(UpdateSparePartRequest $request, SparePart $spare, SparePartService $service): RedirectResponse
     {
-        $data = $request->validated();
+        $data = $request->spareAttributes();
         $service->update(
             $spare,
             $data,
@@ -243,10 +299,28 @@ class SparePartController extends Controller
      */
     protected function formData(SparePart $spare): array
     {
+        $manufacturers = Manufacturer::query()
+            ->with(['models' => fn ($q) => $q->orderBy('name')])
+            ->orderBy('name')
+            ->get();
+
+        $models = ManufacturerModel::query()->with('manufacturer')->orderBy('name')->get();
+
         return [
             'spare' => $spare,
-            'manufacturers' => Manufacturer::query()->orderBy('name')->get(),
-            'models' => ManufacturerModel::query()->with('manufacturer')->orderBy('name')->get(),
+            'manufacturers' => $manufacturers,
+            'models' => $models,
+            'modelsByManufacturer' => $manufacturers
+                ->mapWithKeys(fn (Manufacturer $manufacturer): array => [
+                    (string) $manufacturer->id => $manufacturer->models
+                        ->map(fn (ManufacturerModel $model): array => [
+                            'value' => (string) $model->id,
+                            'label' => $model->name,
+                        ])
+                        ->values()
+                        ->all(),
+                ])
+                ->all(),
             'locations' => Location::query()->orderBy('name')->get(),
             'layouts' => ShelfTagLayout::query()->orderBy('name')->get(),
             'successorOptions' => SparePart::query()

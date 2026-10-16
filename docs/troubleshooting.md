@@ -16,6 +16,7 @@ Symptom → checks → fix. Deeper setup lives in the linked guides; this page i
 | Symptom | Checks | Fix |
 |---------|--------|-----|
 | Camera won’t start on phone/tablet | URL is **HTTPS**; cert trusted on the device | Browser camera APIs require a secure context. On LAN, use a private CA or self-signed cert: [self-signed-tls.md](self-signed-tls.md). |
+| Camera fails on PC via `http://LAN-IP` but works on `localhost` | Address bar host | Same secure-context rule: `http://localhost` / `http://127.0.0.1` is allowed; plain `http://192.168.x.x` is not. Use the Scan page “Open via localhost” / “Open over HTTPS” links, or enable HTTPS ([self-signed-tls.md](self-signed-tls.md)). Do not rely on browser “insecure origins treated as secure” flags in production. |
 | Camera works on desktop but not phone | Mixed content; HTTP bookmark | Open the HTTPS origin; reinstall the PWA shortcut if needed. |
 | Barcode not found | Identifier fields (`fmi_ast`, `tp_barcode`, `rig_tag`, `device_sn`, etc.) | Check Unknown scans report; create or link the asset. |
 

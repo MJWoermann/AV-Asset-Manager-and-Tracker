@@ -107,21 +107,344 @@
                 <?php switch($module['id']):
                     case ('quick_links'): ?>
                         <div class="lg:col-span-2 xl:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <a href="<?php echo e(route('scan.index')); ?>" class="block p-5 bg-black text-white border border-brand-charcoal hover:bg-brand-slate hover:border-brand transition">
-                                <div class="text-brand text-sm uppercase tracking-wide">Primary</div>
-                                <div class="mt-2 text-lg font-semibold">Scan to event</div>
-                                <p class="mt-1 text-sm text-brand-silver">Camera barcode scan with inventory compare</p>
-                            </a>
-                            <a href="<?php echo e(route('assets.index')); ?>" class="block p-5 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal hover:border-brand dark:hover:bg-brand-charcoal transition">
-                                <div class="text-brand text-sm uppercase tracking-wide">Inventory</div>
-                                <div class="mt-2 text-lg font-semibold">Assets</div>
-                                <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Search and edit equipment</p>
-                            </a>
-                            <a href="<?php echo e(route('reports.compare')); ?>" class="block p-5 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal hover:border-brand dark:hover:bg-brand-charcoal transition">
-                                <div class="text-brand text-sm uppercase tracking-wide">Reports</div>
-                                <div class="mt-2 text-lg font-semibold">Compare lists</div>
-                                <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Matched / missing / extras</p>
-                            </a>
+                            <?php $__currentLoopData = $quickLinks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $link): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <a
+                                    href="<?php echo e($link['url']); ?>"
+                                    class="<?php echo \Illuminate\Support\Arr::toCssClasses([
+                                        'block p-5 border transition',
+                                        'bg-black text-white border-brand-charcoal hover:bg-brand-slate hover:border-brand' => $link['primary'],
+                                        'bg-white dark:bg-brand-slate border-brand-silver dark:border-brand-charcoal hover:border-brand dark:hover:bg-brand-charcoal' => ! $link['primary'],
+                                    ]); ?>"
+                                >
+                                    <div class="<?php echo \Illuminate\Support\Arr::toCssClasses([
+                                        'text-sm uppercase tracking-wide',
+                                        'text-brand' => $link['primary'],
+                                        'text-brand' => ! $link['primary'],
+                                    ]); ?>"><?php echo e($link['eyebrow']); ?></div>
+                                    <div class="mt-2 text-lg font-semibold"><?php echo e($link['label']); ?></div>
+                                    <p class="<?php echo \Illuminate\Support\Arr::toCssClasses([
+                                        'mt-1 text-sm',
+                                        'text-brand-silver' => $link['primary'],
+                                        'text-brand-charcoal dark:text-brand-silver' => ! $link['primary'],
+                                    ]); ?>"><?php echo e($link['description']); ?></p>
+                                </a>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('stocktake_pulse'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Stocktake pulse</h3>
+                                <?php if($stocktakePulse['resumeUrl']): ?>
+                                    <a href="<?php echo e($stocktakePulse['resumeUrl']); ?>" class="text-xs text-brand hover:underline">Resume session</a>
+                                <?php endif; ?>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $stocktakePulse['buckets']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <a
+                                            href="<?php echo e($row['url']); ?>"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span class="<?php echo \Illuminate\Support\Arr::toCssClasses(['text-red-700 dark:text-red-400' => $row['key'] === 'open_unknowns' && $row['count'] > 0]); ?>">
+                                                <?php echo e($row['label']); ?>
+
+                                            </span>
+                                            <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                        </a>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('assets_needing_attention'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Assets needing attention</h3>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $assetsNeedingAttention; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <a
+                                            href="<?php echo e($row['url']); ?>"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span class="<?php echo \Illuminate\Support\Arr::toCssClasses(['text-red-700 dark:text-red-400' => $row['count'] > 0]); ?>"><?php echo e($row['label']); ?></span>
+                                            <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                        </a>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('assets_by_location'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Assets by location</h3>
+                            </div>
+                            <?php if($assetsByLocation === []): ?>
+                                <p class="px-4 py-6 text-sm text-center text-brand-charcoal dark:text-brand-silver">No assets yet.</p>
+                            <?php else: ?>
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm max-h-80 overflow-y-auto">
+                                    <?php $__currentLoopData = $assetsByLocation; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <li>
+                                            <a
+                                                href="<?php echo e($row['url']); ?>"
+                                                class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span><?php echo e($row['label']); ?></span>
+                                                <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </ul>
+                            <?php endif; ?>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('data_quality'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Catalogue completeness</h3>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $dataQuality; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <a
+                                            href="<?php echo e($row['url']); ?>"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span class="<?php echo \Illuminate\Support\Arr::toCssClasses(['text-red-700 dark:text-red-400' => $row['count'] > 0]); ?>"><?php echo e($row['label']); ?></span>
+                                            <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                        </a>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('list_activity'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Lists snapshot</h3>
+                                <a href="<?php echo e(route('lists.index')); ?>" class="text-xs text-brand hover:underline">All lists</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $listActivity['counts']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <a
+                                            href="<?php echo e($row['url']); ?>"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span><?php echo e($row['label']); ?></span>
+                                            <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                        </a>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
+                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
+                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Recent activity</p>
+                                <?php if($listActivity['recent'] === []): ?>
+                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No lists yet.</p>
+                                <?php else: ?>
+                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                        <?php $__currentLoopData = $listActivity['recent']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $list): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <li>
+                                                <a
+                                                    href="<?php echo e($list['url']); ?>"
+                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                                >
+                                                    <span class="font-medium"><?php echo e($list['name']); ?></span>
+                                                    <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                        <?php echo e(ucfirst($list['type'])); ?> — <?php echo e($list['items_count']); ?> items
+                                                        <?php if($list['last_activity']): ?>
+                                                            — <?php echo e($list['last_activity']); ?>
+
+                                                        <?php endif; ?>
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </ul>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('my_repairs'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">My repairs</h3>
+                                <a href="<?php echo e(route('repairs.index', ['assignee' => 'me'])); ?>" class="text-xs text-brand hover:underline">View all</a>
+                            </div>
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal text-sm flex items-center justify-between">
+                                <span>Open / in progress</span>
+                                <span class="font-mono tabular-nums"><?php echo e($myRepairs['count']); ?></span>
+                            </div>
+                            <?php if($myRepairs['recent']->isEmpty()): ?>
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No active repairs assigned to you.</p>
+                            <?php else: ?>
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    <?php $__currentLoopData = $myRepairs['recent']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $repair): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <li>
+                                            <a
+                                                href="<?php echo e(route('repairs.show', $repair)); ?>"
+                                                class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="font-medium"><?php echo e($repair->summary); ?></span>
+                                                <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                    <?php echo e($repair->asset?->name ?? 'Unknown asset'); ?>
+
+                                                    — <?php echo e($repair->status?->label()); ?>
+
+                                                </span>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </ul>
+                            <?php endif; ?>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('spare_movements_recent'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Recent spare usage</h3>
+                                <a href="<?php echo e(route('spares.index')); ?>" class="text-xs text-brand hover:underline">Register</a>
+                            </div>
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal text-sm flex items-center justify-between">
+                                <span>Usage events (7 days)</span>
+                                <span class="font-mono tabular-nums"><?php echo e($spareMovementsRecent['usage7Days']); ?></span>
+                            </div>
+                            <?php if($spareMovementsRecent['recent']->isEmpty()): ?>
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No spare movements yet.</p>
+                            <?php else: ?>
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    <?php $__currentLoopData = $spareMovementsRecent['recent']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $movement): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <li class="px-4 py-2.5">
+                                            <span class="font-medium"><?php echo e($movement->sparePart?->component ?? 'Spare part'); ?></span>
+                                            <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                <?php echo e($movement->recorded_at?->format('Y-m-d H:i')); ?>
+
+                                                — Δ <?php echo e($movement->quantity_delta); ?>
+
+                                                <?php if($movement->againstAsset): ?>
+                                                    — <?php echo e($movement->againstAsset->name); ?>
+
+                                                <?php endif; ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </ul>
+                            <?php endif; ?>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('consumables_stats'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Consumables statistics</h3>
+                                <a href="<?php echo e(route('assets.index', ['stock_tracked' => 1])); ?>" class="text-xs text-brand hover:underline">Browse</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $consumablesStats['buckets']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <?php if($row['url']): ?>
+                                            <a
+                                                href="<?php echo e($row['url']); ?>"
+                                                class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="<?php echo \Illuminate\Support\Arr::toCssClasses(['text-red-700 dark:text-red-400' => in_array($row['key'], ['below_min', 'zero_on_hand', 'breakages_30'], true) && $row['count'] > 0]); ?>">
+                                                    <?php echo e($row['label']); ?>
+
+                                                </span>
+                                                <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                            </a>
+                                        <?php else: ?>
+                                            <div class="flex items-center justify-between gap-3 px-4 py-2.5">
+                                                <span><?php echo e($row['label']); ?></span>
+                                                <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
+                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
+                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Recent restocks</p>
+                                <?php if($consumablesStats['recentRestocks']->isEmpty()): ?>
+                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No restocks recorded.</p>
+                                <?php else: ?>
+                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                        <?php $__currentLoopData = $consumablesStats['recentRestocks']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $movement): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <li>
+                                                <a
+                                                    href="<?php echo e($movement->asset ? route('assets.show', [$movement->asset, 'tab' => 'stock']) : route('assets.index', ['stock_tracked' => 1])); ?>"
+                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                                >
+                                                    <span class="font-medium"><?php echo e($movement->asset?->name ?? 'Asset'); ?></span>
+                                                    <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                        <?php echo e($movement->recorded_at?->format('Y-m-d H:i')); ?>
+
+                                                        — +<?php echo e($movement->quantity_delta); ?>
+
+                                                        <?php if($movement->external_po_number): ?>
+                                                            — PO <?php echo e($movement->external_po_number); ?>
+
+                                                        <?php endif; ?>
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </ul>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('connection_coverage'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Connection coverage</h3>
+                                <a href="<?php echo e(route('reports.connection-map')); ?>" class="text-xs text-brand hover:underline">Map</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $connectionCoverage; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <a
+                                            href="<?php echo e($row['url']); ?>"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span class="<?php echo \Illuminate\Support\Arr::toCssClasses(['text-red-700 dark:text-red-400' => $row['count'] > 0]); ?>"><?php echo e($row['label']); ?></span>
+                                            <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                        </a>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('rigging_upcoming'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Rigging events</h3>
+                                <a href="<?php echo e(route('rigging.events.index')); ?>" class="text-xs text-brand hover:underline">All events</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $riggingUpcoming; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <a
+                                            href="<?php echo e($row['url']); ?>"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span><?php echo e($row['label']); ?></span>
+                                            <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                        </a>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
                         </div>
                         <?php break; ?>
 
@@ -216,6 +539,88 @@
                                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </ul>
                             <?php endif; ?>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('maintenance_activities'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Maintenance activities</h3>
+                                <a href="<?php echo e(route('maintenance.index')); ?>" class="text-xs text-brand hover:underline">Hub</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $maintenanceActivities['buckets']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <a
+                                            href="<?php echo e($row['url']); ?>"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span class="<?php echo \Illuminate\Support\Arr::toCssClasses(['text-red-700 dark:text-red-400' => in_array($row['key'], ['open', 'in_progress', 'assets_maintenance'], true) && $row['count'] > 0]); ?>">
+                                                <?php echo e($row['label']); ?>
+
+                                            </span>
+                                            <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                        </a>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
+                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
+                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Active repairs</p>
+                                <?php if($maintenanceActivities['recent']->isEmpty()): ?>
+                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No open repairs.</p>
+                                <?php else: ?>
+                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                        <?php $__currentLoopData = $maintenanceActivities['recent']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $repair): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <li>
+                                                <a
+                                                    href="<?php echo e(route('repairs.show', $repair)); ?>"
+                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                                >
+                                                    <span class="font-medium"><?php echo e($repair->summary); ?></span>
+                                                    <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                        <?php echo e($repair->asset?->name ?? 'Unknown asset'); ?>
+
+                                                        — <?php echo e($repair->status?->label()); ?>
+
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </ul>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('spares_stats'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Spares statistics</h3>
+                                <a href="<?php echo e(route('spares.index')); ?>" class="text-xs text-brand hover:underline">Register</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                <?php $__currentLoopData = $sparesStats; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <li>
+                                        <?php if($row['url']): ?>
+                                            <a
+                                                href="<?php echo e($row['url']); ?>"
+                                                class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="<?php echo \Illuminate\Support\Arr::toCssClasses(['text-red-700 dark:text-red-400' => in_array($row['key'], ['below_min', 'quarantine', 'critical'], true) && $row['count'] > 0]); ?>">
+                                                    <?php echo e($row['label']); ?>
+
+                                                </span>
+                                                <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                            </a>
+                                        <?php else: ?>
+                                            <div class="flex items-center justify-between gap-3 px-4 py-2.5">
+                                                <span><?php echo e($row['label']); ?></span>
+                                                <span class="font-mono tabular-nums"><?php echo e($row['count']); ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                    </li>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </ul>
                         </div>
                         <?php break; ?>
 

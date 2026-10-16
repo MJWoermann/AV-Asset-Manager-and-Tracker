@@ -139,7 +139,7 @@ Training on dirty data burns trust. Gate large Knowledge sessions until this che
 | **Location tree** | Sites / rooms / stores exist and match how staff talk about places |
 | **Item types & field sets** | Types cover the pilot kit; custom fields only where you will actually use them |
 | **Identifier strategy** | Primary scan targets are filled and consistent — e.g. AST# (`fmi_ast`), TP barcode, RIG tag, serial, MAC — so lookups hit indexes instead of guesswork |
-| **Import / cutover** | Spreadsheet columns mapped; a test import succeeded; duplicates and blank IDs cleaned |
+| **Import / cutover** | Spreadsheet columns mapped; a test import succeeded; duplicates and blank IDs cleaned — see [import-spreadsheet-prep.md](import-spreadsheet-prep.md) for AI-assisted prep |
 | **Lists for first stocktake** | One **inventory list** (expected) and one empty **event list** prepared |
 | **Optional modules** | Labels, stock/consumables, connections, RU visualiser stay **off** until the core scan → compare habit sticks; stage them deliberately later |
 

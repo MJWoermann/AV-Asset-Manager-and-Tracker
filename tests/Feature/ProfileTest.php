@@ -205,7 +205,97 @@ class ProfileTest extends TestCase
             ->assertSee('Enable scan noise', false)
             ->assertSee('name="scan_noise"', false)
             ->assertSee('Enable scan vibration', false)
-            ->assertSee('name="scan_vibrate"', false);
+            ->assertSee('name="scan_vibrate"', false)
+            ->assertSee('Battery-saving camera mode', false)
+            ->assertSee('name="camera_battery_optimisation"', false);
+    }
+
+    public function test_user_can_enable_camera_battery_optimisation_preference(): void
+    {
+        $user = $this->userWithRole();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'theme' => 'light',
+                'camera_battery_optimisation' => '1',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertTrue($user->wantsCameraBatteryOptimisation());
+        $this->assertTrue(data_get($user->preferences, 'camera_battery_optimisation'));
+    }
+
+    public function test_user_can_disable_camera_battery_optimisation_preference(): void
+    {
+        $user = $this->userWithRole();
+        $user->preferences = ['camera_battery_optimisation' => true];
+        $user->save();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'theme' => 'light',
+                'camera_battery_optimisation' => '0',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertFalse($user->wantsCameraBatteryOptimisation());
+        $this->assertFalse(data_get($user->preferences, 'camera_battery_optimisation'));
+    }
+
+    public function test_profile_update_without_camera_battery_optimisation_preserves_existing_preference(): void
+    {
+        $user = $this->userWithRole();
+        $user->preferences = ['camera_battery_optimisation' => true];
+        $user->save();
+
+        $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => 'Kept Camera Opt',
+                'email' => $user->email,
+                'theme' => 'light',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertSame('Kept Camera Opt', $user->name);
+        $this->assertTrue($user->wantsCameraBatteryOptimisation());
+    }
+
+    public function test_layout_meta_reflects_camera_battery_optimisation_preference(): void
+    {
+        $user = $this->userWithRole();
+
+        $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('name="av-camera-battery-optimisation" content="0"', false);
+
+        $user->preferences = ['camera_battery_optimisation' => true];
+        $user->save();
+
+        $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('name="av-camera-battery-optimisation" content="1"', false);
     }
 
     public function test_user_can_enable_scan_vibrate_preference(): void

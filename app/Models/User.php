@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\AssetTableColumns;
+use App\Support\CameraBatteryOptimisation;
 use App\Support\DashboardModules;
 use App\Support\DepartmentVisibility;
 use App\Support\DeveloperFeatures;
@@ -66,6 +67,14 @@ class User extends Authenticatable
     public function wantsScanVibrate(): bool
     {
         return ScanVibrate::enabled($this->preferences);
+    }
+
+    /**
+     * Whether the barcode camera should use lower resolution / fps to save battery.
+     */
+    public function wantsCameraBatteryOptimisation(): bool
+    {
+        return CameraBatteryOptimisation::enabled($this->preferences);
     }
 
     /**
@@ -135,6 +144,18 @@ class User extends Authenticatable
         }
 
         return $this->departments()->where('departments.id', $departmentId)->exists();
+    }
+
+    /**
+     * Non-admins with no department memberships cannot see operational data.
+     */
+    public function needsDepartmentAssignment(): bool
+    {
+        if ($this->hasRole('admin')) {
+            return false;
+        }
+
+        return $this->departments()->doesntExist();
     }
 
     /**

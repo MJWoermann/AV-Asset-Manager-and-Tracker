@@ -39,10 +39,13 @@ class AssetFormTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('searchableSelect(', false);
+        $response->assertSee('catalogueManufacturerModelFields(', false);
         $response->assertSee('placeholder="Search…"', false);
         $response->assertSee('name="item_type_id"', false);
         $response->assertSee('name="location_id"', false);
         $response->assertSee('name="parent_id"', false);
+        $response->assertSee('name="manufacturer_id"', false);
+        $response->assertSee('+ Add new manufacturer…', false);
     }
 
     public function test_create_form_marks_required_fields(): void

@@ -89,6 +89,24 @@
                 <span class="font-medium text-gray-900 dark:text-white">{{ __('Enable scan noise') }}</span>
             </label>
             <x-input-error class="mt-2" :messages="$errors->get('scan_noise')" />
+            <label for="camera_battery_optimisation" class="flex items-start gap-2 text-sm text-gray-800 dark:text-brand-silver">
+                <input type="hidden" name="camera_battery_optimisation" value="0">
+                <input
+                    id="camera_battery_optimisation"
+                    type="checkbox"
+                    name="camera_battery_optimisation"
+                    value="1"
+                    class="rounded border-gray-300 text-brand mt-0.5"
+                    @checked(old('camera_battery_optimisation', $user->wantsCameraBatteryOptimisation()))
+                >
+                <span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ __('Battery-saving camera mode') }}</span>
+                    <span class="block text-gray-600 dark:text-brand-silver">
+                        {{ __('Uses a lower camera resolution and frame rate. Leave off when scanning fine barcodes.') }}
+                    </span>
+                </span>
+            </label>
+            <x-input-error class="mt-2" :messages="$errors->get('camera_battery_optimisation')" />
         </div>
 
         @php

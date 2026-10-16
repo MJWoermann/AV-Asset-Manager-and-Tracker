@@ -171,7 +171,7 @@ class ConnectionBusService
     {
         $query = ConnectionBus::query()->with([
             'connectionType',
-            'interfaces.asset.location',
+            'interfaces.asset.location.parent.parent.parent',
             'interfaces.asset.itemType',
         ]);
 

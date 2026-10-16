@@ -30,6 +30,7 @@ class ProfileUpdateRequest extends FormRequest
             'theme' => ['required', 'in:light,dark'],
             'scan_noise' => ['sometimes', 'boolean'],
             'scan_vibrate' => ['sometimes', 'boolean'],
+            'camera_battery_optimisation' => ['sometimes', 'boolean'],
         ];
 
         if ($this->user()?->hasRole('admin')) {

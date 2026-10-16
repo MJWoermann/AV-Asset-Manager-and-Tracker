@@ -30,7 +30,7 @@ class DashboardModulePreferenceTest extends TestCase
     public function test_guest_cannot_update_dashboard_modules(): void
     {
         $this->patch(route('preferences.dashboard-modules'), [
-            'order' => DashboardModules::defaults(),
+            'order' => DashboardModules::keys(),
             'enabled' => [DashboardModules::QUICK_LINKS],
         ])->assertRedirect(route('login'));
     }
@@ -141,5 +141,23 @@ class DashboardModulePreferenceTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors('order.0');
+    }
+
+    public function test_consumables_module_not_available_without_stock_feature(): void
+    {
+        $user = $this->scanner();
+        $available = DashboardModules::availableFor($user);
+
+        $this->assertNotContains(DashboardModules::CONSUMABLES_STATS, $available);
+
+        $user->preferences = [
+            'features' => [
+                'stock_consumables' => true,
+            ],
+        ];
+        $user->save();
+
+        $availableWithFeature = DashboardModules::availableFor($user->fresh());
+        $this->assertContains(DashboardModules::CONSUMABLES_STATS, $availableWithFeature);
     }
 }

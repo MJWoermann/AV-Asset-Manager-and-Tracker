@@ -70,6 +70,7 @@ class ScanSessionTest extends TestCase
         $response->assertSee('Event list (add items to)');
         $response->assertSee('Inventory list (search against)');
         $response->assertSee('Location for next items');
+        $response->assertSee('searchableSelect(', false);
         $response->assertSee('+ Add new location…');
         $response->assertSee('Status for next items');
         $response->assertSee('On Event');

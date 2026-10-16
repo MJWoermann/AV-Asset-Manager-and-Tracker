@@ -98,21 +98,333 @@
                 @switch($module['id'])
                     @case('quick_links')
                         <div class="lg:col-span-2 xl:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <a href="{{ route('scan.index') }}" class="block p-5 bg-black text-white border border-brand-charcoal hover:bg-brand-slate hover:border-brand transition">
-                                <div class="text-brand text-sm uppercase tracking-wide">Primary</div>
-                                <div class="mt-2 text-lg font-semibold">Scan to event</div>
-                                <p class="mt-1 text-sm text-brand-silver">Camera barcode scan with inventory compare</p>
-                            </a>
-                            <a href="{{ route('assets.index') }}" class="block p-5 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal hover:border-brand dark:hover:bg-brand-charcoal transition">
-                                <div class="text-brand text-sm uppercase tracking-wide">Inventory</div>
-                                <div class="mt-2 text-lg font-semibold">Assets</div>
-                                <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Search and edit equipment</p>
-                            </a>
-                            <a href="{{ route('reports.compare') }}" class="block p-5 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal hover:border-brand dark:hover:bg-brand-charcoal transition">
-                                <div class="text-brand text-sm uppercase tracking-wide">Reports</div>
-                                <div class="mt-2 text-lg font-semibold">Compare lists</div>
-                                <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Matched / missing / extras</p>
-                            </a>
+                            @foreach ($quickLinks as $link)
+                                <a
+                                    href="{{ $link['url'] }}"
+                                    @class([
+                                        'block p-5 border transition',
+                                        'bg-black text-white border-brand-charcoal hover:bg-brand-slate hover:border-brand' => $link['primary'],
+                                        'bg-white dark:bg-brand-slate border-brand-silver dark:border-brand-charcoal hover:border-brand dark:hover:bg-brand-charcoal' => ! $link['primary'],
+                                    ])
+                                >
+                                    <div @class([
+                                        'text-sm uppercase tracking-wide',
+                                        'text-brand' => $link['primary'],
+                                        'text-brand' => ! $link['primary'],
+                                    ])>{{ $link['eyebrow'] }}</div>
+                                    <div class="mt-2 text-lg font-semibold">{{ $link['label'] }}</div>
+                                    <p @class([
+                                        'mt-1 text-sm',
+                                        'text-brand-silver' => $link['primary'],
+                                        'text-brand-charcoal dark:text-brand-silver' => ! $link['primary'],
+                                    ])>{{ $link['description'] }}</p>
+                                </a>
+                            @endforeach
+                        </div>
+                        @break
+
+                    @case('stocktake_pulse')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Stocktake pulse</h3>
+                                @if ($stocktakePulse['resumeUrl'])
+                                    <a href="{{ $stocktakePulse['resumeUrl'] }}" class="text-xs text-brand hover:underline">Resume session</a>
+                                @endif
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($stocktakePulse['buckets'] as $row)
+                                    <li>
+                                        <a
+                                            href="{{ $row['url'] }}"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span @class(['text-red-700 dark:text-red-400' => $row['key'] === 'open_unknowns' && $row['count'] > 0])>
+                                                {{ $row['label'] }}
+                                            </span>
+                                            <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        @break
+
+                    @case('assets_needing_attention')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Assets needing attention</h3>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($assetsNeedingAttention as $row)
+                                    <li>
+                                        <a
+                                            href="{{ $row['url'] }}"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span @class(['text-red-700 dark:text-red-400' => $row['count'] > 0])>{{ $row['label'] }}</span>
+                                            <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        @break
+
+                    @case('assets_by_location')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Assets by location</h3>
+                            </div>
+                            @if ($assetsByLocation === [])
+                                <p class="px-4 py-6 text-sm text-center text-brand-charcoal dark:text-brand-silver">No assets yet.</p>
+                            @else
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm max-h-80 overflow-y-auto">
+                                    @foreach ($assetsByLocation as $row)
+                                        <li>
+                                            <a
+                                                href="{{ $row['url'] }}"
+                                                class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span>{{ $row['label'] }}</span>
+                                                <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                        @break
+
+                    @case('data_quality')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Catalogue completeness</h3>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($dataQuality as $row)
+                                    <li>
+                                        <a
+                                            href="{{ $row['url'] }}"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span @class(['text-red-700 dark:text-red-400' => $row['count'] > 0])>{{ $row['label'] }}</span>
+                                            <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        @break
+
+                    @case('list_activity')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Lists snapshot</h3>
+                                <a href="{{ route('lists.index') }}" class="text-xs text-brand hover:underline">All lists</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($listActivity['counts'] as $row)
+                                    <li>
+                                        <a
+                                            href="{{ $row['url'] }}"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span>{{ $row['label'] }}</span>
+                                            <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
+                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Recent activity</p>
+                                @if ($listActivity['recent'] === [])
+                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No lists yet.</p>
+                                @else
+                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                        @foreach ($listActivity['recent'] as $list)
+                                            <li>
+                                                <a
+                                                    href="{{ $list['url'] }}"
+                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                                >
+                                                    <span class="font-medium">{{ $list['name'] }}</span>
+                                                    <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                        {{ ucfirst($list['type']) }} — {{ $list['items_count'] }} items
+                                                        @if ($list['last_activity'])
+                                                            — {{ $list['last_activity'] }}
+                                                        @endif
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                        </div>
+                        @break
+
+                    @case('my_repairs')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">My repairs</h3>
+                                <a href="{{ route('repairs.index', ['assignee' => 'me']) }}" class="text-xs text-brand hover:underline">View all</a>
+                            </div>
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal text-sm flex items-center justify-between">
+                                <span>Open / in progress</span>
+                                <span class="font-mono tabular-nums">{{ $myRepairs['count'] }}</span>
+                            </div>
+                            @if ($myRepairs['recent']->isEmpty())
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No active repairs assigned to you.</p>
+                            @else
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    @foreach ($myRepairs['recent'] as $repair)
+                                        <li>
+                                            <a
+                                                href="{{ route('repairs.show', $repair) }}"
+                                                class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="font-medium">{{ $repair->summary }}</span>
+                                                <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                    {{ $repair->asset?->name ?? 'Unknown asset' }}
+                                                    — {{ $repair->status?->label() }}
+                                                </span>
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                        @break
+
+                    @case('spare_movements_recent')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Recent spare usage</h3>
+                                <a href="{{ route('spares.index') }}" class="text-xs text-brand hover:underline">Register</a>
+                            </div>
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal text-sm flex items-center justify-between">
+                                <span>Usage events (7 days)</span>
+                                <span class="font-mono tabular-nums">{{ $spareMovementsRecent['usage7Days'] }}</span>
+                            </div>
+                            @if ($spareMovementsRecent['recent']->isEmpty())
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No spare movements yet.</p>
+                            @else
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    @foreach ($spareMovementsRecent['recent'] as $movement)
+                                        <li class="px-4 py-2.5">
+                                            <span class="font-medium">{{ $movement->sparePart?->component ?? 'Spare part' }}</span>
+                                            <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                {{ $movement->recorded_at?->format('Y-m-d H:i') }}
+                                                — Δ {{ $movement->quantity_delta }}
+                                                @if ($movement->againstAsset)
+                                                    — {{ $movement->againstAsset->name }}
+                                                @endif
+                                            </span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                        @break
+
+                    @case('consumables_stats')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Consumables statistics</h3>
+                                <a href="{{ route('assets.index', ['stock_tracked' => 1]) }}" class="text-xs text-brand hover:underline">Browse</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($consumablesStats['buckets'] as $row)
+                                    <li>
+                                        @if ($row['url'])
+                                            <a
+                                                href="{{ $row['url'] }}"
+                                                class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span @class(['text-red-700 dark:text-red-400' => in_array($row['key'], ['below_min', 'zero_on_hand', 'breakages_30'], true) && $row['count'] > 0])>
+                                                    {{ $row['label'] }}
+                                                </span>
+                                                <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                            </a>
+                                        @else
+                                            <div class="flex items-center justify-between gap-3 px-4 py-2.5">
+                                                <span>{{ $row['label'] }}</span>
+                                                <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                            </div>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
+                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Recent restocks</p>
+                                @if ($consumablesStats['recentRestocks']->isEmpty())
+                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No restocks recorded.</p>
+                                @else
+                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                        @foreach ($consumablesStats['recentRestocks'] as $movement)
+                                            <li>
+                                                <a
+                                                    href="{{ $movement->asset ? route('assets.show', [$movement->asset, 'tab' => 'stock']) : route('assets.index', ['stock_tracked' => 1]) }}"
+                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                                >
+                                                    <span class="font-medium">{{ $movement->asset?->name ?? 'Asset' }}</span>
+                                                    <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                        {{ $movement->recorded_at?->format('Y-m-d H:i') }}
+                                                        — +{{ $movement->quantity_delta }}
+                                                        @if ($movement->external_po_number)
+                                                            — PO {{ $movement->external_po_number }}
+                                                        @endif
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                        </div>
+                        @break
+
+                    @case('connection_coverage')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Connection coverage</h3>
+                                <a href="{{ route('reports.connection-map') }}" class="text-xs text-brand hover:underline">Map</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($connectionCoverage as $row)
+                                    <li>
+                                        <a
+                                            href="{{ $row['url'] }}"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span @class(['text-red-700 dark:text-red-400' => $row['count'] > 0])>{{ $row['label'] }}</span>
+                                            <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        @break
+
+                    @case('rigging_upcoming')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Rigging events</h3>
+                                <a href="{{ route('rigging.events.index') }}" class="text-xs text-brand hover:underline">All events</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($riggingUpcoming as $row)
+                                    <li>
+                                        <a
+                                            href="{{ $row['url'] }}"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span>{{ $row['label'] }}</span>
+                                            <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
                         </div>
                         @break
 
@@ -205,6 +517,84 @@
                                     @endforeach
                                 </ul>
                             @endif
+                        </div>
+                        @break
+
+                    @case('maintenance_activities')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Maintenance activities</h3>
+                                <a href="{{ route('maintenance.index') }}" class="text-xs text-brand hover:underline">Hub</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($maintenanceActivities['buckets'] as $row)
+                                    <li>
+                                        <a
+                                            href="{{ $row['url'] }}"
+                                            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                        >
+                                            <span @class(['text-red-700 dark:text-red-400' => in_array($row['key'], ['open', 'in_progress', 'assets_maintenance'], true) && $row['count'] > 0])>
+                                                {{ $row['label'] }}
+                                            </span>
+                                            <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
+                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Active repairs</p>
+                                @if ($maintenanceActivities['recent']->isEmpty())
+                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No open repairs.</p>
+                                @else
+                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                        @foreach ($maintenanceActivities['recent'] as $repair)
+                                            <li>
+                                                <a
+                                                    href="{{ route('repairs.show', $repair) }}"
+                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                                >
+                                                    <span class="font-medium">{{ $repair->summary }}</span>
+                                                    <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                        {{ $repair->asset?->name ?? 'Unknown asset' }}
+                                                        — {{ $repair->status?->label() }}
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                        </div>
+                        @break
+
+                    @case('spares_stats')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Spares statistics</h3>
+                                <a href="{{ route('spares.index') }}" class="text-xs text-brand hover:underline">Register</a>
+                            </div>
+                            <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                @foreach ($sparesStats as $row)
+                                    <li>
+                                        @if ($row['url'])
+                                            <a
+                                                href="{{ $row['url'] }}"
+                                                class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span @class(['text-red-700 dark:text-red-400' => in_array($row['key'], ['below_min', 'quarantine', 'critical'], true) && $row['count'] > 0])>
+                                                    {{ $row['label'] }}
+                                                </span>
+                                                <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                            </a>
+                                        @else
+                                            <div class="flex items-center justify-between gap-3 px-4 py-2.5">
+                                                <span>{{ $row['label'] }}</span>
+                                                <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
+                                            </div>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
                         </div>
                         @break
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
+use App\Enums\LocationType;
 use App\Models\Asset;
 use App\Models\AssetConnection;
 use App\Models\AssetInterface;
@@ -557,6 +558,43 @@ class AssetConnectionFeatureTest extends TestCase
         $this->assertNotNull($focusNode);
         $this->assertTrue($focusNode['data']['focus']);
         $this->assertSame('focus', $focusNode['classes'] ?? null);
+    }
+
+    public function test_build_graph_includes_room_rack_serial_and_tp_barcode_on_nodes(): void
+    {
+        $room = Location::query()->create([
+            'name' => 'Control Room',
+            'type' => LocationType::Room,
+        ]);
+        $rack = Location::query()->create([
+            'name' => 'Rack A',
+            'type' => LocationType::Rack,
+            'parent_id' => $room->id,
+        ]);
+
+        $type = $this->makeItemType();
+        $assetA = $this->makeAsset($type, $rack, 'Encoder');
+        $assetA->update([
+            'serial_number' => 'SN-4242',
+            'tp_barcode' => 'TP-9001',
+        ]);
+        $assetB = $this->makeAsset($type, $rack, 'Decoder');
+
+        $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+        $ifaceA = AssetInterface::factory()->create(['asset_id' => $assetA->id, 'name' => 'Out']);
+        $ifaceB = AssetInterface::factory()->create(['asset_id' => $assetB->id, 'name' => 'In']);
+        app(AssetConnectionService::class)->create($ifaceA, $ifaceB, $hdmi);
+
+        $graph = app(AssetConnectionService::class)->buildGraph();
+        $node = collect($graph['nodes'])->first(
+            fn (array $node): bool => (int) ($node['data']['asset_id'] ?? 0) === $assetA->id
+                && ($node['data']['kind'] ?? null) === 'asset'
+        );
+
+        $this->assertNotNull($node);
+        $this->assertSame('Control Room / Rack A', $node['data']['room_rack']);
+        $this->assertSame('SN-4242', $node['data']['serial_number']);
+        $this->assertSame('TP-9001', $node['data']['tp_barcode']);
     }
 
     public function test_build_graph_uses_compound_nodes_when_asset_has_multiple_connection_types(): void

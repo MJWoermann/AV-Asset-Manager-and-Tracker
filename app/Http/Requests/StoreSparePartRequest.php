@@ -7,10 +7,15 @@ use App\Enums\SparePartLifecycleStatus;
 use App\Enums\SparePartSeverity;
 use App\Enums\SparePartStandbyMode;
 use App\Enums\SparePartStockStatus;
+use App\Models\Manufacturer;
+use App\Models\ManufacturerModel;
+use App\Services\ManufacturerCatalogueService;
 use App\Support\SparePartLuhn;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class StoreSparePartRequest extends FormRequest
 {
@@ -19,11 +24,36 @@ class StoreSparePartRequest extends FormRequest
         return $this->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
     }
 
+    protected function failedValidation(Validator $validator): void
+    {
+        // #region agent log
+        $logPath = base_path('debug-b15581.log');
+        file_put_contents($logPath, json_encode([
+            'sessionId' => 'b15581',
+            'hypothesisId' => 'H2',
+            'location' => 'StoreSparePartRequest.php:failedValidation',
+            'message' => 'Spare store validation failed',
+            'data' => [
+                'manufacturer_id' => $this->input('manufacturer_id'),
+                'manufacturer_model_id' => $this->input('manufacturer_model_id'),
+                'new_manufacturer' => $this->filled('new_manufacturer'),
+                'errors' => $validator->errors()->messages(),
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
+        // #endregion
+
+        parent::failedValidation($validator);
+    }
+
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
+        $creatingManufacturer = $this->input('manufacturer_id') === '__new__';
+        $creatingModel = $this->input('manufacturer_model_id') === '__new__';
+
         return [
             'code' => [
                 'nullable',
@@ -42,8 +72,24 @@ class StoreSparePartRequest extends FormRequest
             ],
             'kind' => ['required', Rule::enum(SparePartKind::class)],
             'component' => ['required', 'string', 'max:255'],
-            'manufacturer_id' => ['nullable', 'integer', 'exists:manufacturers,id'],
-            'manufacturer_model_id' => ['nullable', 'integer', 'exists:manufacturer_models,id'],
+            'manufacturer_id' => ['nullable', function (string $attribute, mixed $value, \Closure $fail) use ($creatingManufacturer): void {
+                if ($value === null || $value === '' || $creatingManufacturer) {
+                    return;
+                }
+                if (! Manufacturer::query()->whereKey($value)->exists()) {
+                    $fail('The selected manufacturer is invalid.');
+                }
+            }],
+            'new_manufacturer' => [$creatingManufacturer ? 'required' : 'nullable', 'string', 'max:255'],
+            'manufacturer_model_id' => ['nullable', function (string $attribute, mixed $value, \Closure $fail) use ($creatingModel): void {
+                if ($value === null || $value === '' || $creatingModel) {
+                    return;
+                }
+                if (! ManufacturerModel::query()->whereKey($value)->exists()) {
+                    $fail('The selected model is invalid.');
+                }
+            }],
+            'new_manufacturer_model' => [$creatingModel ? 'required' : 'nullable', 'string', 'max:255'],
             'product_code' => ['nullable', 'string', 'max:255'],
             'quantity_deployed' => ['nullable', 'integer', 'min:0'],
             'quantity_on_hand' => ['nullable', 'integer', 'min:0'],
@@ -71,5 +117,60 @@ class StoreSparePartRequest extends FormRequest
             'compatible_asset_ids' => ['nullable', 'array'],
             'compatible_asset_ids.*' => ['integer', 'exists:assets,id'],
         ];
+    }
+
+    /**
+     * Validated spare attributes with manufacturer/model catalogue IDs resolved.
+     *
+     * @return array<string, mixed>
+     */
+    public function spareAttributes(): array
+    {
+        $data = $this->validated();
+        unset($data['new_manufacturer'], $data['new_manufacturer_model']);
+
+        $creatingManufacturer = $this->input('manufacturer_id') === '__new__';
+        $creatingModel = $this->input('manufacturer_model_id') === '__new__';
+        $catalogue = app(ManufacturerCatalogueService::class);
+        $manufacturer = null;
+
+        if ($creatingManufacturer) {
+            $manufacturer = $catalogue->resolveManufacturer($this->string('new_manufacturer')->toString());
+            $data['manufacturer_id'] = $manufacturer?->id;
+        } elseif (! empty($data['manufacturer_id'])) {
+            $manufacturer = Manufacturer::query()->find((int) $data['manufacturer_id']);
+            $data['manufacturer_id'] = $manufacturer?->id;
+        } else {
+            $data['manufacturer_id'] = null;
+        }
+
+        if ($creatingModel) {
+            if ($manufacturer === null) {
+                throw ValidationException::withMessages([
+                    'manufacturer_id' => 'Choose or create a manufacturer before adding a model.',
+                ]);
+            }
+            $model = $catalogue->resolveModel($manufacturer, $this->string('new_manufacturer_model')->toString());
+            $data['manufacturer_model_id'] = $model?->id;
+            $data['manufacturer_id'] = $manufacturer->id;
+        } elseif (! empty($data['manufacturer_model_id'])) {
+            $model = ManufacturerModel::query()->find((int) $data['manufacturer_model_id']);
+            if ($model === null) {
+                throw ValidationException::withMessages([
+                    'manufacturer_model_id' => 'The selected model is invalid.',
+                ]);
+            }
+            if ($manufacturer !== null && (int) $model->manufacturer_id !== (int) $manufacturer->id) {
+                throw ValidationException::withMessages([
+                    'manufacturer_model_id' => 'The selected model does not belong to the chosen manufacturer.',
+                ]);
+            }
+            $data['manufacturer_model_id'] = $model->id;
+            $data['manufacturer_id'] = $model->manufacturer_id;
+        } else {
+            $data['manufacturer_model_id'] = null;
+        }
+
+        return $data;
     }
 }

@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Enums\SparePartMovementType;
+use App\Enums\SparePartStockStatus;
 use App\Models\Asset;
+use App\Models\Manufacturer;
+use App\Models\ManufacturerModel;
 use App\Models\SpareGroup;
 use App\Models\SparePart;
 use App\Models\User;
@@ -55,6 +58,34 @@ class SparePartRegisterTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_spares_index_filters_by_stock_status_and_below_min(): void
+    {
+        $below = SparePart::factory()->create([
+            'component' => 'Below min spare',
+            'quantity_on_hand' => 0,
+            'min_holding' => 2,
+            'stock_status' => SparePartStockStatus::InStock,
+        ]);
+        $onOrder = SparePart::factory()->create([
+            'component' => 'On order spare',
+            'quantity_on_hand' => 4,
+            'min_holding' => 1,
+            'stock_status' => SparePartStockStatus::OnOrder,
+        ]);
+
+        $this->actingAs($this->scanner())
+            ->get(route('spares.index', ['below_min' => 1]))
+            ->assertOk()
+            ->assertSee($below->code)
+            ->assertDontSee($onOrder->code);
+
+        $this->actingAs($this->scanner())
+            ->get(route('spares.index', ['stock_status' => SparePartStockStatus::OnOrder->value]))
+            ->assertOk()
+            ->assertSee($onOrder->code)
+            ->assertDontSee($below->code);
+    }
+
     public function test_manager_can_create_spare_with_luhn_code(): void
     {
         $code = SparePartLuhn::generate();
@@ -74,6 +105,72 @@ class SparePartRegisterTest extends TestCase
         $response->assertRedirect(route('spares.show', $spare));
         $this->assertSame(3, $spare->quantity_on_hand);
         $this->assertTrue($spare->movements()->exists());
+    }
+
+    public function test_create_form_uses_searchable_manufacturer_model_and_compatible_models(): void
+    {
+        $this->actingAs($this->manager())
+            ->get(route('spares.create'))
+            ->assertOk()
+            ->assertSee('searchableSelect(', false)
+            ->assertSee('searchableMultiSelect(', false)
+            ->assertSee('catalogueManufacturerModelFields(', false)
+            ->assertSee('+ Add new manufacturer…', false)
+            ->assertSee('+ Add new model…', false);
+    }
+
+    public function test_manager_can_create_spare_with_inline_manufacturer_and_model(): void
+    {
+        $code = SparePartLuhn::generate();
+        $other = ManufacturerModel::factory()->create();
+
+        $response = $this->actingAs($this->manager())->post(route('spares.store'), [
+            'code' => $code,
+            'kind' => 'spare_part',
+            'component' => 'Fan module',
+            'manufacturer_id' => '__new__',
+            'new_manufacturer' => 'SpareCo',
+            'manufacturer_model_id' => '__new__',
+            'new_manufacturer_model' => 'Fan-100',
+            'compatible_model_ids' => [$other->id],
+            'quantity_on_hand' => 1,
+        ]);
+
+        $spare = SparePart::query()->where('code', $code)->first();
+        $this->assertNotNull($spare);
+        $response->assertRedirect(route('spares.show', $spare));
+        $this->assertSame('SpareCo', $spare->manufacturer?->name);
+        $this->assertSame('Fan-100', $spare->manufacturerModel?->name);
+        $this->assertTrue($spare->compatibleModels->contains('id', $other->id));
+        $this->assertDatabaseHas('manufacturers', ['name' => 'SpareCo']);
+        $this->assertDatabaseHas('manufacturer_models', [
+            'name' => 'Fan-100',
+            'manufacturer_id' => $spare->manufacturer_id,
+        ]);
+    }
+
+    public function test_manager_can_create_spare_with_existing_manufacturer_and_model(): void
+    {
+        $manufacturer = Manufacturer::factory()->create(['name' => 'ExistingCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'ExistingModel',
+        ]);
+        $code = SparePartLuhn::generate();
+
+        $response = $this->actingAs($this->manager())->post(route('spares.store'), [
+            'code' => $code,
+            'kind' => 'spare_part',
+            'component' => 'PSU',
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+
+        $spare = SparePart::query()->where('code', $code)->first();
+        $this->assertNotNull($spare);
+        $response->assertRedirect(route('spares.show', $spare));
+        $this->assertSame($manufacturer->id, $spare->manufacturer_id);
+        $this->assertSame($model->id, $spare->manufacturer_model_id);
     }
 
     public function test_use_movement_requires_asset_and_reason_and_decrements_stock(): void

@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Enums\LocationType;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\BulkUpdateLocationsRequest;
+use App\Models\Location;
+use App\Services\BulkLocationUpdateService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+class LocationApiController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $query = Location::query()->with('parent');
+
+        if ($request->filled('parent_id')) {
+            $query->where('parent_id', $request->integer('parent_id'));
+        }
+
+        if ($type = $request->string('type')->toString()) {
+            $query->where('type', $type);
+        }
+
+        if ($q = trim($request->string('q')->toString())) {
+            $query->where('name', 'like', '%'.$q.'%');
+        }
+
+        $locations = $query->orderByHierarchy()->paginate(min($request->integer('per_page', 100), 200));
+
+        return response()->json($locations);
+    }
+
+    public function show(Location $location): JsonResponse
+    {
+        $location->load(['parent', 'children']);
+
+        return response()->json($location);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $location = Location::create($this->validated($request));
+
+        return response()->json($location, 201);
+    }
+
+    public function update(Request $request, Location $location): JsonResponse
+    {
+        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+
+        $location->update($this->validated($request));
+
+        return response()->json($location->fresh());
+    }
+
+    public function destroy(Request $request, Location $location): JsonResponse
+    {
+        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        $location->delete();
+
+        return response()->json(['message' => 'Location deleted.']);
+    }
+
+    public function bulkUpdate(BulkUpdateLocationsRequest $request, BulkLocationUpdateService $bulkUpdate): JsonResponse
+    {
+        $result = $bulkUpdate->handle($request->bulkPayload());
+
+        return response()->json(['message' => 'Bulk update applied.', 'result' => $result]);
+    }
+
+    /** @return array<string, mixed> */
+    protected function validated(Request $request): array
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'room_code' => ['nullable', 'string', 'max:64'],
+            'type' => ['required', 'in:site,level,room,rack'],
+            'parent_id' => [
+                'nullable',
+                Rule::exists('locations', 'id')->whereNot('type', LocationType::Rack->value),
+            ],
+            'is_portable' => ['sometimes', 'boolean'],
+        ], [
+            'parent_id.exists' => 'Racks cannot be a parent for another location.',
+        ]) + ['is_portable' => $request->boolean('is_portable')];
+
+        $data['room_code'] = filled($data['room_code'] ?? null) ? trim($data['room_code']) : null;
+
+        return $data;
+    }
+}

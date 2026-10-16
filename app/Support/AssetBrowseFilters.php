@@ -89,6 +89,41 @@ class AssetBrowseFilters
             ->when($manufacturerId, fn (Builder $builder) => $builder->where('manufacturer_id', $manufacturerId))
             ->when($manufacturerModelId, fn (Builder $builder) => $builder->where('manufacturer_model_id', $manufacturerModelId));
 
+        if ($request->boolean('missing_identifiers')) {
+            $query->where(function (Builder $builder): void {
+                $builder->whereNull('tp_barcode')->orWhere('tp_barcode', '');
+            })->where(function (Builder $builder): void {
+                $builder->whereNull('fmi_ast')->orWhere('fmi_ast', '');
+            })->where(function (Builder $builder): void {
+                $builder->whereNull('serial_number')->orWhere('serial_number', '');
+            });
+        }
+
+        if ($request->boolean('missing_location')) {
+            $query->whereNull('location_id');
+        }
+
+        if ($request->boolean('stock_tracked')) {
+            $query->whereHas('itemType', fn (Builder $builder) => $builder->where('supports_stock_tracking', true));
+        }
+
+        if ($request->boolean('stock_below_min')) {
+            $query->whereHas('itemType', fn (Builder $builder) => $builder->where('supports_stock_tracking', true))
+                ->whereNotNull('min_stock_level')
+                ->whereColumn('quantity', '<', 'min_stock_level');
+        }
+
+        if ($request->boolean('stock_at_max')) {
+            $query->whereHas('itemType', fn (Builder $builder) => $builder->where('supports_stock_tracking', true))
+                ->whereNotNull('max_stock_level')
+                ->whereColumn('quantity', '>=', 'max_stock_level');
+        }
+
+        if ($request->boolean('stock_zero')) {
+            $query->whereHas('itemType', fn (Builder $builder) => $builder->where('supports_stock_tracking', true))
+                ->where('quantity', '<=', 0);
+        }
+
         foreach (self::TEXT_COLUMNS as $column) {
             $value = trim($request->string($column)->toString());
 
@@ -178,6 +213,21 @@ class AssetBrowseFilters
         ];
     }
 
+    /**
+     * @return list<string>
+     */
+    public static function booleanFilterParams(): array
+    {
+        return [
+            'missing_identifiers',
+            'missing_location',
+            'stock_tracked',
+            'stock_below_min',
+            'stock_at_max',
+            'stock_zero',
+        ];
+    }
+
     public static function hasActiveFilters(Request $request): bool
     {
         if (filled($request->input('q'))) {
@@ -186,6 +236,12 @@ class AssetBrowseFilters
 
         foreach (self::columnParams() as $param) {
             if (filled($request->input($param))) {
+                return true;
+            }
+        }
+
+        foreach (self::booleanFilterParams() as $param) {
+            if ($request->boolean($param)) {
                 return true;
             }
         }

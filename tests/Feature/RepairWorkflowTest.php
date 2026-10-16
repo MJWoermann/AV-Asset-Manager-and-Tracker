@@ -362,16 +362,18 @@ class RepairWorkflowTest extends TestCase
         $this->assertSame(1, Repair::query()->count());
     }
 
-    public function test_data_hub_lists_repairs_for_all_roles_and_procedures_for_managers(): void
+    public function test_maintenance_hub_lists_repairs_for_all_roles_and_procedures_for_managers(): void
     {
-        $this->actingAs($this->scanner())->get(route('data.index'))
+        $this->actingAs($this->scanner())->get(route('maintenance.index'))
             ->assertOk()
-            ->assertSee('Repairs')
-            ->assertDontSee('Repair procedures');
+            ->assertSee('Open and completed repair work orders linked to faults.')
+            ->assertSee('Critical spares register, kits, and usage history.')
+            ->assertDontSee('Reusable SOP checklists scoped to models, types, or spares.');
 
-        $this->actingAs($this->manager())->get(route('data.index'))
+        $this->actingAs($this->manager())->get(route('maintenance.index'))
             ->assertOk()
-            ->assertSee('Repairs')
-            ->assertSee('Repair procedures');
+            ->assertSee('Open and completed repair work orders linked to faults.')
+            ->assertSee('Critical spares register, kits, and usage history.')
+            ->assertSee('Reusable SOP checklists scoped to models, types, or spares.');
     }
 }

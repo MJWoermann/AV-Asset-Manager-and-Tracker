@@ -118,43 +118,23 @@
 
             <div
                 class="grid grid-cols-1 sm:grid-cols-2 gap-4"
-                x-data="{
+                x-data="catalogueManufacturerModelFields({
                     manufacturerId: @js($initialManufacturerId !== null && $initialManufacturerId !== '' ? (string) $initialManufacturerId : ''),
                     modelId: @js($initialModelId !== null && $initialModelId !== '' ? (string) $initialModelId : ''),
                     modelsByManufacturer: @js($modelsByManufacturer),
-                    get modelOptions() {
-                        if (! this.manufacturerId || this.manufacturerId === '__new__') {
-                            return [];
-                        }
-                        return this.modelsByManufacturer[this.manufacturerId] || [];
-                    },
-                    onManufacturerChange() {
-                        if (this.manufacturerId === '__new__') {
-                            this.modelId = '__new__';
-                            return;
-                        }
-                        const ids = this.modelOptions.map((row) => row.value);
-                        if (! ids.includes(this.modelId) && this.modelId !== '__new__') {
-                            this.modelId = '';
-                        }
-                    }
-                }"
+                })"
+                @searchable-select-changed="onSearchableChanged($event.detail)"
             >
                 <div>
                     <x-input-label for="manufacturer_id" value="Manufacturer" />
-                    <select
-                        id="manufacturer_id"
+                    <x-searchable-select
                         name="manufacturer_id"
-                        class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                        x-model="manufacturerId"
-                        @change="onManufacturerChange()"
-                    >
-                        <option value="">—</option>
-                        @foreach($manufacturers as $manufacturer)
-                            <option value="{{ $manufacturer->id }}">{{ $manufacturer->name }}</option>
-                        @endforeach
-                        <option value="__new__">+ Add new manufacturer…</option>
-                    </select>
+                        id="manufacturer_id"
+                        :options="$manufacturers->map(fn ($manufacturer) => ['value' => $manufacturer->id, 'label' => $manufacturer->name])"
+                        :selected="$initialManufacturerId"
+                        nullable
+                        :create-option="['value' => '__new__', 'label' => '+ Add new manufacturer…']"
+                    />
                     <x-input-error :messages="$errors->get('manufacturer_id')" class="mt-1" />
                     <div class="mt-2" x-show="manufacturerId === '__new__'" x-cloak>
                         <x-input-label for="new_manufacturer" value="New manufacturer name" />
@@ -169,19 +149,16 @@
                 </div>
                 <div>
                     <x-input-label for="manufacturer_model_id" value="Model" />
-                    <select
-                        id="manufacturer_model_id"
+                    <x-searchable-select
+                        x-ref="modelSelect"
                         name="manufacturer_model_id"
-                        class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                        x-model="modelId"
-                        :disabled="! manufacturerId"
-                    >
-                        <option value="">—</option>
-                        <template x-for="option in modelOptions" :key="option.value">
-                            <option :value="option.value" x-text="option.label" :selected="modelId === option.value"></option>
-                        </template>
-                        <option value="__new__" x-show="manufacturerId">+ Add new model…</option>
-                    </select>
+                        id="manufacturer_model_id"
+                        :options="[]"
+                        :selected="$initialModelId"
+                        nullable
+                        :disabled="blank($initialManufacturerId)"
+                        :create-option="['value' => '__new__', 'label' => '+ Add new model…']"
+                    />
                     <x-input-error :messages="$errors->get('manufacturer_model_id')" class="mt-1" />
                     <div class="mt-2" x-show="modelId === '__new__'" x-cloak>
                         <x-input-label for="new_manufacturer_model" value="New model name" />

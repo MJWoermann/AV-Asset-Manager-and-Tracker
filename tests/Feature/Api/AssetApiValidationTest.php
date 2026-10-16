@@ -32,7 +32,7 @@ class AssetApiValidationTest extends TestCase
             ?? Department::factory()->create(['slug' => 'general', 'name' => 'General']);
         $user->departments()->sync([$department->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['*']);
 
         return $user;
     }

@@ -8,6 +8,7 @@ use App\Models\AssetInterface;
 use App\Models\AuditLog;
 use App\Models\ConnectionBus;
 use App\Models\ConnectionType;
+use App\Support\AssetExportColumns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -196,9 +197,9 @@ class AssetConnectionService
         $connections = $this->filteredConnections($filters)
             ->with([
                 'connectionType',
-                'interfaceA.asset.location',
+                'interfaceA.asset.location.parent.parent.parent',
                 'interfaceA.asset.itemType',
-                'interfaceB.asset.location',
+                'interfaceB.asset.location.parent.parent.parent',
                 'interfaceB.asset.itemType',
             ])
             ->get();
@@ -506,6 +507,9 @@ class AssetConnectionService
             'name' => $asset->name,
             'label' => $asset->name,
             'location' => $asset->location?->name,
+            'room_rack' => $this->roomRackLabel($asset),
+            'serial_number' => $asset->serial_number,
+            'tp_barcode' => $asset->tp_barcode,
             'item_type' => $asset->itemType?->name,
             'url' => route('assets.show', [$asset, 'tab' => 'connections']),
             'focus' => $isFocus,
@@ -543,6 +547,9 @@ class AssetConnectionService
                         'label' => $type->name,
                         'type_name' => $type->name,
                         'location' => $asset->location?->name,
+                        'room_rack' => $this->roomRackLabel($asset),
+                        'serial_number' => $asset->serial_number,
+                        'tp_barcode' => $asset->tp_barcode,
                         'item_type' => $asset->itemType?->name,
                         'url' => route('assets.show', [$asset, 'tab' => 'connections']),
                         'color' => $type->color ?: '#64748b',
@@ -581,6 +588,18 @@ class AssetConnectionService
         }
 
         return ['nodes' => $nodes, 'endpoints' => $endpoints];
+    }
+
+    protected function roomRackLabel(Asset $asset): ?string
+    {
+        $room = AssetExportColumns::value($asset, 'location_room');
+        $rack = AssetExportColumns::value($asset, 'location_rack');
+        $parts = array_values(array_filter(
+            [$room, $rack],
+            fn (string $part): bool => $part !== '',
+        ));
+
+        return $parts === [] ? null : implode(' / ', $parts);
     }
 
     /**

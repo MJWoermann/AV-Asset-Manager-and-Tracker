@@ -3,7 +3,7 @@
         <div class="flex justify-between items-center gap-3">
             <h2 class="font-semibold text-xl">Repair procedures</h2>
             <div class="flex gap-2 text-sm">
-                <a href="{{ route('data.index') }}" class="px-3 py-2 border">Data</a>
+                <a href="{{ route('maintenance.index') }}" class="px-3 py-2 border">Maintenance</a>
                 <a href="{{ route('repair-procedures.create') }}" class="px-3 py-2 bg-brand text-white">Add procedure</a>
             </div>
         </div>

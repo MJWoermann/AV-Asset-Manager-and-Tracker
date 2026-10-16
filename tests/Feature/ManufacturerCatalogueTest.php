@@ -67,6 +67,25 @@ class ManufacturerCatalogueTest extends TestCase
         $response->assertSee('Assets', false);
     }
 
+    public function test_index_includes_hierarchy_expand_controls(): void
+    {
+        $user = $this->scanner();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'Yamaha']);
+        ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'QL1',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('manufacturers.index'));
+
+        $response->assertOk();
+        $response->assertSee('manufacturerCatalogue(', false);
+        $response->assertSee('Expand all', false);
+        $response->assertSee('Collapse all', false);
+        $response->assertSee('data-manufacturer-collapsible="1"', false);
+        $response->assertSee('Toggle Yamaha models', false);
+    }
+
     public function test_manager_can_create_manufacturer_and_model(): void
     {
         $user = $this->manager();

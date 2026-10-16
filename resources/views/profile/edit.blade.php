@@ -13,9 +13,17 @@
                 </div>
             </div>
 
+            <x-department-controls />
+
             <div class="p-4 sm:p-8 bg-white dark:bg-brand-slate border border-transparent dark:border-brand-charcoal shadow sm:rounded-lg">
                 <div class="max-w-xl">
                     @include('profile.partials.update-password-form')
+                </div>
+            </div>
+
+            <div class="p-4 sm:p-8 bg-white dark:bg-brand-slate border border-transparent dark:border-brand-charcoal shadow sm:rounded-lg">
+                <div class="max-w-xl">
+                    @include('profile.partials.api-tokens')
                 </div>
             </div>
 

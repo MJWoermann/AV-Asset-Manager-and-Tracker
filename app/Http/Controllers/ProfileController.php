@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Support\ApiTokenAbilities;
+use App\Support\CameraBatteryOptimisation;
 use App\Support\DeveloperFeatures;
 use App\Support\ScanNoise;
 use App\Support\ScanVibrate;
@@ -19,8 +21,12 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $user = $request->user();
+
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $user,
+            'apiTokens' => $user->tokens()->latest()->get(),
+            'apiTokenAbilities' => ApiTokenAbilities::definitions(),
         ]);
     }
 
@@ -31,7 +37,12 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $validated = $request->validated();
-        unset($validated['features'], $validated['scan_noise'], $validated['scan_vibrate']);
+        unset(
+            $validated['features'],
+            $validated['scan_noise'],
+            $validated['scan_vibrate'],
+            $validated['camera_battery_optimisation'],
+        );
 
         $user->fill($validated);
 
@@ -52,6 +63,13 @@ class ProfileController extends Controller
             $preferences = ScanVibrate::mergeIntoPreferences(
                 $preferences,
                 $request->boolean('scan_vibrate'),
+            );
+        }
+
+        if ($request->exists('camera_battery_optimisation')) {
+            $preferences = CameraBatteryOptimisation::mergeIntoPreferences(
+                $preferences,
+                $request->boolean('camera_battery_optimisation'),
             );
         }
 

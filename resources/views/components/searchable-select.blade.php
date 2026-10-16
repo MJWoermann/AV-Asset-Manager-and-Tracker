@@ -6,6 +6,8 @@
     'placeholder' => '—',
     'required' => false,
     'nullable' => false,
+    'disabled' => false,
+    'createOption' => null,
     'form' => null,
 ])
 
@@ -24,6 +26,14 @@
             'label' => (string) data_get($option, 'label', data_get($option, 'name', '')),
         ];
     })->values();
+
+    $create = null;
+    if (is_array($createOption) && ($createOption['value'] ?? null) !== null && ($createOption['value'] ?? '') !== '') {
+        $create = [
+            'value' => (string) $createOption['value'],
+            'label' => (string) ($createOption['label'] ?? '+ Add new…'),
+        ];
+    }
 @endphp
 
 <div
@@ -31,6 +41,8 @@
     x-data="searchableSelect(@js($normalized), @js($selected !== null ? (string) $selected : ''), {
         placeholder: @js($placeholder),
         nullable: @js((bool) $nullable),
+        disabled: @js((bool) $disabled),
+        createOption: @js($create),
     })"
     @keydown="onKeydown($event)"
     @click.outside="closeList()"
@@ -40,8 +52,9 @@
     <div class="flex gap-1">
         <button
             type="button"
-            class="flex min-w-0 flex-1 items-center justify-between gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm dark:border-brand-charcoal dark:bg-black dark:text-white"
+            class="flex min-w-0 flex-1 items-center justify-between gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm dark:border-brand-charcoal dark:bg-black dark:text-white disabled:cursor-not-allowed disabled:opacity-60"
             @click="open ? closeList() : openList()"
+            :disabled="disabled"
             :aria-expanded="open.toString()"
             aria-haspopup="listbox"
             aria-controls="{{ $id }}-listbox"
@@ -53,7 +66,7 @@
         </button>
         <button
             type="button"
-            x-show="nullable && value"
+            x-show="nullable && value && ! disabled"
             x-cloak
             class="rounded border border-gray-300 px-2 text-sm text-brand-charcoal hover:text-black dark:border-brand-charcoal dark:text-brand-silver dark:hover:text-white"
             @click="clear()"

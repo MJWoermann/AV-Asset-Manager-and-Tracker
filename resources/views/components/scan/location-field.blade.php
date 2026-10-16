@@ -20,20 +20,17 @@
     }"
     class="space-y-2"
     :class="{ 'sm:col-span-2': adding }"
+    @searchable-select-changed="if ($event.detail.name === 'location_id') locationId = $event.detail.value"
 >
     <x-input-label :for="$id" value="Location for next items" />
-    <select
-        id="{{ $id }}"
+    <x-searchable-select
         name="location_id"
-        x-model="locationId"
-        class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
-    >
-        <option value="">—</option>
-        @foreach($locations as $location)
-            <option value="{{ $location->id }}">{{ $location->name }}</option>
-        @endforeach
-        <option value="__new__">+ Add new location…</option>
-    </select>
+        :id="$id"
+        :options="$locations->map(fn ($location) => ['value' => $location->id, 'label' => $location->name])->values()"
+        :selected="$initialLocationId"
+        nullable
+        :create-option="['value' => '__new__', 'label' => '+ Add new location…']"
+    />
     <x-input-error :messages="$errors->get('location_id')" class="mt-1" />
 
     <div

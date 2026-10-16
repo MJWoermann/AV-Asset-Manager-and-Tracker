@@ -37,8 +37,10 @@ use App\Http\Controllers\GuestStockController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\MaintenanceHubController;
 use App\Http\Controllers\ManufacturerController;
 use App\Http\Controllers\ManufacturerModelController;
+use App\Http\Controllers\ProfileApiTokenController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RepairController;
 use App\Http\Controllers\RepairProcedureController;
@@ -57,6 +59,7 @@ use App\Http\Controllers\SparePartMovementController;
 use App\Http\Controllers\SparePartShelfTagPrintController;
 use App\Http\Controllers\TrustedExternalDomainPreferenceController;
 use App\Http\Controllers\UnknownScanController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -79,9 +82,28 @@ Route::get('/dashboard', DashboardController::class)
     ->name('dashboard');
 
 Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(function () {
+    // #region agent log
+    Route::post('/__debug/agent-log', function (Request $request) {
+        $payload = $request->all();
+        $payload['sessionId'] = $payload['sessionId'] ?? '456cae';
+        $payload['timestamp'] = $payload['timestamp'] ?? (int) round(microtime(true) * 1000);
+        file_put_contents(
+            base_path('debug-456cae.log'),
+            json_encode($payload, JSON_UNESCAPED_SLASHES)."\n",
+            FILE_APPEND | LOCK_EX
+        );
+
+        return response()->noContent();
+    })->name('debug.agent-log');
+    // #endregion
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/profile/api-tokens', [ProfileApiTokenController::class, 'store'])
+        ->name('profile.api-tokens.store');
+    Route::delete('/profile/api-tokens/{token}', [ProfileApiTokenController::class, 'destroy'])
+        ->name('profile.api-tokens.destroy');
     Route::patch('/preferences/asset-columns', [AssetColumnPreferenceController::class, 'update'])
         ->name('preferences.asset-columns');
     Route::patch('/preferences/dashboard-modules', [DashboardModulePreferenceController::class, 'update'])
@@ -158,6 +180,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     });
 
     Route::get('/data', [DataHubController::class, 'index'])->name('data.index');
+    Route::get('/maintenance', [MaintenanceHubController::class, 'index'])->name('maintenance.index');
 
     Route::get('/spares', [SparePartController::class, 'index'])->name('spares.index');
     Route::get('/spares/lookup', [SparePartController::class, 'lookup'])->name('spares.lookup');

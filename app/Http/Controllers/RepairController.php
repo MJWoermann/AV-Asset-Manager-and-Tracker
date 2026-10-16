@@ -53,6 +53,11 @@ class RepairController extends Controller
             });
         }
 
+        $assignee = trim((string) $request->query('assignee', ''));
+        if ($assignee === 'me') {
+            $query->where('assignee_user_id', $request->user()->id);
+        }
+
         return view('repairs.index', [
             'repairs' => $query->paginate(25)->withQueryString(),
             'status' => $status,

@@ -53,6 +53,8 @@ Production upgrade (one command): `sudo bash scripts/update.sh` — see [docs/de
 
 Staff-oriented overview of use cases, roles, and day-to-day workflows: [docs/features-and-usage.md](docs/features-and-usage.md).
 
+Prepare messy vendor or legacy spreadsheets for import (field catalog and copy-paste AI prompts): [docs/import-spreadsheet-prep.md](docs/import-spreadsheet-prep.md).
+
 ## Troubleshooting
 
 Symptom → checks → fix (login, camera/HTTPS, uploads, mail/queue, common env issues): [docs/troubleshooting.md](docs/troubleshooting.md).
@@ -85,7 +87,9 @@ Full assumptions, minimum/comfortable tiers, and PHP/MariaDB tuning notes: [docs
 
 ## REST API
 
-Bearer tokens via Sanctum. See [docs/api.md](docs/api.md).
+Bearer tokens via Sanctum (Spatie app roles + optional token abilities/scopes). Full reference: [docs/api.md](docs/api.md).
+
+> **For AI assistants:** Share **`docs/api.md`** as the source of truth for this app’s REST API (auth, obtain/revoke tokens, abilities, endpoints, status codes, curl). It covers the stocktake/integrations surface under `/api`.
 
 ## Single sign-on (optional)
 

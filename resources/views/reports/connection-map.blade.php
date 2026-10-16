@@ -94,6 +94,9 @@
                                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.mapName"> Asset name</label>
                                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.mapItemType"> Item type</label>
                                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.mapLocation"> Location</label>
+                                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.mapRoomRack"> Room/Rack</label>
+                                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.mapSerialNumber"> Serial number</label>
+                                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.mapTpBarcode"> TP Barcode</label>
                                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.mapTypeName"> Type name on nodes</label>
                                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.showEdgeLabels"> Connection type names on links</label>
                                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-brand h-3.5 w-3.5" x-model="display.showTypeIcons"> Connection type icons on nodes</label>

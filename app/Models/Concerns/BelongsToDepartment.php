@@ -60,6 +60,13 @@ trait BelongsToDepartment
 
             $activeId = session(DepartmentVisibility::SESSION_KEY);
 
+            if ($activeId === null) {
+                $prefId = ($user->preferences ?? [])[DepartmentVisibility::SESSION_KEY] ?? null;
+                if ($prefId !== null && $user->canUseDepartment((int) $prefId)) {
+                    $activeId = (int) $prefId;
+                }
+            }
+
             if ($activeId === null || ! $user->canUseDepartment((int) $activeId)) {
                 $activeId = $user->defaultDepartmentIdForCreate();
             }

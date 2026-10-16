@@ -1,3 +1,10 @@
+@php
+    $modelsByManufacturer = $modelsByManufacturer ?? [];
+    $initialManufacturerId = old('manufacturer_id', $spare->manufacturer_id);
+    $initialModelId = old('manufacturer_model_id', $spare->manufacturer_model_id);
+    $compatibleSelected = collect(old('compatible_model_ids', $spare->exists ? $spare->compatibleModels->pluck('id')->all() : []));
+@endphp
+
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl">{{ $spare->exists ? 'Edit spare' : 'New spare' }}</h2>
@@ -26,26 +33,75 @@
                     <label class="block text-xs">Component / description</label>
                     <input name="component" value="{{ old('component', $spare->component) }}" class="w-full border border-brand-silver dark:border-brand-charcoal px-2 py-1" required>
                 </div>
-                <div>
-                    <label class="block text-xs">Manufacturer</label>
-                    <select name="manufacturer_id" class="w-full border border-brand-silver dark:border-brand-charcoal px-2 py-1">
-                        <option value="">—</option>
-                        @foreach($manufacturers as $m)
-                            <option value="{{ $m->id }}" @selected((string) old('manufacturer_id', $spare->manufacturer_id) === (string) $m->id)>{{ $m->name }}</option>
-                        @endforeach
-                    </select>
+
+                <div
+                    class="contents"
+                    x-data="catalogueManufacturerModelFields({
+                        manufacturerId: @js($initialManufacturerId !== null && $initialManufacturerId !== '' ? (string) $initialManufacturerId : ''),
+                        modelId: @js($initialModelId !== null && $initialModelId !== '' ? (string) $initialModelId : ''),
+                        modelsByManufacturer: @js($modelsByManufacturer),
+                    })"
+                    @searchable-select-changed="onSearchableChanged($event.detail)"
+                >
+                    <div data-debug-spare-mfr="1">
+                        <label class="block text-xs" for="manufacturer_id">Manufacturer</label>
+                        <x-searchable-select
+                            name="manufacturer_id"
+                            id="manufacturer_id"
+                            :options="$manufacturers->map(fn ($manufacturer) => ['value' => $manufacturer->id, 'label' => $manufacturer->name])"
+                            :selected="$initialManufacturerId"
+                            nullable
+                            :create-option="['value' => '__new__', 'label' => '+ Add new manufacturer…']"
+                        />
+                        @error('manufacturer_id')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
+                        <div class="mt-2" x-show="manufacturerId === '__new__'" x-cloak>
+                            <label class="block text-xs" for="new_manufacturer">New manufacturer name</label>
+                            <input
+                                id="new_manufacturer"
+                                name="new_manufacturer"
+                                value="{{ old('new_manufacturer') }}"
+                                class="w-full border border-brand-silver dark:border-brand-charcoal px-2 py-1"
+                            >
+                            @error('new_manufacturer')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
+                        </div>
+                        {{-- #region agent log --}}
+                        <script>
+                            (() => {
+                                const root = document.querySelector('[data-debug-spare-mfr="1"]');
+                                const hasSearchable = !!root?.querySelector('[aria-haspopup="listbox"]');
+                                const hasAddNewInput = !!document.getElementById('new_manufacturer');
+                                const hasMulti = !!document.querySelector('[data-debug-spare-compatible="1"]');
+                                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b15581'},body:JSON.stringify({sessionId:'b15581',runId:'post-fix',hypothesisId:'H1_H5',location:'spares/form.blade.php:manufacturer',message:'Spare manufacturer UI after fix',data:{hasSearchable,hasAddNewInput,hasCompatibleMultiSearchable:hasMulti},timestamp:Date.now()})}).catch(()=>{});
+                            })();
+                        </script>
+                        {{-- #endregion --}}
+                    </div>
+                    <div>
+                        <label class="block text-xs" for="manufacturer_model_id">Model</label>
+                        <x-searchable-select
+                            x-ref="modelSelect"
+                            name="manufacturer_model_id"
+                            id="manufacturer_model_id"
+                            :options="[]"
+                            :selected="$initialModelId"
+                            nullable
+                            :disabled="blank($initialManufacturerId)"
+                            :create-option="['value' => '__new__', 'label' => '+ Add new model…']"
+                        />
+                        @error('manufacturer_model_id')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
+                        <div class="mt-2" x-show="modelId === '__new__'" x-cloak>
+                            <label class="block text-xs" for="new_manufacturer_model">New model name</label>
+                            <input
+                                id="new_manufacturer_model"
+                                name="new_manufacturer_model"
+                                value="{{ old('new_manufacturer_model') }}"
+                                class="w-full border border-brand-silver dark:border-brand-charcoal px-2 py-1"
+                            >
+                            @error('new_manufacturer_model')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs">Model</label>
-                    <select name="manufacturer_model_id" class="w-full border border-brand-silver dark:border-brand-charcoal px-2 py-1">
-                        <option value="">—</option>
-                        @foreach($models as $model)
-                            <option value="{{ $model->id }}" @selected((string) old('manufacturer_model_id', $spare->manufacturer_model_id) === (string) $model->id)>
-                                {{ $model->manufacturer?->name }} — {{ $model->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+
                 <div>
                     <label class="block text-xs">Product code</label>
                     <input name="product_code" value="{{ old('product_code', $spare->product_code) }}" class="w-full border border-brand-silver dark:border-brand-charcoal px-2 py-1">
@@ -123,14 +179,20 @@
                 <textarea name="notes" rows="3" class="w-full border px-2 py-1">{{ old('notes', $spare->notes) }}</textarea>
             </div>
 
-            <div>
-                <label class="block text-xs mb-1">Also fits models (multi)</label>
-                <select name="compatible_model_ids[]" multiple class="w-full border px-2 py-1 min-h-[6rem]">
-                    @php $selectedModels = collect(old('compatible_model_ids', $spare->compatibleModels->pluck('id')->all())); @endphp
-                    @foreach($models as $model)
-                        <option value="{{ $model->id }}" @selected($selectedModels->contains($model->id))>{{ $model->manufacturer?->name }} — {{ $model->name }}</option>
-                    @endforeach
-                </select>
+            <div data-debug-spare-compatible="1">
+                <label class="block text-xs mb-1" for="compatible_model_ids">Also fits models</label>
+                <x-searchable-multi-select
+                    name="compatible_model_ids[]"
+                    id="compatible_model_ids"
+                    :options="$models->map(fn ($model) => [
+                        'value' => $model->id,
+                        'label' => trim(($model->manufacturer?->name ?? '').' — '.$model->name, ' —'),
+                    ])"
+                    :selected="$compatibleSelected"
+                    placeholder="Search models…"
+                />
+                @error('compatible_model_ids')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
+                @error('compatible_model_ids.*')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
             </div>
 
             @feature('shelf_tag_generator')

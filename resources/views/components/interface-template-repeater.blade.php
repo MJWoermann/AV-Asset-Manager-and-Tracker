@@ -11,6 +11,7 @@
     </div>
     <p class="text-xs text-brand-charcoal dark:text-brand-silver">
         {{ $slot }}
+        Interface names must be unique.
     </p>
 
     <template x-if="templates.length === 0">

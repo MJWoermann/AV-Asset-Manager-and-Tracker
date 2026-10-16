@@ -99,15 +99,50 @@
                 x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false), @js(auth()->user()?->wantsScanNoise() ?? false), @js(auth()->user()?->wantsScanVibrate() ?? false))"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
+                <div
+                    x-show="cameraNeedsSecureOrigin"
+                    x-cloak
+                    class="border border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 text-sm px-3 py-2 space-y-2"
+                    role="status"
+                >
+                    <p class="font-medium">Camera blocked on this address</p>
+                    <p>
+                        Browsers only allow the camera on <strong>HTTPS</strong> or <strong>http://localhost</strong>.
+                        You opened this page over plain HTTP (usually a LAN IP), so camera scanning cannot start.
+                        A USB / Bluetooth hardware barcode scanner still works here.
+                    </p>
+                    <ol class="list-decimal list-inside space-y-1">
+                        <li x-show="localhostCameraUrl" x-cloak>
+                            On <strong>this PC</strong>:
+                            <a :href="localhostCameraUrl" class="underline font-medium">open Scan via localhost</a>
+                            (same session cookie may not carry over — sign in again if asked).
+                        </li>
+                        <li x-show="httpsCameraUrl" x-cloak>
+                            If HTTPS is already set up:
+                            <a :href="httpsCameraUrl" class="underline font-medium">open this page over HTTPS</a>.
+                        </li>
+                        <li>
+                            For phones and other PCs: ask an admin to enable HTTPS on the server
+                            (private CA / self-signed TLS), then bookmark the <code class="text-xs">https://</code> URL.
+                        </li>
+                    </ol>
+                </div>
+
                 <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-text="inputModeStatus" data-scan-input-mode-status></p>
                     <div class="flex flex-wrap gap-2">
                         <button
                             type="button"
                             @click="useCamera"
-                            x-show="!scanning"
+                            x-show="!scanning && !cameraNeedsSecureOrigin"
                             class="px-4 py-2 bg-brand text-white text-sm"
                         >Use camera</button>
+                        <a
+                            x-show="!scanning && cameraNeedsSecureOrigin && (localhostCameraUrl || httpsCameraUrl)"
+                            x-cloak
+                            :href="httpsCameraUrl || localhostCameraUrl"
+                            class="inline-flex items-center px-4 py-2 bg-brand text-white text-sm"
+                        >Open secure Scan page</a>
                         <button
                             type="button"
                             @click="stopCamera"

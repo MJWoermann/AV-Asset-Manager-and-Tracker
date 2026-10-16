@@ -225,7 +225,7 @@ This is the main day-of-event workflow.
 
 ### 4. Import and export spreadsheets
 
-**Import** (managers): upload Excel or CSV → map columns (your mapping can be remembered) → preview → process. Useful for first-time loads and periodic syncs from other systems. Common match keys include serial number, FMI AST#, MAC, RIG tag, and TP barcode.
+**Import** (managers): upload Excel or CSV → map columns (your mapping can be remembered) → preview → process. Useful for first-time loads and periodic syncs from other systems. Common match keys include serial number, FMI AST#, MAC, RIG tag, and TP barcode. Prep messy sheets with AI: [import-spreadsheet-prep.md](import-spreadsheet-prep.md).
 
 **Export**: all assets or a specific list. Admins can configure which columns appear under **Export columns**.
 
@@ -322,7 +322,7 @@ These items matter for evaluation and operations; day-to-day scanners rarely nee
 | **Users** | Admins create accounts and assign roles; new passwords must meet the complexity rules above |
 | **SSO** | Optional Google Workspace / Microsoft Entra sign-in for existing users; see [sso-setup.md](sso-setup.md) |
 | **Storage & backup** | Choose where attachments live; run backups of data + files from Storage / ops commands |
-| **REST API** | Bearer tokens for integrations (assets, lists, compare, scan). See [api.md](api.md) |
+| **REST API** | Bearer tokens (Profile UI or password issue) with optional ability scopes for integrations (assets, lists, compare, scan). See [api.md](api.md) |
 | **Hosting** | PHP/Laravel app; MariaDB in production; Ubuntu + Nginx guide in [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md) |
 | **PWA** | Installable shortcut and cached shell assets; **data operations require being online** |
 | **Audit history** | Append-only for compliance/trust — History cannot be altered after the fact |

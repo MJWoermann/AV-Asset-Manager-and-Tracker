@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
         <meta name="theme-color" content="#00adb7">
+        <meta name="av-camera-battery-optimisation" content="<?php echo e(auth()->user()?->wantsCameraBatteryOptimisation() ? '1' : '0'); ?>">
         <link rel="manifest" href="<?php echo e(asset('build/manifest.webmanifest')); ?>">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="icon" href="/favicon.ico" sizes="any">
@@ -46,6 +47,27 @@
                     </div>
                 </div>
             <?php endif; ?>
+
+            <?php if (isset($component)) { $__componentOriginala48bcfe49d6ae182f80bf7ab2545aa4f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala48bcfe49d6ae182f80bf7ab2545aa4f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.no-department-notice','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('no-department-notice'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala48bcfe49d6ae182f80bf7ab2545aa4f)): ?>
+<?php $attributes = $__attributesOriginala48bcfe49d6ae182f80bf7ab2545aa4f; ?>
+<?php unset($__attributesOriginala48bcfe49d6ae182f80bf7ab2545aa4f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala48bcfe49d6ae182f80bf7ab2545aa4f)): ?>
+<?php $component = $__componentOriginala48bcfe49d6ae182f80bf7ab2545aa4f; ?>
+<?php unset($__componentOriginala48bcfe49d6ae182f80bf7ab2545aa4f); ?>
+<?php endif; ?>
 
             <main class="py-6">
                 <?php echo e($slot); ?>

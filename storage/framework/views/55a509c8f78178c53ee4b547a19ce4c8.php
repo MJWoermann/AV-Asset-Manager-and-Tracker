@@ -17,7 +17,7 @@
         </div>
      <?php $__env->endSlot(); ?>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="manufacturerCatalogue()">
         <?php if(session('status')): ?>
             <div class="mb-4 text-sm text-brand"><?php echo e(session('status')); ?></div>
         <?php endif; ?>
@@ -33,6 +33,18 @@
         <?php if($manufacturers->isEmpty()): ?>
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">No manufacturers yet.</p>
         <?php else: ?>
+            <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver"
+                    @click="expandAll()"
+                >Expand all</button>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver"
+                    @click="collapseAll()"
+                >Collapse all</button>
+            </div>
             <ul class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal text-sm overflow-hidden">
                 <?php $__currentLoopData = $manufacturers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $manufacturer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <?php echo $__env->make('manufacturers.partials.node', [

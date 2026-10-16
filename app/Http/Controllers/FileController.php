@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FileController extends Controller
 {
-    public function __construct(private FileAttachmentService $attachments) {}
+    public function __construct(protected FileAttachmentService $attachments) {}
 
     public function index(Request $request): View
     {

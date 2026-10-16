@@ -263,11 +263,188 @@ async function loadHtml5Qrcode() {
     return html5QrcodeModulePromise;
 }
 
+// #region agent log
+/**
+ * Debug-only: probe camera / secure-context APIs and ship NDJSON.
+ *
+ * @param {string} logLocation
+ * @param {string} message
+ * @param {string} hypothesisId
+ * @param {Record<string, unknown>} [extra]
+ */
+function agentLogCameraContext(logLocation, message, hypothesisId, extra = {}) {
+    const page = window.location;
+    const host = page.hostname || '';
+    const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+    const payload = {
+        sessionId: '456cae',
+        runId: 'post-fix',
+        hypothesisId,
+        location: logLocation,
+        message,
+        data: {
+            href: page.href,
+            protocol: page.protocol,
+            host: page.host,
+            hostname: host,
+            isLoopback,
+            isSecureContext: Boolean(window.isSecureContext),
+            hasMediaDevices: Boolean(navigator.mediaDevices),
+            hasGetUserMedia: typeof navigator.mediaDevices?.getUserMedia === 'function',
+            hasEnumerateDevices: typeof navigator.mediaDevices?.enumerateDevices === 'function',
+            permissionsPolicyCamera:
+                typeof document.featurePolicy?.allowsFeature === 'function'
+                    ? document.featurePolicy.allowsFeature('camera')
+                    : typeof document.permissionsPolicy?.allowsFeature === 'function'
+                      ? document.permissionsPolicy.allowsFeature('camera')
+                      : null,
+            ...extra,
+        },
+        timestamp: Date.now(),
+    };
+    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '456cae' },
+        body: JSON.stringify(payload),
+    }).catch(() => {});
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    fetch('/__debug/agent-log', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+    }).catch(() => {});
+}
+// #endregion
+
 /** @type {{ stopCamera: () => Promise<void> } | null} */
 let activeFieldBarcodeScanner = null;
 
 /**
+ * Whether the signed-in user opted into battery-saving camera constraints (profile preference).
+ *
+ * @returns {boolean}
+ */
+function wantsCameraBatteryOptimisation() {
+    const meta = document.querySelector('meta[name="av-camera-battery-optimisation"]');
+    const value = meta?.getAttribute('content') || '0';
+
+    return value === '1' || value === 'true';
+}
+
+/**
+ * Browsers only expose getUserMedia in a secure context (HTTPS, or http://localhost / 127.0.0.1).
+ * Plain http://LAN-IP is not secure, so navigator.mediaDevices is usually missing.
+ *
+ * @returns {boolean}
+ */
+function cameraBlockedByInsecureOrigin() {
+    return !window.isSecureContext || !navigator.mediaDevices;
+}
+
+/**
+ * Same path/query on localhost — works for camera when the app is served on this PC.
+ *
+ * @returns {string|null}
+ */
+function cameraLocalhostUrl() {
+    if (!cameraBlockedByInsecureOrigin()) {
+        return null;
+    }
+
+    try {
+        const url = new URL(window.location.href);
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]') {
+            return null;
+        }
+        url.protocol = 'http:';
+        url.hostname = 'localhost';
+
+        return url.toString();
+    } catch (_) {
+        return null;
+    }
+}
+
+/**
+ * Prefer configured APP_URL (https), else https:// on the current host.
+ *
+ * @returns {string|null}
+ */
+function cameraHttpsUrl() {
+    if (!cameraBlockedByInsecureOrigin()) {
+        return null;
+    }
+
+    try {
+        const preferred = document.querySelector('meta[name="av-preferred-origin"]')?.getAttribute('content') || '';
+        if (preferred.startsWith('https://')) {
+            const target = new URL(preferred);
+            target.pathname = window.location.pathname;
+            target.search = window.location.search;
+            target.hash = window.location.hash;
+
+            return target.toString();
+        }
+
+        if (window.location.protocol === 'http:') {
+            const url = new URL(window.location.href);
+            url.protocol = 'https:';
+
+            return url.toString();
+        }
+    } catch (_) {}
+
+    return null;
+}
+
+/**
+ * @param {unknown} [error]
+ * @returns {string}
+ */
+function formatCameraStartError(error) {
+    const raw = String(error?.message ?? error ?? '');
+    const looksUnsupported =
+        raw.includes('Camera streaming not supported') ||
+        raw.toLowerCase().includes('secure context') ||
+        raw.includes('navigator.mediaDevices not supported');
+
+    if (cameraBlockedByInsecureOrigin() || looksUnsupported) {
+        const host = window.location.host || 'this address';
+        const localhostUrl = cameraLocalhostUrl();
+        const httpsUrl = cameraHttpsUrl();
+        const steps = [];
+
+        if (localhostUrl) {
+            steps.push(`On this PC, open ${localhostUrl}`);
+        }
+        if (httpsUrl) {
+            steps.push(`If HTTPS is enabled, open ${httpsUrl}`);
+        }
+        steps.push(
+            'For phones and other PCs on the LAN, ask an admin to enable HTTPS (private CA / self-signed TLS) and use the https:// address'
+        );
+
+        return (
+            `Camera blocked: ${host} is not a secure context over plain HTTP, so the browser hides the camera. ` +
+            steps.join(' · ') +
+            '.'
+        );
+    }
+
+    return 'Camera unavailable: ' + raw;
+}
+
+/**
  * Start an html5-qrcode camera session with the same formats/constraints as stocktake scanning.
+ *
+ * Default: 1080p ideal @ 15fps with continuous AF and mild zoom for fine barcodes.
+ * Opt-in battery mode (profile): 720p capped @ 10fps, no AF/zoom extras.
  *
  * @param {string} elementId
  * @param {(decoded: string) => void | Promise<void>} onDecoded
@@ -284,22 +461,44 @@ async function startBarcodeCamera(elementId, onDecoded) {
         verbose: false,
     });
     const compactCamera = window.matchMedia('(max-width: 639px)').matches;
+    const batteryOptimised = wantsCameraBatteryOptimisation();
+    const fps = batteryOptimised ? 10 : 15;
+    const requestedVideoConstraints = batteryOptimised
+        ? {
+              facingMode: 'environment',
+              width: { ideal: 1280, max: 1280 },
+              height: { ideal: 720, max: 720 },
+          }
+        : {
+              facingMode: 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+          };
+    // #region agent log
+    agentLogCameraContext('app.js:startBarcodeCamera:entry', 'Camera start capability probe', 'A', {
+        elementId,
+        batteryOptimised,
+        compactCamera,
+    });
+    let lastQrbox = null;
+    // #endregion
     await scanner.start(
         { facingMode: 'environment' },
         {
-            // Lower fps/resolution than 1080p@15 to preserve battery on all-day stocktake devices.
-            fps: 10,
+            fps,
             disableFlip: true,
             aspectRatio: compactCamera ? 2.2 : 1.777778,
-            qrbox: (viewfinderWidth, viewfinderHeight) => ({
-                width: Math.floor(viewfinderWidth * 0.9),
-                height: Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35)),
-            }),
-            videoConstraints: {
-                facingMode: 'environment',
-                width: { ideal: 1280, max: 1280 },
-                height: { ideal: 720, max: 720 },
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+                const box = {
+                    width: Math.floor(viewfinderWidth * 0.9),
+                    height: Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35)),
+                };
+                // #region agent log
+                lastQrbox = { viewfinderWidth, viewfinderHeight, ...box };
+                // #endregion
+                return box;
             },
+            videoConstraints: requestedVideoConstraints,
         },
         (decoded) => {
             void onDecoded(decoded);
@@ -307,7 +506,62 @@ async function startBarcodeCamera(elementId, onDecoded) {
         () => {}
     );
 
-    // Skip continuous AF / zoom — both increase ISP/CPU cost on phones.
+    if (!batteryOptimised) {
+        try {
+            await scanner.applyVideoConstraints({
+                focusMode: 'continuous',
+                advanced: [{ zoom: 1.5 }],
+            });
+        } catch (_) {}
+    }
+
+    // #region agent log
+    try {
+        const host = document.getElementById(elementId);
+        const video = host?.querySelector('video') || null;
+        let trackSettings = null;
+        let trackCapabilities = null;
+        try {
+            trackSettings = typeof scanner.getRunningTrackSettings === 'function'
+                ? scanner.getRunningTrackSettings()
+                : null;
+        } catch (_) {}
+        try {
+            trackCapabilities = typeof scanner.getRunningTrackCapabilities === 'function'
+                ? scanner.getRunningTrackCapabilities()
+                : null;
+        } catch (_) {}
+        if (!trackSettings && video?.srcObject instanceof MediaStream) {
+            const track = video.srcObject.getVideoTracks()[0];
+            trackSettings = track?.getSettings?.() || null;
+            trackCapabilities = track?.getCapabilities?.() || null;
+        }
+        agentLogCameraContext('app.js:startBarcodeCamera:started', 'Camera stream negotiated after start', 'E', {
+            elementId,
+            batteryOptimised,
+            compactCamera,
+            viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio },
+            fps,
+            lastQrbox,
+            trackSettings: trackSettings
+                ? {
+                      width: trackSettings.width,
+                      height: trackSettings.height,
+                      frameRate: trackSettings.frameRate,
+                      facingMode: trackSettings.facingMode,
+                  }
+                : null,
+            videoEl: video
+                ? {
+                      videoWidth: video.videoWidth,
+                      videoHeight: video.videoHeight,
+                      clientWidth: video.clientWidth,
+                      clientHeight: video.clientHeight,
+                  }
+                : null,
+        });
+    } catch (_) {}
+    // #endregion
 
     return scanner;
 }
@@ -475,24 +729,40 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     })),
     placeholder: config.placeholder ?? '—',
     nullable: Boolean(config.nullable),
+    disabled: Boolean(config.disabled),
+    createOption: config.createOption
+        ? {
+              value: String(config.createOption.value),
+              label: String(config.createOption.label ?? ''),
+          }
+        : null,
     highlight: -1,
 
     get selectedLabel() {
+        if (this.createOption && this.value === this.createOption.value) {
+            return this.createOption.label;
+        }
         const opt = this.options.find((o) => o.value === this.value);
         return opt ? opt.label : this.placeholder;
     },
 
     get filtered() {
         const q = this.query.trim();
-        if (!q) {
-            return this.options;
+        let list = this.options;
+
+        if (q) {
+            list = this.options
+                .map((option) => ({ option, score: matchScore(option.label, q) }))
+                .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
+                .sort((a, b) => a.score - b.score || a.option.label.localeCompare(b.option.label))
+                .map((entry) => entry.option);
         }
 
-        return this.options
-            .map((option) => ({ option, score: matchScore(option.label, q) }))
-            .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
-            .sort((a, b) => a.score - b.score || a.option.label.localeCompare(b.option.label))
-            .map((entry) => entry.option);
+        if (this.createOption) {
+            return [...list, this.createOption];
+        }
+
+        return list;
     },
 
     highlightedLabel(label) {
@@ -500,6 +770,9 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     },
 
     openList() {
+        if (this.disabled) {
+            return;
+        }
         this.open = true;
         this.highlight = -1;
         this.$nextTick(() => this.$refs.search?.focus());
@@ -525,8 +798,29 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
         this.emitChanged();
     },
 
+    setOptions(next) {
+        this.options = (next || []).map((o) => ({
+            value: String(o.value),
+            label: String(o.label ?? ''),
+        }));
+    },
+
+    setValue(next, { emit = false } = {}) {
+        this.value = next === null || next === undefined ? '' : String(next);
+        if (emit) {
+            this.emitChanged();
+        }
+    },
+
+    setDisabled(next) {
+        this.disabled = Boolean(next);
+        if (this.disabled) {
+            this.closeList();
+        }
+    },
+
     clear() {
-        if (!this.nullable) {
+        if (!this.nullable || this.disabled) {
             return;
         }
         this.value = '';
@@ -535,6 +829,10 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     },
 
     onKeydown(event) {
+        if (this.disabled) {
+            return;
+        }
+
         if (!this.open) {
             if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
@@ -565,6 +863,186 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             event.preventDefault();
             this.select(this.filtered[this.highlight]);
         }
+    },
+}));
+
+Alpine.data('searchableMultiSelect', (options, selected = [], config = {}) => ({
+    open: false,
+    query: '',
+    values: (Array.isArray(selected) ? selected : []).map((value) => String(value)),
+    options: (options || []).map((o) => ({
+        value: String(o.value),
+        label: String(o.label ?? ''),
+    })),
+    placeholder: config.placeholder ?? 'Search and add…',
+    highlight: -1,
+
+    get selectedOptions() {
+        return this.values
+            .map((value) => this.options.find((option) => option.value === value))
+            .filter(Boolean);
+    },
+
+    get availableOptions() {
+        return this.options.filter((option) => !this.values.includes(option.value));
+    },
+
+    get filtered() {
+        const q = this.query.trim();
+        const list = this.availableOptions;
+
+        if (!q) {
+            return list;
+        }
+
+        return list
+            .map((option) => ({ option, score: matchScore(option.label, q) }))
+            .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
+            .sort((a, b) => a.score - b.score || a.option.label.localeCompare(b.option.label))
+            .map((entry) => entry.option);
+    },
+
+    highlightedLabel(label) {
+        return highlightSearchTerm(label, this.query);
+    },
+
+    openList() {
+        this.open = true;
+        this.highlight = -1;
+        this.$nextTick(() => this.$refs.search?.focus());
+    },
+
+    closeList() {
+        this.open = false;
+        this.query = '';
+        this.highlight = -1;
+    },
+
+    add(option) {
+        if (!option || this.values.includes(option.value)) {
+            return;
+        }
+        this.values = [...this.values, option.value];
+        this.query = '';
+        this.highlight = -1;
+        this.$nextTick(() => this.$refs.search?.focus());
+    },
+
+    remove(value) {
+        this.values = this.values.filter((entry) => entry !== String(value));
+    },
+
+    onKeydown(event) {
+        if (!this.open && (event.key === 'ArrowDown' || event.key === 'Enter')) {
+            event.preventDefault();
+            this.openList();
+            return;
+        }
+
+        if (!this.open) {
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            this.closeList();
+            return;
+        }
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            this.highlight = Math.min(this.highlight + 1, this.filtered.length - 1);
+            return;
+        }
+
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            this.highlight = Math.max(this.highlight - 1, 0);
+            return;
+        }
+
+        if (event.key === 'Enter' && this.highlight >= 0 && this.filtered[this.highlight]) {
+            event.preventDefault();
+            this.add(this.filtered[this.highlight]);
+        }
+    },
+}));
+
+Alpine.data('catalogueManufacturerModelFields', (config = {}) => ({
+    manufacturerId: config.manufacturerId === null || config.manufacturerId === undefined
+        ? ''
+        : String(config.manufacturerId),
+    modelId: config.modelId === null || config.modelId === undefined
+        ? ''
+        : String(config.modelId),
+    modelsByManufacturer: config.modelsByManufacturer || {},
+
+    init() {
+        this.$nextTick(() => this.syncModelSelect({ emit: false }));
+    },
+
+    onSearchableChanged(detail) {
+        if (!detail?.name) {
+            return;
+        }
+
+        if (detail.name === 'manufacturer_id') {
+            this.manufacturerId = detail.value ?? '';
+            if (this.manufacturerId === '__new__') {
+                this.modelId = '__new__';
+            }
+            this.syncModelSelect({ emit: true });
+            return;
+        }
+
+        if (detail.name === 'manufacturer_model_id') {
+            this.modelId = detail.value ?? '';
+        }
+    },
+
+    modelData() {
+        const el = this.$refs.modelSelect;
+        if (!el) {
+            return null;
+        }
+
+        return Alpine.$data(el);
+    },
+
+    syncModelSelect({ emit = false } = {}) {
+        const model = this.modelData();
+        if (!model) {
+            return;
+        }
+
+        if (!this.manufacturerId) {
+            model.setOptions([]);
+            model.setDisabled(true);
+            model.setValue('', { emit });
+            this.modelId = '';
+            return;
+        }
+
+        if (this.manufacturerId === '__new__') {
+            model.setOptions([]);
+            model.setDisabled(false);
+            model.setValue('__new__', { emit });
+            this.modelId = '__new__';
+            return;
+        }
+
+        const options = this.modelsByManufacturer[this.manufacturerId] || [];
+        model.setOptions(options);
+        model.setDisabled(false);
+
+        const ids = options.map((row) => String(row.value));
+        if (this.modelId === '__new__' || ids.includes(this.modelId)) {
+            model.setValue(this.modelId, { emit });
+            return;
+        }
+
+        this.modelId = '';
+        model.setValue('', { emit });
     },
 }));
 
@@ -914,6 +1392,13 @@ Alpine.data('fieldBarcodeScanner', (fieldId) => ({
     async startCamera() {
         this.error = '';
 
+        if (cameraBlockedByInsecureOrigin()) {
+            this.error = formatCameraStartError();
+            this.scanning = false;
+
+            return;
+        }
+
         if (activeFieldBarcodeScanner && activeFieldBarcodeScanner !== this) {
             await activeFieldBarcodeScanner.stopCamera();
         }
@@ -934,7 +1419,7 @@ Alpine.data('fieldBarcodeScanner', (fieldId) => ({
                 await this.stopCamera();
             });
         } catch (e) {
-            this.error = 'Camera unavailable: ' + (e?.message || e);
+            this.error = formatCameraStartError(e);
             this.scanning = false;
             if (activeFieldBarcodeScanner === this) {
                 activeFieldBarcodeScanner = null;
@@ -1721,6 +2206,9 @@ function defaultConnectionMapDisplay() {
         mapName: true,
         mapItemType: false,
         mapLocation: false,
+        mapRoomRack: false,
+        mapSerialNumber: false,
+        mapTpBarcode: false,
         mapTypeName: false,
         showEdgeLabels: true,
         showTypeIcons: true,
@@ -1768,18 +2256,243 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                 name: 'breadthfirst',
                 directed: false,
                 roots: rootSelector,
-                padding: 40,
-                spacingFactor: 1.35,
+                padding: 48,
+                spacingFactor: 1.85,
                 animate: false,
                 avoidOverlap: true,
+                nodeDimensionsIncludeLabels: true,
+                grid: false,
             };
         }
 
+        // Prefer cose over circle so multi-edge graphs fan out instead of stacking
+        // chords across a ring. nestingFactor keeps compound children from drifting.
         return {
-            name: elements.length > 40 ? 'cose' : 'circle',
+            name: 'cose',
             animate: false,
-            padding: 40,
+            padding: 48,
+            nestingFactor: 0.08,
+            nodeRepulsion: (node) => (node.isParent() ? 14000 : 7000),
+            idealEdgeLength: () => 150,
+            edgeElasticity: () => 90,
+            gravity: 0.35,
+            numIter: 1600,
+            initialTemp: 220,
+            coolingFactor: 0.95,
+            minTemp: 1.0,
+            componentSpacing: 120,
+            nodeDimensionsIncludeLabels: true,
+            randomize: elements.length > 40,
         };
+    },
+
+    /**
+     * Pack type-port children tightly inside compound assets and face each port
+     * toward its connected peers so edges leave in different directions.
+     */
+    packCompoundGroups() {
+        if (!this.cy) {
+            return;
+        }
+
+        this.cy.batch(() => {
+            this.cy.nodes(':parent').forEach((parent) => {
+                const children = parent.children();
+                if (children.empty()) {
+                    return;
+                }
+
+                const parentPos = { ...parent.position() };
+                const items = children.toArray().map((child) => {
+                    let dx = 0;
+                    let dy = 0;
+                    let links = 0;
+
+                    child.connectedEdges().forEach((edge) => {
+                        const other = edge.otherEnd(child);
+                        if (other.same(parent) || other.parent().same(parent)) {
+                            return;
+                        }
+
+                        const op = other.position();
+                        dx += op.x - parentPos.x;
+                        dy += op.y - parentPos.y;
+                        links += 1;
+                    });
+
+                    return {
+                        child,
+                        angle: links > 0 ? Math.atan2(dy, dx) : null,
+                    };
+                });
+
+                const linked = items
+                    .filter((item) => item.angle !== null)
+                    .sort((a, b) => a.angle - b.angle);
+                const ordered = [
+                    ...linked,
+                    ...items.filter((item) => item.angle === null),
+                ];
+
+                const n = ordered.length;
+                const portSize = 24;
+                const gap = 6;
+
+                let sx = 0;
+                let sy = 0;
+                linked.forEach((item) => {
+                    sx += Math.cos(item.angle);
+                    sy += Math.sin(item.angle);
+                });
+                const meanAngle = linked.length > 0 ? Math.atan2(sy, sx) : -Math.PI / 2;
+
+                // If peers sit in one cone, pack ports on a facing arc; otherwise a full ring.
+                let sweep = 2 * Math.PI;
+                if (linked.length >= 2) {
+                    const deltas = linked.map((item) => {
+                        let delta = item.angle - meanAngle;
+                        while (delta > Math.PI) {
+                            delta -= 2 * Math.PI;
+                        }
+                        while (delta < -Math.PI) {
+                            delta += 2 * Math.PI;
+                        }
+                        return delta;
+                    });
+                    const span = Math.max(...deltas) - Math.min(...deltas);
+                    if (span <= Math.PI) {
+                        const minSweep = (n - 1) * (Math.PI / Math.max(n, 2));
+                        sweep = Math.max(minSweep, Math.min(Math.PI * 0.9, span + Math.PI / 6));
+                    }
+                }
+
+                const step = n <= 1 ? 0 : sweep / n;
+                const radius = n <= 1
+                    ? 0
+                    : (portSize + gap) / (2 * Math.sin(Math.max(step, 0.01) / 2));
+                const startAngle = meanAngle - sweep / 2 + step / 2;
+
+                ordered.forEach((item, index) => {
+                    const angle = n === 1 ? meanAngle : startAngle + index * step;
+                    item.child.position({
+                        x: parentPos.x + radius * Math.cos(angle),
+                        y: parentPos.y + radius * Math.sin(angle),
+                    });
+                });
+            });
+        });
+    },
+
+    /**
+     * Nudge nodes that share nearly-collinear multi-hop edges so bezier strokes
+     * do not sit on top of each other.
+     */
+    untangleEdgeOverlays() {
+        if (!this.cy || this.cy.edges().length < 2) {
+            return;
+        }
+
+        const edges = this.cy.edges().toArray();
+        const shifts = new Map();
+
+        const segmentKey = (a, b) => {
+            const ids = [a.id(), b.id()].sort();
+            return `${ids[0]}|${ids[1]}`;
+        };
+
+        // Group edges that share the same pair of top-level anchors (parallel / stacked).
+        const byPair = new Map();
+        edges.forEach((edge) => {
+            let source = edge.source();
+            let target = edge.target();
+            if (source.isChild()) {
+                source = source.parent();
+            }
+            if (target.isChild()) {
+                target = target.parent();
+            }
+            if (source.same(target)) {
+                return;
+            }
+            const key = segmentKey(source, target);
+            if (!byPair.has(key)) {
+                byPair.set(key, []);
+            }
+            byPair.get(key).push({ edge, source, target });
+        });
+
+        byPair.forEach((group) => {
+            if (group.length < 2) {
+                return;
+            }
+
+            group.forEach((item, index) => {
+                const offsetIndex = index - (group.length - 1) / 2;
+                if (offsetIndex === 0) {
+                    return;
+                }
+
+                const sp = item.source.position();
+                const tp = item.target.position();
+                const dx = tp.x - sp.x;
+                const dy = tp.y - sp.y;
+                const len = Math.hypot(dx, dy) || 1;
+                const nx = -dy / len;
+                const ny = dx / len;
+                const amount = offsetIndex * 18;
+
+                [item.source, item.target].forEach((node) => {
+                    if (node.isParent() || node.data('kind') === 'type-port') {
+                        return;
+                    }
+                    const current = shifts.get(node.id()) || { x: 0, y: 0 };
+                    shifts.set(node.id(), {
+                        x: current.x + nx * amount * 0.35,
+                        y: current.y + ny * amount * 0.35,
+                    });
+                });
+            });
+        });
+
+        if (shifts.size === 0) {
+            return;
+        }
+
+        this.cy.batch(() => {
+            shifts.forEach((delta, id) => {
+                const node = this.cy.$id(id);
+                if (!node.nonempty()) {
+                    return;
+                }
+                const pos = node.position();
+                node.position({
+                    x: pos.x + delta.x,
+                    y: pos.y + delta.y,
+                });
+            });
+        });
+    },
+
+    runGraphLayout() {
+        if (!this.cy) {
+            return;
+        }
+
+        const elements = this.cy.elements();
+        const layout = this.cy.layout(this.layoutOptions(elements));
+        layout.on('layoutstop', () => {
+            this.packCompoundGroups();
+            this.untangleEdgeOverlays();
+            this.packCompoundGroups();
+
+            const focusId = graph.focus_asset_id ? Number(graph.focus_asset_id) : null;
+            const focusNode = focusId ? this.cy.$id(`asset-${focusId}`) : null;
+            if (focusNode && focusNode.nonempty()) {
+                this.cy.center(focusNode);
+            }
+            this.cy.fit(undefined, 48);
+        });
+        layout.run();
     },
 
     async init() {
@@ -1806,8 +2519,10 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                         height: 28,
                         'background-fit': 'contain',
                         'background-clip': 'node',
-                        'background-width': '58%',
-                        'background-height': '58%',
+                        'background-width': '100%',
+                        'background-height': '100%',
+                        'background-position-x': '50%',
+                        'background-position-y': '50%',
                     },
                 },
                 {
@@ -1821,7 +2536,7 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                         'text-valign': 'top',
                         'text-halign': 'center',
                         'text-margin-y': -6,
-                        padding: 14,
+                        padding: 6,
                         shape: 'roundrectangle',
                         color: '#111827',
                         'font-size': 11,
@@ -1909,6 +2624,9 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                         'line-color': 'data(color)',
                         'target-arrow-color': 'data(color)',
                         'curve-style': 'bezier',
+                        'control-point-step-size': 40,
+                        'control-point-weight': 0.5,
+                        'edge-distances': 'node-position',
                         label: 'data(edge_label)',
                         'font-size': 9,
                         color: '#4b5563',
@@ -1919,10 +2637,11 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                     },
                 },
             ],
-            layout: this.layoutOptions(elements),
+            layout: { name: 'null' },
         });
 
         this.applyDisplayOptions();
+        this.runGraphLayout();
 
         this.cy.on('tap', 'node', (event) => {
             const data = event.target.data();
@@ -1962,16 +2681,6 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
         window.addEventListener('resize', this._onResize);
         requestAnimationFrame(() => {
             this._onResize();
-            if (this.cy && elements.length) {
-                const focusId = graph.focus_asset_id ? Number(graph.focus_asset_id) : null;
-                const focusNode = focusId ? this.cy.$id(`asset-${focusId}`) : null;
-                if (focusNode && focusNode.nonempty()) {
-                    this.cy.center(focusNode);
-                    this.cy.fit(undefined, 40);
-                } else {
-                    this.cy.fit(undefined, 40);
-                }
-            }
         });
     },
 
@@ -2004,6 +2713,15 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
         if (this.display.mapLocation && data.location) {
             parts.push(data.location);
         }
+        if (this.display.mapRoomRack && data.room_rack) {
+            parts.push(data.room_rack);
+        }
+        if (this.display.mapSerialNumber && data.serial_number) {
+            parts.push(data.serial_number);
+        }
+        if (this.display.mapTpBarcode && data.tp_barcode) {
+            parts.push(data.tp_barcode);
+        }
         if (this.display.mapTypeName && data.type_name && !data.compound) {
             parts.push(data.type_name);
         }
@@ -2015,6 +2733,10 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
         if (!this.cy) {
             return;
         }
+
+        // #region agent log
+        let _dbgIconSample = null;
+        // #endregion
 
         this.cy.batch(() => {
             this.cy.nodes().forEach((node) => {
@@ -2028,6 +2750,22 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                 if (canShowIcon && data.icon) {
                     node.data('icon_url', connectionTypeIconDataUri(data.icon));
                     node.style('background-image', node.data('icon_url'));
+                    // #region agent log
+                    if (! _dbgIconSample) {
+                        _dbgIconSample = {
+                            id: data.id,
+                            kind: data.kind,
+                            width: node.width(),
+                            height: node.height(),
+                            bgWidth: node.style('background-width'),
+                            bgHeight: node.style('background-height'),
+                            bgFit: node.style('background-fit'),
+                            bgPosX: node.style('background-position-x'),
+                            bgPosY: node.style('background-position-y'),
+                            hasRoomRackOpt: Object.prototype.hasOwnProperty.call(this.display, 'mapRoomRack'),
+                        };
+                    }
+                    // #endregion
                 } else {
                     node.style('background-image', 'none');
                 }
@@ -2040,6 +2778,12 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                 );
             });
         });
+
+        // #region agent log
+        if (_dbgIconSample) {
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'117f63'},body:JSON.stringify({sessionId:'117f63',location:'app.js:applyDisplayOptions',message:'connection map icon styles',data:_dbgIconSample,timestamp:Date.now(),hypothesisId:'A',runId:'post-fix'})}).catch(()=>{});
+        }
+        // #endregion
     },
 
     persistDisplayOptions() {
@@ -2500,6 +3244,36 @@ Alpine.data('bulkLocations', () => ({
         }
 
         return true;
+    },
+}));
+
+Alpine.data('manufacturerCatalogue', () => ({
+    collapsed: {},
+
+    isOpen(id) {
+        return !this.collapsed[id];
+    },
+
+    toggle(id) {
+        this.collapsed = { ...this.collapsed, [id]: !this.collapsed[id] };
+    },
+
+    expandAll() {
+        this.collapsed = {};
+    },
+
+    collapseAll() {
+        const next = {};
+        this.collapsibleIds().forEach((id) => {
+            next[id] = true;
+        });
+        this.collapsed = next;
+    },
+
+    collapsibleIds() {
+        return [...this.$root.querySelectorAll('[data-manufacturer-collapsible="1"]')].map((el) =>
+            Number(el.getAttribute('data-manufacturer-id'))
+        );
     },
 }));
 
@@ -3535,7 +4309,26 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     _onVisibilityChange: null,
     _onWedgeKeydown: null,
 
+    get cameraNeedsSecureOrigin() {
+        return cameraBlockedByInsecureOrigin();
+    },
+
+    get localhostCameraUrl() {
+        return cameraLocalhostUrl();
+    },
+
+    get httpsCameraUrl() {
+        return cameraHttpsUrl();
+    },
+
     init() {
+        // #region agent log
+        agentLogCameraContext('app.js:barcodeScanner.init', 'Scan page camera context on init', 'A', {
+            insecureOriginBlocked: cameraBlockedByInsecureOrigin(),
+            localhostCameraUrl: cameraLocalhostUrl(),
+            httpsCameraUrl: cameraHttpsUrl(),
+        });
+        // #endregion
         this.eventItems = (initialEventItems || []).map((entry, index) => this.normalizeEventItem(entry, index));
         this.serverUnknowns = (initialUnknownScans || []).map((scan, index) =>
             this.normalizeEntry(
@@ -3907,6 +4700,24 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     async startCamera() {
         this.error = '';
         this.message = '';
+
+        if (cameraBlockedByInsecureOrigin()) {
+            // #region agent log
+            agentLogCameraContext('app.js:barcodeScanner.startCamera:blocked', 'Camera start blocked before library', 'A', {
+                insecureOriginBlocked: true,
+                formattedError: formatCameraStartError(),
+                localhostCameraUrl: cameraLocalhostUrl(),
+                httpsCameraUrl: cameraHttpsUrl(),
+            });
+            // #endregion
+            this.error = formatCameraStartError();
+            this.scanning = false;
+            this.clearIdleTimer();
+            this.$nextTick(() => this.focusInput());
+
+            return;
+        }
+
         this.scanning = true;
         await this.$nextTick();
 
@@ -3928,7 +4739,19 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
             });
             this.bumpIdleTimer();
         } catch (e) {
-            this.error = 'Camera unavailable: ' + (e?.message || e);
+            // #region agent log
+            const errText = String(e?.message || e);
+            const formatted = formatCameraStartError(e);
+            agentLogCameraContext('app.js:barcodeScanner.startCamera:catch', 'Camera start failed', 'A', {
+                errorName: e?.name || null,
+                errorMessage: errText,
+                formattedError: formatted,
+                insecureOriginBlocked: cameraBlockedByInsecureOrigin(),
+                looksLikeStreamingUnsupported: errText.includes('Camera streaming not supported'),
+                looksLikeInsecureContext: errText.toLowerCase().includes('secure context'),
+            });
+            // #endregion
+            this.error = formatted;
             this.scanning = false;
             this.clearIdleTimer();
             this.$nextTick(() => this.focusInput());
