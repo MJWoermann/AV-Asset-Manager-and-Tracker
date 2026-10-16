@@ -337,7 +337,8 @@ unset($__errorArgs, $__bag); ?>
                     <input type="checkbox" name="dry_run" value="1" class="rounded text-brand" checked>
                     Dry run (no writes)
                 </label>
-                <div>
+                <div class="flex justify-end gap-3 items-center">
+                    <a href="<?php echo e(route('import.create')); ?>" class="text-sm underline">Start over</a>
                     <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -357,7 +358,6 @@ unset($__errorArgs, $__bag); ?>
 <?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
 <?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
 <?php endif; ?>
-                    <a href="<?php echo e(route('import.create')); ?>" class="ml-3 text-sm underline">Start over</a>
                 </div>
             </div>
         </form>

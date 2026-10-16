@@ -33,9 +33,9 @@
                 >
                 <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">Max 10 MB. ZIP-based Brother label archives only.</p>
             </div>
-            <div class="flex flex-wrap gap-3">
-                <button type="submit" class="px-3 py-2 bg-brand text-white text-sm">Import layout</button>
+            <div class="flex flex-wrap justify-end gap-3">
                 <a href="{{ route('labels.index') }}" class="px-3 py-2 border text-sm inline-flex items-center">Cancel</a>
+                <button type="submit" class="px-3 py-2 bg-brand text-white text-sm">Import layout</button>
             </div>
         </form>
     </div>

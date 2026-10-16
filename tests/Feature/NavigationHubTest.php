@@ -41,7 +41,10 @@ class NavigationHubTest extends TestCase
             ->assertOk()
             ->assertSee('Locations')
             ->assertSee('Manufacturers')
-            ->assertDontSee('Item Types');
+            ->assertSee('Spares')
+            ->assertSee('Repairs')
+            ->assertDontSee('Item Types')
+            ->assertDontSee('Repair procedures');
 
         $this->actingAs($user)->get(route('reports.index'))
             ->assertOk()
@@ -57,7 +60,8 @@ class NavigationHubTest extends TestCase
             ->assertOk()
             ->assertSee('Item Types')
             ->assertSee('Field sets')
-            ->assertSee('Files');
+            ->assertSee('Files')
+            ->assertSee('Repair procedures');
     }
 
     public function test_admin_can_view_admin_hub(): void

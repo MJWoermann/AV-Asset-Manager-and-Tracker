@@ -40,6 +40,12 @@ php artisan queue:work
 
 9. After configuring credentials, use **Send test email** on the Email settings page.
 
+**Admin → Email** (Settings tab)
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Email settings desktop](images/email/admin-email-desktop.png) | ![Email settings mobile](images/email/admin-email-mobile.png) |
+
 ### Feature flag behaviour
 
 | Surface | Flag off | Flag on + mail disabled | Flag on + mail enabled |

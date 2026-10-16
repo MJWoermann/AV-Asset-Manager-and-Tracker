@@ -152,13 +152,69 @@ class ManufacturerCatalogueTest extends TestCase
         $this->assertSame($keep->id, $asset->fresh()->manufacturer_model_id);
     }
 
-    public function test_scanner_cannot_mutate_catalogue(): void
+    public function test_scanner_can_create_manufacturer_and_model(): void
     {
         $user = $this->scanner();
 
+        $this->actingAs($user)->get(route('manufacturers.create'))->assertOk();
+
         $this->actingAs($user)->post(route('manufacturers.store'), [
-            'name' => 'Nope',
+            'name' => 'ScannerCo',
+        ])->assertRedirect(route('manufacturers.index'));
+
+        $manufacturer = Manufacturer::query()->where('name', 'ScannerCo')->first();
+        $this->assertNotNull($manufacturer);
+
+        $this->actingAs($user)->get(route('manufacturers.models.create', $manufacturer))->assertOk();
+
+        $this->actingAs($user)->post(route('manufacturers.models.store', $manufacturer), [
+            'name' => 'ScannerModel',
+        ])->assertRedirect(route('manufacturers.index'));
+
+        $this->assertDatabaseHas('manufacturer_models', [
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'ScannerModel',
+        ]);
+    }
+
+    public function test_scanner_cannot_edit_update_or_destroy_catalogue(): void
+    {
+        $user = $this->scanner();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'KeepCo']);
+        $other = Manufacturer::factory()->create(['name' => 'OtherCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'KeepModel',
+        ]);
+        $otherModel = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $other->id,
+            'name' => 'OtherModel',
+        ]);
+
+        $this->actingAs($user)->get(route('manufacturers.edit', $manufacturer))->assertForbidden();
+        $this->actingAs($user)->put(route('manufacturers.update', $manufacturer), [
+            'name' => 'Renamed',
         ])->assertForbidden();
+        $this->actingAs($user)->delete(route('manufacturers.destroy', $manufacturer), [
+            'replacement_manufacturer_id' => $other->id,
+        ])->assertForbidden();
+
+        $this->actingAs($user)->get(route('manufacturers.models.edit', [$manufacturer, $model]))->assertForbidden();
+        $this->actingAs($user)->put(route('manufacturers.models.update', [$manufacturer, $model]), [
+            'name' => 'RenamedModel',
+        ])->assertForbidden();
+        $this->actingAs($user)->delete(route('manufacturers.models.destroy', [$manufacturer, $model]), [
+            'replacement_manufacturer_model_id' => $otherModel->id,
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('manufacturers', [
+            'id' => $manufacturer->id,
+            'name' => 'KeepCo',
+        ]);
+        $this->assertDatabaseHas('manufacturer_models', [
+            'id' => $model->id,
+            'name' => 'KeepModel',
+        ]);
     }
 
     public function test_asset_form_can_create_manufacturer_and_model_on_the_fly(): void

@@ -210,9 +210,9 @@
                     <input type="checkbox" name="dry_run" value="1" class="rounded text-brand" checked>
                     Dry run (no writes)
                 </label>
-                <div>
+                <div class="flex justify-end gap-3 items-center">
+                    <a href="{{ route('import.create') }}" class="text-sm underline">Start over</a>
                     <x-primary-button>Process import</x-primary-button>
-                    <a href="{{ route('import.create') }}" class="ml-3 text-sm underline">Start over</a>
                 </div>
             </div>
         </form>

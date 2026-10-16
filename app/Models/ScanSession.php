@@ -3,13 +3,17 @@
 namespace App\Models;
 
 use App\Enums\AssetStatus;
+use App\Models\Concerns\BelongsToDepartment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScanSession extends Model
 {
+    use BelongsToDepartment;
+
     protected $fillable = [
+        'department_id',
         'user_id',
         'event_list_id',
         'inventory_list_id',

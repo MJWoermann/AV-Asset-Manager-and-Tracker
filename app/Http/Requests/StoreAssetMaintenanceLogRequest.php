@@ -35,6 +35,17 @@ class StoreAssetMaintenanceLogRequest extends FormRequest
             ],
             'files' => ['nullable', 'array', 'max:5'],
             'files.*' => ['file', 'max:'.$maxKb, 'mimes:'.$mimes],
+            'start_repair_now' => ['nullable', 'boolean'],
+            'repair_procedure_id' => ['nullable', 'integer', Rule::exists('repair_procedures', 'id')],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('start_repair_now')) {
+            $this->merge([
+                'start_repair_now' => filter_var($this->input('start_repair_now'), FILTER_VALIDATE_BOOLEAN),
+            ]);
+        }
     }
 }

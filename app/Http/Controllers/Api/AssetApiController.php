@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AssetStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Manufacturer;
@@ -9,6 +10,7 @@ use App\Models\ManufacturerModel;
 use App\Services\ManufacturerCatalogueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AssetApiController extends Controller
@@ -74,19 +76,23 @@ class AssetApiController extends Controller
             'item_type_id' => [$partial ? 'sometimes' : 'required', 'exists:item_types,id'],
             'location_id' => ['nullable', 'exists:locations,id'],
             'parent_id' => ['nullable', 'exists:assets,id'],
-            'status' => [$partial ? 'sometimes' : 'nullable', 'string'],
-            'fmi_ast' => ['nullable', 'string'],
-            'tp_barcode' => ['nullable', 'string'],
-            'rig_tag' => ['nullable', 'string'],
-            'ip_address' => ['nullable', 'string'],
-            'mac_address' => ['nullable', 'string'],
+            'status' => [$partial ? 'sometimes' : 'nullable', Rule::enum(AssetStatus::class)],
+            'fmi_ast' => ['nullable', 'string', 'max:255'],
+            'tp_barcode' => ['nullable', 'string', 'max:255'],
+            'rig_tag' => ['nullable', 'string', 'max:255'],
+            'ip_address' => ['nullable', 'string', 'max:45'],
+            'mac_address' => ['nullable', 'string', 'max:32'],
             'manufacturer_id' => ['nullable', 'exists:manufacturers,id'],
             'manufacturer_model_id' => ['nullable', 'exists:manufacturer_models,id'],
             'manufacturer' => ['nullable', 'string', 'max:255'],
             'model' => ['nullable', 'string', 'max:255'],
-            'serial_number' => ['nullable', 'string'],
+            'serial_number' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        if (array_key_exists('status', $data) && $data['status'] instanceof AssetStatus) {
+            $data['status'] = $data['status']->value;
+        }
 
         if (array_key_exists('manufacturer', $data) || array_key_exists('model', $data)) {
             $resolved = app(ManufacturerCatalogueService::class)->resolveFromNames(

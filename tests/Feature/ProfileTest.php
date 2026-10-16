@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Support\TrustedExternalDomains;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -202,6 +203,113 @@ class ProfileTest extends TestCase
             ->get('/profile')
             ->assertOk()
             ->assertSee('Enable scan noise', false)
-            ->assertSee('name="scan_noise"', false);
+            ->assertSee('name="scan_noise"', false)
+            ->assertSee('Enable scan vibration', false)
+            ->assertSee('name="scan_vibrate"', false);
+    }
+
+    public function test_user_can_enable_scan_vibrate_preference(): void
+    {
+        $user = $this->userWithRole();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'theme' => 'light',
+                'scan_vibrate' => '1',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertTrue($user->wantsScanVibrate());
+        $this->assertTrue(data_get($user->preferences, 'scan_vibrate'));
+    }
+
+    public function test_user_can_disable_scan_vibrate_preference(): void
+    {
+        $user = $this->userWithRole();
+        $user->preferences = ['scan_vibrate' => true];
+        $user->save();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'theme' => 'light',
+                'scan_vibrate' => '0',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertFalse($user->wantsScanVibrate());
+        $this->assertFalse(data_get($user->preferences, 'scan_vibrate'));
+    }
+
+    public function test_profile_update_without_scan_vibrate_preserves_existing_preference(): void
+    {
+        $user = $this->userWithRole();
+        $user->preferences = ['scan_vibrate' => true];
+        $user->save();
+
+        $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => 'Kept Vibrate',
+                'email' => $user->email,
+                'theme' => 'light',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertSame('Kept Vibrate', $user->name);
+        $this->assertTrue($user->wantsScanVibrate());
+    }
+
+    public function test_profile_page_lists_trusted_external_domains(): void
+    {
+        $user = $this->userWithRole();
+        $user->preferences = TrustedExternalDomains::mergeAdd(null, 'https://docs.vendor.com/manual.pdf');
+        $user->save();
+
+        $this->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('Trusted external domains', false)
+            ->assertSee('docs.vendor.com', false);
+    }
+
+    public function test_user_can_remove_trusted_external_domain_from_profile(): void
+    {
+        $user = $this->userWithRole();
+        $user->preferences = [
+            'trusted_external_domains' => ['docs.vendor.com', 'other.example.org'],
+            'scan_noise' => true,
+        ];
+        $user->save();
+
+        $this->actingAs($user)
+            ->from('/profile')
+            ->delete(route('preferences.trusted-external-domains.destroy'), [
+                'host' => 'docs.vendor.com',
+            ])
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertSame(['other.example.org'], TrustedExternalDomains::hosts($user->preferences));
+        $this->assertTrue($user->wantsScanNoise());
     }
 }

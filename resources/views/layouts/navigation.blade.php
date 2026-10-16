@@ -13,7 +13,7 @@
 
                     @php
                         $reportsActive = request()->routeIs('reports.*', 'labels.*');
-                        $dataActive = request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
+                        $dataActive = request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'spares.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
                         $riggingActive = request()->routeIs('rigging.*');
                     @endphp
 
@@ -56,6 +56,7 @@
                         <x-slot name="content">
                             <x-dropdown-link :href="route('locations.index')">Locations</x-dropdown-link>
                             <x-dropdown-link :href="route('manufacturers.index')">Manufacturers</x-dropdown-link>
+                            <x-dropdown-link :href="route('spares.index')">Spares</x-dropdown-link>
                             @role('admin|inventory_manager')
                                 <x-dropdown-link :href="route('item-types.index')">Item Types</x-dropdown-link>
                                 <x-dropdown-link :href="route('custom-field-sets.index')">Field sets</x-dropdown-link>
@@ -97,6 +98,8 @@
                         </button>
                     </x-slot>
                     <x-slot name="content">
+                        <x-department-controls />
+
                         <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
                         <x-dropdown-link
                             href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"
@@ -108,6 +111,7 @@
                             <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
                             <div class="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-brand-silver/70">Admin</div>
                             <x-dropdown-link :href="route('admin.users.index')">Manage users</x-dropdown-link>
+                            <x-dropdown-link :href="route('admin.departments.index')">Departments</x-dropdown-link>
                             <x-dropdown-link :href="route('admin.export-columns.edit')">Export columns</x-dropdown-link>
                             <x-dropdown-link :href="route('admin.storage.edit')">Storage</x-dropdown-link>
                             <x-dropdown-link :href="route('admin.sso.edit')">SSO</x-dropdown-link>
@@ -157,13 +161,14 @@
             >Reports</x-responsive-nav-link>
             <x-responsive-nav-link
                 :href="route('data.index')"
-                :active="request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*')"
+                :active="request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'spares.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*')"
             >Data</x-responsive-nav-link>
             @feature('rigging')
                 <x-responsive-nav-link :href="route('rigging.index')" :active="request()->routeIs('rigging.*')">Rigging</x-responsive-nav-link>
             @endfeature
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
+            <x-department-controls variant="mobile" />
             <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>
             <x-responsive-nav-link
                 href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"

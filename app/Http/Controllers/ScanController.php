@@ -66,6 +66,7 @@ class ScanController extends Controller
             ->update(['status' => 'closed']);
 
         ScanSession::create($data + [
+            'department_id' => $data['department_id'],
             'user_id' => $request->user()->id,
             'status' => 'active',
         ]);
@@ -130,6 +131,10 @@ class ScanController extends Controller
             return response()->json($result);
         }
 
+        if (! empty($result['spare_redirect'])) {
+            return redirect()->to($result['spare_redirect'])->with('status', $result['message']);
+        }
+
         $flash = $result['duplicate'] ? 'warning' : 'status';
 
         return back()->with($flash, $result['message'])->with('inventory_status', $result['inventory_status']);
@@ -144,7 +149,7 @@ class ScanController extends Controller
     }
 
     /**
-     * @return array{event_list_id: int, inventory_list_id: int|null, location_id: int|null, asset_status: string|null}
+     * @return array{event_list_id: int, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, department_id: int}
      */
     protected function validatedSessionLists(Request $request): array
     {
@@ -182,8 +187,32 @@ class ScanController extends Controller
             'new_location.parent_id.exists' => 'Racks cannot be a parent for another location.',
         ]);
 
+        $eventList = AssetList::query()->find($data['event_list_id']);
+        if ($eventList === null) {
+            throw ValidationException::withMessages([
+                'event_list_id' => 'Selected event list is not available.',
+            ]);
+        }
+
+        $inventoryList = null;
+        if (! empty($data['inventory_list_id'])) {
+            $inventoryList = AssetList::query()->find($data['inventory_list_id']);
+            if ($inventoryList === null) {
+                throw ValidationException::withMessages([
+                    'inventory_list_id' => 'Selected inventory list is not available.',
+                ]);
+            }
+
+            if ((int) $inventoryList->department_id !== (int) $eventList->department_id) {
+                throw ValidationException::withMessages([
+                    'inventory_list_id' => 'Event and inventory lists must belong to the same department.',
+                ]);
+            }
+        }
+
         $data['inventory_list_id'] = $data['inventory_list_id'] ?? null;
         $data['asset_status'] = $data['asset_status'] ?? null;
+        $data['department_id'] = (int) $eventList->department_id;
 
         if ($creatingLocation) {
             $location = Location::create([

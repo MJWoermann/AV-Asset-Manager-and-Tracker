@@ -105,9 +105,9 @@
                 <span>Active</span>
             </label>
 
-            <div class="flex gap-2">
-                <x-primary-button>Save</x-primary-button>
+            <div class="flex justify-end gap-2">
                 <a href="{{ route('admin.email.templates.index') }}" class="px-4 py-2 text-sm border">Cancel</a>
+                <x-primary-button>Save</x-primary-button>
             </div>
         </form>
     </div>

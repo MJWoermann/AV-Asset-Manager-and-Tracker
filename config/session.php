@@ -34,6 +34,19 @@ return [
 
     'lifetime' => (int) env('SESSION_LIFETIME', 120),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Scanner Shift Session Lifetime
+    |--------------------------------------------------------------------------
+    |
+    | Idle timeout (minutes) for users with the scanner or inventory_manager
+    | role. Applied via a hint cookie so StartSession can use the longer
+    | lifetime on the following request (all-day stocktake shifts).
+    |
+    */
+
+    'lifetime_scanner' => (int) env('SESSION_LIFETIME_SCANNER', 720),
+
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 
     /*

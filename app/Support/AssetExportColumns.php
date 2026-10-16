@@ -391,7 +391,7 @@ class AssetExportColumns
     public static function row(Asset $asset, array $columns, ?AssetListItem $item = null): array
     {
         return array_map(
-            fn (string $column) => self::value($asset, $column, $item),
+            fn (string $column) => CsvFormula::escape(self::value($asset, $column, $item)),
             $columns,
         );
     }

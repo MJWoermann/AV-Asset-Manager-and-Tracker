@@ -82,6 +82,14 @@
                 Maintenance
             </a>
             <a
+                href="<?php echo e(route('assets.show', [$asset, 'tab' => 'spares'])); ?>"
+                role="tab"
+                aria-selected="<?php echo e($tab === 'spares' ? 'true' : 'false'); ?>"
+                class="px-4 py-2 text-sm border-b-2 -mb-px <?php echo e($tab === 'spares' ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white'); ?>"
+            >
+                Spares
+            </a>
+            <a
                 href="<?php echo e(route('assets.show', [$asset, 'tab' => 'history'])); ?>"
                 role="tab"
                 aria-selected="<?php echo e($tab === 'history' ? 'true' : 'false'); ?>"
@@ -106,6 +114,8 @@
                 'stockReorderMeta' => $stockReorderMeta ?? [],
                 'stockAction' => $stockAction ?? null,
             ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        <?php elseif($tab === 'spares'): ?>
+            <?php echo $__env->make('assets.partials.spares', ['spareMovements' => $spareMovements ?? collect()], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
         <?php elseif($tab === 'connections'): ?>
             <?php echo $__env->make('assets.partials.connections', [
                 'asset' => $asset,

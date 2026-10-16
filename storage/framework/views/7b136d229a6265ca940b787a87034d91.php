@@ -687,20 +687,19 @@
 <?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
 <?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
 <?php endif; ?>
-                        <div class="<?php echo \Illuminate\Support\Arr::toCssClasses(['flex gap-2 items-stretch' => $fieldIsScannable]); ?>">
-                            <div class="<?php echo \Illuminate\Support\Arr::toCssClasses(['flex-1 min-w-0' => $fieldIsScannable, 'w-full' => ! $fieldIsScannable]); ?>">
-                                
-                                <?php if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists): ?>
-                                    <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
+                        <div class="<?php echo \Illuminate\Support\Arr::toCssClasses(['relative mt-1' => $fieldIsScannable]); ?>">
+                            
+                            <?php if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists): ?>
+                                <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal18c21970322f9e5c938bc954620c12bb = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => $field,'name' => $field,'class' => 'mt-1 block w-full','value' => old($field, $asset->{$field}),'xModel' => 'macAddress']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => $field,'name' => $field,'class' => \Illuminate\Support\Arr::toCssClasses(['block w-full', 'mt-1' => ! $fieldIsScannable, 'pe-16' => $fieldIsScannable]),'value' => old($field, $asset->{$field}),'xModel' => 'macAddress']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('text-input'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($field),'name' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($field),'class' => 'mt-1 block w-full','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old($field, $asset->{$field})),'x-model' => 'macAddress']); ?>
+<?php $component->withAttributes(['id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($field),'name' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($field),'class' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(\Illuminate\Support\Arr::toCssClasses(['block w-full', 'mt-1' => ! $fieldIsScannable, 'pe-16' => $fieldIsScannable])),'value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old($field, $asset->{$field})),'x-model' => 'macAddress']); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal18c21970322f9e5c938bc954620c12bb)): ?>
@@ -711,17 +710,17 @@
 <?php $component = $__componentOriginal18c21970322f9e5c938bc954620c12bb; ?>
 <?php unset($__componentOriginal18c21970322f9e5c938bc954620c12bb); ?>
 <?php endif; ?>
-                                <?php else: ?>
-                                    <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
+                            <?php else: ?>
+                                <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal18c21970322f9e5c938bc954620c12bb = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => $field,'name' => $field,'class' => 'mt-1 block w-full','value' => old($field, $asset->{$field})]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => $field,'name' => $field,'class' => \Illuminate\Support\Arr::toCssClasses(['block w-full', 'mt-1' => ! $fieldIsScannable, 'pe-16' => $fieldIsScannable]),'value' => old($field, $asset->{$field})]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('text-input'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($field),'name' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($field),'class' => 'mt-1 block w-full','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old($field, $asset->{$field}))]); ?>
+<?php $component->withAttributes(['id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($field),'name' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($field),'class' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(\Illuminate\Support\Arr::toCssClasses(['block w-full', 'mt-1' => ! $fieldIsScannable, 'pe-16' => $fieldIsScannable])),'value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old($field, $asset->{$field}))]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal18c21970322f9e5c938bc954620c12bb)): ?>
@@ -732,12 +731,11 @@
 <?php $component = $__componentOriginal18c21970322f9e5c938bc954620c12bb; ?>
 <?php unset($__componentOriginal18c21970322f9e5c938bc954620c12bb); ?>
 <?php endif; ?>
-                                <?php endif; ?>
-                            </div>
+                            <?php endif; ?>
                             <?php if($fieldIsScannable): ?>
                                 <button
                                     type="button"
-                                    class="mt-1 shrink-0 px-3 py-2 text-sm border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-black text-brand-charcoal dark:text-white hover:border-brand hover:text-brand"
+                                    class="absolute inset-y-0 end-0 my-px me-px flex items-center rounded-e-md px-2.5 text-xs font-medium text-brand-charcoal hover:text-brand dark:text-brand-silver dark:hover:text-brand"
                                     @click="toggleCamera"
                                     :aria-pressed="scanning.toString()"
                                     :aria-label="scanning ? 'Stop camera' : 'Scan barcode into <?php echo e($label); ?>'"

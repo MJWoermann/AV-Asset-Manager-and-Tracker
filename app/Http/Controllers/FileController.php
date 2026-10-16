@@ -11,12 +11,14 @@ use App\Models\File;
 use App\Models\FileLink;
 use App\Models\User;
 use App\Services\FileAttachmentService;
+use App\Support\TrustedExternalDomains;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FileController extends Controller
@@ -65,11 +67,19 @@ class FileController extends Controller
     public function search(Request $request): JsonResponse
     {
         $term = trim((string) $request->string('q'));
+        /** @var User|null $user */
+        $user = $request->user();
+        $manager = $user?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
 
         $files = File::query()
+            ->when(! $manager, function ($query): void {
+                $query->whereHas('links');
+            })
             ->when($term !== '', function ($query) use ($term): void {
-                $query->where('title', 'like', '%'.$term.'%')
-                    ->orWhere('original_filename', 'like', '%'.$term.'%');
+                $query->where(function ($builder) use ($term): void {
+                    $builder->where('title', 'like', '%'.$term.'%')
+                        ->orWhere('original_filename', 'like', '%'.$term.'%');
+                });
             })
             ->orderBy('title')
             ->limit(20)
@@ -180,13 +190,12 @@ class FileController extends Controller
         return redirect()->route('files.index')->with('status', 'File deleted.');
     }
 
-    public function download(File $file): StreamedResponse|RedirectResponse
+    public function download(Request $request, File $file): StreamedResponse|RedirectResponse|View
     {
-        if ($file->isUrl()) {
-            $scheme = strtolower((string) parse_url((string) $file->external_url, PHP_URL_SCHEME));
-            abort_unless(in_array($scheme, ['http', 'https'], true), 404);
+        $this->authorizeView($file);
 
-            return redirect()->away($file->external_url);
+        if ($file->isUrl()) {
+            return $this->redirectExternalUrl($request, $file);
         }
 
         abort_unless($file->path && $file->disk, 404);
@@ -200,13 +209,12 @@ class FileController extends Controller
         );
     }
 
-    public function preview(File $file): StreamedResponse|RedirectResponse
+    public function preview(Request $request, File $file): StreamedResponse|RedirectResponse|View
     {
-        if ($file->isUrl()) {
-            $scheme = strtolower((string) parse_url((string) $file->external_url, PHP_URL_SCHEME));
-            abort_unless(in_array($scheme, ['http', 'https'], true), 404);
+        $this->authorizeView($file);
 
-            return redirect()->away($file->external_url);
+        if ($file->isUrl()) {
+            return $this->redirectExternalUrl($request, $file);
         }
 
         abort_unless($file->isPreviewable(), 415);
@@ -215,8 +223,16 @@ class FileController extends Controller
         $disk = Storage::disk($file->disk);
         abort_unless($disk->exists($file->path), 404);
 
-        $filename = $file->original_filename ?: $file->title;
-        $disposition = 'inline; filename="'.addslashes($filename).'"';
+        $filename = (string) ($file->original_filename ?: $file->title ?: 'file');
+        $filename = str_replace(['/', '\\'], '_', $filename);
+        $fallback = preg_replace('/[^\x20-\x7e]/', '_', $filename) ?: 'file';
+        $fallback = str_replace('%', '_', $fallback);
+
+        $disposition = HeaderUtils::makeDisposition(
+            HeaderUtils::DISPOSITION_INLINE,
+            $filename,
+            $fallback
+        );
 
         return $disk->response($file->path, $filename, [
             'Content-Type' => (string) $file->mime_type,
@@ -226,12 +242,62 @@ class FileController extends Controller
 
     public function thumbnail(File $file): StreamedResponse
     {
+        $this->authorizeView($file);
+
         abort_unless($file->thumbnail_path && $file->disk, 404);
 
         $disk = Storage::disk($file->disk);
         abort_unless($disk->exists($file->thumbnail_path), 404);
 
         return $disk->response($file->thumbnail_path);
+    }
+
+    public function continueExternal(Request $request, File $file): RedirectResponse
+    {
+        $this->authorizeView($file);
+        abort_unless($file->isUrl(), 404);
+
+        $url = (string) $file->external_url;
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        abort_unless(in_array($scheme, ['http', 'https'], true), 404);
+
+        $host = TrustedExternalDomains::hostFromUrl($url);
+        abort_unless($host !== null, 404);
+
+        $request->validate([
+            'trust' => ['sometimes', 'boolean'],
+        ]);
+
+        if ($request->boolean('trust')) {
+            $user = $request->user();
+            $user->preferences = TrustedExternalDomains::mergeAdd($user->preferences, $url);
+            $user->save();
+        }
+
+        return redirect()->away($url);
+    }
+
+    protected function redirectExternalUrl(Request $request, File $file): RedirectResponse|View
+    {
+        $url = (string) $file->external_url;
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        abort_unless(in_array($scheme, ['http', 'https'], true), 404);
+
+        $host = TrustedExternalDomains::hostFromUrl($url);
+        abort_unless($host !== null, 404);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        if (TrustedExternalDomains::isTrusted($user->preferences, $url)) {
+            return redirect()->away($url);
+        }
+
+        return view('files.external-confirm', [
+            'file' => $file,
+            'url' => $url,
+            'host' => $host,
+        ]);
     }
 
     protected function linkableFromRequest(?string $type, mixed $id): ?Model
@@ -256,6 +322,18 @@ class FileController extends Controller
         if (in_array($type, ['location', 'item_type'], true)) {
             $this->authorizeManager();
         }
+    }
+
+    protected function authorizeView(File $file): void
+    {
+        /** @var User|null $user */
+        $user = auth()->user();
+
+        if ($user?->hasAnyRole(['admin', 'inventory_manager'])) {
+            return;
+        }
+
+        abort_unless($user !== null && $file->links()->exists(), 403);
     }
 
     protected function authorizeManager(): void

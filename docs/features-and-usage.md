@@ -53,7 +53,8 @@ Access is controlled by three roles. Your administrator assigns these when creat
 | Dashboard, Scan, view/edit assets | ✓ | ✓ | ✓ |
 | Delete assets | ✓ | ✓ | |
 | View lists; use Reports | ✓ | ✓ | ✓ |
-| Create/edit lists, locations, item types, field sets | ✓ | ✓ | |
+| Create locations, manufacturers, and models | ✓ | ✓ | ✓ |
+| Edit/delete locations & catalogue; create/edit lists, item types, field sets | ✓ | ✓ | |
 | Import / export spreadsheets | ✓ | ✓ | |
 | File library (central index & delete) | ✓ | ✓ | |
 | Attach files on assets / maintenance | ✓ | ✓ | ✓ |
@@ -96,6 +97,22 @@ Main navigation (desktop and phone menu):
 
 On **Assets** and when browsing a **list**, use **Columns** to show or hide fields. Your choice is saved for your user and shared between those screens.
 
+**Dashboard**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Dashboard desktop](images/features/dashboard-desktop.png) | ![Dashboard mobile](images/features/dashboard-mobile.png) |
+
+**Phone menu** (hamburger)
+
+![Mobile navigation menu](images/features/mobile-nav-menu.png)
+
+**Profile** (theme, scan sounds, developer preview flags)
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Profile desktop](images/features/profile-desktop.png) | ![Profile mobile](images/features/profile-mobile.png) |
+
 ---
 
 ## Core workflows
@@ -127,6 +144,24 @@ This is the main day-of-event workflow.
 - You need network access while scanning; work is saved on the server as you go.
 - On phones and tablets, open the app over **HTTPS**. The camera will not work on plain HTTP to a LAN server. Admins: see [self-signed-tls.md](self-signed-tls.md) for certificates and installing trust on iOS/Android.
 
+**Scan**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Scan desktop](images/features/scan-desktop.png) | ![Scan mobile](images/features/scan-mobile.png) |
+
+**Compare lists**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Compare desktop](images/features/reports-compare-desktop.png) | ![Compare mobile](images/features/reports-compare-mobile.png) |
+
+**Unknown scans**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Unknown scans desktop](images/features/reports-unknown-scans-desktop.png) | ![Unknown scans mobile](images/features/reports-unknown-scans-mobile.png) |
+
 ### 2. Find and maintain an asset
 
 1. Open **Assets** (or a list).
@@ -145,12 +180,48 @@ This is the main day-of-event workflow.
 
 **Bulk actions** on Assets or a list let you update status, location, parent, or list membership for many rows at once. Deleting assets is limited to managers and admins.
 
+**Assets catalogue**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Assets desktop](images/features/assets-desktop.png) | ![Assets mobile](images/features/assets-mobile.png) |
+
+**Asset details**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Asset details desktop](images/features/asset-show-desktop.png) | ![Asset details mobile](images/features/asset-show-mobile.png) |
+
+**Maintenance tab**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Maintenance desktop](images/features/asset-maintenance-desktop.png) | ![Maintenance mobile](images/features/asset-maintenance-mobile.png) |
+
+**History tab**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![History desktop](images/features/asset-history-desktop.png) | ![History mobile](images/features/asset-history-mobile.png) |
+
 ### 3. Lists for jobs and warehouses
 
 - **Inventory managers** create and name lists (inventory vs event).
 - Anyone with access can open a list and work with its members much like the Assets screen.
 - Export a list to Excel or CSV for sharing outside the app.
 - During a stocktake, the event list is the “scanned” side of Compare; the inventory list is the “expected” side.
+
+**Lists index**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Lists desktop](images/features/lists-desktop.png) | ![Lists mobile](images/features/lists-mobile.png) |
+
+**List members** (example inventory list)
+
+| Desktop | Mobile |
+|---------|--------|
+| ![List show desktop](images/features/list-show-desktop.png) | ![List show mobile](images/features/list-show-mobile.png) |
 
 ### 4. Import and export spreadsheets
 
@@ -160,19 +231,50 @@ This is the main day-of-event workflow.
 
 **File size / types for uploads generally:** jpg, png, webp, pdf, docx, xlsx, csv — up to **25 MB** per file.
 
+**Import**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Import desktop](images/features/import-desktop.png) | ![Import mobile](images/features/import-mobile.png) |
+
+**Export columns** (admin)
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Export columns desktop](images/admin/admin-export-columns-desktop.png) | ![Export columns mobile](images/admin/admin-export-columns-mobile.png) |
+
 ### 5. Locations and templates
 
-- **Locations** — organise sites and storage. Scanners can usually view the tree; managers maintain it.
+- **Locations** — organise sites and storage. Scanners can view and create locations; managers edit, delete, and bulk-update.
+- **Manufacturers / models** — catalogue brands and model names. Scanners can view and create; managers edit and delete.
 - **Item types** — define categories of gear and which custom field sets apply.
 - **Field sets** — build reusable extra fields once, then attach them to types so every asset of that type gets the same form.
 
 Getting types and fields right early makes import, scanning, and reports much cleaner.
+
+**Locations**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Locations desktop](images/features/locations-desktop.png) | ![Locations mobile](images/features/locations-mobile.png) |
+
+**Item types**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Item types desktop](images/features/item-types-desktop.png) | ![Item types mobile](images/features/item-types-mobile.png) |
 
 ### 6. Files and manuals
 
 - Attach uploads or external URLs on an asset (and related records such as maintenance).
 - Managers also have a central **Files** library under Data for searching and housekeeping.
 - Storage can be local disk or another configured backend (admin **Storage** settings) — ask your admin where files physically live.
+
+**File library**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Files desktop](images/features/files-desktop.png) | ![Files mobile](images/features/files-mobile.png) |
 
 ### 7. Maintenance logging
 
@@ -203,6 +305,12 @@ Some capabilities are shipped but turned on **per user** under **Profile → Dev
 
 Ask an admin before enabling preview features in production if your organisation has a staged rollout.
 
+**RU visualiser** (Rack tab on a container asset)
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Rack desktop](images/features/asset-rack-desktop.png) | ![Rack mobile](images/features/asset-rack-mobile.png) |
+
 ---
 
 ## Admin and IT (brief)
@@ -218,6 +326,18 @@ These items matter for evaluation and operations; day-to-day scanners rarely nee
 | **Hosting** | PHP/Laravel app; MariaDB in production; Ubuntu + Nginx guide in [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md) |
 | **PWA** | Installable shortcut and cached shell assets; **data operations require being online** |
 | **Audit history** | Append-only for compliance/trust — History cannot be altered after the fact |
+
+**Users**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Users desktop](images/admin/admin-users-desktop.png) | ![Users mobile](images/admin/admin-users-mobile.png) |
+
+**Storage & backup**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![Storage desktop](images/admin/admin-storage-desktop.png) | ![Storage mobile](images/admin/admin-storage-mobile.png) |
 
 ---
 
@@ -251,6 +371,7 @@ Everything else described above is available in the current product; preview mod
 | Document | Audience |
 |----------|----------|
 | [README](../README.md) | Install and upgrade overview |
+| [Organizational deployment (ADKAR)](organizational-deployment.md) | Sponsors and inventory leads — rollout, training, sustainment |
 | [Deploy (Ubuntu + Nginx)](deploy-ubuntu-nginx.md) | Server setup |
 | [REST API](api.md) | Integrators |
 | [SSO setup](sso-setup.md) | Admins enabling Google / Microsoft login |

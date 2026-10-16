@@ -19,9 +19,11 @@
                 href="{{ route('assets.index', ['manufacturer_id' => $manufacturer->id]) }}"
                 class="text-sm text-brand"
             >Assets</a>
-            @role('admin|inventory_manager')
+            @role('admin|inventory_manager|scanner')
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="{{ route('manufacturers.models.create', $manufacturer) }}" class="text-sm text-brand">Add model</a>
+            @endrole
+            @role('admin|inventory_manager')
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="{{ route('manufacturers.edit', $manufacturer) }}" class="text-sm text-brand">Edit</a>
                 @if($replacementManufacturers->where('id', '!=', $manufacturer->id)->isNotEmpty())

@@ -88,7 +88,58 @@ class SocialAuthService
             return (bool) ($raw['email_verified'] ?? false);
         }
 
+        if ($provider === 'azure') {
+            $verified = $this->providerEmailVerifiedClaim($socialUser->getRaw());
+
+            if ($verified === false) {
+                return false;
+            }
+
+            if ($verified === true) {
+                return true;
+            }
+
+            // Azure/Graph often omits a verified claim; require email presence only then.
+            return filled($socialUser->getEmail());
+        }
+
         return filled($socialUser->getEmail());
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     */
+    private function providerEmailVerifiedClaim(array $raw): ?bool
+    {
+        foreach (['email_verified', 'verified_email'] as $key) {
+            if (! array_key_exists($key, $raw)) {
+                continue;
+            }
+
+            $value = $raw[$key];
+
+            if (is_bool($value)) {
+                return $value;
+            }
+
+            if (is_int($value) || is_float($value)) {
+                return (int) $value === 1;
+            }
+
+            if (is_string($value)) {
+                $normalized = strtolower(trim($value));
+
+                if (in_array($normalized, ['true', '1', 'yes'], true)) {
+                    return true;
+                }
+
+                if (in_array($normalized, ['false', '0', 'no'], true)) {
+                    return false;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function deny(string $message): RedirectResponse

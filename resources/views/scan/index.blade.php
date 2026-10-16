@@ -96,12 +96,33 @@
             @endphp
 
             <div
-                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false), @js(auth()->user()?->wantsScanNoise() ?? false))"
+                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false), @js(auth()->user()?->wantsScanNoise() ?? false), @js(auth()->user()?->wantsScanVibrate() ?? false))"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
-                <div class="flex gap-2">
-                    <button type="button" @click="startCamera" x-show="!scanning" class="px-4 py-2 bg-brand text-white text-sm">Start camera</button>
-                    <button type="button" @click="stopCamera" x-show="scanning" x-cloak class="px-4 py-2 bg-black text-white text-sm">Stop camera</button>
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-text="inputModeStatus" data-scan-input-mode-status></p>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            @click="useCamera"
+                            x-show="!scanning"
+                            class="px-4 py-2 bg-brand text-white text-sm"
+                        >Use camera</button>
+                        <button
+                            type="button"
+                            @click="stopCamera"
+                            x-show="scanning"
+                            x-cloak
+                            class="px-4 py-2 bg-black text-white text-sm"
+                        >Stop camera</button>
+                        <button
+                            type="button"
+                            @click="useHardware"
+                            x-show="showHardwareSwitch"
+                            x-cloak
+                            class="px-4 py-2 border border-brand-charcoal dark:border-brand-silver text-sm"
+                        >Use hardware scanner</button>
+                    </div>
                 </div>
                 <div
                     id="qr-reader"
@@ -212,9 +233,9 @@
                                         class="w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white text-sm"
                                         placeholder="Note to help identify this item later…"
                                     ></textarea>
-                                    <div class="flex gap-2">
-                                        <button type="button" class="px-2 py-1 bg-black text-white dark:bg-brand text-xs" @click="saveNote(entry)" :disabled="entry.savingNote">Save note</button>
+                                    <div class="flex justify-end gap-2">
                                         <button type="button" class="px-2 py-1 border text-xs" @click="entry.editingNote = false">Cancel</button>
+                                        <button type="button" class="px-2 py-1 bg-black text-white dark:bg-brand text-xs" @click="saveNote(entry)" :disabled="entry.savingNote">Save note</button>
                                     </div>
                                 </div>
                             </li>
@@ -250,12 +271,12 @@
                 </div>
             </div>
 
-            <div class="flex gap-2">
+            <div class="flex justify-end gap-2">
+                <a href="{{ route('reports.compare') }}?scanned_list_id={{ $session->event_list_id }}&inventory_list_id={{ $session->inventory_list_id }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Compare report</a>
                 <form method="POST" action="{{ route('scan.close', $session) }}">
                     @csrf
                     <x-primary-button>Save &amp; close</x-primary-button>
                 </form>
-                <a href="{{ route('reports.compare') }}?scanned_list_id={{ $session->event_list_id }}&inventory_list_id={{ $session->inventory_list_id }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Compare report</a>
             </div>
         @endunless
     </div>

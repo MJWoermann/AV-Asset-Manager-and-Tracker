@@ -75,6 +75,20 @@ class FileAttachmentTest extends TestCase
         ]);
     }
 
+    protected function linkFileToAsset(File $file, ?Asset $asset = null): Asset
+    {
+        $asset ??= $this->makeAsset();
+
+        FileLink::query()->create([
+            'file_id' => $file->id,
+            'linkable_type' => Asset::class,
+            'linkable_id' => $asset->id,
+            'note' => null,
+        ]);
+
+        return $asset;
+    }
+
     public function test_guest_cannot_download_file(): void
     {
         $file = File::factory()->create();
@@ -190,7 +204,9 @@ class FileAttachmentTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('files.download', $file))
-            ->assertRedirect('https://example.com/docs/manual.pdf');
+            ->assertOk()
+            ->assertSee('Leaving the application', false)
+            ->assertSee('example.com', false);
     }
 
     public function test_unlink_deletes_library_file_when_last_link_removed(): void
@@ -299,6 +315,7 @@ class FileAttachmentTest extends TestCase
         $file = File::factory()->url()->create([
             'external_url' => 'javascript:alert(1)',
         ]);
+        $this->linkFileToAsset($file);
 
         $this->actingAs($user)
             ->get(route('files.download', $file))
@@ -313,6 +330,206 @@ class FileAttachmentTest extends TestCase
         $this->actingAs($user)
             ->get(route('files.download', $file))
             ->assertForbidden();
+    }
+
+    public function test_scanner_can_download_linked_file(): void
+    {
+        $user = $this->scanner();
+        $path = 'attachments/test/linked.pdf';
+        Storage::disk('local')->put($path, '%PDF-1.4 linked');
+
+        $file = File::factory()->create([
+            'path' => $path,
+            'mime_type' => 'application/pdf',
+        ]);
+        $this->linkFileToAsset($file);
+
+        $this->actingAs($user)
+            ->get(route('files.download', $file))
+            ->assertOk();
+    }
+
+    public function test_scanner_cannot_download_unlinked_library_file(): void
+    {
+        $user = $this->scanner();
+        $path = 'attachments/test/unlinked.pdf';
+        Storage::disk('local')->put($path, '%PDF-1.4 unlinked');
+
+        $file = File::factory()->create([
+            'path' => $path,
+            'mime_type' => 'application/pdf',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('files.download', $file))
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get(route('files.preview', $file))
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get(route('files.thumbnail', $file))
+            ->assertForbidden();
+    }
+
+    public function test_manager_can_download_unlinked_library_file(): void
+    {
+        $manager = $this->manager();
+        $path = 'attachments/test/library.pdf';
+        Storage::disk('local')->put($path, '%PDF-1.4 library');
+
+        $file = File::factory()->create([
+            'path' => $path,
+            'mime_type' => 'application/pdf',
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('files.download', $file))
+            ->assertOk();
+    }
+
+    public function test_scanner_search_omits_unlinked_library_files(): void
+    {
+        $scanner = $this->scanner();
+        $manager = $this->manager();
+
+        $linked = File::factory()->create(['title' => 'Shared Spec Alpha']);
+        $this->linkFileToAsset($linked);
+        $unlinked = File::factory()->create(['title' => 'Shared Spec Beta']);
+
+        $scannerResults = $this->actingAs($scanner)
+            ->getJson(route('files.search', ['q' => 'Shared Spec']))
+            ->assertOk()
+            ->json('data');
+
+        $this->assertCount(1, $scannerResults);
+        $this->assertSame($linked->id, $scannerResults[0]['id']);
+        $this->assertNotContains($unlinked->id, collect($scannerResults)->pluck('id')->all());
+
+        $managerResults = $this->actingAs($manager)
+            ->getJson(route('files.search', ['q' => 'Shared Spec']))
+            ->assertOk()
+            ->json('data');
+
+        $managerIds = collect($managerResults)->pluck('id')->all();
+        $this->assertContains($linked->id, $managerIds);
+        $this->assertContains($unlinked->id, $managerIds);
+    }
+
+    public function test_untrusted_external_url_shows_leave_app_confirm(): void
+    {
+        $user = $this->scanner();
+        $file = File::factory()->url()->create([
+            'external_url' => 'https://docs.vendor.com/a/manual.pdf',
+        ]);
+        $this->linkFileToAsset($file);
+
+        $this->actingAs($user)
+            ->get(route('files.download', $file))
+            ->assertOk()
+            ->assertSee('Leaving the application', false)
+            ->assertSee('docs.vendor.com', false)
+            ->assertSee('https://docs.vendor.com/a/manual.pdf', false)
+            ->assertDontSee('redirect', false);
+    }
+
+    public function test_trusting_domain_on_one_file_skips_confirm_for_another_on_same_host(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->makeAsset();
+        $fileA = File::factory()->url()->create([
+            'external_url' => 'https://docs.vendor.com/a/manual.pdf',
+        ]);
+        $fileB = File::factory()->url()->create([
+            'external_url' => 'https://docs.vendor.com/b/other.pdf',
+        ]);
+        $fileC = File::factory()->url()->create([
+            'external_url' => 'https://other.example.org/x.pdf',
+        ]);
+        $this->linkFileToAsset($fileA, $asset);
+        $this->linkFileToAsset($fileB, $asset);
+        $this->linkFileToAsset($fileC, $asset);
+
+        $this->actingAs($user)
+            ->post(route('files.external.continue', $fileA), ['trust' => '1'])
+            ->assertRedirect('https://docs.vendor.com/a/manual.pdf');
+
+        $user->refresh();
+        $this->assertContains('docs.vendor.com', data_get($user->preferences, 'trusted_external_domains'));
+
+        $this->actingAs($user)
+            ->get(route('files.download', $fileB))
+            ->assertRedirect('https://docs.vendor.com/b/other.pdf');
+
+        $this->actingAs($user)
+            ->get(route('files.preview', $fileC))
+            ->assertOk()
+            ->assertSee('Leaving the application', false)
+            ->assertSee('other.example.org', false);
+    }
+
+    public function test_continue_once_does_not_persist_trust(): void
+    {
+        $user = $this->scanner();
+        $file = File::factory()->url()->create([
+            'external_url' => 'https://once.example.com/doc.pdf',
+        ]);
+        $this->linkFileToAsset($file);
+
+        $this->actingAs($user)
+            ->post(route('files.external.continue', $file), ['trust' => '0'])
+            ->assertRedirect('https://once.example.com/doc.pdf');
+
+        $user->refresh();
+        $this->assertNotContains('once.example.com', data_get($user->preferences, 'trusted_external_domains', []));
+
+        $this->actingAs($user)
+            ->get(route('files.download', $file))
+            ->assertOk()
+            ->assertSee('Leaving the application', false);
+    }
+
+    public function test_removing_trusted_domain_restores_confirm_for_all_files_on_host(): void
+    {
+        $user = $this->scanner();
+        $user->preferences = [
+            'trusted_external_domains' => ['docs.vendor.com'],
+        ];
+        $user->save();
+
+        $asset = $this->makeAsset();
+        $fileA = File::factory()->url()->create([
+            'external_url' => 'https://docs.vendor.com/a/manual.pdf',
+        ]);
+        $fileB = File::factory()->url()->create([
+            'external_url' => 'https://docs.vendor.com/b/other.pdf',
+        ]);
+        $this->linkFileToAsset($fileA, $asset);
+        $this->linkFileToAsset($fileB, $asset);
+
+        $this->actingAs($user)
+            ->get(route('files.download', $fileA))
+            ->assertRedirect('https://docs.vendor.com/a/manual.pdf');
+
+        $this->actingAs($user)
+            ->delete(route('preferences.trusted-external-domains.destroy'), [
+                'host' => 'docs.vendor.com',
+            ])
+            ->assertRedirect();
+
+        $user->refresh();
+        $this->assertNotContains('docs.vendor.com', data_get($user->preferences, 'trusted_external_domains', []));
+
+        $this->actingAs($user)
+            ->get(route('files.download', $fileA))
+            ->assertOk()
+            ->assertSee('Leaving the application', false);
+
+        $this->actingAs($user)
+            ->get(route('files.preview', $fileB))
+            ->assertOk()
+            ->assertSee('Leaving the application', false);
     }
 
     public function test_guest_cannot_preview_file(): void
@@ -333,11 +550,13 @@ class FileAttachmentTest extends TestCase
             'mime_type' => 'application/pdf',
             'original_filename' => 'preview.pdf',
         ]);
+        $this->linkFileToAsset($file);
 
         $response = $this->actingAs($user)->get(route('files.preview', $file));
 
         $response->assertOk();
         $this->assertStringContainsString('inline', (string) $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('filename=', (string) $response->headers->get('Content-Disposition'));
         $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
     }
 
@@ -352,6 +571,7 @@ class FileAttachmentTest extends TestCase
             'mime_type' => 'image/jpeg',
             'original_filename' => 'preview.jpg',
         ]);
+        $this->linkFileToAsset($file);
 
         $response = $this->actingAs($user)->get(route('files.preview', $file));
 
@@ -371,6 +591,7 @@ class FileAttachmentTest extends TestCase
             'mime_type' => 'text/csv',
             'original_filename' => 'data.csv',
         ]);
+        $this->linkFileToAsset($file);
 
         $this->actingAs($user)
             ->get(route('files.preview', $file))
@@ -387,6 +608,7 @@ class FileAttachmentTest extends TestCase
             'mime_type' => 'image/jpeg',
             'thumbnail_path' => $thumbPath,
         ]);
+        $this->linkFileToAsset($file);
 
         $this->actingAs($user)
             ->get(route('files.thumbnail', $file))

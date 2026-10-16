@@ -11,7 +11,7 @@
      <?php $__env->slot('header', null, []); ?> 
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Manufacturers / Models</h2>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager|scanner')): ?>
                 <a href="<?php echo e(route('manufacturers.create')); ?>" class="px-3 py-2 bg-brand text-white text-sm">Add manufacturer</a>
             <?php endif; ?>
         </div>

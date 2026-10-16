@@ -246,7 +246,8 @@
 <?php endif; ?>
             <?php endif; ?>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-wrap items-center justify-end gap-3">
+                <a href="<?php echo e(route('item-types.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
                 <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -266,7 +267,6 @@
 <?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
 <?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
 <?php endif; ?>
-                <a href="<?php echo e(route('item-types.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
             </div>
         </form>
 

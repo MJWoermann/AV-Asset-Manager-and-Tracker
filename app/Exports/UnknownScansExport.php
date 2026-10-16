@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\UnknownScan;
+use App\Support\CsvFormula;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -20,18 +21,18 @@ class UnknownScansExport implements FromCollection, WithHeadings
     {
         return $this->scans->map(function (UnknownScan $scan) {
             return [
-                $scan->created_at?->format('Y-m-d H:i:s'),
-                $scan->scanned_code,
-                $scan->quantity,
-                $scan->user?->name ?? '',
-                $scan->location?->breadcrumb() ?? $scan->location?->name ?? '',
-                $scan->eventList?->name ?? '',
-                $scan->inventoryList?->name ?? '',
-                $scan->asset_status?->label() ?? '',
-                $scan->note ?? '',
-                $scan->isResolved() ? 'Resolved' : 'Open',
-                $scan->resolvedAsset?->name ?? '',
-                $scan->resolved_at?->format('Y-m-d H:i:s') ?? '',
+                CsvFormula::escape($scan->created_at?->format('Y-m-d H:i:s') ?? ''),
+                CsvFormula::escape($scan->scanned_code),
+                CsvFormula::escape($scan->quantity),
+                CsvFormula::escape($scan->user?->name ?? ''),
+                CsvFormula::escape($scan->location?->breadcrumb() ?? $scan->location?->name ?? ''),
+                CsvFormula::escape($scan->eventList?->name ?? ''),
+                CsvFormula::escape($scan->inventoryList?->name ?? ''),
+                CsvFormula::escape($scan->asset_status?->label() ?? ''),
+                CsvFormula::escape($scan->note ?? ''),
+                CsvFormula::escape($scan->isResolved() ? 'Resolved' : 'Open'),
+                CsvFormula::escape($scan->resolvedAsset?->name ?? ''),
+                CsvFormula::escape($scan->resolved_at?->format('Y-m-d H:i:s') ?? ''),
             ];
         });
     }

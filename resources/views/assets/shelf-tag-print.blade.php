@@ -5,12 +5,12 @@
                 <h2 class="font-semibold text-xl">Print label</h2>
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">{{ $asset->name }}</p>
             </div>
-            <div class="flex flex-wrap gap-2 print:hidden">
-                @if($layout)
-                    <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
-                    <a href="{{ route('assets.label.pdf', [$asset, 'layout' => $layout->id]) }}" class="px-3 py-2 border text-sm">Download PDF</a>
-                @endif
+            <div class="flex flex-wrap justify-end gap-2 print:hidden">
                 <a href="{{ route('assets.show', $asset) }}" class="px-3 py-2 border text-sm">Back to asset</a>
+                @if($layout)
+                    <a href="{{ route('assets.label.pdf', [$asset, 'layout' => $layout->id]) }}" class="px-3 py-2 border text-sm">Download PDF</a>
+                    <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
+                @endif
             </div>
         </div>
     </x-slot>

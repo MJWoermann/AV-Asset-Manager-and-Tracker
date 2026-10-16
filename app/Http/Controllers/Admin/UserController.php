@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
@@ -15,7 +17,7 @@ class UserController extends Controller
 {
     public function index(): View
     {
-        $users = User::with('roles')->orderBy('name')->paginate(50);
+        $users = User::with(['roles', 'departments'])->orderBy('name')->paginate(50);
 
         return view('admin.users.index', compact('users'));
     }
@@ -25,6 +27,7 @@ class UserController extends Controller
         return view('admin.users.form', [
             'user' => new User(['theme' => 'light']),
             'roles' => Role::orderBy('name')->get(),
+            'departments' => Department::query()->orderBy('name')->get(),
         ]);
     }
 
@@ -36,6 +39,8 @@ class UserController extends Controller
             'password' => ['required', Password::defaults()],
             'role' => ['required', 'exists:roles,name'],
             'theme' => ['required', 'in:light,dark'],
+            'department_ids' => ['nullable', 'array'],
+            'department_ids.*' => ['integer', Rule::exists('departments', 'id')],
         ]);
 
         $user = User::create([
@@ -46,15 +51,19 @@ class UserController extends Controller
             'email_verified_at' => now(),
         ]);
         $user->syncRoles([$data['role']]);
+        $user->departments()->sync($data['department_ids'] ?? []);
 
         return redirect()->route('admin.users.index')->with('status', 'User created.');
     }
 
     public function edit(User $user): View
     {
+        $user->load('departments');
+
         return view('admin.users.form', [
             'user' => $user,
             'roles' => Role::orderBy('name')->get(),
+            'departments' => Department::query()->orderBy('name')->get(),
         ]);
     }
 
@@ -66,6 +75,8 @@ class UserController extends Controller
             'password' => ['nullable', Password::defaults()],
             'role' => ['required', 'exists:roles,name'],
             'theme' => ['required', 'in:light,dark'],
+            'department_ids' => ['nullable', 'array'],
+            'department_ids.*' => ['integer', Rule::exists('departments', 'id')],
         ]);
 
         $user->update([
@@ -75,6 +86,7 @@ class UserController extends Controller
             ...(filled($data['password'] ?? null) ? ['password' => Hash::make($data['password'])] : []),
         ]);
         $user->syncRoles([$data['role']]);
+        $user->departments()->sync($data['department_ids'] ?? []);
 
         return redirect()->route('admin.users.index')->with('status', 'User updated.');
     }

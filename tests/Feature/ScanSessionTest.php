@@ -463,6 +463,12 @@ class ScanSessionTest extends TestCase
         $response->assertSee('Rack A Fixture');
         $response->assertDontSee('Rack B Fixture');
         $response->assertSee('barcodeScanner(', false);
+        $response->assertSee('Use camera');
+        $response->assertSee('Use hardware scanner');
+        $response->assertSee('inputModeStatus', false);
+        $response->assertSee('useCamera', false);
+        $response->assertSee('useHardware', false);
+        $response->assertSee('data-scan-input-mode-status', false);
         $response->assertSee((string) $eventA->id);
 
         $this->actingAs($user)->patch(route('scan.lists', $session), [

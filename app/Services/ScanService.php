@@ -6,7 +6,9 @@ use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\AssetListItem;
 use App\Models\ScanSession;
+use App\Models\SparePart;
 use App\Models\UnknownScan;
+use App\Support\SparePartLuhn;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -49,6 +51,26 @@ class ScanService
         }
 
         if (! $asset) {
+            $spare = $this->resolveSpareByCode($code);
+            if ($spare) {
+                return [
+                    'items' => [],
+                    'duplicate' => false,
+                    'unknown' => false,
+                    'inventory_status' => 'spare_part',
+                    'warning' => null,
+                    'message' => "Spare {$spare->code} ({$spare->component}).",
+                    'asset' => null,
+                    'unknown_scan' => null,
+                    'spare_redirect' => route('spares.show', $spare),
+                    'spare' => [
+                        'id' => $spare->id,
+                        'code' => $spare->code,
+                        'component' => $spare->component,
+                    ],
+                ];
+            }
+
             return $this->logUnknownScan($session, $code, $quantity);
         }
 
@@ -135,11 +157,27 @@ class ScanService
      *     unknown_scan: array<string, mixed>
      * }
      */
+    protected function resolveSpareByCode(string $code): ?SparePart
+    {
+        $part = SparePart::query()->findByCode($code)->first();
+        if ($part) {
+            return $part;
+        }
+
+        $digits = preg_replace('/\D/', '', $code) ?? '';
+        if ($digits !== '' && SparePartLuhn::isValid($digits)) {
+            return SparePart::query()->findByCode($digits)->first();
+        }
+
+        return null;
+    }
+
     protected function logUnknownScan(ScanSession $session, string $code, int $quantity): array
     {
         $session->loadMissing('location');
 
         $unknown = UnknownScan::create([
+            'department_id' => $session->department_id,
             'scanned_code' => $code,
             'user_id' => $session->user_id,
             'scan_session_id' => $session->id,

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Support\DeveloperFeatures;
 use App\Support\ScanNoise;
+use App\Support\ScanVibrate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +31,7 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $validated = $request->validated();
-        unset($validated['features'], $validated['scan_noise']);
+        unset($validated['features'], $validated['scan_noise'], $validated['scan_vibrate']);
 
         $user->fill($validated);
 
@@ -44,6 +45,13 @@ class ProfileController extends Controller
             $preferences = ScanNoise::mergeIntoPreferences(
                 $preferences,
                 $request->boolean('scan_noise'),
+            );
+        }
+
+        if ($request->exists('scan_vibrate')) {
+            $preferences = ScanVibrate::mergeIntoPreferences(
+                $preferences,
+                $request->boolean('scan_vibrate'),
             );
         }
 

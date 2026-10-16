@@ -58,11 +58,24 @@
 
         <div class="space-y-2">
             <p class="text-sm font-medium text-gray-900 dark:text-white">
-                {{ __('Scan sounds') }}
+                {{ __('Scan feedback') }}
             </p>
             <p class="text-sm text-gray-600 dark:text-brand-silver">
-                {{ __('Play a short tone when a barcode matches an asset, and a different tone when a scan fails.') }}
+                {{ __('Optional cues when a barcode matches or fails. Vibration uses less power than tones on supported phones.') }}
             </p>
+            <label for="scan_vibrate" class="flex items-start gap-2 text-sm text-gray-800 dark:text-brand-silver">
+                <input type="hidden" name="scan_vibrate" value="0">
+                <input
+                    id="scan_vibrate"
+                    type="checkbox"
+                    name="scan_vibrate"
+                    value="1"
+                    class="rounded border-gray-300 text-brand mt-0.5"
+                    @checked(old('scan_vibrate', $user->wantsScanVibrate()))
+                >
+                <span class="font-medium text-gray-900 dark:text-white">{{ __('Enable scan vibration') }}</span>
+            </label>
+            <x-input-error class="mt-2" :messages="$errors->get('scan_vibrate')" />
             <label for="scan_noise" class="flex items-start gap-2 text-sm text-gray-800 dark:text-brand-silver">
                 <input type="hidden" name="scan_noise" value="0">
                 <input
@@ -76,6 +89,39 @@
                 <span class="font-medium text-gray-900 dark:text-white">{{ __('Enable scan noise') }}</span>
             </label>
             <x-input-error class="mt-2" :messages="$errors->get('scan_noise')" />
+        </div>
+
+        @php
+            $trustedDomains = \App\Support\TrustedExternalDomains::hosts($user->preferences);
+        @endphp
+        <div class="space-y-2">
+            <p class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ __('Trusted external domains') }}
+            </p>
+            <p class="text-sm text-gray-600 dark:text-brand-silver">
+                {{ __('When you open a URL attachment, hosts you trust skip the leave-app confirmation for every file on that domain.') }}
+            </p>
+            @if ($trustedDomains === [])
+                <p class="text-sm text-gray-600 dark:text-brand-silver">
+                    {{ __('No trusted domains yet.') }}
+                </p>
+            @else
+                <ul class="divide-y divide-gray-200 dark:divide-brand-charcoal border border-gray-200 dark:border-brand-charcoal rounded-md">
+                    @foreach ($trustedDomains as $trustedHost)
+                        <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                            <span class="font-medium text-gray-900 dark:text-white break-all">{{ $trustedHost }}</span>
+                            <form method="post" action="{{ route('preferences.trusted-external-domains.destroy') }}">
+                                @csrf
+                                @method('delete')
+                                <input type="hidden" name="host" value="{{ $trustedHost }}">
+                                <x-danger-button type="submit" class="!px-2 !py-1 !text-[10px]">
+                                    {{ __('Remove') }}
+                                </x-danger-button>
+                            </form>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
         </div>
 
         @if ($user->hasRole('admin'))

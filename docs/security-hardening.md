@@ -393,6 +393,8 @@ Use alongside the checklist in the deploy guide.
 | View assets / lists | ✓ | ✓ | ✓ | ✗ |
 | Create / update assets | ✓ | ✓ | ✓* | ✗ |
 | Delete assets / manage users / SSO / storage | ✓ | — | — | ✗ |
+| Create locations / manufacturers / models | ✓ | ✓ | ✓ | ✗ |
+| Edit / delete / bulk locations & catalogue | ✓ | ✓ | — | ✗ |
 | Import / export | ✓ | ✓ | — | ✗ |
 | Scan into event lists | ✓ | ✓ | ✓ | ✗ |
 | File library admin | ✓ | ✓ | — | ✗ |

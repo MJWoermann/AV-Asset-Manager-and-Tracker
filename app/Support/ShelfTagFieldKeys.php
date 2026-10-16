@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Asset;
 use App\Models\CustomFieldDefinition;
+use App\Models\SparePart;
 use Illuminate\Support\Collection;
 
 class ShelfTagFieldKeys
@@ -38,6 +39,73 @@ class ShelfTagFieldKeys
         return array_keys(self::core());
     }
 
+    /**
+     * Spare-part field keys for label designer / printing.
+     *
+     * @return array<string, string>
+     */
+    public static function spareCore(): array
+    {
+        return [
+            'code' => 'Spare code',
+            'component' => 'Component',
+            'kind' => 'Kind',
+            'product_code' => 'Product code',
+            'manufacturer' => 'Manufacturer',
+            'model' => 'Model',
+            'severity' => 'Severity',
+            'location' => 'Stock location',
+            'shelf_location' => 'Shelf location',
+            'quantity_on_hand' => 'On hand',
+            'min_holding' => 'Min holding',
+            'max_holding' => 'Max holding',
+            'supplier' => 'Supplier',
+            'spare_url' => 'Spare URL (QR)',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function spareCoreKeys(): array
+    {
+        return array_keys(self::spareCore());
+    }
+
+    public static function isSpareKey(string $key): bool
+    {
+        return in_array($key, self::spareCoreKeys(), true);
+    }
+
+    public static function isValidSpareKey(string $key): bool
+    {
+        return self::isSpareKey($key);
+    }
+
+    public static function resolveSpare(SparePart $spare, string $key): string
+    {
+        if ($key === 'spare_url') {
+            return route('spares.show', $spare);
+        }
+
+        $spare->loadMissing(['manufacturer', 'manufacturerModel', 'location']);
+
+        return match ($key) {
+            'code' => (string) $spare->code,
+            'component' => (string) $spare->component,
+            'kind' => $spare->kind?->label() ?? '',
+            'product_code' => (string) ($spare->product_code ?? ''),
+            'manufacturer' => (string) ($spare->manufacturer?->name ?? ''),
+            'model' => (string) ($spare->manufacturerModel?->name ?? ''),
+            'severity' => $spare->severity?->label() ?? '',
+            'location' => (string) ($spare->location?->name ?? ''),
+            'shelf_location' => (string) ($spare->shelf_location ?? ''),
+            'quantity_on_hand' => (string) (int) $spare->quantity_on_hand,
+            'min_holding' => $spare->min_holding !== null ? (string) $spare->min_holding : '',
+            'max_holding' => $spare->max_holding !== null ? (string) $spare->max_holding : '',
+            'supplier' => (string) ($spare->supplier ?? ''),
+            default => '',
+        };
+    }
+
     public static function isCustomKey(string $key): bool
     {
         return str_starts_with($key, 'custom:');
@@ -54,10 +122,31 @@ class ShelfTagFieldKeys
         return $slug !== '' ? $slug : null;
     }
 
+    public static function isSparePrefixedKey(string $key): bool
+    {
+        return str_starts_with($key, 'spare:');
+    }
+
+    public static function spareKeyFromPrefixed(string $key): ?string
+    {
+        if (! self::isSparePrefixedKey($key)) {
+            return null;
+        }
+
+        $inner = substr($key, strlen('spare:'));
+
+        return $inner !== '' ? $inner : null;
+    }
+
     public static function isValidKey(string $key): bool
     {
         if (in_array($key, self::coreKeys(), true)) {
             return true;
+        }
+
+        $spareInner = self::spareKeyFromPrefixed($key);
+        if ($spareInner !== null) {
+            return self::isValidSpareKey($spareInner);
         }
 
         $slug = self::customSlug($key);
@@ -70,6 +159,10 @@ class ShelfTagFieldKeys
      */
     public static function resolve(Asset $asset, string $key): string
     {
+        if (self::isSparePrefixedKey($key)) {
+            return '';
+        }
+
         if (self::isCustomKey($key)) {
             $slug = self::customSlug($key);
             if ($slug === null) {
@@ -108,6 +201,10 @@ class ShelfTagFieldKeys
     public static function optionsForDesigner(): array
     {
         $options = self::core();
+
+        foreach (self::spareCore() as $spareKey => $label) {
+            $options['spare:'.$spareKey] = 'Spare: '.$label;
+        }
 
         /** @var Collection<int, CustomFieldDefinition> $definitions */
         $definitions = CustomFieldDefinition::query()

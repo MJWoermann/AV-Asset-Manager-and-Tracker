@@ -45,13 +45,23 @@ php artisan migrate
 php artisan optimize:clear   # or config/route/view cache in production — see deploy guide
 ```
 
-`php artisan migrate` applies additive schema changes such as `users.preferences` (JSON, nullable). Existing users keep working with default columns until they customise them. Asset History uses existing `audit_logs` rows; no backfill is required.
+`php artisan migrate` applies additive schema changes such as `users.preferences` (JSON, nullable) and multi-department isolation (`departments`, `department_user`, and `department_id` on operational tables). Existing rows are backfilled into a default **General** department; non-admin users are attached to it. Assign users to departments under Admin → Users, and manage departments under Admin → Departments. Asset History uses existing `audit_logs` rows; new history entries store `department_id` when available.
 
 Production upgrade (one command): `sudo bash scripts/update.sh` — see [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md) §7 Updates.
 
 ## Features and usage
 
 Staff-oriented overview of use cases, roles, and day-to-day workflows: [docs/features-and-usage.md](docs/features-and-usage.md).
+
+## Troubleshooting
+
+Symptom → checks → fix (login, camera/HTTPS, uploads, mail/queue, common env issues): [docs/troubleshooting.md](docs/troubleshooting.md).
+
+UI / interaction habits for developers and AI agents: [docs/ui-interaction-guidelines.md](docs/ui-interaction-guidelines.md).
+
+## Organizational rollout
+
+People-and-process guide for sponsors and inventory leads (ADKAR, training, reinforcement so data stays current): [docs/organizational-deployment.md](docs/organizational-deployment.md). Complements the technical production guide below.
 
 ## Production (Ubuntu + Nginx)
 

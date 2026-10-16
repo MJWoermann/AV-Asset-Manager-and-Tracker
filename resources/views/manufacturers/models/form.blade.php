@@ -72,6 +72,21 @@
                 </div>
             @endif
 
+            @if($manufacturerModel->exists && ($linkedSpares ?? collect())->isNotEmpty())
+                <div class="mt-6 border-t border-brand-silver dark:border-brand-charcoal pt-4">
+                    <h3 class="font-medium text-sm">Linked spares</h3>
+                    <ul class="mt-2 text-sm space-y-1">
+                        @foreach($linkedSpares as $spare)
+                            <li>
+                                <a href="{{ route('spares.show', $spare) }}" class="text-brand font-mono">{{ $spare->code }}</a>
+                                — {{ $spare->component }}
+                                <span class="text-xs text-brand-charcoal">({{ $spare->quantity_on_hand }} on hand)</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div class="mt-6 space-y-2">
                 @if($replacementModels->isEmpty())
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver">

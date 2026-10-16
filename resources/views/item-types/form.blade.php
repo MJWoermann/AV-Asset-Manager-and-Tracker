@@ -132,9 +132,9 @@
                 </x-interface-template-repeater>
             @endfeature
 
-            <div class="flex flex-wrap items-center gap-3">
-                <x-primary-button>Save</x-primary-button>
+            <div class="flex flex-wrap items-center justify-end gap-3">
                 <a href="{{ route('item-types.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
+                <x-primary-button>Save</x-primary-button>
             </div>
         </form>
 

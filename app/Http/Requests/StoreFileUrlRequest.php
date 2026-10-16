@@ -21,7 +21,7 @@ class StoreFileUrlRequest extends FormRequest
             'category' => ['required', Rule::enum(FileCategory::class)],
             'note' => ['nullable', 'string', 'max:255'],
             'external_url' => ['required', 'url', 'max:2048'],
-            'linkable_type' => ['nullable', Rule::in(['asset', 'location', 'item_type', 'maintenance_log', 'rig_event'])],
+            'linkable_type' => ['nullable', Rule::in(['asset', 'location', 'item_type', 'maintenance_log', 'rig_event', 'spare_part'])],
             'linkable_id' => ['required_with:linkable_type', 'nullable', 'integer'],
         ];
     }

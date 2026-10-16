@@ -37,8 +37,15 @@ class AuditableObserver
 
     protected function log(Model $model, string $action, ?array $old, ?array $new): void
     {
+        $departmentId = null;
+
+        if ($model->isFillable('department_id') || array_key_exists('department_id', $model->getAttributes())) {
+            $departmentId = $model->getAttribute('department_id');
+        }
+
         AuditLog::create([
             'user_id' => Auth::id(),
+            'department_id' => $departmentId !== null ? (int) $departmentId : null,
             'auditable_type' => $model::class,
             'auditable_id' => $model->getKey(),
             'action' => $action,

@@ -245,11 +245,11 @@
                             ></textarea>
                         </div>
 
-                        <div class="flex flex-wrap gap-2">
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <x-secondary-button type="button" @click="closePanel()">Cancel</x-secondary-button>
                             <x-primary-button type="submit">
                                 <span x-text="panel === 'edit' ? 'Save placement' : 'Place'"></span>
                             </x-primary-button>
-                            <x-secondary-button type="button" @click="closePanel()">Cancel</x-secondary-button>
                         </div>
                     </form>
 
@@ -291,11 +291,11 @@
     <div
         x-show="confirmParent"
         x-cloak
-        class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6"
         @keydown.escape.window="confirmParent = false"
     >
         <div class="fixed inset-0 bg-gray-500/75" @click="confirmParent = false"></div>
-        <div class="relative w-full max-w-md bg-white dark:bg-brand-slate dark:text-white p-6 space-y-4 shadow-xl">
+        <div class="relative w-full max-w-md max-h-[calc(100vh-3rem)] overflow-y-auto bg-white dark:bg-brand-slate dark:text-white p-6 space-y-4 shadow-xl">
             <h2 class="text-lg font-medium">
                 Change parent?
             </h2>

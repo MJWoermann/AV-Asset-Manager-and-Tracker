@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\RigEventStatus;
+use App\Models\Concerns\BelongsToDepartment;
 use App\Services\FileAttachmentService;
 use Database\Factories\RigEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,9 +15,10 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 class RigEvent extends Model
 {
     /** @use HasFactory<RigEventFactory> */
-    use HasFactory;
+    use BelongsToDepartment, HasFactory;
 
     protected $fillable = [
+        'department_id',
         'name',
         'venue_space',
         'event_date',

@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Manufacturers / Models</h2>
-            @role('admin|inventory_manager')
+            @role('admin|inventory_manager|scanner')
                 <a href="{{ route('manufacturers.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add manufacturer</a>
             @endrole
         </div>

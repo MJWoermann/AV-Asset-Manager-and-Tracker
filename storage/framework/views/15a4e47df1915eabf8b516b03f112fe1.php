@@ -15,7 +15,7 @@
     <div class="max-w-7xl mx-auto px-4">
         <table class="min-w-full text-sm bg-white dark:bg-brand-slate border">
             <thead class="bg-brand-silver dark:bg-brand-charcoal text-left"><tr>
-                <th class="px-3 py-2">Name</th><th class="px-3 py-2">Email</th><th class="px-3 py-2">Role</th><th class="px-3 py-2"></th>
+                <th class="px-3 py-2">Name</th><th class="px-3 py-2">Email</th><th class="px-3 py-2">Role</th><th class="px-3 py-2">Departments</th><th class="px-3 py-2"></th>
             </tr></thead>
             <tbody>
                 <?php $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $user): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -23,6 +23,7 @@
                         <td class="px-3 py-2"><?php echo e($user->name); ?></td>
                         <td class="px-3 py-2"><?php echo e($user->email); ?></td>
                         <td class="px-3 py-2"><?php echo e($user->roles->pluck('name')->join(', ')); ?></td>
+                        <td class="px-3 py-2"><?php echo e($user->departments->pluck('name')->join(', ') ?: '—'); ?></td>
                         <td class="px-3 py-2 space-x-3 whitespace-nowrap">
                             <a class="text-brand" href="<?php echo e(route('admin.users.edit', $user)); ?>">Edit</a>
                             <?php if (! ($user->hasRole('admin'))): ?>

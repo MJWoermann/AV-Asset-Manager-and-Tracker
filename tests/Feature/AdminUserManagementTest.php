@@ -80,4 +80,68 @@ class AdminUserManagementTest extends TestCase
         $response->assertSee('action="'.route('admin.users.destroy', $scanner).'"', false);
         $response->assertDontSee('action="'.route('admin.users.destroy', $admin).'"', false);
     }
+
+    public function test_create_user_form_marks_required_fields_and_password_rules(): void
+    {
+        $admin = $this->admin();
+
+        $response = $this->actingAs($admin)->get(route('admin.users.create'));
+
+        $response->assertOk();
+        $response->assertSee('Required field', false);
+        $response->assertSee('At least 8 characters, one uppercase letter, and one number or symbol.', false);
+        $response->assertDontSee('Leave the password blank unless you want to change it.', false);
+    }
+
+    public function test_edit_user_form_notes_password_is_optional(): void
+    {
+        $admin = $this->admin();
+        $target = $this->scanner();
+
+        $response = $this->actingAs($admin)->get(route('admin.users.edit', $target));
+
+        $response->assertOk();
+        $response->assertSee('Leave the password blank unless you want to change it. Only enter a new password if you intend to update it.', false);
+        $response->assertSee('Optional. Only fill this in to change the password.', false);
+    }
+
+    public function test_store_rejects_passwords_that_fail_complexity_rules(): void
+    {
+        $admin = $this->admin();
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.users.create'))
+            ->post(route('admin.users.store'), [
+                'name' => 'Weak Password User',
+                'email' => 'weak@example.com',
+                'password' => 'password',
+                'role' => 'scanner',
+                'theme' => 'light',
+            ]);
+
+        $response->assertRedirect(route('admin.users.create'));
+        $response->assertSessionHasErrors('password');
+        $this->assertDatabaseMissing('users', ['email' => 'weak@example.com']);
+    }
+
+    public function test_update_rejects_passwords_that_fail_complexity_rules(): void
+    {
+        $admin = $this->admin();
+        $target = $this->scanner();
+        $originalHash = $target->password;
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.users.edit', $target))
+            ->put(route('admin.users.update', $target), [
+                'name' => $target->name,
+                'email' => $target->email,
+                'password' => 'password',
+                'role' => 'scanner',
+                'theme' => 'light',
+            ]);
+
+        $response->assertRedirect(route('admin.users.edit', $target));
+        $response->assertSessionHasErrors('password');
+        $this->assertSame($originalHash, $target->refresh()->password);
+    }
 }

@@ -104,6 +104,18 @@ class EmailIntegrationSeeder extends Seeder
                 'body' => "An inbound email match for {{asset.name}} was rejected.\n\nOpen: {{asset.url}}",
                 'selected_fields' => ['asset.name', 'asset.url'],
             ],
+            NotificationEventKey::RepairStarted->value => [
+                'name' => 'Repair started',
+                'subject' => 'Repair started: {{asset.name}}',
+                'body' => "A repair was started for {{asset.name}}.\n\nOpen: {{asset.url}}",
+                'selected_fields' => ['asset.name', 'asset.url'],
+            ],
+            NotificationEventKey::RepairCompleted->value => [
+                'name' => 'Repair completed',
+                'subject' => 'Repair completed: {{asset.name}}',
+                'body' => "A repair was completed for {{asset.name}}.\n\nOpen: {{asset.url}}",
+                'selected_fields' => ['asset.name', 'asset.url'],
+            ],
         ];
 
         foreach ($defaults as $eventKey => $payload) {

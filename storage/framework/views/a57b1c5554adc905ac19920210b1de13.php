@@ -18,7 +18,11 @@
         <div class="grid gap-3 sm:grid-cols-2">
             <a href="<?php echo e(route('admin.users.index')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                 <h3 class="font-semibold">Manage users</h3>
-                <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Accounts, roles, and access.</p>
+                <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Accounts, roles, and department membership.</p>
+            </a>
+            <a href="<?php echo e(route('admin.departments.index')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
+                <h3 class="font-semibold">Departments</h3>
+                <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Operational data isolation boundaries.</p>
             </a>
             <a href="<?php echo e(route('admin.export-columns.edit')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                 <h3 class="font-semibold">Export columns</h3>

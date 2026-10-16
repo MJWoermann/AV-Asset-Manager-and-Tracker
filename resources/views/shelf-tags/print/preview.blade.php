@@ -13,10 +13,10 @@
                     · {{ $list->name }}
                 </p>
             </div>
-            <div class="flex flex-wrap gap-2 print:hidden">
-                <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
-                <a href="{{ route('labels.print.pdf') }}" class="px-3 py-2 border text-sm">Download PDF</a>
+            <div class="flex flex-wrap justify-end gap-2 print:hidden">
                 <a href="{{ route('labels.index', ['asset_list_id' => $list->id, 'shelf_tag_layout_id' => $layout->id]) }}" class="px-3 py-2 border text-sm">Back</a>
+                <a href="{{ route('labels.print.pdf') }}" class="px-3 py-2 border text-sm">Download PDF</a>
+                <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
             </div>
         </div>
     </x-slot>

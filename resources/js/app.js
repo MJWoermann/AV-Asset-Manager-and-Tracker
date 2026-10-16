@@ -4,6 +4,14 @@ import Alpine from 'alpinejs';
 window.Alpine = Alpine;
 
 const CAMERA_SAME_CODE_DEBOUNCE_MS = 800;
+/** Idle camera auto-pause while stocktake scanning (no successful decode). */
+const CAMERA_IDLE_PAUSE_MS = 60_000;
+/** Max gap between keystrokes for keyboard-wedge barcode scanners. */
+const WEDGE_MAX_INTER_KEY_MS = 50;
+/** Minimum buffered characters before a terminator counts as a wedge scan. */
+const WEDGE_MIN_BUFFER_LENGTH = 3;
+/** Device-local preferred scan capture mode (hardware vs camera). */
+const SCAN_INPUT_MODE_STORAGE_KEY = 'av-scan-input-mode';
 
 /** @type {AudioContext | null} */
 let scanAudioContext = null;
@@ -23,6 +31,23 @@ function getScanAudioContext() {
  * Play a short generated tone for scan feedback.
  * @param {'match' | 'fail'} kind
  */
+/**
+ * Short haptic pulse for scan feedback (cheaper than audio when both are optional).
+ * @param {'match' | 'fail'} kind
+ * @returns {boolean} whether vibration was attempted successfully
+ */
+function playScanVibrate(kind) {
+    try {
+        if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') {
+            return false;
+        }
+        const pattern = kind === 'match' ? [40, 30, 40] : [80, 40, 80];
+        return Boolean(navigator.vibrate(pattern));
+    } catch (_) {
+        return false;
+    }
+}
+
 function playScanNoise(kind) {
     try {
         const ctx = getScanAudioContext();
@@ -262,7 +287,8 @@ async function startBarcodeCamera(elementId, onDecoded) {
     await scanner.start(
         { facingMode: 'environment' },
         {
-            fps: 15,
+            // Lower fps/resolution than 1080p@15 to preserve battery on all-day stocktake devices.
+            fps: 10,
             disableFlip: true,
             aspectRatio: compactCamera ? 2.2 : 1.777778,
             qrbox: (viewfinderWidth, viewfinderHeight) => ({
@@ -271,8 +297,8 @@ async function startBarcodeCamera(elementId, onDecoded) {
             }),
             videoConstraints: {
                 facingMode: 'environment',
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
+                width: { ideal: 1280, max: 1280 },
+                height: { ideal: 720, max: 720 },
             },
         },
         (decoded) => {
@@ -281,12 +307,7 @@ async function startBarcodeCamera(elementId, onDecoded) {
         () => {}
     );
 
-    try {
-        await scanner.applyVideoConstraints({
-            focusMode: 'continuous',
-            advanced: [{ zoom: 1.5 }],
-        });
-    } catch (_) {}
+    // Skip continuous AF / zoom — both increase ISP/CPU cost on phones.
 
     return scanner;
 }
@@ -303,6 +324,82 @@ async function stopBarcodeCamera(scanner) {
         await scanner.stop();
         await scanner.clear();
     } catch (_) {}
+}
+
+/**
+ * @returns {{ buffer: string, lastKeyAt: number }}
+ */
+function createWedgeBufferState() {
+    return { buffer: '', lastKeyAt: 0 };
+}
+
+/**
+ * Process a document-level keydown for keyboard-wedge scanners (burst + Enter/Tab).
+ *
+ * @param {{ buffer: string, lastKeyAt: number }} state
+ * @param {KeyboardEvent} event
+ * @param {{
+ *   maxInterKeyMs?: number,
+ *   minLength?: number,
+ *   ignoreSlowTyping?: boolean,
+ * }} [options]
+ * @returns {{ scanned: string | null, consume: boolean }}
+ */
+function processWedgeKeydown(state, event, options = {}) {
+    if (event.isComposing || event.repeat) {
+        return { scanned: null, consume: false };
+    }
+
+    const maxInterKeyMs = options.maxInterKeyMs ?? WEDGE_MAX_INTER_KEY_MS;
+    const minLength = options.minLength ?? WEDGE_MIN_BUFFER_LENGTH;
+    const now = performance.now();
+    const gap = state.lastKeyAt > 0 ? now - state.lastKeyAt : 0;
+    const continuingBurst = state.lastKeyAt > 0 && gap <= maxInterKeyMs;
+
+    const isTerminator =
+        event.key === 'Enter' || event.key === 'Tab' || event.code === 'NumpadEnter';
+
+    if (isTerminator) {
+        const code = state.buffer;
+        const terminatorInBurst = state.lastKeyAt > 0 && gap <= maxInterKeyMs;
+        state.buffer = '';
+        state.lastKeyAt = 0;
+
+        if (code.length >= minLength && terminatorInBurst) {
+            return { scanned: code, consume: true };
+        }
+
+        return { scanned: null, consume: false };
+    }
+
+    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) {
+        if (!continuingBurst) {
+            state.buffer = '';
+            state.lastKeyAt = 0;
+        }
+
+        return { scanned: null, consume: false };
+    }
+
+    if (!continuingBurst) {
+        state.buffer = '';
+    }
+
+    // Focus drifted to quantity/notes/etc.: seed the buffer on the first key without
+    // stealing it; only preventDefault once a fast burst is confirmed (2+ chars).
+    if (options.ignoreSlowTyping && !continuingBurst && state.buffer.length === 0) {
+        state.buffer = event.key;
+        state.lastKeyAt = now;
+
+        return { scanned: null, consume: false };
+    }
+
+    state.buffer += event.key;
+    state.lastKeyAt = now;
+
+    const consume = Boolean(options.ignoreSlowTyping && state.buffer.length >= 2);
+
+    return { scanned: null, consume };
 }
 
 function searchTokens(term) {
@@ -1010,6 +1107,101 @@ Alpine.data('stockPanel', (config = {}) => ({
                         },
                     },
                 },
+                onClick: (_event, elements) => {
+                    if (!elements.length) {
+                        return;
+                    }
+                    const element = elements[0];
+                    const raw = this.chart.data.datasets[element.datasetIndex].data[element.index];
+                    if (raw?.meta) {
+                        this.selected = raw.meta;
+                    }
+                },
+            },
+        });
+    },
+}));
+
+Alpine.data('sparePartPanel', (config = {}) => ({
+    chartPayload: config.chart || {},
+    action: config.initialAction || 'count',
+    selected: null,
+    chart: null,
+
+    init() {
+        this.$nextTick(() => this.mountChart());
+    },
+
+    async mountChart() {
+        const canvas = this.$refs.chart;
+        if (!canvas) {
+            return;
+        }
+
+        const Chart = await loadChart();
+        const points = this.chartPayload.points || [];
+        const restocks = this.chartPayload.restock_markers || [];
+        const trend = this.chartPayload.trend?.projection || [];
+        const annotations = {};
+
+        if (this.chartPayload.min_line !== null && this.chartPayload.min_line !== undefined) {
+            annotations.minLine = {
+                type: 'line',
+                yMin: this.chartPayload.min_line,
+                yMax: this.chartPayload.min_line,
+                borderColor: '#ef4444',
+                borderWidth: 1,
+                borderDash: [6, 4],
+            };
+        }
+
+        if (this.chartPayload.max_line !== null && this.chartPayload.max_line !== undefined) {
+            annotations.maxLine = {
+                type: 'line',
+                yMin: this.chartPayload.max_line,
+                yMax: this.chartPayload.max_line,
+                borderColor: '#00adb7',
+                borderWidth: 1,
+                borderDash: [6, 4],
+            };
+        }
+
+        this.chart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'On hand',
+                        data: points.map((point) => ({ x: point.x, y: point.y, meta: point })),
+                        borderColor: '#111827',
+                        stepped: true,
+                        pointRadius: 4,
+                    },
+                    {
+                        label: 'Restock',
+                        data: restocks.map((point) => ({ x: point.x, y: point.y, meta: point })),
+                        borderColor: '#00adb7',
+                        showLine: false,
+                        pointRadius: 7,
+                        pointStyle: 'triangle',
+                    },
+                    {
+                        label: 'Trend',
+                        data: trend,
+                        borderColor: '#9ca3af',
+                        borderDash: [8, 4],
+                        pointRadius: 0,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { type: 'time', time: { tooltipFormat: 'yyyy-MM-dd HH:mm' } },
+                    y: { beginAtZero: true, ticks: { precision: 0 } },
+                },
+                plugins: { annotation: { annotations } },
                 onClick: (_event, elements) => {
                     if (!elements.length) {
                         return;
@@ -2542,17 +2734,37 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         return Math.max(...this.elements.map((el) => Number(el.y) + Number(el.height)));
     },
 
+    contentRightMm() {
+        if (!this.elements.length) {
+            return this.continuousMinMm;
+        }
+        return Math.max(...this.elements.map((el) => Number(el.x) + Number(el.width)));
+    },
+
+    /** Continuous feed length: X in landscape (visual width), Y in portrait (visual height). */
+    contentFeedExtentMm() {
+        return this.isLandscape ? this.contentRightMm() : this.contentBottomMm();
+    },
+
     syncAutoHeight() {
         if (!this.isContinuous || this.lengthMode !== 'auto') {
             return;
         }
         const needed = this.elements.length
-            ? this.contentBottomMm() + this.autoPaddingMm
+            ? this.contentFeedExtentMm() + this.autoPaddingMm
             : this.continuousMinMm;
+        // #region agent log
+        const contentBottom = this.elements.length ? this.contentBottomMm() : 0;
+        const contentRight = this.elements.length ? this.contentRightMm() : 0;
+        const beforeH = this.heightMm;
+        // #endregion
         this.heightMm = this.clampContinuousHeight(needed);
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9bd8ee'},body:JSON.stringify({sessionId:'9bd8ee',runId:'post-fix',hypothesisId:'A',location:'app.js:syncAutoHeight',message:'auto length sync',data:{isLandscape:this.isLandscape,orientation:this.orientation,lengthMode:this.lengthMode,feedAxis:this.isLandscape?'x':'y',contentBottom,contentRight,needed,heightMmBefore:beforeH,heightMmAfter:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
     },
 
-    maybeExtendForBottom(bottomMm) {
+    maybeExtendAlongFeed(extentMm) {
         if (!this.isContinuous) {
             return;
         }
@@ -2560,8 +2772,8 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             this.syncAutoHeight();
             return;
         }
-        if (bottomMm > this.heightMm) {
-            this.heightMm = this.clampContinuousHeight(bottomMm);
+        if (extentMm > this.heightMm) {
+            this.heightMm = this.clampContinuousHeight(extentMm);
         }
     },
 
@@ -2570,7 +2782,14 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         const bottom = list.length
             ? Math.max(...list.map((el) => Number(el.y) + Number(el.height)))
             : 0;
-        this.maybeExtendForBottom(bottom);
+        const right = list.length
+            ? Math.max(...list.map((el) => Number(el.x) + Number(el.width)))
+            : 0;
+        const extent = this.isLandscape ? right : bottom;
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9bd8ee'},body:JSON.stringify({sessionId:'9bd8ee',runId:'post-fix',hypothesisId:'C',location:'app.js:afterGeometryChange',message:'geometry change extents',data:{isLandscape:this.isLandscape,lengthMode:this.lengthMode,feedAxis:this.isLandscape?'x':'y',bottom,right,extent,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,elCount:list.length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        this.maybeExtendAlongFeed(extent);
         if (this.lengthMode === 'auto') {
             this.syncAutoHeight();
         }
@@ -3045,6 +3264,14 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
                 el.y = this.applyCoord(Math.max(0, orig.y + dy), this.displayHeightMm);
             });
             const moved = this.elements.filter((item) => this.drag.ids.includes(item.id));
+            // #region agent log
+            if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+                const sample = moved[0];
+                const elRight = sample ? Number(sample.x) + Number(sample.width) : null;
+                const elBottom = sample ? Number(sample.y) + Number(sample.height) : null;
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9bd8ee'},body:JSON.stringify({sessionId:'9bd8ee',runId:'post-fix',hypothesisId:'D',location:'app.js:onPointerMove',message:'drag move',data:{isLandscape:this.isLandscape,dx,dy,elX:sample?.x,elY:sample?.y,elRight,elBottom,outsideX:elRight!=null&&(sample.x<0||elRight>this.displayWidthMm),outsideY:elBottom!=null&&(sample.y<0||elBottom>this.displayHeightMm),heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm},timestamp:Date.now()})}).catch(()=>{});
+            }
+            // #endregion
             this.afterGeometryChange(moved);
         }
         if (this.resize) {
@@ -3281,7 +3508,7 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
     },
 }));
 
-Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = [], clearRecent = false, scanNoiseEnabled = false) => ({
+Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = [], clearRecent = false, scanNoiseEnabled = false, scanVibrateEnabled = false) => ({
     scanning: false,
     code: '',
     quantity: 1,
@@ -3299,6 +3526,14 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     lastCameraCode: '',
     lastCameraAt: 0,
     scanNoiseEnabled: Boolean(scanNoiseEnabled),
+    scanVibrateEnabled: Boolean(scanVibrateEnabled),
+    /** @type {'auto' | 'hardware' | 'camera'} */
+    inputMode: 'auto',
+    hardwareDetected: false,
+    wedgeState: createWedgeBufferState(),
+    _idleTimer: null,
+    _onVisibilityChange: null,
+    _onWedgeKeydown: null,
 
     init() {
         this.eventItems = (initialEventItems || []).map((entry, index) => this.normalizeEventItem(entry, index));
@@ -3332,7 +3567,163 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
             this.persistRecent();
         }
 
+        this.inputMode = this.readInputMode();
+        this.hardwareDetected = this.inputMode === 'hardware';
+
+        this._onVisibilityChange = () => {
+            if (document.hidden && this.scanning) {
+                void this.pauseCamera('Camera paused while the app was in the background. Tap Use camera to resume.');
+            }
+        };
+        document.addEventListener('visibilitychange', this._onVisibilityChange);
+        window.addEventListener('pagehide', this._onVisibilityChange);
+
+        this._onWedgeKeydown = (event) => this.handleWedgeKeydown(event);
+        window.addEventListener('keydown', this._onWedgeKeydown, true);
+
         this.$nextTick(() => this.focusInput());
+    },
+
+    async destroy() {
+        this.clearIdleTimer();
+        if (this._onVisibilityChange) {
+            document.removeEventListener('visibilitychange', this._onVisibilityChange);
+            window.removeEventListener('pagehide', this._onVisibilityChange);
+            this._onVisibilityChange = null;
+        }
+        if (this._onWedgeKeydown) {
+            window.removeEventListener('keydown', this._onWedgeKeydown, true);
+            this._onWedgeKeydown = null;
+        }
+        await this.stopCamera({ silent: true });
+    },
+
+    readInputMode() {
+        try {
+            const stored = localStorage.getItem(SCAN_INPUT_MODE_STORAGE_KEY);
+            if (stored === 'hardware' || stored === 'camera' || stored === 'auto') {
+                return stored;
+            }
+        } catch (_) {}
+
+        return 'auto';
+    },
+
+    persistInputMode(mode) {
+        if (mode !== 'hardware' && mode !== 'camera' && mode !== 'auto') {
+            return;
+        }
+        this.inputMode = mode;
+        try {
+            localStorage.setItem(SCAN_INPUT_MODE_STORAGE_KEY, mode);
+        } catch (_) {}
+    },
+
+    get prefersHardware() {
+        return this.inputMode === 'auto' || this.inputMode === 'hardware';
+    },
+
+    get showHardwareSwitch() {
+        return this.scanning || this.inputMode === 'camera';
+    },
+
+    get inputModeStatus() {
+        if (this.scanning) {
+            return 'Camera active';
+        }
+        if (this.inputMode === 'camera') {
+            return 'Camera mode — tap Use camera when ready';
+        }
+
+        return 'Hardware scanner ready';
+    },
+
+    isSlowTypingTarget(el) {
+        if (!el || el === document.body || el === document.documentElement) {
+            return false;
+        }
+        if (this.$refs.codeInput && el === this.$refs.codeInput) {
+            return false;
+        }
+
+        const tag = el.tagName;
+        if (tag === 'TEXTAREA' || tag === 'SELECT') {
+            return true;
+        }
+        if (tag === 'INPUT') {
+            const type = String(el.type || 'text').toLowerCase();
+            return type !== 'button' && type !== 'submit' && type !== 'checkbox' && type !== 'radio' && type !== 'hidden';
+        }
+
+        return Boolean(el.isContentEditable);
+    },
+
+    handleWedgeKeydown(event) {
+        const active = document.activeElement;
+        const ignoreSlowTyping = this.isSlowTypingTarget(active);
+        const result = processWedgeKeydown(this.wedgeState, event, { ignoreSlowTyping });
+
+        if (result.scanned) {
+            event.preventDefault();
+            event.stopPropagation();
+            void this.onWedgeScan(result.scanned);
+            return;
+        }
+
+        if (result.consume) {
+            event.preventDefault();
+        }
+    },
+
+    async onWedgeScan(code) {
+        this.hardwareDetected = true;
+        if (this.inputMode !== 'hardware') {
+            this.persistInputMode('hardware');
+        }
+        if (this.scanning) {
+            await this.stopCamera({ silent: true });
+        }
+        this.code = code;
+        await this.submitCode();
+    },
+
+    async useCamera() {
+        this.persistInputMode('camera');
+        await this.startCamera();
+    },
+
+    async useHardware() {
+        await this.stopCamera({ silent: true });
+        this.persistInputMode('hardware');
+        this.message = '';
+        this.$nextTick(() => this.focusInput());
+    },
+
+    clearIdleTimer() {
+        if (this._idleTimer) {
+            clearTimeout(this._idleTimer);
+            this._idleTimer = null;
+        }
+    },
+
+    bumpIdleTimer() {
+        this.clearIdleTimer();
+        if (!this.scanning) {
+            return;
+        }
+        this._idleTimer = setTimeout(() => {
+            void this.pauseCamera('Camera paused after idle. Tap Use camera to resume.');
+        }, CAMERA_IDLE_PAUSE_MS);
+    },
+
+    async pauseCamera(message) {
+        if (!this.scanning && !this.scanner) {
+            return;
+        }
+        await this.stopCamera({ silent: true });
+        if (message) {
+            this.message = message;
+        }
     },
 
     storageKey() {
@@ -3515,31 +3906,43 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
 
     async startCamera() {
         this.error = '';
+        this.message = '';
         this.scanning = true;
         await this.$nextTick();
 
         try {
             this.scanner = await startBarcodeCamera('qr-reader', async (decoded) => {
+                // Rest decode CPU while a scan POST is in flight.
+                if (this.busy) {
+                    return;
+                }
                 const now = Date.now();
                 if (decoded === this.lastCameraCode && now - this.lastCameraAt < CAMERA_SAME_CODE_DEBOUNCE_MS) {
                     return;
                 }
                 this.lastCameraCode = decoded;
                 this.lastCameraAt = now;
+                this.bumpIdleTimer();
                 this.code = decoded;
                 await this.submitCode();
             });
+            this.bumpIdleTimer();
         } catch (e) {
             this.error = 'Camera unavailable: ' + (e?.message || e);
             this.scanning = false;
+            this.clearIdleTimer();
             this.$nextTick(() => this.focusInput());
         }
     },
 
-    async stopCamera() {
+    async stopCamera({ silent = false } = {}) {
+        this.clearIdleTimer();
         await stopBarcodeCamera(this.scanner);
         this.scanner = null;
         this.scanning = false;
+        if (!silent) {
+            this.message = '';
+        }
         this.$nextTick(() => this.focusInput());
     },
 
@@ -3576,10 +3979,14 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     },
 
     playScanFeedback(kind) {
-        if (!this.scanNoiseEnabled) {
-            return;
+        let vibrated = false;
+        if (this.scanVibrateEnabled) {
+            vibrated = playScanVibrate(kind);
         }
-        playScanNoise(kind);
+        // Prefer haptics when both prefs are on; fall back to tone if vibrate is unavailable.
+        if (this.scanNoiseEnabled && !(this.scanVibrateEnabled && vibrated)) {
+            playScanNoise(kind);
+        }
     },
 
     async sendScan(code, quantity) {

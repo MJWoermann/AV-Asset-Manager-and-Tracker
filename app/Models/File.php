@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\FileCategory;
 use App\Enums\FileSourceType;
+use App\Models\Concerns\BelongsToDepartment;
 use Database\Factories\FileFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,9 +15,10 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 class File extends Model
 {
     /** @use HasFactory<FileFactory> */
-    use HasFactory;
+    use BelongsToDepartment, HasFactory;
 
     protected $fillable = [
+        'department_id',
         'title',
         'category',
         'source_type',
@@ -88,6 +90,27 @@ class File extends Model
     public function rigEvents(): MorphToMany
     {
         return $this->morphedByMany(RigEvent::class, 'linkable', 'file_links')
+            ->withPivot(['id', 'note'])
+            ->withTimestamps();
+    }
+
+    public function spareParts(): MorphToMany
+    {
+        return $this->morphedByMany(SparePart::class, 'linkable', 'file_links')
+            ->withPivot(['id', 'note'])
+            ->withTimestamps();
+    }
+
+    public function repairProcedures(): MorphToMany
+    {
+        return $this->morphedByMany(RepairProcedure::class, 'linkable', 'file_links')
+            ->withPivot(['id', 'note'])
+            ->withTimestamps();
+    }
+
+    public function repairs(): MorphToMany
+    {
+        return $this->morphedByMany(Repair::class, 'linkable', 'file_links')
             ->withPivot(['id', 'note'])
             ->withTimestamps();
     }

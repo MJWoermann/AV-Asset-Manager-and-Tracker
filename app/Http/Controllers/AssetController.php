@@ -221,6 +221,7 @@ class AssetController extends Controller
             $requestedTab === 'connections' && $connectionsEnabled => 'connections',
             $requestedTab === 'rack' && $ruVisualiserEnabled => 'rack',
             $requestedTab === 'stock' && $stockEnabled => 'stock',
+            $requestedTab === 'spares' => 'spares',
             default => 'details',
         };
 
@@ -387,12 +388,24 @@ class AssetController extends Controller
 
         $maintenanceLogs = collect();
         $maintenanceUserOptions = collect();
+        $openRepairs = collect();
+        $openRepairsByFaultId = collect();
 
         if ($tab === 'maintenance') {
             $maintenanceQuery = $asset->maintenanceLogs()->with(['user', 'files']);
             AssetMaintenanceFilters::apply($maintenanceQuery, $request);
             $maintenanceLogs = $maintenanceQuery->get();
             $maintenanceUserOptions = AssetMaintenanceFilters::userOptions($asset);
+            $openRepairs = $asset->repairs()->active()->with('assignee')->get();
+            $openRepairsByFaultId = $openRepairs->keyBy('maintenance_log_id');
+        }
+
+        $spareMovements = collect();
+        if ($tab === 'spares') {
+            $spareMovements = $asset->sparePartMovements()
+                ->with(['sparePart', 'user'])
+                ->limit(100)
+                ->get();
         }
 
         return view('assets.show', [
@@ -424,6 +437,9 @@ class AssetController extends Controller
             'maintenanceLogTypes' => MaintenanceLogType::options(),
             'maintenanceStatuses' => AssetStatus::options(),
             'canDeleteMaintenanceLogs' => $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false,
+            'openRepairs' => $openRepairs,
+            'openRepairsByFaultId' => $openRepairsByFaultId,
+            'spareMovements' => $spareMovements,
         ]);
     }
 
@@ -676,14 +692,25 @@ class AssetController extends Controller
             return;
         }
 
-        $layoutIds = CustomFieldDefinition::query()
+        $asset->loadMissing('itemType');
+        $itemType = $asset->itemType;
+        if ($itemType === null) {
+            return;
+        }
+
+        $allowedIds = CustomFieldDefinition::query()
+            ->whereIn('custom_field_set_id', $itemType->fieldSets()->pluck('custom_field_sets.id'))
+            ->whereNotIn('type', CustomFieldDefinition::LAYOUT_TYPES)
             ->whereIn('id', array_keys($values))
-            ->whereIn('type', CustomFieldDefinition::LAYOUT_TYPES)
             ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
             ->all();
 
+        $allowedLookup = array_fill_keys($allowedIds, true);
+
         foreach ($values as $definitionId => $value) {
-            if (in_array((int) $definitionId, $layoutIds, true)) {
+            $definitionId = (int) $definitionId;
+            if (! isset($allowedLookup[$definitionId])) {
                 continue;
             }
 

@@ -19,9 +19,11 @@
                 href="<?php echo e(route('assets.index', ['manufacturer_id' => $manufacturer->id])); ?>"
                 class="text-sm text-brand"
             >Assets</a>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager|scanner')): ?>
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="<?php echo e(route('manufacturers.models.create', $manufacturer)); ?>" class="text-sm text-brand">Add model</a>
+            <?php endif; ?>
+            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="<?php echo e(route('manufacturers.edit', $manufacturer)); ?>" class="text-sm text-brand">Edit</a>
                 <?php if($replacementManufacturers->where('id', '!=', $manufacturer->id)->isNotEmpty()): ?>

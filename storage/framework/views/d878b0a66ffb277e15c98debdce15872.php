@@ -112,12 +112,12 @@ unset($__defined_vars, $__key, $__value); ?>
 <div
     x-cloak
     x-show="deleteConfirmOpen"
-    class="fixed inset-0 z-50 overflow-y-auto px-4 py-6"
+    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6"
     role="dialog"
     aria-modal="true"
 >
     <div class="fixed inset-0 bg-black/50" @click="cancelDelete()"></div>
-    <div class="relative mx-auto max-w-md bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-6 space-y-4">
+    <div class="relative w-full max-w-md max-h-[calc(100vh-3rem)] overflow-y-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-6 space-y-4 shadow-xl">
         <h3 class="text-lg font-semibold">Confirm delete</h3>
         <p class="text-sm text-brand-charcoal dark:text-brand-silver">
             Permanently delete

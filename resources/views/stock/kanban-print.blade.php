@@ -22,9 +22,9 @@
                 <h1 class="text-xl font-semibold">Kanban tags — {{ $asset->name }}</h1>
                 <p class="text-sm text-brand-charcoal">Print this page for labels. QR codes open the guest stock update URL.</p>
             </div>
-            <div class="flex gap-2">
-                <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
+            <div class="flex justify-end gap-2">
                 <a href="{{ route('assets.show', [$asset, 'tab' => 'stock']) }}" class="px-3 py-2 border text-sm">Back</a>
+                <button type="button" onclick="window.print()" class="px-3 py-2 bg-brand text-white text-sm">Print</button>
             </div>
         </div>
 

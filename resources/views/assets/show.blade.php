@@ -73,6 +73,14 @@
                 Maintenance
             </a>
             <a
+                href="{{ route('assets.show', [$asset, 'tab' => 'spares']) }}"
+                role="tab"
+                aria-selected="{{ $tab === 'spares' ? 'true' : 'false' }}"
+                class="px-4 py-2 text-sm border-b-2 -mb-px {{ $tab === 'spares' ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white' }}"
+            >
+                Spares
+            </a>
+            <a
                 href="{{ route('assets.show', [$asset, 'tab' => 'history']) }}"
                 role="tab"
                 aria-selected="{{ $tab === 'history' ? 'true' : 'false' }}"
@@ -97,6 +105,8 @@
                 'stockReorderMeta' => $stockReorderMeta ?? [],
                 'stockAction' => $stockAction ?? null,
             ])
+        @elseif($tab === 'spares')
+            @include('assets.partials.spares', ['spareMovements' => $spareMovements ?? collect()])
         @elseif($tab === 'connections')
             @include('assets.partials.connections', [
                 'asset' => $asset,

@@ -44,6 +44,11 @@ class SsoAuthenticationTest extends TestCase
         SsoSettings::put(true, false, ['example.com']);
     }
 
+    protected function enableAzureSso(): void
+    {
+        SsoSettings::put(false, true, ['example.com']);
+    }
+
     protected function fakeGoogleUser(string $email, bool $emailVerified = true): SocialiteUser
     {
         return SocialiteUser::fake([
@@ -53,6 +58,22 @@ class SsoAuthenticationTest extends TestCase
             'email' => $email,
             'email_verified' => $emailVerified,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $rawExtras
+     */
+    protected function fakeAzureUser(string $email, array $rawExtras = []): SocialiteUser
+    {
+        return SocialiteUser::fake(array_merge([
+            'id' => 'azure-123',
+            'nickname' => 'sso-user',
+            'name' => 'SSO User',
+            'email' => $email,
+            'userPrincipalName' => $email,
+            'mail' => $email,
+            'displayName' => 'SSO User',
+        ], $rawExtras));
     }
 
     public function test_login_page_hides_sso_buttons_when_sso_is_not_configured(): void
@@ -159,5 +180,59 @@ class SsoAuthenticationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_google_callback_rejects_unverified_email(): void
+    {
+        $this->enableGoogleSso();
+        User::factory()->create(['email' => 'staff@example.com']);
+        Socialite::fake('google', $this->fakeGoogleUser('staff@example.com', emailVerified: false));
+
+        $this->get(route('auth.social.callback', ['provider' => 'google']))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest();
+    }
+
+    public function test_azure_callback_rejects_explicitly_unverified_email(): void
+    {
+        $this->enableAzureSso();
+        User::factory()->create(['email' => 'staff@example.com']);
+        Socialite::fake('azure', $this->fakeAzureUser('staff@example.com', [
+            'email_verified' => false,
+        ]));
+
+        $this->get(route('auth.social.callback', ['provider' => 'azure']))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest();
+    }
+
+    public function test_azure_callback_allows_when_verified_claim_absent(): void
+    {
+        $this->enableAzureSso();
+        $user = User::factory()->unverified()->create(['email' => 'staff@example.com']);
+        Socialite::fake('azure', $this->fakeAzureUser('staff@example.com'));
+
+        $this->get(route('auth.social.callback', ['provider' => 'azure']))
+            ->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_azure_callback_allows_when_verified_claim_true(): void
+    {
+        $this->enableAzureSso();
+        $user = User::factory()->create(['email' => 'staff@example.com']);
+        Socialite::fake('azure', $this->fakeAzureUser('staff@example.com', [
+            'email_verified' => true,
+        ]));
+
+        $this->get(route('auth.social.callback', ['provider' => 'azure']))
+            ->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertAuthenticatedAs($user);
     }
 }

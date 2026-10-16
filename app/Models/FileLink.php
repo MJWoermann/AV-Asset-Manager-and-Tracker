@@ -39,6 +39,9 @@ class FileLink extends Model
             AssetMaintenanceLog::class => 'Maintenance log',
             StockMovement::class => 'Stock movement',
             RigEvent::class => 'Rig event',
+            SparePart::class => 'Spare part',
+            RepairProcedure::class => 'Repair procedure',
+            Repair::class => 'Repair',
             default => class_basename((string) $this->linkable_type) ?: 'Unknown',
         };
     }
@@ -59,6 +62,18 @@ class FileLink extends Model
 
         if ($linkable instanceof StockMovement) {
             return 'Stock movement #'.$linkable->id;
+        }
+
+        if ($linkable instanceof SparePart) {
+            return $linkable->displayLabel();
+        }
+
+        if ($linkable instanceof RepairProcedure) {
+            return $linkable->title;
+        }
+
+        if ($linkable instanceof Repair) {
+            return $linkable->summary;
         }
 
         $name = trim((string) ($linkable->name ?? ''));
@@ -92,6 +107,18 @@ class FileLink extends Model
 
         if ($linkable instanceof StockMovement && $linkable->asset_id) {
             return route('assets.show', [$linkable->asset_id, 'tab' => 'stock']);
+        }
+
+        if ($linkable instanceof SparePart) {
+            return route('spares.show', $linkable);
+        }
+
+        if ($linkable instanceof RepairProcedure) {
+            return route('repair-procedures.show', $linkable);
+        }
+
+        if ($linkable instanceof Repair) {
+            return route('repairs.show', $linkable);
         }
 
         return null;

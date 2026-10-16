@@ -3,13 +3,17 @@
 namespace App\Models;
 
 use App\Enums\AssetStatus;
+use App\Models\Concerns\BelongsToDepartment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UnknownScan extends Model
 {
+    use BelongsToDepartment;
+
     protected $fillable = [
+        'department_id',
         'scanned_code',
         'user_id',
         'scan_session_id',

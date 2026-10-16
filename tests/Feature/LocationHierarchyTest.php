@@ -141,6 +141,46 @@ class LocationHierarchyTest extends TestCase
         $response->assertSee('bg-[#dcdcdc] dark:bg-[#3d4043] border-l-[3px] border-l-brand-charcoal', false);
     }
 
+    public function test_scanner_can_create_and_store_location(): void
+    {
+        $user = $this->scanner();
+
+        $this->actingAs($user)->get(route('locations.create'))->assertOk();
+
+        $this->actingAs($user)->post(route('locations.store'), [
+            'name' => 'Scanner Site',
+            'type' => LocationType::Site->value,
+        ])->assertRedirect(route('locations.index'));
+
+        $this->assertDatabaseHas('locations', [
+            'name' => 'Scanner Site',
+            'type' => LocationType::Site->value,
+        ]);
+    }
+
+    public function test_scanner_cannot_edit_update_or_destroy_location(): void
+    {
+        $user = $this->scanner();
+        $location = Location::create([
+            'name' => 'Locked Site',
+            'type' => LocationType::Site,
+        ]);
+
+        $this->actingAs($user)->get(route('locations.edit', $location))->assertForbidden();
+
+        $this->actingAs($user)->put(route('locations.update', $location), [
+            'name' => 'Renamed Site',
+            'type' => LocationType::Site->value,
+        ])->assertForbidden();
+
+        $this->actingAs($user)->delete(route('locations.destroy', $location))->assertForbidden();
+
+        $this->assertDatabaseHas('locations', [
+            'id' => $location->id,
+            'name' => 'Locked Site',
+        ]);
+    }
+
     public function test_create_form_uses_searchable_parent_and_excludes_racks(): void
     {
         $user = User::factory()->create();

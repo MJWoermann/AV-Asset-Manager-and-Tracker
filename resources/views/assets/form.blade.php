@@ -213,30 +213,28 @@
                         @endif
                     >
                         <x-input-label :for="$field" :value="$label" />
-                        <div @class(['flex gap-2 items-stretch' => $fieldIsScannable])>
-                            <div @class(['flex-1 min-w-0' => $fieldIsScannable, 'w-full' => ! $fieldIsScannable])>
-                                {{-- Keep @if outside the component tag so Blade compiles it to <input> --}}
-                                @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
-                                    <x-text-input
-                                        :id="$field"
-                                        :name="$field"
-                                        class="mt-1 block w-full"
-                                        :value="old($field, $asset->{$field})"
-                                        x-model="macAddress"
-                                    />
-                                @else
-                                    <x-text-input
-                                        :id="$field"
-                                        :name="$field"
-                                        class="mt-1 block w-full"
-                                        :value="old($field, $asset->{$field})"
-                                    />
-                                @endif
-                            </div>
+                        <div @class(['relative mt-1' => $fieldIsScannable])>
+                            {{-- Keep @if outside the component tag so Blade compiles it to <input> --}}
+                            @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
+                                <x-text-input
+                                    :id="$field"
+                                    :name="$field"
+                                    @class(['block w-full', 'mt-1' => ! $fieldIsScannable, 'pe-16' => $fieldIsScannable])
+                                    :value="old($field, $asset->{$field})"
+                                    x-model="macAddress"
+                                />
+                            @else
+                                <x-text-input
+                                    :id="$field"
+                                    :name="$field"
+                                    @class(['block w-full', 'mt-1' => ! $fieldIsScannable, 'pe-16' => $fieldIsScannable])
+                                    :value="old($field, $asset->{$field})"
+                                />
+                            @endif
                             @if($fieldIsScannable)
                                 <button
                                     type="button"
-                                    class="mt-1 shrink-0 px-3 py-2 text-sm border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-black text-brand-charcoal dark:text-white hover:border-brand hover:text-brand"
+                                    class="absolute inset-y-0 end-0 my-px me-px flex items-center rounded-e-md px-2.5 text-xs font-medium text-brand-charcoal hover:text-brand dark:text-brand-silver dark:hover:text-brand"
                                     @click="toggleCamera"
                                     :aria-pressed="scanning.toString()"
                                     :aria-label="scanning ? 'Stop camera' : 'Scan barcode into {{ $label }}'"
@@ -461,9 +459,9 @@
                 @endif
             @endfeature
 
-            <div class="flex gap-2">
-                <x-primary-button>Save</x-primary-button>
+            <div class="flex justify-end gap-2">
                 <a href="{{ $asset->exists ? route('assets.show', $asset) : route('assets.index') }}" class="px-4 py-2 text-sm border border-brand-charcoal dark:border-white">Cancel</a>
+                <x-primary-button>Save</x-primary-button>
             </div>
         </form>
     </div>

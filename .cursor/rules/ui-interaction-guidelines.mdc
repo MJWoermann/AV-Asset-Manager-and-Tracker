@@ -1,0 +1,27 @@
+---
+description: Follow the portable UI / habits playbook for menus, tables, actions, modals, view continuity, learning, passwords, security, and docs
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# UI interaction guidelines
+
+When changing UI, navigation, forms, modals, tables, preferences, import/learning flows, password handling, security-sensitive code, or project documentation, follow:
+
+**[docs/ui-interaction-guidelines.md](docs/ui-interaction-guidelines.md)**
+
+That playbook is the source of truth for:
+
+1. Simplified UI menus (short top bar; admin under profile; mobile hubs)
+2. Tables: filtering + per-user customizability where browse density warrants it
+3. Action button placement (secondary left, primary/proceed right)
+4. Visual clarity (contrast, spacing, in-field controls)
+5. Viewport-safe centered modals
+6. View continuity (preferences merge, URL filters, scroll restore)
+7. System learning (mapping recall, rename/merge aliases) — no speculative ML
+8. Password handling basics
+9. AI coding security don’ts (defensive checklist)
+10. Required documentation set outlines
+
+Prefer stack-agnostic habits from the playbook; use “In this project…” callouts for Laravel/Blade/Alpine specifics. Do not invent new learning systems or retrofit column pickers onto every admin index unless the playbook (or an explicit request) requires it.

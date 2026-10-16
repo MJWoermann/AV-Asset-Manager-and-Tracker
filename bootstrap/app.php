@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Middleware\ApplyScannerSessionLifetime;
 use App\Http\Middleware\EnsureDeveloperFeature;
 use App\Http\Middleware\EnsureUserHasFeature;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\SyncScannerSessionLifetimeHint;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,6 +21,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Plain integer TTL hint — not a secret; must be readable before StartSession.
+        $middleware->encryptCookies(except: [
+            ApplyScannerSessionLifetime::COOKIE,
+        ]);
+
+        $middleware->web(
+            prepend: [
+                ApplyScannerSessionLifetime::class,
+            ],
+            append: [
+                SyncScannerSessionLifetimeHint::class,
+            ],
+        );
+
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
             'feature' => EnsureUserHasFeature::class,

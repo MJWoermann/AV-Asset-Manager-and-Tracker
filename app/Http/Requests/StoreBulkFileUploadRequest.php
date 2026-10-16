@@ -30,7 +30,7 @@ class StoreBulkFileUploadRequest extends FormRequest
             'categories.*' => ['required', Rule::enum(FileCategory::class)],
             'notes' => ['nullable', 'array'],
             'notes.*' => ['nullable', 'string', 'max:255'],
-            'linkable_type' => ['nullable', Rule::in(['asset', 'location', 'item_type', 'maintenance_log', 'rig_event'])],
+            'linkable_type' => ['nullable', Rule::in(['asset', 'location', 'item_type', 'maintenance_log', 'rig_event', 'spare_part'])],
             'linkable_id' => ['required_with:linkable_type', 'nullable', 'integer'],
         ];
     }

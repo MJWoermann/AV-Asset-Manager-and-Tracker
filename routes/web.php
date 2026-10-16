@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\ActiveDepartmentController;
 use App\Http\Controllers\Admin\AdminHubController;
+use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\Admin\ExportColumnController;
 use App\Http\Controllers\Admin\InboundEmailActionController;
@@ -28,6 +30,7 @@ use App\Http\Controllers\CustomFieldSetController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardModulePreferenceController;
 use App\Http\Controllers\DataHubController;
+use App\Http\Controllers\DepartmentVisibilityPreferenceController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\GuestStockController;
@@ -37,6 +40,8 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ManufacturerController;
 use App\Http\Controllers\ManufacturerModelController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RepairController;
+use App\Http\Controllers\RepairProcedureController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RigEventController;
 use App\Http\Controllers\RiggingCalculationLogController;
@@ -45,6 +50,12 @@ use App\Http\Controllers\RiggingController;
 use App\Http\Controllers\ScanController;
 use App\Http\Controllers\ShelfTagLayoutController;
 use App\Http\Controllers\ShelfTagPrintController;
+use App\Http\Controllers\SpareGroupController;
+use App\Http\Controllers\SparePartChartController;
+use App\Http\Controllers\SparePartController;
+use App\Http\Controllers\SparePartMovementController;
+use App\Http\Controllers\SparePartShelfTagPrintController;
+use App\Http\Controllers\TrustedExternalDomainPreferenceController;
 use App\Http\Controllers\UnknownScanController;
 use Illuminate\Support\Facades\Route;
 
@@ -75,6 +86,13 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
         ->name('preferences.asset-columns');
     Route::patch('/preferences/dashboard-modules', [DashboardModulePreferenceController::class, 'update'])
         ->name('preferences.dashboard-modules');
+    Route::patch('/preferences/active-department', [ActiveDepartmentController::class, 'update'])
+        ->name('preferences.active-department');
+    Route::patch('/preferences/department-visibility', [DepartmentVisibilityPreferenceController::class, 'update'])
+        ->middleware('role:admin')
+        ->name('preferences.department-visibility');
+    Route::delete('/preferences/trusted-external-domains', [TrustedExternalDomainPreferenceController::class, 'destroy'])
+        ->name('preferences.trusted-external-domains.destroy');
 
     Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
     Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.create');
@@ -93,6 +111,35 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
         ->middleware('role:admin,inventory_manager')
         ->name('assets.maintenance-logs.destroy');
 
+    Route::get('/repairs', [RepairController::class, 'index'])->name('repairs.index');
+    Route::get('/repairs/{repair}', [RepairController::class, 'show'])->name('repairs.show');
+    Route::post('/assets/{asset}/repairs', [RepairController::class, 'storeFromFault'])
+        ->name('assets.repairs.store');
+    Route::post('/assets/{asset}/repairs/with-fault', [RepairController::class, 'storeWithNewFault'])
+        ->name('assets.repairs.store-with-fault');
+    Route::post('/spares/{spare}/repairs', [RepairController::class, 'storeFromSpare'])
+        ->name('spares.repairs.store');
+    Route::post('/repairs/{repair}/steps', [RepairController::class, 'storeStep'])
+        ->name('repairs.steps.store');
+    Route::patch('/repairs/{repair}/steps/{step}', [RepairController::class, 'updateStep'])
+        ->name('repairs.steps.update');
+    Route::post('/repairs/{repair}/parts', [RepairController::class, 'storePart'])
+        ->name('repairs.parts.store');
+    Route::post('/repairs/{repair}/complete', [RepairController::class, 'complete'])
+        ->name('repairs.complete');
+    Route::post('/repairs/{repair}/cancel', [RepairController::class, 'cancel'])
+        ->name('repairs.cancel');
+
+    Route::middleware('role:admin,inventory_manager')->group(function () {
+        Route::get('/repair-procedures', [RepairProcedureController::class, 'index'])->name('repair-procedures.index');
+        Route::get('/repair-procedures/create', [RepairProcedureController::class, 'create'])->name('repair-procedures.create');
+        Route::post('/repair-procedures', [RepairProcedureController::class, 'store'])->name('repair-procedures.store');
+        Route::get('/repair-procedures/{repair_procedure}', [RepairProcedureController::class, 'show'])->name('repair-procedures.show');
+        Route::get('/repair-procedures/{repair_procedure}/edit', [RepairProcedureController::class, 'edit'])->name('repair-procedures.edit');
+        Route::put('/repair-procedures/{repair_procedure}', [RepairProcedureController::class, 'update'])->name('repair-procedures.update');
+        Route::delete('/repair-procedures/{repair_procedure}', [RepairProcedureController::class, 'destroy'])->name('repair-procedures.destroy');
+    });
+
     Route::get('/files/search', [FileController::class, 'search'])->name('files.search');
     Route::post('/files/upload', [FileController::class, 'storeUpload'])->name('files.upload');
     Route::post('/files/bulk-upload', [FileController::class, 'storeBulkUpload'])->name('files.bulk-upload');
@@ -102,6 +149,8 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::get('/files/{file}/download', [FileController::class, 'download'])->name('files.download');
     Route::get('/files/{file}/preview', [FileController::class, 'preview'])->name('files.preview');
     Route::get('/files/{file}/thumbnail', [FileController::class, 'thumbnail'])->name('files.thumbnail');
+    Route::post('/files/{file}/external/continue', [FileController::class, 'continueExternal'])
+        ->name('files.external.continue');
     Route::middleware('role:admin,inventory_manager')->group(function () {
         Route::get('/files', [FileController::class, 'index'])->name('files.index');
         Route::get('/files/{file}', [FileController::class, 'show'])->name('files.show');
@@ -109,23 +158,49 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     });
 
     Route::get('/data', [DataHubController::class, 'index'])->name('data.index');
-    Route::get('/locations', [LocationController::class, 'index'])->name('locations.index');
-    Route::get('/manufacturers', [ManufacturerController::class, 'index'])->name('manufacturers.index');
+
+    Route::get('/spares', [SparePartController::class, 'index'])->name('spares.index');
+    Route::get('/spares/lookup', [SparePartController::class, 'lookup'])->name('spares.lookup');
+    Route::get('/spares/c/{code}', [SparePartController::class, 'showByCode'])->name('spares.show-by-code');
+    Route::get('/spares/groups', [SpareGroupController::class, 'index'])->name('spares.groups.index');
     Route::middleware('role:admin,inventory_manager')->group(function () {
-        Route::get('/locations/create', [LocationController::class, 'create'])->name('locations.create');
-        Route::post('/locations', [LocationController::class, 'store'])->name('locations.store');
+        Route::get('/spares/create', [SparePartController::class, 'create'])->name('spares.create');
+        Route::post('/spares', [SparePartController::class, 'store'])->name('spares.store');
+        Route::post('/spares/labels/print', [SparePartShelfTagPrintController::class, 'batch'])->name('spares.labels.print');
+        Route::get('/spares/groups/create', [SpareGroupController::class, 'create'])->name('spares.groups.create');
+        Route::post('/spares/groups', [SpareGroupController::class, 'store'])->name('spares.groups.store');
+        Route::get('/spares/groups/{group}/edit', [SpareGroupController::class, 'edit'])->name('spares.groups.edit');
+        Route::put('/spares/groups/{group}', [SpareGroupController::class, 'update'])->name('spares.groups.update');
+        Route::delete('/spares/groups/{group}', [SpareGroupController::class, 'destroy'])->name('spares.groups.destroy');
+        Route::get('/spares/{spare}/edit', [SparePartController::class, 'edit'])->name('spares.edit');
+        Route::put('/spares/{spare}', [SparePartController::class, 'update'])->name('spares.update');
+        Route::delete('/spares/{spare}', [SparePartController::class, 'destroy'])->name('spares.destroy');
+        Route::post('/spares/{spare}/supersede', [SparePartController::class, 'supersede'])->name('spares.supersede');
+        Route::get('/spares/{spare}/label', [SparePartShelfTagPrintController::class, 'label'])->name('spares.label');
+    });
+    Route::get('/spares/groups/{group}', [SpareGroupController::class, 'show'])->name('spares.groups.show');
+    Route::get('/spares/{spare}', [SparePartController::class, 'show'])->name('spares.show');
+    Route::get('/spares/{spare}/chart', [SparePartChartController::class, 'show'])->name('spares.chart');
+    Route::post('/spares/{spare}/movements', [SparePartMovementController::class, 'store'])
+        ->name('spares.movements.store');
+
+    Route::get('/locations', [LocationController::class, 'index'])->name('locations.index');
+    Route::get('/locations/create', [LocationController::class, 'create'])->name('locations.create');
+    Route::post('/locations', [LocationController::class, 'store'])->name('locations.store');
+    Route::get('/manufacturers', [ManufacturerController::class, 'index'])->name('manufacturers.index');
+    Route::get('/manufacturers/create', [ManufacturerController::class, 'create'])->name('manufacturers.create');
+    Route::post('/manufacturers', [ManufacturerController::class, 'store'])->name('manufacturers.store');
+    Route::get('/manufacturers/{manufacturer}/models/create', [ManufacturerModelController::class, 'create'])->name('manufacturers.models.create');
+    Route::post('/manufacturers/{manufacturer}/models', [ManufacturerModelController::class, 'store'])->name('manufacturers.models.store');
+    Route::middleware('role:admin,inventory_manager')->group(function () {
         Route::post('/locations/bulk-update', [LocationController::class, 'bulkUpdate'])->name('locations.bulk-update');
         Route::get('/locations/{location}/edit', [LocationController::class, 'edit'])->name('locations.edit');
         Route::put('/locations/{location}', [LocationController::class, 'update'])->name('locations.update');
         Route::delete('/locations/{location}', [LocationController::class, 'destroy'])->name('locations.destroy');
 
-        Route::get('/manufacturers/create', [ManufacturerController::class, 'create'])->name('manufacturers.create');
-        Route::post('/manufacturers', [ManufacturerController::class, 'store'])->name('manufacturers.store');
         Route::get('/manufacturers/{manufacturer}/edit', [ManufacturerController::class, 'edit'])->name('manufacturers.edit');
         Route::put('/manufacturers/{manufacturer}', [ManufacturerController::class, 'update'])->name('manufacturers.update');
         Route::delete('/manufacturers/{manufacturer}', [ManufacturerController::class, 'destroy'])->name('manufacturers.destroy');
-        Route::get('/manufacturers/{manufacturer}/models/create', [ManufacturerModelController::class, 'create'])->name('manufacturers.models.create');
-        Route::post('/manufacturers/{manufacturer}/models', [ManufacturerModelController::class, 'store'])->name('manufacturers.models.store');
         Route::get('/manufacturers/{manufacturer}/models/{manufacturer_model}/edit', [ManufacturerModelController::class, 'edit'])->name('manufacturers.models.edit');
         Route::put('/manufacturers/{manufacturer}/models/{manufacturer_model}', [ManufacturerModelController::class, 'update'])->name('manufacturers.models.update');
         Route::delete('/manufacturers/{manufacturer}/models/{manufacturer_model}', [ManufacturerModelController::class, 'destroy'])->name('manufacturers.models.destroy');
@@ -175,6 +250,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [AdminHubController::class, 'index'])->name('index');
         Route::resource('users', UserController::class)->except(['show']);
+        Route::resource('departments', DepartmentController::class)->except(['show']);
         Route::get('/export-columns', [ExportColumnController::class, 'edit'])->name('export-columns.edit');
         Route::put('/export-columns', [ExportColumnController::class, 'update'])->name('export-columns.update');
         Route::get('/sso', [SsoSettingsController::class, 'edit'])->name('sso.edit');

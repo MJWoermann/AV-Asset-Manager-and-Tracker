@@ -29,6 +29,7 @@ class ProfileUpdateRequest extends FormRequest
             ],
             'theme' => ['required', 'in:light,dark'],
             'scan_noise' => ['sometimes', 'boolean'],
+            'scan_vibrate' => ['sometimes', 'boolean'],
         ];
 
         if ($this->user()?->hasRole('admin')) {

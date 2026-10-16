@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AssetStatus;
+use App\Models\Concerns\BelongsToDepartment;
 use App\Services\FileAttachmentService;
 use App\Support\AssetSearch;
 use Database\Factories\AssetFactory;
@@ -13,13 +14,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Validation\ValidationException;
 
 class Asset extends Model
 {
     /** @use HasFactory<AssetFactory> */
-    use HasFactory;
+    use BelongsToDepartment, HasFactory;
 
     protected $fillable = [
+        'department_id',
         'item_type_id',
         'location_id',
         'parent_id',
@@ -65,9 +68,38 @@ class Asset extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (Asset $asset): void {
+            if (! $asset->parent_id) {
+                return;
+            }
+
+            $parent = static::withoutDepartmentScope()->find($asset->parent_id);
+
+            if ($parent) {
+                $asset->department_id = $parent->department_id;
+            }
+        });
+
         static::saving(function (Asset $asset) {
-            if ($asset->parent_id && $asset->parent) {
-                $asset->location_id = $asset->parent->location_id;
+            if ($asset->parent_id) {
+                $parent = $asset->relationLoaded('parent')
+                    ? $asset->parent
+                    : static::withoutDepartmentScope()->find($asset->parent_id);
+
+                if ($parent) {
+                    $asset->location_id = $parent->location_id;
+
+                    if (
+                        $asset->department_id !== null
+                        && (int) $parent->department_id !== (int) $asset->department_id
+                    ) {
+                        throw ValidationException::withMessages([
+                            'parent_id' => 'Parent asset must belong to the same department.',
+                        ]);
+                    }
+
+                    $asset->department_id = $parent->department_id;
+                }
             }
         });
 
@@ -151,9 +183,21 @@ class Asset extends Model
             ->orderByDesc('id');
     }
 
+    public function repairs(): HasMany
+    {
+        return $this->hasMany(Repair::class)->orderByDesc('started_at')->orderByDesc('id');
+    }
+
     public function auditLogs(): MorphMany
     {
         return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');
+    }
+
+    public function sparePartMovements(): HasMany
+    {
+        return $this->hasMany(SparePartMovement::class, 'against_asset_id')
+            ->orderByDesc('recorded_at')
+            ->orderByDesc('id');
     }
 
     public function files(): MorphToMany

@@ -11,6 +11,12 @@ Supported providers:
 
 Credentials live in `.env` only. Provider toggles and the **allowed email domain** list are stored in the app database and managed under **Admin → SSO**.
 
+**Admin → SSO**
+
+| Desktop | Mobile |
+|---------|--------|
+| ![SSO settings desktop](images/sso/admin-sso-desktop.png) | ![SSO settings mobile](images/sso/admin-sso-mobile.png) |
+
 ## How visibility works
 
 A provider button appears on the login page only when **all** of the following are true:

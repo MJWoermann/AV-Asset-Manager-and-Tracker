@@ -10,6 +10,8 @@ enum NotificationEventKey: string
     case InboundMatchPending = 'inbound_match_pending';
     case InboundMatchApplied = 'inbound_match_applied';
     case InboundMatchRejected = 'inbound_match_rejected';
+    case RepairStarted = 'repair_started';
+    case RepairCompleted = 'repair_completed';
 
     public function label(): string
     {
@@ -20,6 +22,8 @@ enum NotificationEventKey: string
             self::InboundMatchPending => 'Inbound match pending',
             self::InboundMatchApplied => 'Inbound match applied',
             self::InboundMatchRejected => 'Inbound match rejected',
+            self::RepairStarted => 'Repair started',
+            self::RepairCompleted => 'Repair completed',
         };
     }
 

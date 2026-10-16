@@ -231,7 +231,7 @@
                         >
                             <div class="absolute top-0 left-0" :style="viewportTransformStyle">
                                 <div
-                                    class="relative bg-white shadow-md ring-1 ring-black/20 overflow-hidden"
+                                    class="relative bg-white shadow-md ring-1 ring-black/20 overflow-visible"
                                     x-ref="canvas"
                                     :style="canvasStyle"
                                     @pointerdown.stop="onCanvasPointerDown($event)"
@@ -477,9 +477,9 @@
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
-                <x-primary-button>Save layout</x-primary-button>
+            <div class="flex flex-wrap items-center justify-end gap-3">
                 <a href="{{ route('labels.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
+                <x-primary-button>Save layout</x-primary-button>
             </div>
         </form>
     </div>

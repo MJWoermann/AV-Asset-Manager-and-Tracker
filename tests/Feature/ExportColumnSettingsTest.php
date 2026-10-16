@@ -294,4 +294,23 @@ class ExportColumnSettingsTest extends TestCase
             $export->headings()
         );
     }
+
+    public function test_asset_export_escapes_formula_like_cell_values(): void
+    {
+        AssetExportColumns::putAssets(['name', 'notes']);
+
+        $type = ItemType::create(['name' => 'Audio', 'slug' => 'audio']);
+        Asset::create([
+            'name' => '=CMD()',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Available,
+            'notes' => '+1-555',
+            'quantity' => 1,
+        ]);
+
+        $export = new AssetsExport;
+        $row = $export->collection()->first();
+
+        $this->assertSame(["'=CMD()", "'+1-555"], $row);
+    }
 }

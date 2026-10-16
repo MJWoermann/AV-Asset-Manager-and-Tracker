@@ -11,7 +11,10 @@ use App\Models\File;
 use App\Models\FileLink;
 use App\Models\ItemType;
 use App\Models\Location;
+use App\Models\Repair;
+use App\Models\RepairProcedure;
 use App\Models\RigEvent;
+use App\Models\SparePart;
 use App\Models\StockMovement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
@@ -36,6 +39,9 @@ class FileAttachmentService
             'stock_movement' => StockMovement::class,
             'maintenance_log' => AssetMaintenanceLog::class,
             'rig_event' => RigEvent::class,
+            'spare_part' => SparePart::class,
+            'repair_procedure' => RepairProcedure::class,
+            'repair' => Repair::class,
             default => throw new InvalidArgumentException('Unsupported linkable type.'),
         };
     }
@@ -56,6 +62,9 @@ class FileAttachmentService
             StockMovement::class => 'stock_movement',
             AssetMaintenanceLog::class => 'maintenance_log',
             RigEvent::class => 'rig_event',
+            SparePart::class => 'spare_part',
+            RepairProcedure::class => 'repair_procedure',
+            Repair::class => 'repair',
             default => throw new InvalidArgumentException('Unsupported linkable model.'),
         };
     }

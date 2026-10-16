@@ -6,6 +6,7 @@ use Database\Factories\ManufacturerModelFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ManufacturerModel extends Model
@@ -44,6 +45,17 @@ class ManufacturerModel extends Model
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class);
+    }
+
+    public function spareParts(): HasMany
+    {
+        return $this->hasMany(SparePart::class);
+    }
+
+    public function compatibleSpareParts(): BelongsToMany
+    {
+        return $this->belongsToMany(SparePart::class, 'spare_part_models')
+            ->withTimestamps();
     }
 
     public function interfaceTemplates(): HasMany

@@ -6,6 +6,7 @@ use App\Http\Requests\DeleteManufacturerModelRequest;
 use App\Models\ConnectionType;
 use App\Models\Manufacturer;
 use App\Models\ManufacturerModel;
+use App\Models\SparePart;
 use App\Services\AssetInterfaceService;
 use App\Services\ManufacturerCatalogueService;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +25,7 @@ class ManufacturerModelController extends Controller
             'assetCount' => 0,
             'interfaceTemplates' => [],
             'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
+            'linkedSpares' => collect(),
         ]);
     }
 
@@ -62,6 +64,19 @@ class ManufacturerModelController extends Controller
             ])->values()->all();
         }
 
+        $compatibleIds = $manufacturerModel->compatibleSpareParts()->pluck('spare_parts.id');
+        $linkedSpares = $manufacturerModel->exists
+            ? SparePart::query()
+                ->where(function ($query) use ($manufacturerModel, $compatibleIds): void {
+                    $query->where('manufacturer_model_id', $manufacturerModel->id);
+                    if ($compatibleIds->isNotEmpty()) {
+                        $query->orWhereIn('id', $compatibleIds);
+                    }
+                })
+                ->orderBy('code')
+                ->get()
+            : collect();
+
         return view('manufacturers.models.form', [
             'manufacturer' => $manufacturer,
             'manufacturerModel' => $manufacturerModel,
@@ -69,6 +84,7 @@ class ManufacturerModelController extends Controller
             'assetCount' => $manufacturerModel->assets()->count(),
             'interfaceTemplates' => $interfaceTemplates,
             'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
+            'linkedSpares' => $linkedSpares,
         ]);
     }
 

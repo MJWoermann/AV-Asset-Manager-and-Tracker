@@ -8,6 +8,7 @@ use Database\Factories\AssetMaintenanceLogFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class AssetMaintenanceLog extends Model
@@ -49,6 +50,11 @@ class AssetMaintenanceLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function repairs(): HasMany
+    {
+        return $this->hasMany(Repair::class, 'maintenance_log_id');
     }
 
     public function files(): MorphToMany
