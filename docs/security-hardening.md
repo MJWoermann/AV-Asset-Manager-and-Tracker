@@ -56,9 +56,9 @@ Severity reflects impact if the host is reachable by untrusted users (or a compr
 |----|------|----------|------|
 | M1 | Guest stock kill-switch | **Mitigated** — `STOCK_GUEST_ENABLED` (default true) via `StockTracking::guestSurfaceEnabled()`; set false to 404 guest routes | Keep tokens revoked when unused |
 | M2 | Registration / password-reset throttle gaps | Register unthrottled; `forgot-password` outside SSO throttle group; login uses 5-attempt lockout in `LoginRequest` | Signup spam; reset-email abuse |
-| M3 | Weak first-admin password path | `app:install` / some admin user flows allow weaker `min:8` vs `Password::defaults()` on register | Weak break-glass admin |
+| M3 | Weak first-admin password path | **Mitigated** — `Password::defaults()` (min 8, one uppercase, one number or symbol) applies to register, reset, profile update, Admin → Users, and `app:install` | Rotate install password; tighten further via [Password complexity](#password-complexity) |
 | M4 | SSO email binding | `SocialAuthService` matches by email; Azure “verified” is weaker than Google’s `email_verified` check | IdP/email edge cases → wrong account session |
-| M5 | Production defaults in docs | Deploy guide sets `SESSION_SECURE_COOKIE=false` for HTTP; `.env.example` has `APP_DEBUG=true` | Mis-copy into production → cookie theft on HTTP, stack traces if debug left on |
+| M5 | Production defaults in docs | Deploy guide targets HTTPS + `SESSION_SECURE_COOKIE=true`; temporary HTTP bootstrap is documented; `.env.example` has `APP_DEBUG=true` | Mis-copy into production → cookie theft on HTTP, stack traces if debug left on; mobile camera needs HTTPS ([self-signed-tls.md](self-signed-tls.md)) |
 | M6 | Backup / restore sensitivity | SQL dumps include password hashes; restore is destructive CLI/admin path | Stolen backup ≈ offline credential attack + data loss if misused |
 | M7 | Trusted proxies unset | No explicit `trustProxies` in `bootstrap/app.php` | Wrong client IP behind reverse proxy → broken rate limits / audit IP |
 | M8 | Upload MIME depth | `config/attachments.php` allow-list + `mimes` validation; good UUID storage paths | Residual MIME spoofing; downloads should stay `Content-Disposition: attachment` |
@@ -86,10 +86,11 @@ Do these on every production host. Many are already sketched in [deploy-ubuntu-n
 ### 1. Network and TLS
 
 - Prefer VPN / LAN-only access. UFW: allow SSH from admin networks only; allow HTTP/HTTPS only from trusted subnets.
-- Terminate TLS (Certbot or corporate cert). After HTTPS:
+- **HTTPS is required for mobile camera scanning and reliable PWA install** (secure context). Prefer a corporate internal CA or Certbot when you have a public name; otherwise follow **[self-signed-tls.md](self-signed-tls.md)** (private CA, Nginx `443`, device trust on iOS/Android).
+- After HTTPS:
   - `APP_URL=https://…`
   - `SESSION_SECURE_COOKIE=true`
-  - Optionally HSTS in Nginx (`Strict-Transport-Security`).
+  - Optionally HSTS in Nginx (`Strict-Transport-Security`) once every client uses HTTPS and trusts the cert.
 - Add security headers beyond the example (`X-Frame-Options`, `X-Content-Type-Options`): `Referrer-Policy`, `Permissions-Policy`, and a Content-Security-Policy appropriate for Blade + Vite + scanner libs.
 - Deny direct access to `/storage` blobs if you ever symlink user uploads there; this app should serve attachments only via authenticated `/files/{id}/download`.
 
@@ -133,10 +134,72 @@ LOG_LEVEL=warning
 ### 5. Accounts and secrets
 
 - Create users only via Admin → Users (or `app:install` for the first admin).
+- New passwords must be ≥8 characters with one uppercase letter and one number or symbol (enforced in code — see [Password complexity](#password-complexity)).
 - Rotate the install admin password immediately; use unique emails.
 - Prefer SSO ([sso-setup.md](sso-setup.md)) with a strict domain allow-list for staff mailboxes; keep password login for break-glass admins only if needed.
 - Graph / Google / Azure client secrets and QNAP SFTP/S3 keys: `.env` or OS secret store only; rotate on staff change.
 - Sanctum tokens: treat like passwords; revoke on device loss (`DELETE /api/auth/token` or delete `personal_access_tokens` rows).
+
+### Password complexity
+
+Default policy (all password set/change paths, including `app:install`):
+
+- Minimum **8** characters
+- At least **one uppercase** letter
+- At least **one number or one symbol**
+
+Policy lives in `app/Providers/AppServiceProvider.php` inside `Password::defaults(...)`. There is no Admin UI toggle — tightening it is a **server-side code change** (SSH/terminal on the host, or a normal deploy of an edited file).
+
+**Increase requirements on a live LEMP host (terminal):**
+
+```bash
+# 1. SSH to the app host and go to the app root (adjust path)
+cd /var/www/av-asset-manager
+
+# 2. Edit the defaults callback
+sudo -u www-data nano app/Providers/AppServiceProvider.php
+# (or edit as the deploy user that owns the tree)
+```
+
+In `boot()`, strengthen the rule, for example:
+
+```php
+Password::defaults(function () {
+    return Password::min(12)           // longer minimum
+        ->mixedCase()                  // require upper and lower
+        ->numbers()                    // require a digit
+        ->symbols()                    // require a symbol (and, not or)
+        ->uncompromised()              // reject known-breached passwords (needs outbound HTTPS)
+        ->rules([
+            // keep or remove the custom “uppercase + number-or-symbol” closure
+            // if you fully switch to the built-in chain above
+        ]);
+});
+```
+
+Useful Laravel helpers:
+
+| Method | Effect |
+|--------|--------|
+| `Password::min(n)` | Raise minimum length |
+| `->mixedCase()` | At least one upper and one lower |
+| `->numbers()` | At least one digit |
+| `->symbols()` | At least one symbol |
+| `->uncompromised()` | Check against haveibeenpwned-style API (host needs outbound HTTPS) |
+| `->rules([...])` | Custom closures / rule objects (current default uses this for “number **or** symbol”) |
+
+```bash
+# 3. Clear caches and reload PHP so the change is picked up
+php artisan optimize:clear
+sudo systemctl reload php8.3-fpm   # adjust PHP-FPM unit name for your host
+```
+
+Notes:
+
+- Existing users keep their current passwords until they next change or reset them; stricter rules apply to **new** passwords only.
+- After you tighten rules, update install examples and staff guidance so new accounts are not rejected.
+- Prefer committing the change in git and deploying with `scripts/update.sh` on production so the host does not drift from the repo. Direct `nano` on the server is fine for an emergency policy bump — fold it back into source control afterward.
+- `uncompromised()` calls an external breach list; on air-gapped LAN hosts, skip it or ensure the host can reach the API.
 
 ### 6. Guest Kanban / stock QR
 
@@ -189,7 +252,7 @@ sudo ufw status numbered
 
 3. **Do not expose MariaDB or SSH to WiFi broadly** — Keep `bind-address = 127.0.0.1` for MariaDB. Never open `3306` on the WiFi ACLs. SSH from admin subnets (or VPN jump) only.
 4. **Optional mDNS / DNS hostname** — Avahi/`*.local` or an internal A/AAAA record (e.g. `av-assets.corp.example`) so phones and laptops resolve the same name. Whatever staff type in the browser must match `APP_URL` (scheme + host + port).
-5. **HTTPS on the LAN if feasible** — Prefer a corporate internal CA cert or split-horizon public name so browsers trust TLS. After HTTPS: `APP_URL=https://…`, `SESSION_SECURE_COOKIE=true`, and optional HSTS. If you must stay on HTTP LAN-only, document that risk and keep `SESSION_SECURE_COOKIE=false` (as in the deploy guide).
+5. **HTTPS on the LAN (required for phones/tablets that scan)** — Prefer a corporate internal CA cert or split-horizon public name so browsers trust TLS. If neither is available, use a private CA / self-signed setup and install the CA on every scanner device — **[self-signed-tls.md](self-signed-tls.md)**. After HTTPS: `APP_URL=https://…`, `SESSION_SECURE_COOKIE=true`, and optional HSTS. HTTP-only LAN is a last resort for laptop-only access; it does **not** satisfy mobile camera scanning and must be treated as an accepted risk with `SESSION_SECURE_COOKIE=false`.
 
 Nginx can also deny by source (same idea as UFW):
 
@@ -277,7 +340,7 @@ These are the highest-value code/config changes relative to the findings above. 
 ### P2 — Abuse resistance and SSO
 
 8. Throttle `POST /register` (if kept for non-prod) and `POST /forgot-password` like login/SSO.
-9. Use `Password::defaults()` (consider `uncompromised()`) for admin create/install passwords.
+9. Shared `Password::defaults()` for register / reset / profile / Admin → Users / `app:install` — **done** (min 8, uppercase, number or symbol). Optional further tightening (longer min, `mixedCase()`, both numbers and symbols, `uncompromised()`) is a server-side edit — see [Password complexity](#password-complexity).
 10. SSO: store provider subject IDs; require verified email claims for Azure comparable to Google; keep domain allow-list non-empty in production.
 11. Guest stock kill-switch — **done** (`STOCK_GUEST_ENABLED`); optional token expiry and tighter throttle remain open.
 
@@ -299,9 +362,10 @@ Use alongside the checklist in the deploy guide.
 - [ ] `ALLOW_REGISTRATION=false` (default; leave false in production)
 - [ ] Optional: `STOCK_GUEST_ENABLED=false` if Kanban guest QR is not needed
 - [ ] Only known users exist; each has exactly the roles they need
-- [ ] First admin password rotated; no `admin@example.com` in production
+- [ ] First admin password meets complexity rules and is rotated; no `admin@example.com` in production
+- [ ] Optional: password policy tightened beyond defaults if required by org policy ([Password complexity](#password-complexity))
 - [ ] `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` correct
-- [ ] HTTPS + `SESSION_SECURE_COOKIE=true` (or accepted risk documented for HTTP LAN)
+- [ ] HTTPS + `SESSION_SECURE_COOKIE=true`; mobile CA trust verified for scanning ([self-signed-tls.md](self-signed-tls.md)) — or accepted risk documented for HTTP laptop-only LAN
 - [ ] MariaDB localhost-only; least-privilege DB user; audit_logs UPDATE/DELETE revoked
 - [ ] UFW / firewall restricts who can reach the host (staff WiFi subnets for HTTP/HTTPS; admin-only SSH; no DB on WiFi)
 - [ ] Corporate LAN: `APP_URL` resolvable on staff WiFi; outbound limited to SSO + email (see [Corporate LAN section](#corporate-lan--staff-wifi-deployment))

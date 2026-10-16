@@ -15,6 +15,7 @@
             <div>
                 <x-input-label for="password" :value="$user->exists ? 'Password (leave blank to keep)' : 'Password'" />
                 <x-text-input id="password" name="password" type="password" class="mt-1 block w-full" :required="!$user->exists" />
+                <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">At least 8 characters, one uppercase letter, and one number or symbol.</p>
             </div>
             <div>
                 <x-input-label for="role" value="Role" />

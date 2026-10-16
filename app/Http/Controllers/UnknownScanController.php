@@ -106,35 +106,7 @@ class UnknownScanController extends Controller
 
     public function deduplicate(): RedirectResponse
     {
-        // #region agent log
-        $logPath = base_path('debug-5c1253.log');
-        file_put_contents($logPath, json_encode([
-            'sessionId' => '5c1253',
-            'hypothesisId' => 'B',
-            'location' => 'UnknownScanController.php:deduplicate',
-            'message' => 'deduplicate_entered',
-            'data' => ['total_rows' => UnknownScan::query()->count()],
-            'timestamp' => (int) (microtime(true) * 1000),
-            'runId' => 'post-fix',
-        ])."\n", FILE_APPEND);
-        // #endregion
-
         $deleted = UnknownScan::deleteDuplicatesKeepingLatest();
-
-        // #region agent log
-        file_put_contents($logPath, json_encode([
-            'sessionId' => '5c1253',
-            'hypothesisId' => 'C',
-            'location' => 'UnknownScanController.php:deduplicate',
-            'message' => 'deduplicate_result',
-            'data' => [
-                'deleted' => $deleted,
-                'remaining_rows' => UnknownScan::query()->count(),
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-            'runId' => 'post-fix',
-        ])."\n", FILE_APPEND);
-        // #endregion
 
         return redirect()
             ->route('reports.unknown-scans')

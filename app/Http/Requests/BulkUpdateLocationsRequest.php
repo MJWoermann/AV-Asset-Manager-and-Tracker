@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\LocationType;
 use App\Models\Location;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -55,8 +56,16 @@ class BulkUpdateLocationsRequest extends FormRequest
                 'nullable',
                 Rule::excludeIf(fn () => $this->boolean('clear_parent')),
                 Rule::requiredIf(fn () => $this->input('action') === 'update' && $this->boolean('update_parent') && ! $this->boolean('clear_parent')),
-                'exists:locations,id',
+                Rule::exists('locations', 'id')->whereNot('type', LocationType::Rack->value),
             ],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'parent_id.exists' => 'Racks cannot be a parent for another location.',
         ];
     }
 

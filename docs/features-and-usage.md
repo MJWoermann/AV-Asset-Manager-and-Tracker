@@ -64,6 +64,16 @@ Access is controlled by three roles. Your administrator assigns these when creat
 - Email and password by default.
 - Optional **Google** or **Microsoft** sign-in for existing users (admin configures this). New people are not auto-created via SSO — an admin must create the account first.
 
+**Passwords**
+
+When you set or change a password (first login reset, Profile → Update Password, or when an admin creates your account), it must meet these rules:
+
+- At least **8 characters**
+- At least **one uppercase letter** (A–Z)
+- At least **one number** (0–9) **or** **one symbol** (for example `!`, `@`, `#`, `-`)
+
+Examples that work: `Stocktake1`, `Warehouse!`. Examples that do not: `password`, `Password`, `pass1234`.
+
 ---
 
 ## Getting around
@@ -113,6 +123,7 @@ This is the main day-of-event workflow.
 - Prefer barcodes and IDs that match fields such as FMI AST#, TP barcode, RIG tag, serial number, or MAC.
 - The app looks up exact identifiers first, then falls back to broader search (name, IP, and similar). Clean barcodes in the database make stocktakes faster and more accurate.
 - You need network access while scanning; work is saved on the server as you go.
+- On phones and tablets, open the app over **HTTPS**. The camera will not work on plain HTTP to a LAN server. Admins: see [self-signed-tls.md](self-signed-tls.md) for certificates and installing trust on iOS/Android.
 
 ### 2. Find and maintain an asset
 
@@ -198,7 +209,7 @@ These items matter for evaluation and operations; day-to-day scanners rarely nee
 
 | Topic | Summary |
 |-------|---------|
-| **Users** | Admins create accounts and assign roles |
+| **Users** | Admins create accounts and assign roles; new passwords must meet the complexity rules above |
 | **SSO** | Optional Google Workspace / Microsoft Entra sign-in for existing users; see [sso-setup.md](sso-setup.md) |
 | **Storage & backup** | Choose where attachments live; run backups of data + files from Storage / ops commands |
 | **REST API** | Bearer tokens for integrations (assets, lists, compare, scan). See [api.md](api.md) |

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\FileCategory;
 use App\Http\Requests\LinkFileRequest;
+use App\Http\Requests\StoreBulkFileUploadRequest;
 use App\Http\Requests\StoreFileUploadRequest;
 use App\Http\Requests\StoreFileUrlRequest;
 use App\Models\File;
@@ -101,6 +102,37 @@ class FileController extends Controller
         }
 
         return back()->with('status', 'File uploaded.');
+    }
+
+    public function storeBulkUpload(StoreBulkFileUploadRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+        $linkable = $this->linkableFromRequest($data['linkable_type'] ?? null, $data['linkable_id'] ?? null);
+        $this->authorizeMutate($linkable);
+
+        $uploads = $request->file('files', []);
+        $items = [];
+
+        foreach ($uploads as $index => $upload) {
+            $category = $data['categories'][$index];
+
+            $items[] = [
+                'file' => $upload,
+                'title' => $data['titles'][$index],
+                'category' => $category instanceof FileCategory ? $category->value : (string) $category,
+                'note' => $data['notes'][$index] ?? null,
+            ];
+        }
+
+        try {
+            $stored = $this->attachments->storeBulkUploads($items, $linkable);
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors(['files' => $exception->getMessage()]);
+        }
+
+        $count = count($stored);
+
+        return back()->with('status', $count === 1 ? '1 file uploaded.' : "{$count} files uploaded.");
     }
 
     public function storeUrl(StoreFileUrlRequest $request): RedirectResponse

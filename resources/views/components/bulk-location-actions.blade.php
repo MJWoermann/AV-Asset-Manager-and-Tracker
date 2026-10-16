@@ -45,16 +45,14 @@
                     <input type="checkbox" name="clear_parent" value="1" x-model="fields.clear_parent" @change="if (fields.clear_parent) fields.update_parent = false">
                     <span>Clear parent</span>
                 </label>
-                <select
-                    name="parent_id"
-                    class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                    :disabled="!fields.update_parent"
-                >
-                    <option value="">—</option>
-                    @foreach($parents as $parent)
-                        <option value="{{ $parent->id }}">{{ $parent->breadcrumb() }}</option>
-                    @endforeach
-                </select>
+                <div x-bind:class="!fields.update_parent ? 'pointer-events-none opacity-50' : ''">
+                    <x-searchable-select
+                        name="parent_id"
+                        id="bulk_location_parent_id"
+                        :options="$parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->breadcrumb()])"
+                        nullable
+                    />
+                </div>
                 <p class="text-xs text-brand-charcoal dark:text-brand-silver">
                     Use “Merge same names” to combine selected locations that share a name. Assets on duplicates move to the kept location.
                 </p>

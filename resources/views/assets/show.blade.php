@@ -103,6 +103,7 @@
                 'connectionPeers' => $connectionPeers ?? collect(),
                 'connectionTypes' => $connectionTypes ?? collect(),
                 'peerAssetOptions' => $peerAssetOptions ?? [],
+                'canApplyInterfaceTemplates' => $canApplyInterfaceTemplates ?? false,
             ])
         @elseif($tab === 'files')
             <x-file-attachments

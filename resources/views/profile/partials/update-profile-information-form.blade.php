@@ -56,6 +56,28 @@
             <x-input-error class="mt-2" :messages="$errors->get('theme')" />
         </div>
 
+        <div class="space-y-2">
+            <p class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ __('Scan sounds') }}
+            </p>
+            <p class="text-sm text-gray-600 dark:text-brand-silver">
+                {{ __('Play a short tone when a barcode matches an asset, and a different tone when a scan fails.') }}
+            </p>
+            <label for="scan_noise" class="flex items-start gap-2 text-sm text-gray-800 dark:text-brand-silver">
+                <input type="hidden" name="scan_noise" value="0">
+                <input
+                    id="scan_noise"
+                    type="checkbox"
+                    name="scan_noise"
+                    value="1"
+                    class="rounded border-gray-300 text-brand mt-0.5"
+                    @checked(old('scan_noise', $user->wantsScanNoise()))
+                >
+                <span class="font-medium text-gray-900 dark:text-white">{{ __('Enable scan noise') }}</span>
+            </label>
+            <x-input-error class="mt-2" :messages="$errors->get('scan_noise')" />
+        </div>
+
         @if ($user->hasRole('admin'))
             <fieldset class="space-y-3">
                 <legend class="text-sm font-medium text-gray-900 dark:text-white">

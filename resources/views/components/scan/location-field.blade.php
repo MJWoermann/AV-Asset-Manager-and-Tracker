@@ -70,18 +70,13 @@
         </div>
         <div>
             <x-input-label for="{{ $id }}_new_parent" value="Parent (optional)" />
-            <select
-                id="{{ $id }}_new_parent"
+            <x-searchable-select
                 name="new_location[parent_id]"
-                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
-            >
-                <option value="">—</option>
-                @foreach($locations as $location)
-                    <option value="{{ $location->id }}" @selected((string) old('new_location.parent_id') === (string) $location->id)>
-                        {{ $location->name }}
-                    </option>
-                @endforeach
-            </select>
+                id="{{ $id }}_new_parent"
+                :options="$locations->filter(fn ($location) => $location->type !== \App\Enums\LocationType::Rack)->map(fn ($location) => ['value' => $location->id, 'label' => $location->name])->values()"
+                :selected="old('new_location.parent_id')"
+                nullable
+            />
             <x-input-error :messages="$errors->get('new_location.parent_id')" class="mt-1" />
         </div>
     </div>

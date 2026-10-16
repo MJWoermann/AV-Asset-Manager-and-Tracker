@@ -24,12 +24,14 @@
             </div>
             <div>
                 <x-input-label for="parent_id" value="Parent" />
-                <select name="parent_id" id="parent_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                    <option value="">—</option>
-                    @foreach($parents as $parent)
-                        <option value="{{ $parent->id }}" @selected(old('parent_id', $location->parent_id) == $parent->id)>{{ $parent->name }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="parent_id"
+                    id="parent_id"
+                    :options="$parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->name])"
+                    :selected="old('parent_id', $location->parent_id)"
+                    nullable
+                />
+                <x-input-error :messages="$errors->get('parent_id')" class="mt-1" />
             </div>
             <label class="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" name="is_portable" value="1" class="rounded text-brand" @checked(old('is_portable', $location->is_portable))>

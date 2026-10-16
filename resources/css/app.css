@@ -5,3 +5,22 @@
 [x-cloak] {
     display: none !important;
 }
+
+/* Keep the html5-qrcode viewfinder short on phones so scan UI + session list fit. */
+.scan-qr-reader video,
+.scan-qr-reader img {
+    width: 100% !important;
+    max-height: 28vh !important;
+    object-fit: cover;
+}
+
+.scan-qr-reader #qr-reader__scan_region {
+    min-height: 0 !important;
+}
+
+@media (min-width: 640px) {
+    .scan-qr-reader video,
+    .scan-qr-reader img {
+        max-height: min(50vh, 28rem) !important;
+    }
+}

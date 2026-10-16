@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\DeleteItemTypeRequest;
 use App\Models\Asset;
+use App\Models\ConnectionType;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
 use App\Services\AssetInterfaceService;
@@ -31,6 +32,7 @@ class ItemTypeController extends Controller
             'assetCount' => 0,
             'fileRows' => [],
             'interfaceTemplates' => [],
+            'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -79,6 +81,7 @@ class ItemTypeController extends Controller
                 'id' => $template->id,
                 'name' => $template->name,
                 'notes' => $template->notes,
+                'connection_type_id' => $template->connection_type_id,
             ])->values()->all();
         }
 
@@ -92,6 +95,7 @@ class ItemTypeController extends Controller
             'assetCount' => $itemType->assets()->count(),
             'fileRows' => $fileRows,
             'interfaceTemplates' => $interfaceTemplates,
+            'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -174,6 +178,7 @@ class ItemTypeController extends Controller
             $rules['interface_templates.*.id'] = ['nullable', 'integer'];
             $rules['interface_templates.*.name'] = ['nullable', 'string', 'max:255'];
             $rules['interface_templates.*.notes'] = ['nullable', 'string'];
+            $rules['interface_templates.*.connection_type_id'] = ['nullable', 'integer', 'exists:connection_types,id'];
         }
 
         return $request->validate($rules);

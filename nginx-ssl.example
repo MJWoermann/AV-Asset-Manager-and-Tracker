@@ -1,0 +1,57 @@
+# HTTPS site for LAN / mobile scanning.
+# Full steps (certs, device trust, .env): docs/self-signed-tls.md
+#
+# sudo cp nginx-ssl.example /etc/nginx/sites-available/av-asset-manager
+# Then edit server_name and ssl_* paths.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name YOUR_HOSTNAME;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name YOUR_HOSTNAME;
+    root /var/www/av-asset-manager/public;
+
+    ssl_certificate     /etc/ssl/av-asset-manager/av-assets.crt;
+    ssl_certificate_key /etc/ssl/av-asset-manager/av-assets.key;
+
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    # Enable only after all clients use trusted HTTPS:
+    # add_header Strict-Transport-Security "max-age=31536000" always;
+
+    index index.php;
+    charset utf-8;
+
+    client_max_body_size 25M;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}

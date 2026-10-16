@@ -27,4 +27,9 @@ class ManufacturerModel extends Model
     {
         return $this->hasMany(Asset::class);
     }
+
+    public function interfaceTemplates(): HasMany
+    {
+        return $this->hasMany(ManufacturerModelInterfaceTemplate::class)->orderBy('sort_order')->orderBy('id');
+    }
 }

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\DeleteManufacturerModelRequest;
+use App\Models\ConnectionType;
 use App\Models\Manufacturer;
 use App\Models\ManufacturerModel;
+use App\Services\AssetInterfaceService;
 use App\Services\ManufacturerCatalogueService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,12 +22,20 @@ class ManufacturerModelController extends Controller
             'manufacturerModel' => new ManufacturerModel(['manufacturer_id' => $manufacturer->id]),
             'replacementModels' => collect(),
             'assetCount' => 0,
+            'interfaceTemplates' => [],
+            'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
-    public function store(Request $request, Manufacturer $manufacturer): RedirectResponse
+    public function store(Request $request, Manufacturer $manufacturer, AssetInterfaceService $interfaces): RedirectResponse
     {
-        $manufacturer->models()->create($this->validated($request, $manufacturer));
+        $data = $this->validated($request, $manufacturer);
+
+        $manufacturerModel = $manufacturer->models()->create($data);
+
+        if ($request->user()?->hasFeature('asset_connections')) {
+            $interfaces->syncModelTemplates($manufacturerModel, $data['interface_templates'] ?? []);
+        }
 
         return redirect()->route('manufacturers.index')->with('status', 'Model created.');
     }
@@ -34,17 +44,31 @@ class ManufacturerModelController extends Controller
     {
         abort_unless($manufacturerModel->manufacturer_id === $manufacturer->id, 404);
 
+        $manufacturerModel->load('interfaceTemplates');
+
         $replacementModels = ManufacturerModel::query()
             ->with('manufacturer:id,name')
             ->whereKeyNot($manufacturerModel->id)
             ->orderBy('name')
             ->get();
 
+        $interfaceTemplates = old('interface_templates');
+        if ($interfaceTemplates === null) {
+            $interfaceTemplates = $manufacturerModel->interfaceTemplates->map(fn ($template) => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'notes' => $template->notes,
+                'connection_type_id' => $template->connection_type_id,
+            ])->values()->all();
+        }
+
         return view('manufacturers.models.form', [
             'manufacturer' => $manufacturer,
             'manufacturerModel' => $manufacturerModel,
             'replacementModels' => $replacementModels,
             'assetCount' => $manufacturerModel->assets()->count(),
+            'interfaceTemplates' => $interfaceTemplates,
+            'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
@@ -52,12 +76,35 @@ class ManufacturerModelController extends Controller
         Request $request,
         Manufacturer $manufacturer,
         ManufacturerModel $manufacturerModel,
+        AssetInterfaceService $interfaces,
     ): RedirectResponse {
         abort_unless($manufacturerModel->manufacturer_id === $manufacturer->id, 404);
 
-        $manufacturerModel->update($this->validated($request, $manufacturer, $manufacturerModel));
+        $data = $this->validated($request, $manufacturer, $manufacturerModel);
+
+        $manufacturerModel->update(['name' => $data['name']]);
+
+        if ($request->user()?->hasFeature('asset_connections')) {
+            $interfaces->syncModelTemplates($manufacturerModel, $data['interface_templates'] ?? []);
+        }
 
         return redirect()->route('manufacturers.index')->with('status', 'Model updated.');
+    }
+
+    public function syncMissingInterfaces(
+        Manufacturer $manufacturer,
+        ManufacturerModel $manufacturerModel,
+        AssetInterfaceService $interfaces,
+    ): RedirectResponse {
+        abort_unless($manufacturerModel->manufacturer_id === $manufacturer->id, 404);
+
+        $created = $interfaces->syncMissingForManufacturerModel($manufacturerModel);
+
+        return redirect()
+            ->route('manufacturers.models.edit', [$manufacturer, $manufacturerModel])
+            ->with('status', $created === 0
+                ? 'No missing interfaces to sync.'
+                : "Synced {$created} missing interface".($created === 1 ? '' : 's').' onto existing assets.');
     }
 
     public function destroy(
@@ -83,7 +130,7 @@ class ManufacturerModelController extends Controller
         Manufacturer $manufacturer,
         ?ManufacturerModel $manufacturerModel = null,
     ): array {
-        return $request->validate([
+        $rules = [
             'name' => [
                 'required',
                 'string',
@@ -92,6 +139,16 @@ class ManufacturerModelController extends Controller
                     ->where(fn ($query) => $query->where('manufacturer_id', $manufacturer->id))
                     ->ignore($manufacturerModel?->id),
             ],
-        ]);
+        ];
+
+        if ($request->user()?->hasFeature('asset_connections')) {
+            $rules['interface_templates'] = ['nullable', 'array'];
+            $rules['interface_templates.*.id'] = ['nullable', 'integer'];
+            $rules['interface_templates.*.name'] = ['nullable', 'string', 'max:255'];
+            $rules['interface_templates.*.notes'] = ['nullable', 'string'];
+            $rules['interface_templates.*.connection_type_id'] = ['nullable', 'integer', 'exists:connection_types,id'];
+        }
+
+        return $request->validate($rules);
     }
 }

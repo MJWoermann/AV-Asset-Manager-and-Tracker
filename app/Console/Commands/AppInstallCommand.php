@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 
 class AppInstallCommand extends Command
 {
@@ -44,7 +45,7 @@ class AppInstallCommand extends Command
         ], [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', Password::defaults()],
         ]);
 
         if ($validator->fails()) {

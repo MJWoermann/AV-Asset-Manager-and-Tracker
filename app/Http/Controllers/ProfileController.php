@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Support\DeveloperFeatures;
+use App\Support\ScanNoise;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,12 +30,21 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $validated = $request->validated();
-        unset($validated['features']);
+        unset($validated['features'], $validated['scan_noise']);
 
         $user->fill($validated);
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
+        }
+
+        $preferences = $user->preferences ?? [];
+
+        if ($request->exists('scan_noise')) {
+            $preferences = ScanNoise::mergeIntoPreferences(
+                $preferences,
+                $request->boolean('scan_noise'),
+            );
         }
 
         if ($user->hasRole('admin')) {
@@ -43,12 +53,13 @@ class ProfileController extends Controller
                 $featureFlags[$key] = $request->boolean('features.'.$key);
             }
 
-            $user->preferences = DeveloperFeatures::mergeIntoPreferences(
-                $user->preferences,
+            $preferences = DeveloperFeatures::mergeIntoPreferences(
+                $preferences,
                 $featureFlags,
             );
         }
 
+        $user->preferences = $preferences;
         $user->save();
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');

@@ -28,6 +28,7 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
             'theme' => ['required', 'in:light,dark'],
+            'scan_noise' => ['sometimes', 'boolean'],
         ];
 
         if ($this->user()?->hasRole('admin')) {

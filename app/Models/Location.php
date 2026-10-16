@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\LocationType;
 use App\Services\FileAttachmentService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -46,6 +47,29 @@ class Location extends Model
     public function children(): HasMany
     {
         return $this->hasMany(self::class, 'parent_id')->orderBy('name');
+    }
+
+    /**
+     * Racks are leaf locations and cannot parent other locations.
+     * Rooms (and other non-rack types) may still nest under rooms.
+     */
+    public function scopeCanBeParent(Builder $query): Builder
+    {
+        return $query->where('type', '!=', LocationType::Rack);
+    }
+
+    /**
+     * @return Collection<int, Location>
+     */
+    public static function parentOptions(?int $excludeId = null): Collection
+    {
+        $query = static::query()->canBeParent()->orderBy('name');
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->get();
     }
 
     public function assets(): HasMany

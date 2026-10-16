@@ -196,8 +196,13 @@ class ScanController extends Controller
                 'nullable',
                 Rule::enum(LocationType::class),
             ],
-            'new_location.parent_id' => ['nullable', 'exists:locations,id'],
+            'new_location.parent_id' => [
+                'nullable',
+                Rule::exists('locations', 'id')->whereNot('type', LocationType::Rack->value),
+            ],
             'asset_status' => ['nullable', Rule::enum(AssetStatus::class)],
+        ], [
+            'new_location.parent_id.exists' => 'Racks cannot be a parent for another location.',
         ]);
 
         $data['inventory_list_id'] = $data['inventory_list_id'] ?? null;

@@ -5,6 +5,67 @@ window.Alpine = Alpine;
 
 const CAMERA_SAME_CODE_DEBOUNCE_MS = 800;
 
+/** @type {AudioContext | null} */
+let scanAudioContext = null;
+
+function getScanAudioContext() {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) {
+        return null;
+    }
+    if (!scanAudioContext) {
+        scanAudioContext = new AudioCtx();
+    }
+    return scanAudioContext;
+}
+
+/**
+ * Play a short generated tone for scan feedback.
+ * @param {'match' | 'fail'} kind
+ */
+function playScanNoise(kind) {
+    try {
+        const ctx = getScanAudioContext();
+        if (!ctx) {
+            return;
+        }
+
+        const start = () => {
+            const now = ctx.currentTime;
+            const schedule = (frequency, offset, duration, type = 'sine') => {
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+                oscillator.type = type;
+                oscillator.frequency.value = frequency;
+                gain.gain.setValueAtTime(0.0001, now + offset);
+                gain.gain.exponentialRampToValueAtTime(0.18, now + offset + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + duration);
+                oscillator.connect(gain);
+                gain.connect(ctx.destination);
+                oscillator.start(now + offset);
+                oscillator.stop(now + offset + duration + 0.02);
+            };
+
+            if (kind === 'match') {
+                schedule(880, 0, 0.09);
+                schedule(1175, 0.1, 0.12);
+            } else {
+                schedule(240, 0, 0.16, 'square');
+                schedule(160, 0.14, 0.22, 'square');
+            }
+        };
+
+        if (ctx.state === 'suspended') {
+            ctx.resume().then(start).catch(() => {});
+            return;
+        }
+
+        start();
+    } catch (_) {
+        // Ignore audio failures (autoplay policy, unsupported browsers).
+    }
+}
+
 /** @type {Promise<typeof import('chart.js').Chart> | null} */
 let chartModulePromise = null;
 /** @type {Promise<typeof import('cytoscape').default> | null} */
@@ -444,6 +505,9 @@ Alpine.data('interfaceTemplateForm', (initialTemplates = []) => ({
         id: template.id || null,
         name: template.name || '',
         notes: template.notes || '',
+        connection_type_id: template.connection_type_id === null || template.connection_type_id === undefined
+            ? ''
+            : String(template.connection_type_id),
     })),
 
     addTemplate() {
@@ -452,6 +516,7 @@ Alpine.data('interfaceTemplateForm', (initialTemplates = []) => ({
             id: null,
             name: '',
             notes: '',
+            connection_type_id: '',
         });
     },
 
@@ -1636,7 +1701,7 @@ Alpine.data('bulkAssets', () => ({
     init() {
         // #region agent log
         this.$nextTick(() => {
-            const selectAll = this.$el.querySelector('input[aria-label="Select all assets on this page"]');
+            const selectAll = this.$root.querySelector('input[aria-label="Select all assets on this page"]');
             const boxes = this.pageCheckboxes();
             let overlay = null;
             if (selectAll) {
@@ -1663,7 +1728,7 @@ Alpine.data('bulkAssets', () => ({
                             },
                             body: JSON.stringify({
                                 sessionId: 'e131a9',
-                                runId: 'pre-fix',
+                                runId: 'post-fix',
                                 hypothesisId: 'A',
                                 location: 'app.js:bulkAssets.init.click',
                                 message: 'Native click on select-all',
@@ -1690,7 +1755,7 @@ Alpine.data('bulkAssets', () => ({
                             },
                             body: JSON.stringify({
                                 sessionId: 'e131a9',
-                                runId: 'pre-fix',
+                                runId: 'post-fix',
                                 hypothesisId: 'C',
                                 location: 'app.js:bulkAssets.init.nativeChange',
                                 message: 'Native change on select-all',
@@ -1714,7 +1779,7 @@ Alpine.data('bulkAssets', () => ({
                 },
                 body: JSON.stringify({
                     sessionId: 'e131a9',
-                    runId: 'pre-fix',
+                    runId: 'post-fix',
                     hypothesisId: 'A',
                     location: 'app.js:bulkAssets.init',
                     message: 'bulkAssets init select-all probe',
@@ -1723,6 +1788,7 @@ Alpine.data('bulkAssets', () => ({
                         boxCount: boxes.length,
                         boxIdsSample: boxes.slice(0, 10),
                         elTag: this.$el ? this.$el.tagName : null,
+                        rootTag: this.$root ? this.$root.tagName : null,
                         overlay,
                         selectAllDisabled: selectAll ? !!selectAll.disabled : null,
                         selectAllRect: selectAll
@@ -1755,7 +1821,8 @@ Alpine.data('bulkAssets', () => ({
     },
 
     pageCheckboxes() {
-        return [...this.$el.querySelectorAll('[data-bulk-asset-id]')].map((el) =>
+        // Use $root: $el is the event target when called from child @change handlers.
+        return [...this.$root.querySelectorAll('[data-bulk-asset-id]')].map((el) =>
             Number(el.getAttribute('data-bulk-asset-id'))
         );
     },
@@ -1770,7 +1837,7 @@ Alpine.data('bulkAssets', () => ({
             },
             body: JSON.stringify({
                 sessionId: 'e131a9',
-                runId: 'pre-fix',
+                runId: 'post-fix',
                 hypothesisId: 'D',
                 location: 'app.js:bulkAssets.setSelected',
                 message: 'Row checkbox setSelected',
@@ -1799,7 +1866,7 @@ Alpine.data('bulkAssets', () => ({
             },
             body: JSON.stringify({
                 sessionId: 'e131a9',
-                runId: 'pre-fix',
+                runId: 'post-fix',
                 hypothesisId: 'B',
                 location: 'app.js:bulkAssets.toggleAll',
                 message: 'toggleAll invoked',
@@ -1807,6 +1874,8 @@ Alpine.data('bulkAssets', () => ({
                     checked: !!checked,
                     boxCount: boxes.length,
                     boxIdsSample: boxes.slice(0, 10),
+                    elTag: this.$el ? this.$el.tagName : null,
+                    rootTag: this.$root ? this.$root.tagName : null,
                     allPageSelectedBefore: boxes.length > 0 && boxes.every((id) => !!this.selected[id]),
                     selectedCountBefore: this.selectedIds.length,
                     pageCheckboxesError: err,
@@ -1823,8 +1892,8 @@ Alpine.data('bulkAssets', () => ({
         // #region agent log
         this.$nextTick(() => {
             const afterBoxes = this.pageCheckboxes();
-            const selectAll = this.$el.querySelector('input[aria-label="Select all assets on this page"]');
-            const rowCheckedCount = [...this.$el.querySelectorAll('[data-bulk-asset-id]')].filter(
+            const selectAll = this.$root.querySelector('input[aria-label="Select all assets on this page"]');
+            const rowCheckedCount = [...this.$root.querySelectorAll('[data-bulk-asset-id]')].filter(
                 (el) => el.checked
             ).length;
             fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
@@ -1835,7 +1904,7 @@ Alpine.data('bulkAssets', () => ({
                 },
                 body: JSON.stringify({
                     sessionId: 'e131a9',
-                    runId: 'pre-fix',
+                    runId: 'post-fix',
                     hypothesisId: 'D',
                     location: 'app.js:bulkAssets.toggleAll.after',
                     message: 'toggleAll after state',
@@ -1960,7 +2029,8 @@ Alpine.data('bulkLocations', () => ({
     },
 
     pageCheckboxes() {
-        return [...this.$el.querySelectorAll('[data-bulk-location-id]')].map((el) =>
+        // Use $root: $el is the event target when called from child @change handlers.
+        return [...this.$root.querySelectorAll('[data-bulk-location-id]')].map((el) =>
             Number(el.getAttribute('data-bulk-location-id'))
         );
     },
@@ -3101,7 +3171,7 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
     },
 }));
 
-Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = [], clearRecent = false) => ({
+Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = [], clearRecent = false, scanNoiseEnabled = false) => ({
     scanning: false,
     code: '',
     quantity: 1,
@@ -3118,6 +3188,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     serverUnknowns: [],
     lastCameraCode: '',
     lastCameraAt: 0,
+    scanNoiseEnabled: Boolean(scanNoiseEnabled),
 
     init() {
         this.eventItems = (initialEventItems || []).map((entry, index) => this.normalizeEventItem(entry, index));
@@ -3370,14 +3441,17 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                 ],
                 verbose: false,
             });
+            const compactCamera = window.matchMedia('(max-width: 639px)').matches;
             await this.scanner.start(
                 { facingMode: 'environment' },
                 {
                     fps: 15,
                     disableFlip: true,
+                    // Wider aspect on phones keeps the viewfinder short so the session list stays on-screen.
+                    aspectRatio: compactCamera ? 2.2 : 1.777778,
                     qrbox: (viewfinderWidth, viewfinderHeight) => ({
                         width: Math.floor(viewfinderWidth * 0.9),
-                        height: Math.floor(viewfinderHeight * 0.35),
+                        height: Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35)),
                     }),
                     videoConstraints: {
                         facingMode: 'environment',
@@ -3455,6 +3529,13 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         this.$nextTick(() => this.focusInput());
     },
 
+    playScanFeedback(kind) {
+        if (!this.scanNoiseEnabled) {
+            return;
+        }
+        playScanNoise(kind);
+    },
+
     async sendScan(code, quantity) {
         const token = document.querySelector('meta[name="csrf-token"]')?.content;
         try {
@@ -3477,6 +3558,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                         .join(' ') ||
                     'Scan failed';
                 this.warning = '';
+                this.playScanFeedback('fail');
                 return;
             }
 
@@ -3501,6 +3583,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                         0
                     )
                 );
+                this.playScanFeedback('fail');
             } else if (Array.isArray(data.items) && data.items.length > 0) {
                 data.items.forEach((item, index) => {
                     entries.push(
@@ -3516,6 +3599,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                         )
                     );
                 });
+                this.playScanFeedback('match');
             } else if (data.asset) {
                 entries.push(
                     this.normalizeEntry(
@@ -3532,6 +3616,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                         0
                     )
                 );
+                this.playScanFeedback('match');
             }
 
             if (entries.length) {
@@ -3546,6 +3631,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         } catch (e) {
             this.error = 'Scan failed: ' + (e?.message || e);
             this.warning = '';
+            this.playScanFeedback('fail');
         }
     },
 }));

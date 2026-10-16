@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
 
@@ -32,7 +33,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', Password::defaults()],
             'role' => ['required', 'exists:roles,name'],
             'theme' => ['required', 'in:light,dark'],
         ]);
@@ -62,7 +63,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email,'.$user->id],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', Password::defaults()],
             'role' => ['required', 'exists:roles,name'],
             'theme' => ['required', 'in:light,dark'],
         ]);

@@ -3,6 +3,7 @@
         'id' => $row['id'] ?? null,
         'name' => $row['name'] ?? '',
         'notes' => $row['notes'] ?? '',
+        'connection_type_id' => $row['connection_type_id'] ?? null,
     ])->values()->all();
 @endphp
 
@@ -89,36 +90,9 @@
             </fieldset>
 
             @feature('asset_connections')
-                <fieldset class="space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <legend class="text-sm font-semibold">Interface templates</legend>
-                        <button type="button" class="text-sm text-brand" @click="addTemplate()">Add interface</button>
-                    </div>
-                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
-                        New assets of this type receive these interfaces. Editing templates does not rewrite existing assets — use Sync missing below.
-                    </p>
-
-                    <template x-if="templates.length === 0">
-                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">No interface templates yet.</p>
-                    </template>
-
-                    <template x-for="(template, index) in templates" :key="template.key">
-                        <div class="border border-brand-charcoal/20 dark:border-brand-charcoal p-3 space-y-2">
-                            <input type="hidden" :name="`interface_templates[${index}][id]`" :value="template.id || ''">
-                            <div class="flex flex-wrap gap-2 items-start">
-                                <div class="flex-1 min-w-[10rem]">
-                                    <x-input-label value="Name" />
-                                    <input type="text" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" :name="`interface_templates[${index}][name]`" x-model="template.name" required>
-                                </div>
-                                <div class="flex-1 min-w-[10rem]">
-                                    <x-input-label value="Notes" />
-                                    <input type="text" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" :name="`interface_templates[${index}][notes]`" x-model="template.notes">
-                                </div>
-                                <button type="button" class="text-sm text-red-600 mt-6" @click="removeTemplate(index)">Remove</button>
-                            </div>
-                        </div>
-                    </template>
-                </fieldset>
+                <x-interface-template-repeater :connection-types="$connectionTypes">
+                    New assets of this type receive these interfaces. Editing templates does not rewrite existing assets — use Sync missing below.
+                </x-interface-template-repeater>
             @endfeature
 
             <div class="flex flex-wrap items-center gap-3">

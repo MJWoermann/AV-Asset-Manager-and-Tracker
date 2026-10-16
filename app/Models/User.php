@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\AssetTableColumns;
 use App\Support\DashboardModules;
 use App\Support\DeveloperFeatures;
+use App\Support\ScanNoise;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -41,6 +42,14 @@ class User extends Authenticatable
     public function hasFeature(string $feature): bool
     {
         return DeveloperFeatures::enabled($this->preferences, $feature);
+    }
+
+    /**
+     * Whether scan success/fail tones should play during barcode scanning.
+     */
+    public function wantsScanNoise(): bool
+    {
+        return ScanNoise::enabled($this->preferences);
     }
 
     /**

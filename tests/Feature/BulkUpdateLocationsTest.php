@@ -269,4 +269,27 @@ class BulkUpdateLocationsTest extends TestCase
         $response->assertSessionHasErrors('parent_id');
         $this->assertNull($site->fresh()->parent_id);
     }
+
+    public function test_bulk_parent_cannot_be_a_rack(): void
+    {
+        $user = $this->manager();
+        $room = Location::create(['name' => 'Store A', 'type' => LocationType::Room]);
+        $rack = Location::create([
+            'name' => 'Rack 01',
+            'type' => LocationType::Rack,
+            'parent_id' => $room->id,
+        ]);
+        $child = Location::create(['name' => 'Store B', 'type' => LocationType::Room]);
+
+        $response = $this->actingAs($user)->from(route('locations.index'))->post(route('locations.bulk-update'), [
+            'action' => 'update',
+            'location_ids' => [$child->id],
+            'update_parent' => '1',
+            'parent_id' => $rack->id,
+        ]);
+
+        $response->assertRedirect(route('locations.index'));
+        $response->assertSessionHasErrors('parent_id');
+        $this->assertNull($child->fresh()->parent_id);
+    }
 }

@@ -96,14 +96,19 @@
             @endphp
 
             <div
-                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false))"
+                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false), @js(auth()->user()?->wantsScanNoise() ?? false))"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
                 <div class="flex gap-2">
                     <button type="button" @click="startCamera" x-show="!scanning" class="px-4 py-2 bg-brand text-white text-sm">Start camera</button>
                     <button type="button" @click="stopCamera" x-show="scanning" x-cloak class="px-4 py-2 bg-black text-white text-sm">Stop camera</button>
                 </div>
-                <div id="qr-reader" class="w-full max-w-xl mx-auto" x-show="scanning" x-cloak></div>
+                <div
+                    id="qr-reader"
+                    class="scan-qr-reader w-full max-w-xl mx-auto max-h-[28vh] sm:max-h-[min(50vh,28rem)] overflow-hidden"
+                    x-show="scanning"
+                    x-cloak
+                ></div>
 
                 <form @submit.prevent="submitCode" class="flex flex-col sm:flex-row gap-2">
                     <input
@@ -151,7 +156,7 @@
                         </div>
                     </div>
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="recent.length === 0" x-cloak>No items added yet.</p>
-                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal border border-brand-silver dark:border-brand-charcoal max-h-64 overflow-y-auto" x-show="recent.length > 0">
+                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal border border-brand-silver dark:border-brand-charcoal max-h-40 sm:max-h-64 overflow-y-auto" x-show="recent.length > 0">
                         <template x-for="entry in recent" :key="entry.key">
                             <li
                                 class="px-3 py-2 text-sm flex flex-col gap-1"

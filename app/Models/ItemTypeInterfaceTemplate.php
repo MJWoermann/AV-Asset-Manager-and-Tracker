@@ -18,6 +18,7 @@ class ItemTypeInterfaceTemplate extends Model
         'name',
         'sort_order',
         'notes',
+        'connection_type_id',
     ];
 
     protected function casts(): array
@@ -30,6 +31,11 @@ class ItemTypeInterfaceTemplate extends Model
     public function itemType(): BelongsTo
     {
         return $this->belongsTo(ItemType::class);
+    }
+
+    public function connectionType(): BelongsTo
+    {
+        return $this->belongsTo(ConnectionType::class);
     }
 
     public function assetInterfaces(): HasMany

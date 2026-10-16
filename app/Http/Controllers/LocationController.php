@@ -9,6 +9,7 @@ use App\Services\BulkLocationUpdateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class LocationController extends Controller
@@ -17,11 +18,17 @@ class LocationController extends Controller
     {
         $locations = Location::tree();
         $flatLocations = Location::query()->with('parent.parent.parent')->orderBy('name')->get();
+        $parentOptions = Location::query()
+            ->canBeParent()
+            ->with('parent.parent.parent')
+            ->orderBy('name')
+            ->get();
         $duplicateNames = $this->duplicateNormalizedNames($flatLocations);
 
         return view('locations.index', [
             'locations' => $locations,
             'flatLocations' => $flatLocations,
+            'parentOptions' => $parentOptions,
             'duplicateNames' => $duplicateNames,
         ]);
     }
@@ -30,7 +37,7 @@ class LocationController extends Controller
     {
         return view('locations.form', [
             'location' => new Location(['type' => LocationType::Site]),
-            'parents' => Location::orderBy('name')->get(),
+            'parents' => Location::parentOptions(),
             'types' => LocationType::cases(),
             'fileRows' => [],
         ]);
@@ -56,7 +63,7 @@ class LocationController extends Controller
 
         return view('locations.form', [
             'location' => $location,
-            'parents' => Location::where('id', '!=', $location->id)->orderBy('name')->get(),
+            'parents' => Location::parentOptions((int) $location->id),
             'types' => LocationType::cases(),
             'fileRows' => $fileRows,
         ]);
@@ -132,8 +139,13 @@ class LocationController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'room_code' => ['nullable', 'string', 'max:64'],
             'type' => ['required', 'in:site,level,room,rack'],
-            'parent_id' => ['nullable', 'exists:locations,id'],
+            'parent_id' => [
+                'nullable',
+                Rule::exists('locations', 'id')->whereNot('type', LocationType::Rack->value),
+            ],
             'is_portable' => ['sometimes', 'boolean'],
+        ], [
+            'parent_id.exists' => 'Racks cannot be a parent for another location.',
         ]) + ['is_portable' => $request->boolean('is_portable')];
 
         $data['room_code'] = filled($data['room_code'] ?? null) ? trim($data['room_code']) : null;

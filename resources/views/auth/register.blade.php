@@ -24,6 +24,7 @@
                             type="password"
                             name="password"
                             required autocomplete="new-password" />
+            <p class="mt-1 text-xs text-gray-600">{{ __('At least 8 characters, one uppercase letter, and one number or symbol.') }}</p>
 
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>

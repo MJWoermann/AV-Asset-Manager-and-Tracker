@@ -10,6 +10,9 @@ use App\Models\ConnectionType;
 use App\Models\ItemType;
 use App\Models\ItemTypeInterfaceTemplate;
 use App\Models\Location;
+use App\Models\Manufacturer;
+use App\Models\ManufacturerModel;
+use App\Models\ManufacturerModelInterfaceTemplate;
 use App\Models\User;
 use App\Services\AssetConnectionService;
 use Database\Seeders\ConnectionTypeSeeder;
@@ -737,5 +740,192 @@ class AssetConnectionFeatureTest extends TestCase
             ['SDI Out', 'LAN'],
             $itemType->interfaceTemplates()->pluck('name')->all()
         );
+    }
+
+    public function test_manufacturer_model_form_can_persist_interface_templates(): void
+    {
+        $user = $this->manager();
+        $manufacturer = Manufacturer::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('manufacturers.models.store', $manufacturer), [
+                'name' => 'X100',
+                'interface_templates' => [
+                    ['name' => 'HDMI 1', 'notes' => ''],
+                    ['name' => 'USB-C', 'notes' => 'Host'],
+                ],
+            ])
+            ->assertRedirect(route('manufacturers.index'));
+
+        $model = ManufacturerModel::query()->where('name', 'X100')->firstOrFail();
+        $this->assertEqualsCanonicalizing(
+            ['HDMI 1', 'USB-C'],
+            $model->interfaceTemplates()->pluck('name')->all()
+        );
+    }
+
+    public function test_sync_missing_templates_for_manufacturer_model_assets(): void
+    {
+        $user = $this->manager();
+        $manufacturer = Manufacturer::factory()->create();
+        $model = ManufacturerModel::factory()->create(['manufacturer_id' => $manufacturer->id]);
+        $itemType = $this->makeItemType();
+        $asset = Asset::query()->create([
+            'item_type_id' => $itemType->id,
+            'manufacturer_model_id' => $model->id,
+            'name' => 'Unit A',
+            'status' => AssetStatus::Available,
+        ]);
+
+        ManufacturerModelInterfaceTemplate::query()->create([
+            'manufacturer_model_id' => $model->id,
+            'name' => 'Model Port',
+            'sort_order' => 10,
+        ]);
+
+        $this->assertSame(0, $asset->interfaces()->count());
+
+        $this->actingAs($user)
+            ->post(route('manufacturers.models.sync-interfaces', [$manufacturer, $model]))
+            ->assertRedirect(route('manufacturers.models.edit', [$manufacturer, $model]));
+
+        $this->assertSame(['Model Port'], $asset->fresh()->interfaces()->pluck('name')->all());
+    }
+
+    public function test_merge_type_and_model_templates_skips_duplicate_names(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->makeItemType('Amplifier');
+        $manufacturer = Manufacturer::factory()->create();
+        $model = ManufacturerModel::factory()->create(['manufacturer_id' => $manufacturer->id]);
+
+        ItemTypeInterfaceTemplate::query()->create([
+            'item_type_id' => $itemType->id,
+            'name' => 'LAN 1',
+            'sort_order' => 10,
+        ]);
+        ItemTypeInterfaceTemplate::query()->create([
+            'item_type_id' => $itemType->id,
+            'name' => 'AES',
+            'sort_order' => 20,
+        ]);
+        ManufacturerModelInterfaceTemplate::query()->create([
+            'manufacturer_model_id' => $model->id,
+            'name' => 'lan 1',
+            'sort_order' => 10,
+        ]);
+        ManufacturerModelInterfaceTemplate::query()->create([
+            'manufacturer_model_id' => $model->id,
+            'name' => 'Dante',
+            'sort_order' => 20,
+        ]);
+
+        $this->actingAs($user)->post(route('assets.store'), [
+            'name' => 'Amp 1',
+            'item_type_id' => $itemType->id,
+            'manufacturer_model_id' => $model->id,
+            'status' => AssetStatus::Available->value,
+            'quantity' => 1,
+        ]);
+
+        $asset = Asset::query()->where('name', 'Amp 1')->firstOrFail();
+        $this->assertEqualsCanonicalizing(
+            ['LAN 1', 'AES', 'Dante'],
+            $asset->interfaces()->pluck('name')->all()
+        );
+    }
+
+    public function test_template_connection_type_is_copied_when_present(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->makeItemType();
+        $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
+        $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
+
+        ItemTypeInterfaceTemplate::query()->create([
+            'item_type_id' => $itemType->id,
+            'name' => 'LAN',
+            'sort_order' => 10,
+            'connection_type_id' => $network->id,
+        ]);
+        ItemTypeInterfaceTemplate::query()->create([
+            'item_type_id' => $itemType->id,
+            'name' => 'Aux',
+            'sort_order' => 20,
+            'connection_type_id' => null,
+        ]);
+
+        $this->actingAs($user)->post(route('assets.store'), [
+            'name' => 'Device',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available->value,
+            'quantity' => 1,
+        ]);
+
+        $asset = Asset::query()->where('name', 'Device')->firstOrFail();
+        $lan = $asset->interfaces()->where('name', 'LAN')->first();
+        $aux = $asset->interfaces()->where('name', 'Aux')->first();
+
+        $this->assertSame((int) $network->id, (int) $lan->connection_type_id);
+        $this->assertNull($aux->connection_type_id);
+
+        $manufacturer = Manufacturer::factory()->create();
+        $model = ManufacturerModel::factory()->create(['manufacturer_id' => $manufacturer->id]);
+        ManufacturerModelInterfaceTemplate::query()->create([
+            'manufacturer_model_id' => $model->id,
+            'name' => 'HDMI Out',
+            'sort_order' => 10,
+            'connection_type_id' => $hdmi->id,
+        ]);
+
+        $this->actingAs($user)->put(route('assets.update', $asset), [
+            'name' => $asset->name,
+            'item_type_id' => $itemType->id,
+            'manufacturer_model_id' => $model->id,
+            'status' => AssetStatus::Available->value,
+            'quantity' => 1,
+        ]);
+
+        $hdmiIface = $asset->fresh()->interfaces()->where('name', 'HDMI Out')->first();
+        $this->assertNotNull($hdmiIface);
+        $this->assertSame((int) $hdmi->id, (int) $hdmiIface->connection_type_id);
+    }
+
+    public function test_apply_missing_templates_from_connections_tab(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->makeItemType();
+        $asset = $this->makeAsset($itemType, name: 'Switch');
+
+        ItemTypeInterfaceTemplate::query()->create([
+            'item_type_id' => $itemType->id,
+            'name' => 'SFP+ 1',
+            'sort_order' => 10,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('assets.interfaces.apply-templates', $asset))
+            ->assertRedirect(route('assets.show', [$asset, 'tab' => 'connections']));
+
+        $this->assertSame(['SFP+ 1'], $asset->fresh()->interfaces()->pluck('name')->all());
+
+        $this->actingAs($user)
+            ->post(route('assets.interfaces.store', $asset), [
+                'name' => 'Manual Port',
+                'connection_type_id' => ConnectionType::query()->where('slug', 'network')->value('id'),
+            ])
+            ->assertRedirect(route('assets.show', [$asset, 'tab' => 'connections']));
+
+        $this->assertCount(2, $asset->fresh()->interfaces);
+    }
+
+    public function test_scanner_cannot_apply_interface_templates(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->makeAsset();
+
+        $this->actingAs($user)
+            ->post(route('assets.interfaces.apply-templates', $asset))
+            ->assertForbidden();
     }
 }

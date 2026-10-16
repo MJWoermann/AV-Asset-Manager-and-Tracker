@@ -52,7 +52,8 @@ Edit `.env`:
 APP_NAME="AV Asset Manager"
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=http://YOUR_SERVER_IP_OR_HOSTNAME
+# Use https:// after §4a TLS (required for phone/tablet camera scanning)
+APP_URL=https://YOUR_HOSTNAME
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -61,20 +62,26 @@ DB_DATABASE=av_assets
 DB_USERNAME=av_app
 DB_PASSWORD=STRONG_PASSWORD_HERE
 
-SESSION_SECURE_COOKIE=false
+# true once HTTPS is enabled (§4a); leave false only for temporary HTTP bootstrap
+SESSION_SECURE_COOKIE=true
 FILESYSTEM_DISK=local
 ```
+
+If you briefly bring the site up on HTTP before certificates are ready, use `APP_URL=http://…` and `SESSION_SECURE_COOKIE=false`, then switch both when TLS is live and run `php artisan config:cache`.
 
 ```bash
 npm ci
 npm run build
 # Runs migrations (incl. users.preferences), seeds, and creates the first admin
-php artisan app:install --email=admin@your.org --password='ChooseAStrongPassword'
-# If the prior command fails use php artisan db:wipe --force to celar the data and try again
+# Password must be ≥8 chars, include one uppercase letter, and one number or symbol
+php artisan app:install --email=admin@your.org --password='ChooseAStrongPassword1!'
+# If the prior command fails use php artisan db:wipe --force to clear the data and try again
 php artisan storage:link
 sudo chown -R www-data:www-data storage bootstrap/cache
 sudo chmod -R ug+rwx storage bootstrap/cache
 ```
+
+**Password policy:** the first admin password (and every later password set via Admin → Users, reset, or Profile) must be at least **8 characters**, include **one uppercase letter**, and **one number or symbol**. Rotate the install password after first login. To tighten the policy further on a live host, see [security-hardening.md — Password complexity](security-hardening.md#password-complexity).
 
 First-time install needs no extra environment variables for per-user asset table columns or the asset **History** tab. Column choices are stored in `users.preferences` after each user saves them in the UI; History reads the existing append-only `audit_logs` table.
 
@@ -151,7 +158,32 @@ sudo systemctl reload nginx
 sudo systemctl enable nginx php8.5-fpm mariadb
 ```
 
-Optional TLS: use Certbot (`sudo apt install certbot python3-certbot-nginx`) if the host has a public DNS name.
+### 4a. HTTPS (required for mobile scanning)
+
+Phone and tablet browsers only expose the Scan **camera** (and reliable PWA install) on a **secure context**. On the LAN that means **HTTPS**. HTTP to a server IP or hostname is not enough for scanning, even if the page loads.
+
+Complete TLS before staff rely on mobile stocktakes:
+
+| Situation | Approach |
+|-----------|----------|
+| No public DNS (typical LAN / corporate WiFi) | Private CA + server cert, then trust the CA on each device — **[self-signed-tls.md](self-signed-tls.md)** |
+| Public DNS name reachable for ACME | Certbot: `sudo apt install certbot python3-certbot-nginx` then `sudo certbot --nginx` |
+| Corporate internal CA / MDM | Issue a server cert from IT; install in Nginx the same way as the self-signed guide; push the CA via MDM |
+
+The self-signed guide covers certificate generation, the Nginx `443` server block (HTTP→HTTPS redirect), `.env` (`APP_URL=https://…`, `SESSION_SECURE_COOKIE=true`), firewall port `443`, and **iOS / Android trust steps** (required — without trusting the CA, camera scanning still fails). A ready-to-edit site file is in the repo as `nginx-ssl.example`:
+
+```bash
+sudo cp /var/www/av-asset-manager/nginx-ssl.example /etc/nginx/sites-available/av-asset-manager
+# edit server_name + ssl_certificate paths, then:
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+After HTTPS is live, re-cache config:
+
+```bash
+cd /var/www/av-asset-manager
+php artisan config:cache
+```
 
 ## 5. PHP-FPM tuning (20 concurrent users)
 
@@ -178,8 +210,11 @@ Minimal open ports for a first boot:
 ```bash
 sudo ufw allow OpenSSH
 sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
 sudo ufw enable
 ```
+
+Port `80` is only needed for the HTTPS redirect (and optional Certbot HTTP-01). Scanning traffic should use `443`.
 
 For production on corporate WiFi, prefer **source-restricted** rules (staff subnets for HTTP/HTTPS, admin/jump only for SSH) and keep MariaDB off the WiFi path. Limit host outbound internet to SSO (Google/Microsoft Entra OAuth) and email (SMTP and/or Microsoft Graph) when IT policy allows. Full patterns, `APP_URL`/split-DNS notes, and guest QR / Sanctum reachability: **[security-hardening.md — Corporate LAN / staff WiFi deployment](security-hardening.md#corporate-lan--staff-wifi-deployment)**.
 
@@ -316,12 +351,14 @@ Full evaluation, threat model, prioritized application hardening, and **corporat
 - [ ] Strong DB password; MariaDB on localhost only
 - [ ] Dedicated DB user (not root)
 - [ ] Firewall: HTTP(S) from staff WiFi/LAN subnets only; SSH from admin/jump only; no MariaDB on WiFi
-- [ ] `APP_URL` matches the hostname staff resolve on corporate WiFi (PWA, API, SSO callbacks, guest QR)
+- [ ] HTTPS enabled; `APP_URL` is `https://…` and matches the hostname staff resolve on corporate WiFi (PWA, API, SSO, guest QR)
+- [ ] `SESSION_SECURE_COOKIE=true` after TLS
+- [ ] Mobile scanners trust the TLS CA (see [self-signed-tls.md](self-signed-tls.md)); camera scan verified on a phone
 - [ ] Outbound from the host limited to SSO + email where policy allows (see security-hardening corporate LAN section)
 - [ ] `storage` and `bootstrap/cache` writable by `www-data` only as needed
 - [ ] Web root is `public/` only
 - [ ] Uploads limited to 25MB in Nginx and PHP (`upload_max_filesize`, `post_max_size`)
-- [ ] Admin password rotated after first login
+- [ ] Admin password meets complexity rules (≥8 chars, one uppercase, one number or symbol) and is rotated after first login
 - [ ] Audit logs treated as append-only
 - [ ] Updates always run `php artisan migrate --force` before serving traffic
 - [ ] QNAP mount owned by `www-data` (or SFTP/S3 credentials scoped to the attachment path)

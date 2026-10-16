@@ -123,4 +123,85 @@ class ProfileTest extends TestCase
             ->get('/profile')
             ->assertForbidden();
     }
+
+    public function test_user_can_enable_scan_noise_preference(): void
+    {
+        $user = $this->userWithRole();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'theme' => 'light',
+                'scan_noise' => '1',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertTrue($user->wantsScanNoise());
+        $this->assertTrue(data_get($user->preferences, 'scan_noise'));
+    }
+
+    public function test_user_can_disable_scan_noise_preference(): void
+    {
+        $user = $this->userWithRole();
+        $user->preferences = ['scan_noise' => true];
+        $user->save();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'theme' => 'light',
+                'scan_noise' => '0',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertFalse($user->wantsScanNoise());
+        $this->assertFalse(data_get($user->preferences, 'scan_noise'));
+    }
+
+    public function test_profile_update_without_scan_noise_preserves_existing_preference(): void
+    {
+        $user = $this->userWithRole();
+        $user->preferences = ['scan_noise' => true];
+        $user->save();
+
+        $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => 'Kept Noise',
+                'email' => $user->email,
+                'theme' => 'light',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertSame('Kept Noise', $user->name);
+        $this->assertTrue($user->wantsScanNoise());
+    }
+
+    public function test_profile_page_shows_scan_noise_option(): void
+    {
+        $user = $this->userWithRole();
+
+        $this->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('Enable scan noise', false)
+            ->assertSee('name="scan_noise"', false);
+    }
 }

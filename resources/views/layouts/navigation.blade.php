@@ -78,6 +78,11 @@
                     </x-slot>
                     <x-slot name="content">
                         <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
+                        <x-dropdown-link
+                            href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/blob/main/docs/features-and-usage.md"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >Help</x-dropdown-link>
 
                         @role('admin')
                             <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
@@ -153,6 +158,11 @@
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
             <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>
+            <x-responsive-nav-link
+                href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/blob/main/docs/features-and-usage.md"
+                target="_blank"
+                rel="noopener noreferrer"
+            >Help</x-responsive-nav-link>
 
             @role('admin')
                 <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Admin</div>

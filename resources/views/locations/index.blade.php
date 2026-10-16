@@ -68,7 +68,7 @@
                 </div>
             @endif
 
-            <x-bulk-location-actions :parents="$flatLocations" />
+            <x-bulk-location-actions :parents="$parentOptions" />
         @endrole
 
         @if ($locations->isEmpty())

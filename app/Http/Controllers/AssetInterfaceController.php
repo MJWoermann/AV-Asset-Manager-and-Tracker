@@ -6,6 +6,7 @@ use App\Http\Requests\StoreAssetInterfaceRequest;
 use App\Http\Requests\UpdateAssetInterfaceRequest;
 use App\Models\Asset;
 use App\Models\AssetInterface;
+use App\Services\AssetInterfaceService;
 use Illuminate\Http\RedirectResponse;
 
 class AssetInterfaceController extends Controller
@@ -23,6 +24,7 @@ class AssetInterfaceController extends Controller
             'notes' => $data['notes'] ?? null,
             'sort_order' => $sortOrder,
             'item_type_interface_template_id' => null,
+            'manufacturer_model_interface_template_id' => null,
         ]);
 
         return redirect()
@@ -59,5 +61,16 @@ class AssetInterfaceController extends Controller
         return redirect()
             ->route('assets.show', [$asset, 'tab' => 'connections'])
             ->with('status', 'Interface removed.');
+    }
+
+    public function applyTemplates(Asset $asset, AssetInterfaceService $interfaces): RedirectResponse
+    {
+        $created = $interfaces->syncMissingForAsset($asset);
+
+        return redirect()
+            ->route('assets.show', [$asset, 'tab' => 'connections'])
+            ->with('status', $created === 0
+                ? 'No missing template interfaces to apply.'
+                : "Applied {$created} missing template interface".($created === 1 ? '' : 's').'.');
     }
 }

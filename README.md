@@ -28,6 +28,8 @@ npm run build
 php artisan serve
 ```
 
+**Password requirement:** new passwords (including `app:install`, Admin → Users, registration, and password reset/change) must be at least **8 characters**, with **one uppercase letter** and **one number or symbol**. Example that meets the rule: `ChangeMeNow!`.
+
 Open `http://127.0.0.1:8000` and sign in with the admin account.
 
 No extra `.env` keys are required for column preferences or the asset History tab. Preferences default until each user saves columns from the **Columns** control on Assets or list pages.
@@ -54,6 +56,8 @@ Staff-oriented overview of use cases, roles, and day-to-day workflows: [docs/fea
 ## Production (Ubuntu + Nginx)
 
 See [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md). Production hardening and security review notes: [docs/security-hardening.md](docs/security-hardening.md).
+
+**Mobile scanning needs HTTPS.** Phone/tablet cameras only work in a secure context. On a LAN without public DNS, set up a private CA or self-signed cert and trust it on each device: [docs/self-signed-tls.md](docs/self-signed-tls.md).
 
 ## Hardware sizing
 

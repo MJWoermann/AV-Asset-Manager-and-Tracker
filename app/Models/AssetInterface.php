@@ -19,6 +19,7 @@ class AssetInterface extends Model
         'connection_type_id',
         'sort_order',
         'item_type_interface_template_id',
+        'manufacturer_model_interface_template_id',
         'notes',
     ];
 
@@ -44,6 +45,11 @@ class AssetInterface extends Model
         return $this->belongsTo(ItemTypeInterfaceTemplate::class, 'item_type_interface_template_id');
     }
 
+    public function modelTemplate(): BelongsTo
+    {
+        return $this->belongsTo(ManufacturerModelInterfaceTemplate::class, 'manufacturer_model_interface_template_id');
+    }
+
     public function connectionsAsA(): HasMany
     {
         return $this->hasMany(AssetConnection::class, 'interface_a_id');
@@ -56,6 +62,17 @@ class AssetInterface extends Model
 
     public function isFromTemplate(): bool
     {
+        return $this->item_type_interface_template_id !== null
+            || $this->manufacturer_model_interface_template_id !== null;
+    }
+
+    public function isFromItemTypeTemplate(): bool
+    {
         return $this->item_type_interface_template_id !== null;
+    }
+
+    public function isFromManufacturerModelTemplate(): bool
+    {
+        return $this->manufacturer_model_interface_template_id !== null;
     }
 }

@@ -58,7 +58,7 @@ composer install
 cp .env.example .env   # if needed
 php artisan key:generate
 touch database/database.sqlite   # or configure MariaDB
-php artisan app:install --email=admin@example.com --password=secret123
+php artisan app:install --email=admin@example.com --password=Secret123!
 npm install && npm run build
 php artisan serve
 ```

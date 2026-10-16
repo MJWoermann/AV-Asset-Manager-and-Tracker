@@ -10,9 +10,11 @@ use App\Models\AssetListItem;
 use App\Models\Location;
 use App\Models\User;
 use App\Observers\AuditableObserver;
+use Closure;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 
@@ -25,6 +27,24 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Password::defaults(function () {
+            return Password::min(8)->rules([
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! is_string($value)) {
+                        return;
+                    }
+
+                    if (! preg_match('/\p{Lu}/u', $value)) {
+                        $fail(__('The :attribute must contain at least one uppercase letter.'));
+                    }
+
+                    if (! preg_match('/\d|\p{Z}|\p{S}|\p{P}/u', $value)) {
+                        $fail(__('The :attribute must contain at least one number or symbol.'));
+                    }
+                },
+            ]);
+        });
+
         Event::listen(SocialiteWasCalled::class, AzureExtendSocialite::class);
 
         Asset::observe(AuditableObserver::class);

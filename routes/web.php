@@ -223,6 +223,12 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
             Route::resource('connection-types', ConnectionTypeController::class)->except(['show']);
             Route::post('/item-types/{item_type}/sync-interfaces', [ItemTypeController::class, 'syncMissingInterfaces'])
                 ->name('item-types.sync-interfaces');
+
+            Route::post('/assets/{asset}/interfaces/apply-templates', [AssetInterfaceController::class, 'applyTemplates'])
+                ->name('assets.interfaces.apply-templates');
+
+            Route::post('/manufacturers/{manufacturer}/models/{manufacturer_model}/sync-interfaces', [ManufacturerModelController::class, 'syncMissingInterfaces'])
+                ->name('manufacturers.models.sync-interfaces');
         });
     });
 

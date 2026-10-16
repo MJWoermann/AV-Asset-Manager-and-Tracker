@@ -75,4 +75,85 @@ class LocationHierarchyTest extends TestCase
         $response->assertSee('bg-brand-silver dark:bg-brand-slate border-l-[3px] border-l-brand-charcoal', false);
         $response->assertSee('bg-[#dcdcdc] dark:bg-[#3d4043] border-l-[3px] border-l-brand-charcoal', false);
     }
+
+    public function test_create_form_uses_searchable_parent_and_excludes_racks(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('inventory_manager');
+
+        $room = Location::create(['name' => 'Store A', 'type' => LocationType::Room]);
+        $rack = Location::create([
+            'name' => 'Rack 01',
+            'type' => LocationType::Rack,
+            'parent_id' => $room->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('locations.create'));
+
+        $response->assertOk();
+        $response->assertSee('searchableSelect(', false);
+        $response->assertSee('Store A', false);
+        $response->assertDontSee('Rack 01', false);
+        $this->assertTrue(
+            $response->viewData('parents')->pluck('id')->contains($room->id)
+        );
+        $this->assertFalse(
+            $response->viewData('parents')->pluck('id')->contains($rack->id)
+        );
+    }
+
+    public function test_store_rejects_rack_as_parent_but_allows_room_under_room(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('inventory_manager');
+
+        $parentRoom = Location::create(['name' => 'Store A', 'type' => LocationType::Room]);
+        $rack = Location::create([
+            'name' => 'Rack 01',
+            'type' => LocationType::Rack,
+            'parent_id' => $parentRoom->id,
+        ]);
+
+        $this->actingAs($user)->post(route('locations.store'), [
+            'name' => 'Store B',
+            'type' => LocationType::Room->value,
+            'parent_id' => $rack->id,
+        ])->assertSessionHasErrors('parent_id');
+
+        $this->assertDatabaseMissing('locations', ['name' => 'Store B']);
+
+        $this->actingAs($user)->post(route('locations.store'), [
+            'name' => 'Store B',
+            'type' => LocationType::Room->value,
+            'parent_id' => $parentRoom->id,
+        ])->assertRedirect(route('locations.index'));
+
+        $this->assertDatabaseHas('locations', [
+            'name' => 'Store B',
+            'type' => LocationType::Room->value,
+            'parent_id' => $parentRoom->id,
+        ]);
+    }
+
+    public function test_update_rejects_rack_as_parent(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('inventory_manager');
+
+        $room = Location::create(['name' => 'Store A', 'type' => LocationType::Room]);
+        $rack = Location::create([
+            'name' => 'Rack 01',
+            'type' => LocationType::Rack,
+            'parent_id' => $room->id,
+        ]);
+        $child = Location::create(['name' => 'Store B', 'type' => LocationType::Room]);
+
+        $this->actingAs($user)->put(route('locations.update', $child), [
+            'name' => 'Store B',
+            'type' => LocationType::Room->value,
+            'parent_id' => $rack->id,
+        ])->assertSessionHasErrors('parent_id');
+
+        $this->assertNull($child->fresh()->parent_id);
+    }
 }

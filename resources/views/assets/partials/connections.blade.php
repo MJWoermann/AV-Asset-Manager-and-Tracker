@@ -34,6 +34,12 @@
     <section class="space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <h3 class="font-semibold text-lg">Interfaces</h3>
+            @if($canApplyInterfaceTemplates ?? false)
+                <form method="POST" action="{{ route('assets.interfaces.apply-templates', $asset) }}">
+                    @csrf
+                    <x-secondary-button type="submit">Apply missing templates</x-secondary-button>
+                </form>
+            @endif
         </div>
 
         <div class="space-y-2">
@@ -60,8 +66,10 @@
                             <x-text-input name="notes" class="block w-full" :value="old('notes', $interface->notes)" placeholder="Notes" aria-label="Notes" title="Notes" />
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            @if($interface->isFromTemplate())
-                                <span class="text-xs text-brand whitespace-nowrap" title="From item type template">Template</span>
+                            @if($interface->isFromItemTypeTemplate())
+                                <span class="text-xs text-brand whitespace-nowrap" title="From item type template">Type template</span>
+                            @elseif($interface->isFromManufacturerModelTemplate())
+                                <span class="text-xs text-brand whitespace-nowrap" title="From manufacturer model template">Model template</span>
                             @endif
                             <x-secondary-button type="submit">Save</x-secondary-button>
                             <button
@@ -78,7 +86,7 @@
                     </form>
                 </div>
             @empty
-                <p class="text-sm text-brand-charcoal dark:text-brand-silver">No interfaces yet. Add one below or sync from the item type templates.</p>
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver">No interfaces yet. Add one below or apply missing templates from the item type and/or manufacturer model.</p>
             @endforelse
         </div>
 

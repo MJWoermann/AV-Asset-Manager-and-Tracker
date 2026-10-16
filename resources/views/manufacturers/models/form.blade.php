@@ -1,3 +1,12 @@
+@php
+    $initialInterfaceTemplates = collect($interfaceTemplates ?? [])->map(fn ($row) => [
+        'id' => $row['id'] ?? null,
+        'name' => $row['name'] ?? '',
+        'notes' => $row['notes'] ?? '',
+        'connection_type_id' => $row['connection_type_id'] ?? null,
+    ])->values()->all();
+@endphp
+
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl">
@@ -14,6 +23,9 @@
             method="POST"
             action="{{ $manufacturerModel->exists ? route('manufacturers.models.update', [$manufacturer, $manufacturerModel]) : route('manufacturers.models.store', $manufacturer) }}"
             class="space-y-4 bg-white dark:bg-brand-slate border p-4"
+            @feature('asset_connections')
+                x-data="interfaceTemplateForm(@js($initialInterfaceTemplates))"
+            @endfeature
         >
             @csrf
             @if($manufacturerModel->exists) @method('PUT') @endif
@@ -22,10 +34,30 @@
                 <x-text-input id="name" name="name" class="mt-1 block w-full" :value="old('name', $manufacturerModel->name)" required />
                 <x-input-error :messages="$errors->get('name')" class="mt-1" />
             </div>
+
+            @feature('asset_connections')
+                <x-interface-template-repeater :connection-types="$connectionTypes">
+                    New assets with this model receive these interfaces. Editing templates does not rewrite existing assets — use Sync missing below.
+                </x-interface-template-repeater>
+            @endfeature
+
             <x-primary-button>Save</x-primary-button>
         </form>
 
         @if($manufacturerModel->exists)
+            @feature('asset_connections')
+                <div class="mt-8 space-y-3 border p-4 bg-white dark:bg-brand-slate">
+                    <h3 class="font-semibold text-lg">Sync missing interfaces</h3>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Copy any template interfaces that existing assets with this model do not already have (by template or name).
+                    </p>
+                    <form method="POST" action="{{ route('manufacturers.models.sync-interfaces', [$manufacturer, $manufacturerModel]) }}">
+                        @csrf
+                        <x-secondary-button type="submit">Sync missing templates</x-secondary-button>
+                    </form>
+                </div>
+            @endfeature
+
             <div class="mt-6 space-y-2">
                 @if($replacementModels->isEmpty())
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver">

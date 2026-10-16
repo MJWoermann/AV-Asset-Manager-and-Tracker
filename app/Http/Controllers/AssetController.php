@@ -146,7 +146,7 @@ class AssetController extends Controller
 
         $asset = Asset::create($data);
         $this->syncCustomFields($asset, $request);
-        $interfaces->syncMissingFromItemType($asset);
+        $interfaces->syncMissingForAsset($asset);
         $ruVisualiser->seedRuHeightFromCustomField($asset->fresh());
 
         if ($unknownScanId) {
@@ -241,9 +241,12 @@ class AssetController extends Controller
         $connectionPeers = collect();
         $connectionTypes = collect();
         $peerAssetOptions = [];
+        $canApplyInterfaceTemplates = false;
 
         if ($tab === 'connections') {
             $asset->load([
+                'itemType.interfaceTemplates',
+                'manufacturerModel.interfaceTemplates',
                 'interfaces.connectionType',
                 'interfaces.connectionsAsA.connectionType',
                 'interfaces.connectionsAsA.interfaceB.asset.itemType',
@@ -271,6 +274,9 @@ class AssetController extends Controller
                         ->all(),
                 ])
                 ->all();
+
+            $canApplyInterfaceTemplates = ($asset->itemType?->interfaceTemplates->isNotEmpty() ?? false)
+                || ($asset->manufacturerModel?->interfaceTemplates->isNotEmpty() ?? false);
         }
 
         $ruChildAssetOptions = [];
@@ -379,6 +385,7 @@ class AssetController extends Controller
             'connectionPeers' => $connectionPeers,
             'connectionTypes' => $connectionTypes,
             'peerAssetOptions' => $peerAssetOptions,
+            'canApplyInterfaceTemplates' => $canApplyInterfaceTemplates,
             'connectionsEnabled' => $connectionsEnabled,
             'ruVisualiserEnabled' => $ruVisualiserEnabled,
             'ruChildAssetOptions' => $ruChildAssetOptions,
@@ -487,11 +494,15 @@ class AssetController extends Controller
         }
 
         $previousTypeId = $asset->item_type_id;
+        $previousModelId = $asset->manufacturer_model_id;
         $asset->update($data);
         $this->syncCustomFields($asset, $request);
 
-        if ((int) $previousTypeId !== (int) $asset->item_type_id) {
-            $interfaces->syncMissingFromItemType($asset->fresh());
+        if (
+            (int) $previousTypeId !== (int) $asset->item_type_id
+            || (int) $previousModelId !== (int) $asset->manufacturer_model_id
+        ) {
+            $interfaces->syncMissingForAsset($asset->fresh());
         }
 
         $ruVisualiser->seedRuHeightFromCustomField($asset->fresh());
