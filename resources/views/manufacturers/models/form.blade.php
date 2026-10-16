@@ -58,6 +58,20 @@
                 </div>
             @endfeature
 
+            @if($manufacturerModel->aliases->isNotEmpty())
+                <div class="mt-6 rounded border border-gray-200 dark:border-brand-charcoal p-3 space-y-1">
+                    <p class="text-sm font-medium">Former names (import aliases)</p>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Spreadsheet rows using these names will use this model instead of creating a new one.
+                    </p>
+                    <ul class="text-sm list-disc list-inside">
+                        @foreach($manufacturerModel->aliases as $alias)
+                            <li>{{ $alias->former_name }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div class="mt-6 space-y-2">
                 @if($replacementModels->isEmpty())
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver">
@@ -89,6 +103,7 @@
                         @else
                             No assets use this model. Choose a replacement model, then delete.
                         @endif
+                        The deleted name is kept so future imports that still use it map to the replacement.
                     </p>
                     <div>
                         <x-input-label for="replacement_manufacturer_model_id" value="Replacement model" />

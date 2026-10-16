@@ -14,7 +14,7 @@
     object-fit: cover;
 }
 
-.scan-qr-reader #qr-reader__scan_region {
+.scan-qr-reader [id$='__scan_region'] {
     min-height: 0 !important;
 }
 

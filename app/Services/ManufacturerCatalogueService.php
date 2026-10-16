@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Asset;
 use App\Models\Manufacturer;
+use App\Models\ManufacturerAlias;
 use App\Models\ManufacturerModel;
+use App\Models\ManufacturerModelAlias;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -29,6 +31,11 @@ class ManufacturerCatalogueService
             return $existing;
         }
 
+        $aliased = ManufacturerAlias::resolveManufacturer($name);
+        if ($aliased) {
+            return $aliased;
+        }
+
         return Manufacturer::create(['name' => $name]);
     }
 
@@ -49,6 +56,11 @@ class ManufacturerCatalogueService
 
         if ($existing) {
             return $existing;
+        }
+
+        $aliased = ManufacturerModelAlias::resolveModel($manufacturer, $name);
+        if ($aliased) {
+            return $aliased;
         }
 
         return ManufacturerModel::create([
@@ -109,6 +121,7 @@ class ManufacturerCatalogueService
                     ]);
 
                 if ($target->isNot($model)) {
+                    ManufacturerModelAlias::recordMerge($model, $target);
                     $model->delete();
                 }
             }
@@ -119,6 +132,7 @@ class ManufacturerCatalogueService
                     'manufacturer_id' => $replacement->id,
                 ]);
 
+            ManufacturerAlias::recordMerge($manufacturer, $replacement);
             $manufacturer->delete();
         });
     }
@@ -137,6 +151,7 @@ class ManufacturerCatalogueService
                     'manufacturer_model_id' => $replacement->id,
                 ]);
 
+            ManufacturerModelAlias::recordMerge($model, $replacement);
             $model->delete();
         });
     }

@@ -34,6 +34,16 @@ class Location extends Model
 
     protected static function booted(): void
     {
+        static::created(function (Location $location): void {
+            LocationAlias::forgetMatching($location->name, $location->type);
+        });
+
+        static::updated(function (Location $location): void {
+            if ($location->wasChanged(['name', 'type'])) {
+                LocationAlias::forgetMatching($location->name, $location->type);
+            }
+        });
+
         static::deleting(function (Location $location): void {
             app(FileAttachmentService::class)->detachAll($location);
         });
@@ -46,7 +56,12 @@ class Location extends Model
 
     public function children(): HasMany
     {
-        return $this->hasMany(self::class, 'parent_id')->orderBy('name');
+        return $this->hasMany(self::class, 'parent_id')->orderByHierarchy();
+    }
+
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(LocationAlias::class)->orderBy('former_name');
     }
 
     /**
@@ -59,17 +74,44 @@ class Location extends Model
     }
 
     /**
+     * Sibling order within the location hierarchy: room code, then name.
+     */
+    public function scopeOrderByHierarchy(Builder $query): Builder
+    {
+        return $query->orderBy('room_code')->orderBy('name');
+    }
+
+    /**
      * @return Collection<int, Location>
      */
     public static function parentOptions(?int $excludeId = null): Collection
     {
-        $query = static::query()->canBeParent()->orderBy('name');
+        $query = static::query()->canBeParent()->orderByHierarchy();
 
         if ($excludeId !== null) {
             $query->where('id', '!=', $excludeId);
         }
 
         return $query->get();
+    }
+
+    /**
+     * @param  Collection<int, Location>  $locations
+     * @return Collection<int, Location>
+     */
+    public static function sortHierarchySiblings(Collection $locations): Collection
+    {
+        return $locations
+            ->sort(function (self $a, self $b): int {
+                $codeCmp = ($a->room_code ?? '') <=> ($b->room_code ?? '');
+
+                if ($codeCmp !== 0) {
+                    return $codeCmp;
+                }
+
+                return $a->name <=> $b->name;
+            })
+            ->values();
     }
 
     public function assets(): HasMany
@@ -105,7 +147,7 @@ class Location extends Model
      */
     public static function tree(?Collection $locations = null): EloquentCollection
     {
-        $locations ??= static::query()->orderBy('name')->get();
+        $locations ??= static::query()->orderByHierarchy()->get();
         // Null parent_id cannot be used as a collection group key (PHP coerces it to "").
         $grouped = $locations->groupBy(
             fn (self $location): int|string => $location->parent_id ?? 'root'
@@ -114,7 +156,7 @@ class Location extends Model
         $build = function (int|string $parentKey) use (&$build, $grouped): EloquentCollection {
             /** @var EloquentCollection<int, Location> $nodes */
             $nodes = new EloquentCollection(
-                $grouped->get($parentKey, collect())->values()->all()
+                static::sortHierarchySiblings($grouped->get($parentKey, collect()))->all()
             );
 
             $nodes->each(function (self $location) use ($build): void {
@@ -133,7 +175,7 @@ class Location extends Model
     public static function selfAndDescendantIds(int $locationId): array
     {
         $grouped = static::query()
-            ->orderBy('name')
+            ->orderByHierarchy()
             ->get(['id', 'parent_id'])
             ->groupBy(fn (self $location): int|string => $location->parent_id ?? 'root');
 

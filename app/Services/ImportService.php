@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AssetStatus;
 use App\Enums\LocationType;
 use App\Imports\AssetImport;
+use App\Imports\ColumnExampleImport;
 use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
 use App\Models\AssetList;
@@ -12,7 +13,9 @@ use App\Models\AssetListItem;
 use App\Models\CustomFieldDefinition;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
+use App\Models\ItemTypeAlias;
 use App\Models\Location;
+use App\Models\LocationAlias;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -31,6 +34,11 @@ use Throwable;
 class ImportService
 {
     public const CREATE_NEW_FIELD = 'create_new_field';
+
+    public const CUSTOM_FIELD_PREFIX = 'custom_field:';
+
+    /** @var Collection<int, CustomFieldDefinition>|null */
+    protected ?Collection $importableCustomFieldDefinitionsCache = null;
 
     /** @var list<string> */
     public const DUPLICATE_KEYS = [
@@ -103,6 +111,60 @@ class ImportService
     }
 
     /**
+     * Find a sample cell value for each heading, scanning data rows until one is found.
+     *
+     * @param  list<string>  $columns
+     * @return array<string, string|null> column => example (null when the column has no content)
+     */
+    public function readColumnExamples(UploadedFile|string $file, array $columns): array
+    {
+        $examples = [];
+        foreach ($columns as $column) {
+            $examples[(string) $column] = null;
+        }
+
+        if ($examples === []) {
+            return [];
+        }
+
+        try {
+            $reader = new ColumnExampleImport;
+            Excel::import($reader, $file);
+        } catch (Throwable $e) {
+            throw ValidationException::withMessages([
+                'file' => $this->userFacingReadError($e),
+            ]);
+        }
+
+        foreach ($reader->rows as $row) {
+            if (! $row instanceof Collection) {
+                $row = collect($row);
+            }
+
+            $stillMissing = false;
+
+            foreach ($examples as $column => $example) {
+                if ($example !== null) {
+                    continue;
+                }
+
+                $formatted = $this->formatExampleCell($this->cellValue($row, $column));
+                if ($formatted !== null) {
+                    $examples[$column] = $formatted;
+                } else {
+                    $stillMissing = true;
+                }
+            }
+
+            if (! $stillMissing) {
+                break;
+            }
+        }
+
+        return $examples;
+    }
+
+    /**
      * Read spreadsheet data rows using the confirmed column mapping headings.
      *
      * @return Collection<int, Collection<string, mixed>>
@@ -159,6 +221,33 @@ class ImportService
     }
 
     /**
+     * Core + custom field options for the map step dropdowns.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public function fieldOptionsForMapping(): array
+    {
+        $options = [];
+
+        foreach (self::ASSET_FIELDS as $field => $label) {
+            $options[] = [
+                'value' => $field,
+                'label' => $label,
+            ];
+        }
+
+        foreach ($this->importableCustomFieldDefinitions() as $definition) {
+            $setName = (string) ($definition->fieldSet?->name ?: 'Custom fields');
+            $options[] = [
+                'value' => self::CUSTOM_FIELD_PREFIX.$definition->id,
+                'label' => $setName.': '.$definition->name,
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
      * Ensure each target field is mapped from at most one source column.
      * create_new_field may be selected multiple times (once per source column).
      *
@@ -169,27 +258,46 @@ class ImportService
     {
         $cleaned = [];
         $usedTargets = [];
+        $customFieldIds = $this->importableCustomFieldDefinitionIds();
+        $customFieldLabels = $this->customFieldMappingLabels();
 
         foreach ($mapping as $column => $field) {
             if ($field === null || $field === '') {
                 continue;
             }
 
-            if ($field !== self::CREATE_NEW_FIELD && ! array_key_exists($field, self::ASSET_FIELDS)) {
+            if ($field === self::CREATE_NEW_FIELD) {
+                $cleaned[(string) $column] = $field;
+
+                continue;
+            }
+
+            if (! array_key_exists($field, self::ASSET_FIELDS) && ! $this->isCustomFieldMapping($field)) {
                 throw ValidationException::withMessages([
                     "mapping.{$column}" => "Unknown target field [{$field}].",
                 ]);
             }
 
-            if ($field !== self::CREATE_NEW_FIELD) {
-                if (isset($usedTargets[$field])) {
+            if ($this->isCustomFieldMapping($field)) {
+                $definitionId = $this->customFieldDefinitionIdFromMapping($field);
+                if ($definitionId === null || ! isset($customFieldIds[$definitionId])) {
                     throw ValidationException::withMessages([
-                        "mapping.{$column}" => self::ASSET_FIELDS[$field].' is already mapped from column "'.$usedTargets[$field].'". Each field can only be used once.',
+                        "mapping.{$column}" => "Unknown target field [{$field}].",
                     ]);
                 }
-                $usedTargets[$field] = (string) $column;
             }
 
+            if (isset($usedTargets[$field])) {
+                $label = self::ASSET_FIELDS[$field]
+                    ?? $customFieldLabels[$field]
+                    ?? $field;
+
+                throw ValidationException::withMessages([
+                    "mapping.{$column}" => $label.' is already mapped from column "'.$usedTargets[$field].'". Each field can only be used once.',
+                ]);
+            }
+
+            $usedTargets[$field] = (string) $column;
             $cleaned[(string) $column] = $field;
         }
 
@@ -321,11 +429,20 @@ class ImportService
             return true;
         }
 
-        if (! array_key_exists($field, self::ASSET_FIELDS)) {
-            return false;
+        if (array_key_exists($field, self::ASSET_FIELDS)) {
+            return ! isset($usedFields[$field]);
         }
 
-        return ! isset($usedFields[$field]);
+        if ($this->isCustomFieldMapping($field)) {
+            $definitionId = $this->customFieldDefinitionIdFromMapping($field);
+            if ($definitionId === null || ! isset($this->importableCustomFieldDefinitionIds()[$definitionId])) {
+                return false;
+            }
+
+            return ! isset($usedFields[$field]);
+        }
+
+        return false;
     }
 
     /**
@@ -348,6 +465,24 @@ class ImportService
             }
         }
 
+        foreach ($this->importableCustomFieldDefinitions() as $definition) {
+            $mappingKey = self::CUSTOM_FIELD_PREFIX.$definition->id;
+            if (isset($usedFields[$mappingKey])) {
+                continue;
+            }
+
+            $definitionName = Str::lower($definition->name);
+            $setName = Str::lower((string) ($definition->fieldSet?->name ?: ''));
+            $fullLabel = trim($setName.': '.$definitionName);
+
+            if (
+                ($definitionName !== '' && str_contains($hay, $definitionName))
+                || ($fullLabel !== ':' && str_contains($hay, $fullLabel))
+            ) {
+                return $mappingKey;
+            }
+        }
+
         return null;
     }
 
@@ -358,6 +493,7 @@ class ImportService
      *     index: int,
      *     payload: array<string, mixed>,
      *     custom_fields: array<string, string>,
+     *     mapped_custom_fields: array<int, string>,
      *     item_type_name: string,
      *     location_level: ?string,
      *     location_room: ?string,
@@ -375,6 +511,7 @@ class ImportService
             $row = Collection::make($row);
             $payload = [];
             $customFields = [];
+            $mappedCustomFields = [];
             $itemTypeName = null;
             $level = null;
             $room = null;
@@ -388,6 +525,15 @@ class ImportService
 
                 if ($field === self::CREATE_NEW_FIELD) {
                     $customFields[(string) $column] = (string) $value;
+
+                    continue;
+                }
+
+                if ($this->isCustomFieldMapping($field)) {
+                    $definitionId = $this->customFieldDefinitionIdFromMapping($field);
+                    if ($definitionId !== null) {
+                        $mappedCustomFields[$definitionId] = (string) $value;
+                    }
 
                     continue;
                 }
@@ -434,6 +580,7 @@ class ImportService
                 'index' => (int) $index,
                 'payload' => $payload,
                 'custom_fields' => $customFields,
+                'mapped_custom_fields' => $mappedCustomFields,
                 'item_type_name' => $itemTypeName,
                 'location_level' => $level,
                 'location_room' => $room,
@@ -722,6 +869,7 @@ class ImportService
         }
 
         $this->syncImportedCustomFields($existing, $itemType, $row['custom_fields'] ?? [], $replace);
+        $this->syncMappedCustomFields($existing, $itemType, $row['mapped_custom_fields'] ?? [], $replace);
 
         return $existing;
     }
@@ -789,6 +937,115 @@ class ImportService
         }
     }
 
+    /**
+     * @param  array<int, string>  $mappedCustomFields  definition id => value
+     */
+    protected function syncMappedCustomFields(Asset $asset, ItemType $itemType, array $mappedCustomFields, bool $replace): void
+    {
+        if ($mappedCustomFields === []) {
+            return;
+        }
+
+        $definitions = CustomFieldDefinition::query()
+            ->with('fieldSet:id,name')
+            ->whereIn('id', array_keys($mappedCustomFields))
+            ->whereNotIn('type', CustomFieldDefinition::LAYOUT_TYPES)
+            ->get()
+            ->keyBy('id');
+
+        $attachedSetIds = [];
+
+        foreach ($mappedCustomFields as $definitionId => $value) {
+            $definition = $definitions->get((int) $definitionId);
+            if (! $definition) {
+                continue;
+            }
+
+            $setId = (int) $definition->custom_field_set_id;
+            if (! isset($attachedSetIds[$setId])) {
+                $itemType->fieldSets()->syncWithoutDetaching([$setId]);
+                $attachedSetIds[$setId] = true;
+            }
+
+            AssetCustomFieldValue::query()->updateOrCreate(
+                [
+                    'asset_id' => $asset->id,
+                    'custom_field_definition_id' => $definition->id,
+                ],
+                ['value' => $value]
+            );
+        }
+
+        if ($replace) {
+            // Mapped custom field values not present in this row are left intact;
+            // replace clears core columns only.
+        }
+    }
+
+    public function isCustomFieldMapping(string $field): bool
+    {
+        return str_starts_with($field, self::CUSTOM_FIELD_PREFIX);
+    }
+
+    public function customFieldDefinitionIdFromMapping(string $field): ?int
+    {
+        if (! $this->isCustomFieldMapping($field)) {
+            return null;
+        }
+
+        $id = (int) substr($field, strlen(self::CUSTOM_FIELD_PREFIX));
+
+        return $id > 0 ? $id : null;
+    }
+
+    /**
+     * @return Collection<int, CustomFieldDefinition>
+     */
+    protected function importableCustomFieldDefinitions(): Collection
+    {
+        return $this->importableCustomFieldDefinitionsCache ??= CustomFieldDefinition::query()
+            ->with('fieldSet:id,name')
+            ->whereNotIn('type', CustomFieldDefinition::LAYOUT_TYPES)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get()
+            ->sortBy(fn (CustomFieldDefinition $definition): string => sprintf(
+                '%s|%05d|%s|%d',
+                (string) ($definition->fieldSet?->name ?: 'Custom fields'),
+                (int) $definition->sort_order,
+                $definition->name,
+                (int) $definition->id,
+            ))
+            ->values();
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    protected function importableCustomFieldDefinitionIds(): array
+    {
+        return $this->importableCustomFieldDefinitions()
+            ->mapWithKeys(fn (CustomFieldDefinition $definition): array => [(int) $definition->id => true])
+            ->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function customFieldMappingLabels(): array
+    {
+        return $this->importableCustomFieldDefinitions()
+            ->mapWithKeys(function (CustomFieldDefinition $definition): array {
+                $setName = (string) ($definition->fieldSet?->name ?: 'Custom fields');
+
+                return [
+                    self::CUSTOM_FIELD_PREFIX.$definition->id => $setName.': '.$definition->name,
+                ];
+            })
+            ->all();
+    }
+
     protected function importedFieldSet(): CustomFieldSet
     {
         return CustomFieldSet::query()->firstOrCreate(
@@ -833,6 +1090,11 @@ class ImportService
 
         if ($existing) {
             return $existing;
+        }
+
+        $aliased = ItemTypeAlias::resolveItemType($name);
+        if ($aliased) {
+            return $aliased;
         }
 
         return ItemType::create([
@@ -899,6 +1161,11 @@ class ImportService
             return $existing;
         }
 
+        $aliased = LocationAlias::resolveLocation($name, $type);
+        if ($aliased) {
+            return $aliased;
+        }
+
         return Location::create([
             'name' => $name,
             'type' => $type,
@@ -946,6 +1213,28 @@ class ImportService
         $key = Str::slug($column, '_');
 
         return $row->get($key) ?? $row->get($column) ?? $row->get(Str::lower($column));
+    }
+
+    /**
+     * Normalise a spreadsheet cell into a short display string for the mapping UI.
+     */
+    protected function formatExampleCell(mixed $value): ?string
+    {
+        if ($value === null || is_array($value) || is_object($value)) {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        $string = trim((string) $value);
+
+        if ($string === '') {
+            return null;
+        }
+
+        return Str::limit($string, 80);
     }
 
     protected function nullableTrim(?string $value): ?string

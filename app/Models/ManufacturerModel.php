@@ -18,9 +18,27 @@ class ManufacturerModel extends Model
         'name',
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (ManufacturerModel $model): void {
+            ManufacturerModelAlias::forgetMatching($model->name, (int) $model->manufacturer_id);
+        });
+
+        static::updated(function (ManufacturerModel $model): void {
+            if ($model->wasChanged(['name', 'manufacturer_id'])) {
+                ManufacturerModelAlias::forgetMatching($model->name, (int) $model->manufacturer_id);
+            }
+        });
+    }
+
     public function manufacturer(): BelongsTo
     {
         return $this->belongsTo(Manufacturer::class);
+    }
+
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(ManufacturerModelAlias::class)->orderBy('former_name');
     }
 
     public function assets(): HasMany

@@ -38,6 +38,48 @@ class LocationTreeTest extends TestCase
         $this->assertCount(0, $tree->last()->children);
     }
 
+    public function test_tree_sorts_siblings_by_room_code_then_name(): void
+    {
+        $site = Location::create([
+            'name' => 'Campus',
+            'room_code' => 'C',
+            'type' => LocationType::Site,
+        ]);
+
+        Location::create([
+            'name' => 'Beta Room',
+            'room_code' => 'B-02',
+            'type' => LocationType::Room,
+            'parent_id' => $site->id,
+        ]);
+        Location::create([
+            'name' => 'Alpha Room',
+            'room_code' => 'A-01',
+            'type' => LocationType::Room,
+            'parent_id' => $site->id,
+        ]);
+        Location::create([
+            'name' => 'Zulu Room',
+            'room_code' => 'A-01',
+            'type' => LocationType::Room,
+            'parent_id' => $site->id,
+        ]);
+        Location::create([
+            'name' => 'No Code Room',
+            'type' => LocationType::Room,
+            'parent_id' => $site->id,
+        ]);
+
+        $children = Location::tree()->first()->children;
+
+        $this->assertSame([
+            'No Code Room',
+            'Alpha Room',
+            'Zulu Room',
+            'Beta Room',
+        ], $children->pluck('name')->all());
+    }
+
     public function test_self_and_descendant_ids_includes_nested_locations(): void
     {
         $site = Location::create([

@@ -1,5 +1,9 @@
 @php
     $alternate = (bool) ($alternate ?? false);
+    $hasChildren = $location->children->isNotEmpty();
+    $hasRackChildren = $hasChildren && $location->children->contains(
+        fn ($child): bool => $child->type === \App\Enums\LocationType::Rack
+    );
 
     $rowClasses = match ($location->type) {
         \App\Enums\LocationType::Site => $alternate
@@ -16,9 +20,33 @@
             : 'bg-[#e5f5f6] dark:bg-[#2b3c3e] border-l-[3px] border-l-brand',
     };
 @endphp
-<li class="border-b border-brand-charcoal/25 dark:border-brand-charcoal last:border-b-0">
+<li
+    class="border-b border-brand-charcoal/25 dark:border-brand-charcoal last:border-b-0"
+    data-location-id="{{ $location->id }}"
+    @if ($hasChildren)
+        data-location-collapsible="1"
+    @endif
+    @if ($hasRackChildren)
+        data-location-has-racks="1"
+    @endif
+>
     <div class="{{ $rowClasses }} px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-start gap-3 min-w-0">
+            @if ($hasChildren)
+                <button
+                    type="button"
+                    class="mt-0.5 shrink-0 p-0.5 text-brand-charcoal dark:text-brand-silver"
+                    @click="toggle({{ $location->id }})"
+                    :aria-expanded="isOpen({{ $location->id }}) ? 'true' : 'false'"
+                    aria-label="Toggle {{ $location->name }} children"
+                >
+                    <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-90': isOpen({{ $location->id }}) }" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            @else
+                <span class="mt-0.5 inline-block w-5 shrink-0" aria-hidden="true"></span>
+            @endif
             @role('admin|inventory_manager')
                 <input
                     type="checkbox"
@@ -38,13 +66,15 @@
                 <span class="text-brand-charcoal dark:text-brand-silver"> — {{ $location->type->label() }}@if($location->is_portable) (portable)@endif</span>
             </div>
         </div>
-        <div class="flex items-center gap-3 shrink-0">
+        <div class="flex items-center gap-2 shrink-0">
             <a
                 href="{{ route('assets.index', ['location_id' => $location->id]) }}"
                 class="text-sm text-brand"
             >Assets</a>
             @role('admin|inventory_manager')
+                <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="{{ route('locations.edit', $location) }}" class="text-sm text-brand">Edit</a>
+                <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <form method="POST" action="{{ route('locations.destroy', $location) }}" class="inline" onsubmit="return confirm('Delete this location? Child locations become top-level and assets here lose their location.')">
                     @csrf
                     @method('DELETE')
@@ -53,8 +83,11 @@
             @endrole
         </div>
     </div>
-    @if ($location->children->isNotEmpty())
-        <ul class="ml-4 border-l border-brand-charcoal/30 dark:border-brand-charcoal">
+    @if ($hasChildren)
+        <ul
+            class="ml-4 border-l border-brand-charcoal/30 dark:border-brand-charcoal"
+            x-show="isOpen({{ $location->id }})"
+        >
             @php
                 $previousType = null;
                 $sameTypeRun = 0;

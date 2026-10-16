@@ -20,6 +20,7 @@ use App\Models\UnknownScan;
 use App\Services\AssetConnectionService;
 use App\Services\AssetInterfaceService;
 use App\Services\BulkAssetUpdateService;
+use App\Services\ConnectionBusService;
 use App\Services\FileAttachmentService;
 use App\Services\KanbanTagService;
 use App\Services\ManufacturerCatalogueService;
@@ -187,6 +188,7 @@ class AssetController extends Controller
         Asset $asset,
         FileAttachmentService $attachments,
         AssetConnectionService $connections,
+        ConnectionBusService $buses,
         RuVisualiserService $ruVisualiser,
         StockMovementService $stockMovements,
         StockChartService $stockCharts,
@@ -239,6 +241,8 @@ class AssetController extends Controller
             : [];
 
         $connectionPeers = collect();
+        $busMemberships = collect();
+        $connectionBusesByType = [];
         $connectionTypes = collect();
         $peerAssetOptions = [];
         $canApplyInterfaceTemplates = false;
@@ -248,6 +252,9 @@ class AssetController extends Controller
                 'itemType.interfaceTemplates',
                 'manufacturerModel.interfaceTemplates',
                 'interfaces.connectionType',
+                'interfaces.buses.connectionType',
+                'interfaces.buses.interfaces.asset.itemType',
+                'interfaces.buses.interfaces.asset.location',
                 'interfaces.connectionsAsA.connectionType',
                 'interfaces.connectionsAsA.interfaceB.asset.itemType',
                 'interfaces.connectionsAsA.interfaceB.asset.location',
@@ -256,7 +263,20 @@ class AssetController extends Controller
                 'interfaces.connectionsAsB.interfaceA.asset.location',
             ]);
             $connectionPeers = $connections->peersForAsset($asset);
+            $busMemberships = $buses->membershipsForAsset($asset);
             $connectionTypes = ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get();
+            $connectionBusesByType = $connectionTypes
+                ->filter(fn (ConnectionType $type): bool => (bool) $type->allows_bus)
+                ->mapWithKeys(function (ConnectionType $type) use ($buses): array {
+                    return [
+                        (string) $type->id => $buses->busesForType($type)->map(fn ($bus): array => [
+                            'id' => (string) $bus->id,
+                            'name' => $bus->name,
+                            'member_count' => (int) $bus->interfaces_count,
+                        ])->values()->all(),
+                    ];
+                })
+                ->all();
             $peerAssetOptions = Asset::query()
                 ->whereKeyNot($asset->id)
                 ->with(['interfaces:id,asset_id,connection_type_id'])
@@ -383,6 +403,8 @@ class AssetController extends Controller
             'historyUserOptions' => $historyUserOptions,
             'fileRows' => $fileRows,
             'connectionPeers' => $connectionPeers,
+            'busMemberships' => $busMemberships,
+            'connectionBusesByType' => $connectionBusesByType,
             'connectionTypes' => $connectionTypes,
             'peerAssetOptions' => $peerAssetOptions,
             'canApplyInterfaceTemplates' => $canApplyInterfaceTemplates,

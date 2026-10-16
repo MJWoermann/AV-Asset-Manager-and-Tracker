@@ -372,6 +372,22 @@ class AssetConnectionFeatureTest extends TestCase
         ]);
     }
 
+    public function test_connection_type_seeder_includes_xlr_dmx_power_and_usb(): void
+    {
+        $expected = [
+            'xlr' => 'xlr',
+            'dmx' => 'dmx',
+            'power' => 'power',
+            'usb' => 'usb',
+        ];
+
+        foreach ($expected as $slug => $icon) {
+            $type = ConnectionType::query()->where('slug', $slug)->first();
+            $this->assertNotNull($type, "Missing seeded connection type [{$slug}]");
+            $this->assertSame($icon, $type->icon);
+        }
+    }
+
     public function test_connection_type_crud_is_gated_to_managers(): void
     {
         $scanner = $this->scanner();
@@ -385,26 +401,28 @@ class AssetConnectionFeatureTest extends TestCase
             ->post(route('connection-types.store'), [
                 'name' => 'Fiber',
                 'color' => '#112233',
-                'icon' => 'network',
+                'icon' => 'xlr',
                 'allows_protocol' => '0',
-                'sort_order' => 70,
+                'sort_order' => 110,
             ])
             ->assertRedirect(route('connection-types.index'));
 
         $type = ConnectionType::query()->where('slug', 'fiber')->first();
         $this->assertNotNull($type);
+        $this->assertSame('xlr', $type->icon);
 
         $this->actingAs($manager)
             ->put(route('connection-types.update', $type), [
                 'name' => 'Fiber Optic',
                 'color' => '#445566',
-                'icon' => 'network',
+                'icon' => 'usb',
                 'allows_protocol' => '0',
-                'sort_order' => 70,
+                'sort_order' => 110,
             ])
             ->assertRedirect(route('connection-types.index'));
 
         $this->assertSame('Fiber Optic', $type->fresh()->name);
+        $this->assertSame('usb', $type->fresh()->icon);
     }
 
     public function test_map_returns_only_filtered_connected_assets(): void

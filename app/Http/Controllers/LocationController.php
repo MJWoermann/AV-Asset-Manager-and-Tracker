@@ -17,11 +17,11 @@ class LocationController extends Controller
     public function index(): View
     {
         $locations = Location::tree();
-        $flatLocations = Location::query()->with('parent.parent.parent')->orderBy('name')->get();
+        $flatLocations = Location::query()->with('parent.parent.parent')->orderByHierarchy()->get();
         $parentOptions = Location::query()
             ->canBeParent()
             ->with('parent.parent.parent')
-            ->orderBy('name')
+            ->orderByHierarchy()
             ->get();
         $duplicateNames = $this->duplicateNormalizedNames($flatLocations);
 
@@ -52,7 +52,7 @@ class LocationController extends Controller
 
     public function edit(Location $location): View
     {
-        $location->load('files');
+        $location->load(['files', 'aliases']);
 
         $fileRows = $location->files->map(fn ($file): array => [
             'file' => $file,

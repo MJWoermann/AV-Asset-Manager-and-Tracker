@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\ConnectionType;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
+use App\Models\ItemTypeAlias;
 use App\Services\AssetInterfaceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,7 +72,7 @@ class ItemTypeController extends Controller
 
     public function edit(ItemType $itemType): View
     {
-        $itemType->load(['fieldSets', 'files', 'interfaceTemplates']);
+        $itemType->load(['fieldSets', 'files', 'interfaceTemplates', 'aliases']);
 
         $fileRows = $itemType->files->map(fn ($file): array => [
             'file' => $file,
@@ -208,16 +209,19 @@ class ItemTypeController extends Controller
     public function destroy(DeleteItemTypeRequest $request, ItemType $itemType): RedirectResponse
     {
         $replacementId = (int) $request->validated('replacement_item_type_id');
+        $replacement = ItemType::query()->findOrFail($replacementId);
 
-        DB::transaction(function () use ($itemType, $replacementId): void {
+        DB::transaction(function () use ($itemType, $replacement): void {
             Asset::query()
                 ->where('item_type_id', $itemType->id)
-                ->update(['item_type_id' => $replacementId]);
+                ->update(['item_type_id' => $replacement->id]);
+
+            ItemTypeAlias::recordMerge($itemType, $replacement);
 
             $itemType->fieldSets()->detach();
             $itemType->delete();
         });
 
-        return redirect()->route('item-types.index')->with('status', 'Item type deleted.');
+        return redirect()->route('item-types.index')->with('status', 'Item type deleted. Imports using the old name will map to '.$replacement->name.'.');
     }
 }

@@ -238,6 +238,73 @@ async function loadHtml5Qrcode() {
     return html5QrcodeModulePromise;
 }
 
+/** @type {{ stopCamera: () => Promise<void> } | null} */
+let activeFieldBarcodeScanner = null;
+
+/**
+ * Start an html5-qrcode camera session with the same formats/constraints as stocktake scanning.
+ *
+ * @param {string} elementId
+ * @param {(decoded: string) => void | Promise<void>} onDecoded
+ * @returns {Promise<import('html5-qrcode').Html5Qrcode>}
+ */
+async function startBarcodeCamera(elementId, onDecoded) {
+    const { Html5Qrcode, Html5QrcodeSupportedFormats } = await loadHtml5Qrcode();
+    const scanner = new Html5Qrcode(elementId, {
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.QR_CODE,
+        ],
+        verbose: false,
+    });
+    const compactCamera = window.matchMedia('(max-width: 639px)').matches;
+    await scanner.start(
+        { facingMode: 'environment' },
+        {
+            fps: 15,
+            disableFlip: true,
+            aspectRatio: compactCamera ? 2.2 : 1.777778,
+            qrbox: (viewfinderWidth, viewfinderHeight) => ({
+                width: Math.floor(viewfinderWidth * 0.9),
+                height: Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35)),
+            }),
+            videoConstraints: {
+                facingMode: 'environment',
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+            },
+        },
+        (decoded) => {
+            void onDecoded(decoded);
+        },
+        () => {}
+    );
+
+    try {
+        await scanner.applyVideoConstraints({
+            focusMode: 'continuous',
+            advanced: [{ zoom: 1.5 }],
+        });
+    } catch (_) {}
+
+    return scanner;
+}
+
+/**
+ * @param {import('html5-qrcode').Html5Qrcode | null} scanner
+ */
+async function stopBarcodeCamera(scanner) {
+    if (!scanner) {
+        return;
+    }
+
+    try {
+        await scanner.stop();
+        await scanner.clear();
+    } catch (_) {}
+}
+
 function searchTokens(term) {
     return String(term || '')
         .trim()
@@ -432,9 +499,13 @@ Alpine.data('comparisonSearch', (sections = []) => ({
     },
 }));
 
-Alpine.data('importMapper', (columns, initialSelections = {}, requiredFields = []) => ({
+Alpine.data('importMapper', (columns, initialSelections = {}, requiredFields = [], fieldOptions = []) => ({
     selections: Object.fromEntries(columns.map((c) => [c, initialSelections[c] ?? ''])),
     requiredFields: requiredFields,
+    fieldOptions: (fieldOptions || []).map((o) => ({
+        value: String(o.value ?? ''),
+        label: String(o.label ?? ''),
+    })),
     missingRequirements: [],
     duplicateWarning: '',
 
@@ -496,6 +567,144 @@ Alpine.data('importMapper', (columns, initialSelections = {}, requiredFields = [
 
         event.preventDefault();
         return false;
+    },
+}));
+
+Alpine.data('importMappingSelect', (column) => ({
+    open: false,
+    query: '',
+    highlight: -1,
+    column: String(column),
+
+    mapper() {
+        const root = this.$el.closest('[data-import-mapper]');
+
+        return root ? Alpine.$data(root) : null;
+    },
+
+    get value() {
+        const mapper = this.mapper();
+
+        return mapper?.selections?.[this.column] ?? '';
+    },
+
+    get selectedLabel() {
+        const opt = this.allOptions.find((o) => o.value === this.value);
+
+        return opt ? opt.label : 'Ignore';
+    },
+
+    get allOptions() {
+        const mapper = this.mapper();
+        const fieldOptions = (mapper?.fieldOptions ?? []).map((o) => ({
+            value: String(o.value ?? ''),
+            label: String(o.label ?? ''),
+        }));
+
+        return [
+            { value: '', label: 'Ignore' },
+            ...fieldOptions,
+            {
+                value: 'create_new_field',
+                label: `Create new field (Imported-Field:${this.column})`,
+            },
+        ];
+    },
+
+    get filtered() {
+        const q = this.query.trim();
+        const options = this.allOptions;
+
+        if (!q) {
+            return options;
+        }
+
+        return options
+            .map((option) => ({ option, score: matchScore(option.label, q) }))
+            .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
+            .sort((a, b) => a.score - b.score || a.option.label.localeCompare(b.option.label))
+            .map((entry) => entry.option);
+    },
+
+    isOptionTaken(field) {
+        const mapper = this.mapper();
+
+        return mapper ? mapper.isTaken(field, this.column) : false;
+    },
+
+    highlightedLabel(label) {
+        return highlightSearchTerm(label, this.query);
+    },
+
+    openList() {
+        this.open = true;
+        this.highlight = -1;
+        this.$nextTick(() => this.$refs.search?.focus());
+    },
+
+    closeList() {
+        this.open = false;
+        this.query = '';
+        this.highlight = -1;
+    },
+
+    select(option) {
+        if (this.isOptionTaken(option.value)) {
+            return;
+        }
+
+        const mapper = this.mapper();
+        if (!mapper) {
+            return;
+        }
+
+        mapper.selections[this.column] = option.value;
+        mapper.onChange(this.column);
+        this.closeList();
+    },
+
+    clear() {
+        const mapper = this.mapper();
+        if (!mapper) {
+            return;
+        }
+
+        mapper.selections[this.column] = '';
+        mapper.onChange(this.column);
+        this.closeList();
+    },
+
+    onKeydown(event) {
+        if (!this.open) {
+            if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                this.openList();
+            }
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            this.closeList();
+            return;
+        }
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            this.highlight = Math.min(this.highlight + 1, this.filtered.length - 1);
+            return;
+        }
+
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            this.highlight = Math.max(this.highlight - 1, 0);
+            return;
+        }
+
+        if (event.key === 'Enter' && this.highlight >= 0 && this.filtered[this.highlight]) {
+            event.preventDefault();
+            this.select(this.filtered[this.highlight]);
+        }
     },
 }));
 
@@ -580,6 +789,90 @@ Alpine.data('assetFormFields', (config = {}) => ({
                 ?? '';
             return String(value).trim() !== '';
         });
+    },
+}));
+
+/**
+ * Camera barcode fill for a single form input (asset create/edit identifiers).
+ *
+ * @param {string} fieldId Input element id / name to populate
+ */
+Alpine.data('fieldBarcodeScanner', (fieldId) => ({
+    fieldId: String(fieldId || ''),
+    readerId: `field-qr-${String(fieldId || 'input')}`,
+    scanning: false,
+    scanner: null,
+    error: '',
+    lastCameraCode: '',
+    lastCameraAt: 0,
+
+    async toggleCamera() {
+        if (this.scanning) {
+            await this.stopCamera();
+            return;
+        }
+        await this.startCamera();
+    },
+
+    async startCamera() {
+        this.error = '';
+
+        if (activeFieldBarcodeScanner && activeFieldBarcodeScanner !== this) {
+            await activeFieldBarcodeScanner.stopCamera();
+        }
+
+        this.scanning = true;
+        activeFieldBarcodeScanner = this;
+        await this.$nextTick();
+
+        try {
+            this.scanner = await startBarcodeCamera(this.readerId, async (decoded) => {
+                const now = Date.now();
+                if (decoded === this.lastCameraCode && now - this.lastCameraAt < CAMERA_SAME_CODE_DEBOUNCE_MS) {
+                    return;
+                }
+                this.lastCameraCode = decoded;
+                this.lastCameraAt = now;
+                this.applyDecoded(decoded);
+                await this.stopCamera();
+            });
+        } catch (e) {
+            this.error = 'Camera unavailable: ' + (e?.message || e);
+            this.scanning = false;
+            if (activeFieldBarcodeScanner === this) {
+                activeFieldBarcodeScanner = null;
+            }
+        }
+    },
+
+    async stopCamera() {
+        await stopBarcodeCamera(this.scanner);
+        this.scanner = null;
+        this.scanning = false;
+        if (activeFieldBarcodeScanner === this) {
+            activeFieldBarcodeScanner = null;
+        }
+    },
+
+    applyDecoded(decoded) {
+        const value = String(decoded || '').trim();
+        if (!value || !this.fieldId) {
+            return;
+        }
+
+        const input = document.getElementById(this.fieldId);
+        if (!input) {
+            return;
+        }
+
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        this.$dispatch('field-barcode-scanned', { field: this.fieldId, value });
+    },
+
+    async destroy() {
+        await this.stopCamera();
     },
 }));
 
@@ -992,12 +1285,18 @@ Alpine.data('assetConnectionsForm', (config = {}) => ({
     createPeerInterface: Boolean(config.old?.create_peer_interface),
     newPeerInterfaceName: config.old?.new_peer_interface_name || '',
     allowsProtocolByType: config.allowsProtocolByType || {},
+    allowsBusByType: config.allowsBusByType || {},
+    busesByType: config.busesByType || {},
     peerInterfacesUrl: config.peerInterfacesUrl || '',
     localInterfaces: Array.isArray(config.localInterfaces) ? config.localInterfaces : [],
     peerAssets: Array.isArray(config.peerAssets) ? config.peerAssets : [],
     peerOpen: false,
     peerQuery: '',
     peerHighlight: -1,
+    busLocalInterfaceId: config.old?.bus_local_interface_id || '',
+    connectionBusId: config.old?.connection_bus_id || '',
+    createNewBus: Boolean(config.old?.create_new_bus),
+    newBusName: config.old?.new_bus_name || '',
 
     init() {
         if (this.peerAssetId) {
@@ -1010,8 +1309,37 @@ Alpine.data('assetConnectionsForm', (config = {}) => ({
         return local?.connection_type_id ? String(local.connection_type_id) : '';
     },
 
+    get selectedBusLocalTypeId() {
+        const local = this.localInterfaces.find((iface) => String(iface.id) === String(this.busLocalInterfaceId));
+        return local?.connection_type_id ? String(local.connection_type_id) : '';
+    },
+
     get needsProtocol() {
         return Boolean(this.allowsProtocolByType[this.selectedLocalTypeId]);
+    },
+
+    get availableBuses() {
+        const typeId = this.selectedBusLocalTypeId;
+        if (!typeId) {
+            return [];
+        }
+
+        const list = this.busesByType[typeId];
+        return Array.isArray(list) ? list : [];
+    },
+
+    onBusLocalInterfaceChange() {
+        this.connectionBusId = '';
+        this.newBusName = '';
+        this.createNewBus = this.availableBuses.length === 0;
+    },
+
+    onCreateNewBusToggle() {
+        if (this.createNewBus) {
+            this.connectionBusId = '';
+        } else {
+            this.newBusName = '';
+        }
     },
 
     get peerSelectedLabel() {
@@ -1182,6 +1510,10 @@ const CONNECTION_TYPE_ICON_PATHS = {
     dante: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4.5 12h3l2-4 3 8 2-4h5"/>',
     custom: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M7 7l2.1 2.1M14.9 14.9 17 17M17 7l-2.1 2.1M9.1 14.9 7 17"/>',
     analog: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 14c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/>',
+    xlr: '<circle cx="12" cy="12" r="8" stroke-width="1.75"/><circle cx="12" cy="8.25" r="1.35" stroke-width="1.5"/><circle cx="8.85" cy="13.75" r="1.35" stroke-width="1.5"/><circle cx="15.15" cy="13.75" r="1.35" stroke-width="1.5"/>',
+    dmx: '<circle cx="12" cy="12" r="8" stroke-width="1.75"/><circle cx="12" cy="7.5" r="1.15" stroke-width="1.5"/><circle cx="8.2" cy="10.4" r="1.15" stroke-width="1.5"/><circle cx="15.8" cy="10.4" r="1.15" stroke-width="1.5"/><circle cx="9.4" cy="15.4" r="1.15" stroke-width="1.5"/><circle cx="14.6" cy="15.4" r="1.15" stroke-width="1.5"/>',
+    power: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 3.5v8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M7.35 6.9a6.5 6.5 0 109.3 0"/>',
+    usb: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 21V10.5M12 10.5 7.5 7M12 10.5l4.5-3.5M12 10.5V5"/><circle cx="7.5" cy="6.25" r="1.6" stroke-width="1.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.4 4.15h3.4v3.4"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.6 3.4 12 2l1.4 1.4"/>',
     generic: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 12h8M12 8v8M5 5h14v14H5z"/>',
 };
 
@@ -1316,6 +1648,20 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                     },
                 },
                 {
+                    selector: 'node.bus',
+                    style: {
+                        shape: 'roundrectangle',
+                        width: 40,
+                        height: 28,
+                        'font-size': 9,
+                        'font-weight': '600',
+                        'text-max-width': 100,
+                        'border-width': 2,
+                        'border-color': '#111827',
+                        'border-style': 'dashed',
+                    },
+                },
+                {
                     selector: 'node.focus',
                     style: {
                         'border-width': 3,
@@ -1445,6 +1791,17 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
             return '';
         }
 
+        if (data.kind === 'bus') {
+            const parts = [];
+            if (data.name) {
+                parts.push(data.name);
+            }
+            if (this.display.mapTypeName && data.type_name) {
+                parts.push(data.type_name);
+            }
+            return parts.join('\n');
+        }
+
         const parts = [];
         if (this.display.mapName && data.name) {
             parts.push(data.name);
@@ -1474,7 +1831,7 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
 
                 const canShowIcon = this.display.showTypeIcons
                     && data.kind !== undefined
-                    && (data.kind === 'type-port' || (data.kind === 'asset' && !data.compound));
+                    && (data.kind === 'type-port' || data.kind === 'bus' || (data.kind === 'asset' && !data.compound));
 
                 if (canShowIcon && data.icon) {
                     node.data('icon_url', connectionTypeIconDataUri(data.icon));
@@ -1794,9 +2151,44 @@ Alpine.data('bulkLocations', () => ({
     deleteConfirmOpen: false,
     pendingDelete: false,
     pendingMerge: false,
+    collapsed: {},
     fields: {
         update_parent: false,
         clear_parent: false,
+    },
+
+    isOpen(id) {
+        return !this.collapsed[id];
+    },
+
+    toggle(id) {
+        this.collapsed = { ...this.collapsed, [id]: !this.collapsed[id] };
+    },
+
+    expandAll() {
+        this.collapsed = {};
+    },
+
+    collapseAll() {
+        const next = {};
+        this.collapsibleIds().forEach((id) => {
+            next[id] = true;
+        });
+        this.collapsed = next;
+    },
+
+    hideRacks() {
+        const next = { ...this.collapsed };
+        this.$root.querySelectorAll('[data-location-has-racks="1"]').forEach((el) => {
+            next[Number(el.getAttribute('data-location-id'))] = true;
+        });
+        this.collapsed = next;
+    },
+
+    collapsibleIds() {
+        return [...this.$root.querySelectorAll('[data-location-collapsible="1"]')].map((el) =>
+            Number(el.getAttribute('data-location-id'))
+        );
     },
 
     get selectedIds() {
@@ -3127,52 +3519,16 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         await this.$nextTick();
 
         try {
-            const { Html5Qrcode, Html5QrcodeSupportedFormats } = await loadHtml5Qrcode();
-            this.scanner = new Html5Qrcode('qr-reader', {
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                ],
-                verbose: false,
+            this.scanner = await startBarcodeCamera('qr-reader', async (decoded) => {
+                const now = Date.now();
+                if (decoded === this.lastCameraCode && now - this.lastCameraAt < CAMERA_SAME_CODE_DEBOUNCE_MS) {
+                    return;
+                }
+                this.lastCameraCode = decoded;
+                this.lastCameraAt = now;
+                this.code = decoded;
+                await this.submitCode();
             });
-            const compactCamera = window.matchMedia('(max-width: 639px)').matches;
-            await this.scanner.start(
-                { facingMode: 'environment' },
-                {
-                    fps: 15,
-                    disableFlip: true,
-                    // Wider aspect on phones keeps the viewfinder short so the session list stays on-screen.
-                    aspectRatio: compactCamera ? 2.2 : 1.777778,
-                    qrbox: (viewfinderWidth, viewfinderHeight) => ({
-                        width: Math.floor(viewfinderWidth * 0.9),
-                        height: Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35)),
-                    }),
-                    videoConstraints: {
-                        facingMode: 'environment',
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                },
-                async (decoded) => {
-                    const now = Date.now();
-                    if (decoded === this.lastCameraCode && now - this.lastCameraAt < CAMERA_SAME_CODE_DEBOUNCE_MS) {
-                        return;
-                    }
-                    this.lastCameraCode = decoded;
-                    this.lastCameraAt = now;
-                    this.code = decoded;
-                    await this.submitCode();
-                },
-                () => {}
-            );
-
-            try {
-                await this.scanner.applyVideoConstraints({
-                    focusMode: 'continuous',
-                    advanced: [{ zoom: 1.5 }],
-                });
-            } catch (_) {}
         } catch (e) {
             this.error = 'Camera unavailable: ' + (e?.message || e);
             this.scanning = false;
@@ -3181,13 +3537,8 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     },
 
     async stopCamera() {
-        if (this.scanner) {
-            try {
-                await this.scanner.stop();
-                await this.scanner.clear();
-            } catch (_) {}
-            this.scanner = null;
-        }
+        await stopBarcodeCamera(this.scanner);
+        this.scanner = null;
         this.scanning = false;
         this.$nextTick(() => this.focusInput());
     },

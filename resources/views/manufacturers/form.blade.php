@@ -21,6 +21,20 @@
         </form>
 
         @if($manufacturer->exists)
+            @if($manufacturer->aliases->isNotEmpty())
+                <div class="mt-6 rounded border border-gray-200 dark:border-brand-charcoal p-3 space-y-1">
+                    <p class="text-sm font-medium">Former names (import aliases)</p>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Spreadsheet rows using these names will use this manufacturer instead of creating a new one.
+                    </p>
+                    <ul class="text-sm list-disc list-inside">
+                        @foreach($manufacturer->aliases as $alias)
+                            <li>{{ $alias->former_name }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div class="mt-6 space-y-2">
                 @if($replacementManufacturers->isEmpty())
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver">
@@ -49,6 +63,7 @@
                         This manufacturer has {{ $modelCount }} model{{ $modelCount === 1 ? '' : 's' }}
                         and {{ $assetCount }} asset{{ $assetCount === 1 ? '' : 's' }}.
                         Choose a replacement manufacturer, then delete.
+                        The deleted name is kept so future imports that still use it map to the replacement.
                     </p>
                     <div>
                         <x-input-label for="replacement_manufacturer_id" value="Replacement manufacturer" />

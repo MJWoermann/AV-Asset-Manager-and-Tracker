@@ -25,6 +25,7 @@ class ConnectionTypeFactory extends Factory
             'color' => fake()->hexColor(),
             'icon' => fake()->randomElement(ConnectionTypeIcons::keys()),
             'allows_protocol' => false,
+            'allows_bus' => false,
             'sort_order' => fake()->numberBetween(0, 100),
         ];
     }
@@ -34,6 +35,13 @@ class ConnectionTypeFactory extends Factory
         return $this->state(fn (): array => [
             'allows_protocol' => true,
             'icon' => 'custom',
+        ]);
+    }
+
+    public function busCapable(): static
+    {
+        return $this->state(fn (): array => [
+            'allows_bus' => true,
         ]);
     }
 }

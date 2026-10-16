@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\ItemType;
+use App\Models\ItemTypeAlias;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -81,9 +82,15 @@ class ItemTypeDeleteTest extends TestCase
         ]);
 
         $response->assertRedirect(route('item-types.index'));
-        $response->assertSessionHas('status', 'Item type deleted.');
+        $response->assertSessionHas('status');
         $this->assertDatabaseMissing('item_types', ['id' => $delete->id]);
         $this->assertSame($keep->id, $asset->fresh()->item_type_id);
+        $this->assertDatabaseHas('item_type_aliases', [
+            'former_name' => 'Delete Type',
+            'former_slug' => 'delete-type',
+            'item_type_id' => $keep->id,
+        ]);
+        $this->assertSame(1, ItemTypeAlias::query()->count());
     }
 
     public function test_delete_requires_replacement_item_type(): void

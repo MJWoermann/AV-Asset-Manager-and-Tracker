@@ -23,15 +23,21 @@
                         <div class="font-medium">{{ $type->name }}</div>
                         <div class="text-xs text-brand-charcoal dark:text-brand-silver">
                             {{ $type->connections_count }} {{ $type->connections_count === 1 ? 'connection' : 'connections' }}
+                            @if(($type->buses_count ?? 0) > 0)
+                                · {{ $type->buses_count }} {{ $type->buses_count === 1 ? 'bus' : 'buses' }}
+                            @endif
                             @if($type->allows_protocol)
                                 · protocol field
+                            @endif
+                            @if($type->allows_bus)
+                                · device bus
                             @endif
                         </div>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 text-sm">
                     <a href="{{ route('connection-types.edit', $type) }}" class="text-brand">Edit</a>
-                    @if($type->connections_count === 0)
+                    @if($type->connections_count === 0 && ($type->buses_count ?? 0) === 0)
                         <form method="POST" action="{{ route('connection-types.destroy', $type) }}" onsubmit="return confirm('Delete this connection type?')">
                             @csrf
                             @method('DELETE')

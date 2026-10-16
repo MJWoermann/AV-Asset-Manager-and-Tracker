@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\LocationType;
 use App\Models\Asset;
 use App\Models\Location;
+use App\Models\LocationAlias;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -166,6 +167,7 @@ class BulkLocationUpdateService
                 ->update(['parent_id' => $survivor->id]);
 
             foreach ($duplicates as $duplicate) {
+                LocationAlias::recordMerge($duplicate, $survivor);
                 $duplicate->delete();
                 $deleted++;
             }

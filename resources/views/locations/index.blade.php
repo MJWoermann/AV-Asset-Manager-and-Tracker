@@ -7,11 +7,7 @@
             @endrole
         </div>
     </x-slot>
-    @role('admin|inventory_manager')
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkLocations()">
-    @else
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    @endrole
         @if (session('status'))
             <div class="mb-4 text-sm text-brand">{{ session('status') }}</div>
         @endif
@@ -50,9 +46,9 @@
         @if ($locations->isEmpty())
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">No locations yet.</p>
         @else
-            @role('admin|inventory_manager')
-                <div class="mb-2 flex items-center gap-2 text-sm">
-                    <label class="inline-flex items-center gap-2">
+            <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                @role('admin|inventory_manager')
+                    <label class="inline-flex items-center gap-2 mr-2">
                         <input
                             type="checkbox"
                             class="rounded border-brand-charcoal/40"
@@ -62,8 +58,23 @@
                         >
                         <span>Select all</span>
                     </label>
-                </div>
-            @endrole
+                @endrole
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver"
+                    @click="expandAll()"
+                >Expand all</button>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver"
+                    @click="collapseAll()"
+                >Collapse all</button>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver"
+                    @click="hideRacks()"
+                >Hide racks</button>
+            </div>
             <ul class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal text-sm overflow-hidden">
                 @php
                     $previousType = null;
@@ -87,4 +98,3 @@
         @endif
     </div>
 </x-app-layout>
-

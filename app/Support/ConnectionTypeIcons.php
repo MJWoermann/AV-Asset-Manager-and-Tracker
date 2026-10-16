@@ -9,7 +9,7 @@ class ConnectionTypeIcons
      */
     public static function keys(): array
     {
-        return ['network', 'wireless', 'hdmi', 'sdi', 'dante', 'custom', 'analog', 'generic'];
+        return ['network', 'wireless', 'hdmi', 'sdi', 'dante', 'custom', 'analog', 'xlr', 'dmx', 'power', 'usb', 'generic'];
     }
 
     public static function isValid(string $icon): bool

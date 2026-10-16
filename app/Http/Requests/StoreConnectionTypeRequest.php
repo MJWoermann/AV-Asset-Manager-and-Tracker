@@ -21,6 +21,7 @@ class StoreConnectionTypeRequest extends FormRequest
             'color' => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'icon' => ['required', 'string', Rule::in(ConnectionTypeIcons::keys())],
             'allows_protocol' => ['sometimes', 'boolean'],
+            'allows_bus' => ['sometimes', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
         ];
     }

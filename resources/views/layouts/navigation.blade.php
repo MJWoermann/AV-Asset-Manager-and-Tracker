@@ -12,8 +12,8 @@
                     <x-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-nav-link>
 
                     @php
-                        $reportsActive = request()->routeIs('reports.compare*', 'reports.unknown-scans*', 'reports.connection-map*', 'labels.*');
-                        $dataActive = request()->routeIs('locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
+                        $reportsActive = request()->routeIs('reports.*', 'labels.*');
+                        $dataActive = request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*');
                         $riggingActive = request()->routeIs('rigging.*');
                     @endphp
 
@@ -151,35 +151,16 @@
             <x-responsive-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">Scan</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('assets.index')" :active="request()->routeIs('assets.*')">Assets</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('lists.index')" :active="request()->routeIs('lists.*')">Lists</x-responsive-nav-link>
-
-            <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Reports</div>
-            <x-responsive-nav-link :href="route('reports.compare')" :active="request()->routeIs('reports.compare*')">Compare</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('reports.unknown-scans')" :active="request()->routeIs('reports.unknown-scans*')">Unknown scans</x-responsive-nav-link>
-            @feature('asset_connections')
-                <x-responsive-nav-link :href="route('reports.connection-map')" :active="request()->routeIs('reports.connection-map*')">Connection map</x-responsive-nav-link>
-            @endfeature
-            @feature('shelf_tag_generator')
-                @role('admin|inventory_manager')
-                    <x-responsive-nav-link :href="route('labels.index')" :active="request()->routeIs('labels.*')">Labels</x-responsive-nav-link>
-                @endrole
-            @endfeature
-
-            <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Data</div>
-            <x-responsive-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">Locations</x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('manufacturers.index')" :active="request()->routeIs('manufacturers.*')">Manufacturers</x-responsive-nav-link>
-            @role('admin|inventory_manager')
-                <x-responsive-nav-link :href="route('item-types.index')" :active="request()->routeIs('item-types.*')">Item Types</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('custom-field-sets.index')" :active="request()->routeIs('custom-field-sets.*')">Field sets</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('files.index')" :active="request()->routeIs('files.index')">Files</x-responsive-nav-link>
-                @feature('asset_connections')
-                    <x-responsive-nav-link :href="route('connection-types.index')" :active="request()->routeIs('connection-types.*')">Connection types</x-responsive-nav-link>
-                @endfeature
-            @endrole
-
+            <x-responsive-nav-link
+                :href="route('reports.index')"
+                :active="request()->routeIs('reports.*', 'labels.*')"
+            >Reports</x-responsive-nav-link>
+            <x-responsive-nav-link
+                :href="route('data.index')"
+                :active="request()->routeIs('data.*', 'locations.*', 'manufacturers.*', 'item-types.*', 'custom-field-sets.*', 'files.*', 'connection-types.*')"
+            >Data</x-responsive-nav-link>
             @feature('rigging')
-                <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Rigging</div>
-                <x-responsive-nav-link :href="route('rigging.events.index')" :active="request()->routeIs('rigging.events.*')">Rig Events</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('rigging.calculators.index')" :active="request()->routeIs('rigging.calculators.*')">Calculators</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('rigging.index')" :active="request()->routeIs('rigging.*')">Rigging</x-responsive-nav-link>
             @endfeature
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
@@ -191,14 +172,7 @@
             >Help</x-responsive-nav-link>
 
             @role('admin')
-                <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Admin</div>
-                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">Manage users</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.export-columns.edit')" :active="request()->routeIs('admin.export-columns.*')">Export columns</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.storage.edit')" :active="request()->routeIs('admin.storage.*')">Storage</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.sso.edit')" :active="request()->routeIs('admin.sso.*')">SSO</x-responsive-nav-link>
-                @feature('email_integration')
-                    <x-responsive-nav-link :href="route('admin.email.edit')" :active="request()->routeIs('admin.email.*')">Email</x-responsive-nav-link>
-                @endfeature
+                <x-responsive-nav-link :href="route('admin.index')" :active="request()->routeIs('admin.*')">Admin</x-responsive-nav-link>
             @endrole
 
             @feature('email_integration')

@@ -37,6 +37,16 @@ class ItemType extends Model
 
     protected static function booted(): void
     {
+        static::created(function (ItemType $itemType): void {
+            ItemTypeAlias::forgetMatching($itemType->name, $itemType->slug);
+        });
+
+        static::updated(function (ItemType $itemType): void {
+            if ($itemType->wasChanged(['name', 'slug'])) {
+                ItemTypeAlias::forgetMatching($itemType->name, $itemType->slug);
+            }
+        });
+
         static::deleting(function (ItemType $itemType): void {
             app(FileAttachmentService::class)->detachAll($itemType);
         });
@@ -50,6 +60,11 @@ class ItemType extends Model
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class);
+    }
+
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(ItemTypeAlias::class)->orderBy('former_name');
     }
 
     public function interfaceTemplates(): HasMany

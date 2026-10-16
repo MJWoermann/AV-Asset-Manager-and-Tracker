@@ -110,6 +110,8 @@
             <?php echo $__env->make('assets.partials.connections', [
                 'asset' => $asset,
                 'connectionPeers' => $connectionPeers ?? collect(),
+                'busMemberships' => $busMemberships ?? collect(),
+                'connectionBusesByType' => $connectionBusesByType ?? [],
                 'connectionTypes' => $connectionTypes ?? collect(),
                 'peerAssetOptions' => $peerAssetOptions ?? [],
                 'canApplyInterfaceTemplates' => $canApplyInterfaceTemplates ?? false,
@@ -380,6 +382,28 @@
                                             <?php if(! empty($vals['label'])): ?>
                                                 — <?php echo e($vals['label']); ?>
 
+                                            <?php endif; ?>
+                                        </span>
+                                    <?php elseif($log->action === 'bus_joined'): ?>
+                                        <?php $vals = $log->new_values ?? []; ?>
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Joined bus <?php echo e($vals['bus_name'] ?? '—'); ?>
+
+                                            via <?php echo e($vals['local_interface'] ?? '—'); ?>
+
+                                            <?php if(! empty($vals['connection_type'])): ?>
+                                                (<?php echo e($vals['connection_type']); ?>)
+                                            <?php endif; ?>
+                                        </span>
+                                    <?php elseif($log->action === 'bus_left'): ?>
+                                        <?php $vals = $log->old_values ?? []; ?>
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Left bus <?php echo e($vals['bus_name'] ?? '—'); ?>
+
+                                            via <?php echo e($vals['local_interface'] ?? '—'); ?>
+
+                                            <?php if(! empty($vals['connection_type'])): ?>
+                                                (<?php echo e($vals['connection_type']); ?>)
                                             <?php endif; ?>
                                         </span>
                                     <?php else: ?>

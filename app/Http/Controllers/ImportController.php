@@ -34,7 +34,9 @@ class ImportController extends Controller
 
         try {
             // Prefer the persisted storage path so Excel does not depend on the PHP upload temp file.
-            $columns = $this->imports->readHeadingColumns(Storage::path($path));
+            $absolutePath = Storage::path($path);
+            $columns = $this->imports->readHeadingColumns($absolutePath);
+            $columnExamples = $this->imports->readColumnExamples($absolutePath, $columns);
         } catch (ValidationException $e) {
             Storage::delete($path);
 
@@ -53,7 +55,9 @@ class ImportController extends Controller
 
         return view('import.map', [
             'columns' => $columns,
+            'columnExamples' => $columnExamples,
             'fields' => ImportService::ASSET_FIELDS,
+            'fieldOptions' => $this->imports->fieldOptionsForMapping(),
             'createNewField' => ImportService::CREATE_NEW_FIELD,
             'suggestedMappings' => $suggestedMappings,
             'usedRememberedMappings' => $previous !== [],

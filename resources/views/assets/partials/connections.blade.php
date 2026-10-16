@@ -1,15 +1,22 @@
 @php
     $allowsProtocolByType = $connectionTypes->mapWithKeys(fn ($type) => [(string) $type->id => (bool) $type->allows_protocol])->all();
+    $allowsBusByType = $connectionTypes->mapWithKeys(fn ($type) => [(string) $type->id => (bool) $type->allows_bus])->all();
     $localInterfacesPayload = $asset->interfaces->map(fn ($interface) => [
         'id' => (string) $interface->id,
         'name' => $interface->name,
         'connection_type_id' => $interface->connection_type_id ? (string) $interface->connection_type_id : null,
+        'on_bus' => $interface->currentBus() !== null,
     ])->values()->all();
+    $busCapableInterfaces = $asset->interfaces->filter(
+        fn ($interface) => $interface->connectionType?->allows_bus && $interface->currentBus() === null
+    );
 @endphp
 
 <div class="space-y-8" x-data="assetConnectionsForm(@js([
     'peerInterfacesUrl' => route('assets.peer-interfaces', [$asset, 'peer' => '__PEER__']),
     'allowsProtocolByType' => $allowsProtocolByType,
+    'allowsBusByType' => $allowsBusByType,
+    'busesByType' => $connectionBusesByType ?? [],
     'localInterfaces' => $localInterfacesPayload,
     'peerAssets' => $peerAssetOptions,
     'old' => [
@@ -18,6 +25,12 @@
         'peer_interface_id' => old('peer_interface_id') ? (string) old('peer_interface_id') : '',
         'new_peer_interface_name' => old('new_peer_interface_name', ''),
         'create_peer_interface' => old('new_peer_interface_name') ? true : false,
+        'bus_local_interface_id' => old('local_interface_id') && old('new_bus_name', old('connection_bus_id'))
+            ? (string) old('local_interface_id')
+            : '',
+        'connection_bus_id' => old('connection_bus_id') ? (string) old('connection_bus_id') : '',
+        'new_bus_name' => old('new_bus_name', ''),
+        'create_new_bus' => old('new_bus_name') ? true : false,
     ],
 ]))">
     @if (session('status'))
@@ -115,7 +128,7 @@
     <section class="space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <h3 class="font-semibold text-lg">Connections</h3>
-            @if($connectionPeers->isNotEmpty())
+            @if($connectionPeers->isNotEmpty() || ($busMemberships ?? collect())->isNotEmpty())
                 <a
                     href="{{ route('reports.connection-map', ['asset_id' => $asset->id]) }}"
                     class="text-sm text-brand font-medium"
@@ -317,4 +330,126 @@
             <x-primary-button>Create connection</x-primary-button>
         </form>
     </section>
+
+    @if($connectionTypes->contains(fn ($type) => $type->allows_bus))
+        <section class="space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h3 class="font-semibold text-lg">Device buses</h3>
+                <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                    1-to-many shared buses for types like Dante — join several interfaces onto one bus.
+                </p>
+            </div>
+
+            <div class="space-y-2">
+                @forelse($busMemberships ?? collect() as $row)
+                    @php
+                        /** @var \App\Models\ConnectionBus $bus */
+                        $bus = $row['bus'];
+                        $local = $row['local_interface'];
+                        $members = $row['members'];
+                        $type = $bus->connectionType;
+                    @endphp
+                    <div class="bg-white dark:bg-brand-slate border p-4 flex flex-wrap justify-between gap-3 items-start">
+                        <div class="min-w-0 space-y-1">
+                            <div class="flex items-center gap-2 text-sm">
+                                <span class="inline-block h-3 w-3 rounded-sm" style="background-color: {{ $type?->color ?? '#64748b' }}"></span>
+                                <x-connection-type-icon :icon="$type?->icon ?? 'generic'" class="h-4 w-4" />
+                                <span class="font-medium">{{ $bus->name }}</span>
+                                <span class="text-brand-charcoal dark:text-brand-silver">({{ $type?->name ?? 'Bus' }})</span>
+                            </div>
+                            <p class="text-sm">
+                                Local: {{ $local->name }}
+                            </p>
+                            @if($members->isNotEmpty())
+                                <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                                    Also on this bus:
+                                    @foreach($members as $member)
+                                        @if($member->asset)
+                                            <a href="{{ route('assets.show', [$member->asset, 'tab' => 'connections']) }}" class="text-brand font-medium">{{ $member->asset->name }}</a>/{{ $member->name }}@if(! $loop->last), @endif
+                                        @endif
+                                    @endforeach
+                                </p>
+                            @else
+                                <p class="text-xs text-brand-charcoal dark:text-brand-silver">No other members yet.</p>
+                            @endif
+                        </div>
+                        <form method="POST" action="{{ route('assets.interfaces.bus.destroy', [$asset, $local]) }}" onsubmit="return confirm('Leave this device bus?')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-sm text-red-600">Leave</button>
+                        </form>
+                    </div>
+                @empty
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">Not on any device buses yet.</p>
+                @endforelse
+            </div>
+
+            @if($busCapableInterfaces->isNotEmpty())
+                <form method="POST" action="{{ route('assets.buses.store', $asset) }}" class="bg-white dark:bg-brand-slate border p-4 space-y-3">
+                    @csrf
+                    <h4 class="text-sm font-semibold">Join device bus</h4>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <x-input-label for="bus_local_interface_id" value="Local interface" />
+                            <select
+                                id="bus_local_interface_id"
+                                name="local_interface_id"
+                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                required
+                                x-model="busLocalInterfaceId"
+                                @change="onBusLocalInterfaceChange()"
+                            >
+                                <option value="">Select…</option>
+                                @foreach($busCapableInterfaces as $interface)
+                                    <option value="{{ $interface->id }}">
+                                        {{ $interface->name }}@if($interface->connectionType) ({{ $interface->connectionType->name }})@endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div x-show="busLocalInterfaceId" x-cloak>
+                            <x-input-label for="connection_bus_id" value="Existing bus" />
+                            <select
+                                id="connection_bus_id"
+                                name="connection_bus_id"
+                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                x-model="connectionBusId"
+                                :disabled="createNewBus"
+                                :required="Boolean(busLocalInterfaceId) && !createNewBus"
+                            >
+                                <option value="">Select…</option>
+                                <template x-for="bus in availableBuses" :key="bus.id">
+                                    <option :value="bus.id" x-text="bus.name + ' (' + bus.member_count + ')'"></option>
+                                </template>
+                            </select>
+                            <label class="mt-2 flex items-center gap-2 text-sm">
+                                <input type="checkbox" x-model="createNewBus" @change="onCreateNewBusToggle()">
+                                <span>Create new bus</span>
+                            </label>
+                            <div class="mt-2" x-show="createNewBus" x-cloak>
+                                <x-input-label for="new_bus_name" value="New bus name" />
+                                <input
+                                    type="text"
+                                    id="new_bus_name"
+                                    name="new_bus_name"
+                                    class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                    x-model="newBusName"
+                                    :required="createNewBus"
+                                    :disabled="!createNewBus"
+                                    placeholder="e.g. FOH Dante"
+                                >
+                            </div>
+                        </div>
+                        <div class="sm:col-span-2" x-show="createNewBus" x-cloak>
+                            <x-input-label for="bus_notes" value="Notes (optional)" />
+                            <textarea id="bus_notes" name="notes" rows="2" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">{{ old('notes') }}</textarea>
+                        </div>
+                    </div>
+
+                    <x-primary-button>Join bus</x-primary-button>
+                </form>
+            @endif
+        </section>
+    @endif
 </div>

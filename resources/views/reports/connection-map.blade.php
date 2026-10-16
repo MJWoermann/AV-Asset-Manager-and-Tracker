@@ -139,13 +139,23 @@
                         <div class="space-y-2 text-sm">
                             <p class="font-medium" x-text="selection.name || selection.label"></p>
                             <p
+                                x-show="selection.node_kind === 'bus'"
+                                class="text-xs text-brand-charcoal dark:text-brand-silver"
+                            >Device bus</p>
+                            <p
+                                x-show="selection.node_kind === 'bus' && selection.member_count != null"
+                                class="text-brand-charcoal dark:text-brand-silver"
+                            >
+                                Members: <span x-text="selection.member_count"></span>
+                            </p>
+                            <p
                                 x-show="display.popupTypeName && selection.type_name"
                                 class="text-brand-charcoal dark:text-brand-silver"
                             >
                                 Type: <span x-text="selection.type_name"></span>
                             </p>
                             <p
-                                x-show="display.popupItemType || display.popupLocation"
+                                x-show="selection.node_kind !== 'bus' && (display.popupItemType || display.popupLocation)"
                                 class="text-brand-charcoal dark:text-brand-silver"
                             >
                                 <span x-show="display.popupItemType" x-text="selection.item_type || '—'"></span>
@@ -181,7 +191,10 @@
                                         <a :href="selection.asset_a_url" class="text-brand" x-text="selection.asset_a_name"></a>
                                         / <span x-text="selection.interface_a"></span>
                                     </p>
-                                    <p>
+                                    <p x-show="selection.is_bus">
+                                        Bus: <span x-text="selection.interface_b"></span>
+                                    </p>
+                                    <p x-show="!selection.is_bus">
                                         <a :href="selection.asset_b_url" class="text-brand" x-text="selection.asset_b_name"></a>
                                         / <span x-text="selection.interface_b"></span>
                                     </p>

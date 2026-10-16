@@ -6,6 +6,7 @@ use Database\Factories\AssetInterfaceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssetInterface extends Model
@@ -58,6 +59,24 @@ class AssetInterface extends Model
     public function connectionsAsB(): HasMany
     {
         return $this->hasMany(AssetConnection::class, 'interface_b_id');
+    }
+
+    public function buses(): BelongsToMany
+    {
+        return $this->belongsToMany(ConnectionBus::class, 'connection_bus_members')
+            ->withTimestamps();
+    }
+
+    /**
+     * An interface belongs to at most one device bus.
+     */
+    public function currentBus(): ?ConnectionBus
+    {
+        if ($this->relationLoaded('buses')) {
+            return $this->buses->first();
+        }
+
+        return $this->buses()->first();
     }
 
     public function isFromTemplate(): bool

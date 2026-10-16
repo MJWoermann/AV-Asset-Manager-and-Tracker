@@ -14,15 +14,18 @@
                 {{ $manufacturer->assets_count }} asset{{ $manufacturer->assets_count === 1 ? '' : 's' }})
             </span>
         </div>
-        <div class="flex items-center gap-3 shrink-0">
+        <div class="flex items-center gap-2 shrink-0">
             <a
                 href="{{ route('assets.index', ['manufacturer_id' => $manufacturer->id]) }}"
                 class="text-sm text-brand"
             >Assets</a>
             @role('admin|inventory_manager')
+                <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="{{ route('manufacturers.models.create', $manufacturer) }}" class="text-sm text-brand">Add model</a>
+                <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="{{ route('manufacturers.edit', $manufacturer) }}" class="text-sm text-brand">Edit</a>
                 @if($replacementManufacturers->where('id', '!=', $manufacturer->id)->isNotEmpty())
+                    <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                     <button
                         type="button"
                         class="text-sm text-red-700"

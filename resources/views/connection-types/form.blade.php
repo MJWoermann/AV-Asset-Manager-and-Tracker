@@ -130,6 +130,15 @@
                 Allow free-text protocol on connections
             </label>
 
+            <label class="inline-flex items-start gap-2 text-sm">
+                <input type="hidden" name="allows_bus" value="0">
+                <input type="checkbox" name="allows_bus" value="1" class="mt-0.5 rounded text-brand" @checked(old('allows_bus', $connectionType->allows_bus))>
+                <span>
+                    Allow device bus (1-to-many)
+                    <span class="block text-xs text-brand-charcoal dark:text-brand-silver">Join many interfaces of this type onto a shared bus (e.g. Dante).</span>
+                </span>
+            </label>
+
             <div class="flex flex-wrap items-center gap-3">
                 <x-primary-button>Save</x-primary-button>
                 <a href="{{ route('connection-types.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>

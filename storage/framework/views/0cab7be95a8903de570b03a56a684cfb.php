@@ -1,15 +1,22 @@
 <?php
     $allowsProtocolByType = $connectionTypes->mapWithKeys(fn ($type) => [(string) $type->id => (bool) $type->allows_protocol])->all();
+    $allowsBusByType = $connectionTypes->mapWithKeys(fn ($type) => [(string) $type->id => (bool) $type->allows_bus])->all();
     $localInterfacesPayload = $asset->interfaces->map(fn ($interface) => [
         'id' => (string) $interface->id,
         'name' => $interface->name,
         'connection_type_id' => $interface->connection_type_id ? (string) $interface->connection_type_id : null,
+        'on_bus' => $interface->currentBus() !== null,
     ])->values()->all();
+    $busCapableInterfaces = $asset->interfaces->filter(
+        fn ($interface) => $interface->connectionType?->allows_bus && $interface->currentBus() === null
+    );
 ?>
 
 <div class="space-y-8" x-data="assetConnectionsForm(<?php echo \Illuminate\Support\Js::from([
     'peerInterfacesUrl' => route('assets.peer-interfaces', [$asset, 'peer' => '__PEER__']),
     'allowsProtocolByType' => $allowsProtocolByType,
+    'allowsBusByType' => $allowsBusByType,
+    'busesByType' => $connectionBusesByType ?? [],
     'localInterfaces' => $localInterfacesPayload,
     'peerAssets' => $peerAssetOptions,
     'old' => [
@@ -18,6 +25,12 @@
         'peer_interface_id' => old('peer_interface_id') ? (string) old('peer_interface_id') : '',
         'new_peer_interface_name' => old('new_peer_interface_name', ''),
         'create_peer_interface' => old('new_peer_interface_name') ? true : false,
+        'bus_local_interface_id' => old('local_interface_id') && old('new_bus_name', old('connection_bus_id'))
+            ? (string) old('local_interface_id')
+            : '',
+        'connection_bus_id' => old('connection_bus_id') ? (string) old('connection_bus_id') : '',
+        'new_bus_name' => old('new_bus_name', ''),
+        'create_new_bus' => old('new_bus_name') ? true : false,
     ],
 ])->toHtml() ?>)">
     <?php if(session('status')): ?>
@@ -264,7 +277,7 @@
     <section class="space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <h3 class="font-semibold text-lg">Connections</h3>
-            <?php if($connectionPeers->isNotEmpty()): ?>
+            <?php if($connectionPeers->isNotEmpty() || ($busMemberships ?? collect())->isNotEmpty()): ?>
                 <a
                     href="<?php echo e(route('reports.connection-map', ['asset_id' => $asset->id])); ?>"
                     class="text-sm text-brand font-medium"
@@ -678,5 +691,241 @@
 <?php endif; ?>
         </form>
     </section>
+
+    <?php if($connectionTypes->contains(fn ($type) => $type->allows_bus)): ?>
+        <section class="space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h3 class="font-semibold text-lg">Device buses</h3>
+                <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                    1-to-many shared buses for types like Dante — join several interfaces onto one bus.
+                </p>
+            </div>
+
+            <div class="space-y-2">
+                <?php $__empty_1 = true; $__currentLoopData = $busMemberships ?? collect(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php
+                        /** @var \App\Models\ConnectionBus $bus */
+                        $bus = $row['bus'];
+                        $local = $row['local_interface'];
+                        $members = $row['members'];
+                        $type = $bus->connectionType;
+                    ?>
+                    <div class="bg-white dark:bg-brand-slate border p-4 flex flex-wrap justify-between gap-3 items-start">
+                        <div class="min-w-0 space-y-1">
+                            <div class="flex items-center gap-2 text-sm">
+                                <span class="inline-block h-3 w-3 rounded-sm" style="background-color: <?php echo e($type?->color ?? '#64748b'); ?>"></span>
+                                <?php if (isset($component)) { $__componentOriginalfea741d9327fe7b55315608624860d68 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalfea741d9327fe7b55315608624860d68 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.connection-type-icon','data' => ['icon' => $type?->icon ?? 'generic','class' => 'h-4 w-4']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('connection-type-icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['icon' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($type?->icon ?? 'generic'),'class' => 'h-4 w-4']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalfea741d9327fe7b55315608624860d68)): ?>
+<?php $attributes = $__attributesOriginalfea741d9327fe7b55315608624860d68; ?>
+<?php unset($__attributesOriginalfea741d9327fe7b55315608624860d68); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalfea741d9327fe7b55315608624860d68)): ?>
+<?php $component = $__componentOriginalfea741d9327fe7b55315608624860d68; ?>
+<?php unset($__componentOriginalfea741d9327fe7b55315608624860d68); ?>
+<?php endif; ?>
+                                <span class="font-medium"><?php echo e($bus->name); ?></span>
+                                <span class="text-brand-charcoal dark:text-brand-silver">(<?php echo e($type?->name ?? 'Bus'); ?>)</span>
+                            </div>
+                            <p class="text-sm">
+                                Local: <?php echo e($local->name); ?>
+
+                            </p>
+                            <?php if($members->isNotEmpty()): ?>
+                                <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                                    Also on this bus:
+                                    <?php $__currentLoopData = $members; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $member): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <?php if($member->asset): ?>
+                                            <a href="<?php echo e(route('assets.show', [$member->asset, 'tab' => 'connections'])); ?>" class="text-brand font-medium"><?php echo e($member->asset->name); ?></a>/<?php echo e($member->name); ?><?php if(! $loop->last): ?>, <?php endif; ?>
+                                        <?php endif; ?>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </p>
+                            <?php else: ?>
+                                <p class="text-xs text-brand-charcoal dark:text-brand-silver">No other members yet.</p>
+                            <?php endif; ?>
+                        </div>
+                        <form method="POST" action="<?php echo e(route('assets.interfaces.bus.destroy', [$asset, $local])); ?>" onsubmit="return confirm('Leave this device bus?')">
+                            <?php echo csrf_field(); ?>
+                            <?php echo method_field('DELETE'); ?>
+                            <button type="submit" class="text-sm text-red-600">Leave</button>
+                        </form>
+                    </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">Not on any device buses yet.</p>
+                <?php endif; ?>
+            </div>
+
+            <?php if($busCapableInterfaces->isNotEmpty()): ?>
+                <form method="POST" action="<?php echo e(route('assets.buses.store', $asset)); ?>" class="bg-white dark:bg-brand-slate border p-4 space-y-3">
+                    <?php echo csrf_field(); ?>
+                    <h4 class="text-sm font-semibold">Join device bus</h4>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'bus_local_interface_id','value' => 'Local interface']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['for' => 'bus_local_interface_id','value' => 'Local interface']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                            <select
+                                id="bus_local_interface_id"
+                                name="local_interface_id"
+                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                required
+                                x-model="busLocalInterfaceId"
+                                @change="onBusLocalInterfaceChange()"
+                            >
+                                <option value="">Select…</option>
+                                <?php $__currentLoopData = $busCapableInterfaces; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $interface): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($interface->id); ?>">
+                                        <?php echo e($interface->name); ?><?php if($interface->connectionType): ?> (<?php echo e($interface->connectionType->name); ?>)<?php endif; ?>
+                                    </option>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </select>
+                        </div>
+                        <div x-show="busLocalInterfaceId" x-cloak>
+                            <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'connection_bus_id','value' => 'Existing bus']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['for' => 'connection_bus_id','value' => 'Existing bus']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                            <select
+                                id="connection_bus_id"
+                                name="connection_bus_id"
+                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                x-model="connectionBusId"
+                                :disabled="createNewBus"
+                                :required="Boolean(busLocalInterfaceId) && !createNewBus"
+                            >
+                                <option value="">Select…</option>
+                                <template x-for="bus in availableBuses" :key="bus.id">
+                                    <option :value="bus.id" x-text="bus.name + ' (' + bus.member_count + ')'"></option>
+                                </template>
+                            </select>
+                            <label class="mt-2 flex items-center gap-2 text-sm">
+                                <input type="checkbox" x-model="createNewBus" @change="onCreateNewBusToggle()">
+                                <span>Create new bus</span>
+                            </label>
+                            <div class="mt-2" x-show="createNewBus" x-cloak>
+                                <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'new_bus_name','value' => 'New bus name']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['for' => 'new_bus_name','value' => 'New bus name']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                                <input
+                                    type="text"
+                                    id="new_bus_name"
+                                    name="new_bus_name"
+                                    class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                    x-model="newBusName"
+                                    :required="createNewBus"
+                                    :disabled="!createNewBus"
+                                    placeholder="e.g. FOH Dante"
+                                >
+                            </div>
+                        </div>
+                        <div class="sm:col-span-2" x-show="createNewBus" x-cloak>
+                            <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'bus_notes','value' => 'Notes (optional)']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['for' => 'bus_notes','value' => 'Notes (optional)']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                            <textarea id="bus_notes" name="notes" rows="2" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"><?php echo e(old('notes')); ?></textarea>
+                        </div>
+                    </div>
+
+                    <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('primary-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>Join bus <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginald411d1792bd6cc877d687758b753742c)): ?>
+<?php $attributes = $__attributesOriginald411d1792bd6cc877d687758b753742c; ?>
+<?php unset($__attributesOriginald411d1792bd6cc877d687758b753742c); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginald411d1792bd6cc877d687758b753742c)): ?>
+<?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
+<?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
+<?php endif; ?>
+                </form>
+            <?php endif; ?>
+        </section>
+    <?php endif; ?>
 </div>
 <?php /**PATH C:\Users\MatthewWoermann\Software Projects\AV-Asset-Manager-and-Tracker\resources\views/assets/partials/connections.blade.php ENDPATH**/ ?>

@@ -44,7 +44,7 @@ class ManufacturerModelController extends Controller
     {
         abort_unless($manufacturerModel->manufacturer_id === $manufacturer->id, 404);
 
-        $manufacturerModel->load('interfaceTemplates');
+        $manufacturerModel->load(['interfaceTemplates', 'aliases']);
 
         $replacementModels = ManufacturerModel::query()
             ->with('manufacturer:id,name')

@@ -101,6 +101,8 @@
             @include('assets.partials.connections', [
                 'asset' => $asset,
                 'connectionPeers' => $connectionPeers ?? collect(),
+                'busMemberships' => $busMemberships ?? collect(),
+                'connectionBusesByType' => $connectionBusesByType ?? [],
                 'connectionTypes' => $connectionTypes ?? collect(),
                 'peerAssetOptions' => $peerAssetOptions ?? [],
                 'canApplyInterfaceTemplates' => $canApplyInterfaceTemplates ?? false,
@@ -219,6 +221,24 @@
                                             @endif
                                             @if(! empty($vals['label']))
                                                 — {{ $vals['label'] }}
+                                            @endif
+                                        </span>
+                                    @elseif($log->action === 'bus_joined')
+                                        @php $vals = $log->new_values ?? []; @endphp
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Joined bus {{ $vals['bus_name'] ?? '—' }}
+                                            via {{ $vals['local_interface'] ?? '—' }}
+                                            @if(! empty($vals['connection_type']))
+                                                ({{ $vals['connection_type'] }})
+                                            @endif
+                                        </span>
+                                    @elseif($log->action === 'bus_left')
+                                        @php $vals = $log->old_values ?? []; @endphp
+                                        <span class="text-brand-charcoal dark:text-brand-silver">
+                                            Left bus {{ $vals['bus_name'] ?? '—' }}
+                                            via {{ $vals['local_interface'] ?? '—' }}
+                                            @if(! empty($vals['connection_type']))
+                                                ({{ $vals['connection_type'] }})
                                             @endif
                                         </span>
                                     @else

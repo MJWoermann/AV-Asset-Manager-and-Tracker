@@ -9,6 +9,7 @@ use App\Models\Asset;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\CustomFieldDefinition;
+use App\Models\CustomFieldSet;
 use App\Models\File;
 use App\Models\ItemType;
 use App\Models\Location;
@@ -143,7 +144,74 @@ class ImportAssetTest extends TestCase
         $response->assertSee('Location: Level');
         $response->assertSee('Location: Room');
         $response->assertSee('Location: Rack');
-        $response->assertSee('Create new field (Imported-Field:');
+        $response->assertSee('data-import-mapper', false);
+        $response->assertSee('importMappingSelect', false);
+        $response->assertSee('custom field sets are enabled on item types', false);
+    }
+
+    public function test_mapping_step_shows_column_examples_and_marks_empty_columns(): void
+    {
+        Storage::fake('local');
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
+            'Name,Type,Notes,Unused',
+            'Speaker A,Audio,,',
+            ',Lighting,Backline note,',
+        ]));
+
+        $response = $this->actingAs($this->manager())
+            ->post(route('import.upload'), ['file' => $csv]);
+
+        $response->assertOk();
+        $response->assertSee('e.g. Speaker A', false);
+        $response->assertSee('e.g. Audio', false);
+        $response->assertSee('e.g. Backline note', false);
+        $response->assertSee('empty column', false);
+
+        /** @var array<string, string|null> $examples */
+        $examples = $response->viewData('columnExamples');
+        $this->assertSame('Speaker A', $examples['name']);
+        $this->assertSame('Audio', $examples['type']);
+        $this->assertSame('Backline note', $examples['notes']);
+        $this->assertArrayHasKey('unused', $examples);
+        $this->assertNull($examples['unused']);
+    }
+
+    public function test_mapping_step_exposes_existing_custom_field_options(): void
+    {
+        Storage::fake('local');
+
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Network Details',
+            'slug' => 'network-details',
+        ]);
+        $definition = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Host Colour',
+            'slug' => 'host-colour',
+            'type' => 'text',
+            'sort_order' => 0,
+        ]);
+        $spacer = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Layout spacer',
+            'slug' => 'layout-spacer',
+            'type' => 'spacer',
+            'sort_order' => 1,
+        ]);
+
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', "Name,Type,Colour\nA,Audio,Red\n");
+
+        $response = $this->actingAs($this->manager())
+            ->post(route('import.upload'), ['file' => $csv]);
+
+        $response->assertOk();
+        $response->assertSee('Network Details: Host Colour', false);
+
+        /** @var list<array{value: string, label: string}> $fieldOptions */
+        $fieldOptions = $response->viewData('fieldOptions');
+        $values = collect($fieldOptions)->pluck('value')->all();
+        $this->assertContains(ImportService::CUSTOM_FIELD_PREFIX.$definition->id, $values);
+        $this->assertNotContains(ImportService::CUSTOM_FIELD_PREFIX.$spacer->id, $values);
     }
 
     public function test_prepare_rejects_duplicate_target_field_mapping(): void
@@ -163,6 +231,95 @@ class ImportAssetTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors();
+    }
+
+    public function test_prepare_rejects_duplicate_custom_field_mapping(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Looks',
+            'slug' => 'looks',
+        ]);
+        $definition = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Colour',
+            'slug' => 'colour',
+            'type' => 'text',
+            'sort_order' => 0,
+        ]);
+        $mappingKey = ImportService::CUSTOM_FIELD_PREFIX.$definition->id;
+
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', "Name,Type,Colour,AltColour\nA,Audio,Red,Blue\n");
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+
+        $response = $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Name' => 'name',
+                'Type' => 'item_type',
+                'Colour' => $mappingKey,
+                'AltColour' => $mappingKey,
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('mapping.AltColour');
+    }
+
+    public function test_import_writes_mapped_custom_field_and_attaches_missing_set(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Looks',
+            'slug' => 'looks',
+        ]);
+        $definition = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Colour',
+            'slug' => 'colour',
+            'type' => 'text',
+            'sort_order' => 0,
+        ]);
+        $itemType = ItemType::create([
+            'name' => 'Audio Equipment',
+            'slug' => 'audio-equipment',
+        ]);
+        $this->assertFalse($itemType->fieldSets()->where('custom_field_sets.id', $fieldSet->id)->exists());
+
+        $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
+            'Name,Type,Colour',
+            'Console One,Audio Equipment,Red',
+        ]));
+
+        $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
+
+        $prepare = $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'Name' => 'name',
+                'Type' => 'item_type',
+                'Colour' => ImportService::CUSTOM_FIELD_PREFIX.$definition->id,
+            ],
+        ]);
+        $prepare->assertOk();
+
+        $process = $this->actingAs($user)->post(route('import.process'), [
+            'bulk_action' => 'update',
+        ]);
+        $process->assertRedirect(route('assets.index'));
+
+        $asset = Asset::query()->where('name', 'Console One')->first();
+        $this->assertNotNull($asset);
+        $this->assertDatabaseHas('asset_custom_field_values', [
+            'asset_id' => $asset->id,
+            'custom_field_definition_id' => $definition->id,
+            'value' => 'Red',
+        ]);
+        $this->assertTrue(
+            $itemType->fresh()->fieldSets()->where('custom_field_sets.id', $fieldSet->id)->exists()
+        );
     }
 
     public function test_subsequent_upload_prefers_previous_column_mappings(): void

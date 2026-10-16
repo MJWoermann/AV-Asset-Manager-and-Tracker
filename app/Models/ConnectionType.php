@@ -19,6 +19,7 @@ class ConnectionType extends Model
         'color',
         'icon',
         'allows_protocol',
+        'allows_bus',
         'sort_order',
     ];
 
@@ -26,6 +27,7 @@ class ConnectionType extends Model
     {
         return [
             'allows_protocol' => 'boolean',
+            'allows_bus' => 'boolean',
             'sort_order' => 'integer',
         ];
     }
@@ -33,6 +35,11 @@ class ConnectionType extends Model
     public function connections(): HasMany
     {
         return $this->hasMany(AssetConnection::class);
+    }
+
+    public function buses(): HasMany
+    {
+        return $this->hasMany(ConnectionBus::class);
     }
 
     public function interfaces(): HasMany

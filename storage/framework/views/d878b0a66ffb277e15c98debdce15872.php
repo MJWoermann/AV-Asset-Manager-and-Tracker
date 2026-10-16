@@ -75,16 +75,28 @@ unset($__defined_vars, $__key, $__value); ?>
                     <input type="checkbox" name="clear_parent" value="1" x-model="fields.clear_parent" @change="if (fields.clear_parent) fields.update_parent = false">
                     <span>Clear parent</span>
                 </label>
-                <select
-                    name="parent_id"
-                    class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                    :disabled="!fields.update_parent"
-                >
-                    <option value="">—</option>
-                    <?php $__currentLoopData = $parents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $parent): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($parent->id); ?>"><?php echo e($parent->breadcrumb()); ?></option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                </select>
+                <div x-bind:class="!fields.update_parent ? 'pointer-events-none opacity-50' : ''">
+                    <?php if (isset($component)) { $__componentOriginal93f56a9791a1857c74a51e0e80d6e731 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal93f56a9791a1857c74a51e0e80d6e731 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.searchable-select','data' => ['name' => 'parent_id','id' => 'bulk_location_parent_id','options' => $parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->breadcrumb()]),'nullable' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('searchable-select'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'parent_id','id' => 'bulk_location_parent_id','options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->breadcrumb()])),'nullable' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal93f56a9791a1857c74a51e0e80d6e731)): ?>
+<?php $attributes = $__attributesOriginal93f56a9791a1857c74a51e0e80d6e731; ?>
+<?php unset($__attributesOriginal93f56a9791a1857c74a51e0e80d6e731); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal93f56a9791a1857c74a51e0e80d6e731)): ?>
+<?php $component = $__componentOriginal93f56a9791a1857c74a51e0e80d6e731; ?>
+<?php unset($__componentOriginal93f56a9791a1857c74a51e0e80d6e731); ?>
+<?php endif; ?>
+                </div>
                 <p class="text-xs text-brand-charcoal dark:text-brand-silver">
                     Use “Merge same names” to combine selected locations that share a name. Assets on duplicates move to the kept location.
                 </p>

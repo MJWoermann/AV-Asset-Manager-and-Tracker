@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminHubController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\Admin\ExportColumnController;
 use App\Http\Controllers\Admin\InboundEmailActionController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Admin\SsoSettingsController;
 use App\Http\Controllers\Admin\StorageController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AssetColumnPreferenceController;
+use App\Http\Controllers\AssetConnectionBusController;
 use App\Http\Controllers\AssetConnectionController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetInterfaceController;
@@ -25,6 +27,7 @@ use App\Http\Controllers\ConnectionTypeController;
 use App\Http\Controllers\CustomFieldSetController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardModulePreferenceController;
+use App\Http\Controllers\DataHubController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\GuestStockController;
@@ -105,6 +108,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
         Route::delete('/files/{file}', [FileController::class, 'destroy'])->name('files.destroy');
     });
 
+    Route::get('/data', [DataHubController::class, 'index'])->name('data.index');
     Route::get('/locations', [LocationController::class, 'index'])->name('locations.index');
     Route::get('/manufacturers', [ManufacturerController::class, 'index'])->name('manufacturers.index');
     Route::middleware('role:admin,inventory_manager')->group(function () {
@@ -146,6 +150,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::post('/scan/{scan}', [ScanController::class, 'scan'])->name('scan.scan');
     Route::post('/scan/{scan}/close', [ScanController::class, 'close'])->name('scan.close');
 
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/compare', [ReportController::class, 'compareForm'])->name('reports.compare');
     Route::post('/reports/compare', [ReportController::class, 'compare'])->name('reports.compare.run');
     Route::get('/reports/unknown-scans', [UnknownScanController::class, 'index'])->name('reports.unknown-scans');
@@ -168,6 +173,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     });
 
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/', [AdminHubController::class, 'index'])->name('index');
         Route::resource('users', UserController::class)->except(['show']);
         Route::get('/export-columns', [ExportColumnController::class, 'edit'])->name('export-columns.edit');
         Route::put('/export-columns', [ExportColumnController::class, 'update'])->name('export-columns.update');
@@ -223,6 +229,11 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
                 ->name('assets.connections.store');
             Route::delete('/assets/{asset}/connections/{connection}', [AssetConnectionController::class, 'destroy'])
                 ->name('assets.connections.destroy');
+
+            Route::post('/assets/{asset}/buses', [AssetConnectionBusController::class, 'store'])
+                ->name('assets.buses.store');
+            Route::delete('/assets/{asset}/interfaces/{interface}/bus', [AssetConnectionBusController::class, 'destroy'])
+                ->name('assets.interfaces.bus.destroy');
 
             Route::resource('connection-types', ConnectionTypeController::class)->except(['show']);
             Route::post('/item-types/{item_type}/sync-interfaces', [ItemTypeController::class, 'syncMissingInterfaces'])

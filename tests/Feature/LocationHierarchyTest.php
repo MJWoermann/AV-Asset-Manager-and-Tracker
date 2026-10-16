@@ -62,6 +62,71 @@ class LocationHierarchyTest extends TestCase
         $response->assertDontSee('duplicate name', false);
     }
 
+    public function test_locations_index_sorts_siblings_by_room_code_then_name(): void
+    {
+        $user = $this->scanner();
+
+        $site = Location::create([
+            'name' => 'Campus',
+            'room_code' => 'C',
+            'type' => LocationType::Site,
+        ]);
+        Location::create([
+            'name' => 'Beta',
+            'room_code' => 'B-02',
+            'type' => LocationType::Room,
+            'parent_id' => $site->id,
+        ]);
+        Location::create([
+            'name' => 'Alpha',
+            'room_code' => 'A-01',
+            'type' => LocationType::Room,
+            'parent_id' => $site->id,
+        ]);
+        Location::create([
+            'name' => 'Zulu',
+            'room_code' => 'A-01',
+            'type' => LocationType::Room,
+            'parent_id' => $site->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('locations.index'));
+
+        $response->assertOk();
+        $response->assertSeeInOrder([
+            'Campus',
+            'Alpha',
+            'Zulu',
+            'Beta',
+        ]);
+    }
+
+    public function test_locations_index_includes_hierarchy_expand_controls(): void
+    {
+        $user = $this->scanner();
+
+        $room = Location::create([
+            'name' => 'Store A',
+            'type' => LocationType::Room,
+        ]);
+        Location::create([
+            'name' => 'Rack 01',
+            'type' => LocationType::Rack,
+            'parent_id' => $room->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('locations.index'));
+
+        $response->assertOk();
+        $response->assertSee('bulkLocations(', false);
+        $response->assertSee('Expand all', false);
+        $response->assertSee('Collapse all', false);
+        $response->assertSee('Hide racks', false);
+        $response->assertSee('hideRacks(', false);
+        $response->assertSee('data-location-has-racks="1"', false);
+        $response->assertSee('data-location-collapsible="1"', false);
+    }
+
     public function test_locations_index_alternates_row_shades_for_adjacent_same_type_siblings(): void
     {
         $user = $this->scanner();

@@ -6,6 +6,7 @@ use App\Models\Asset;
 use App\Models\AssetConnection;
 use App\Models\AssetInterface;
 use App\Models\AuditLog;
+use App\Models\ConnectionBus;
 use App\Models\ConnectionType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -15,6 +16,8 @@ use InvalidArgumentException;
 
 class AssetConnectionService
 {
+    public function __construct(protected ConnectionBusService $buses) {}
+
     /**
      * Return interface IDs in canonical undirected order (lower id first).
      *
@@ -200,8 +203,20 @@ class AssetConnectionService
             ])
             ->get();
 
+        $buses = $this->buses->filteredBuses($filters)->get();
+
         if ($focusAssetId) {
             $componentAssetIds = $this->connectedAssetIds($connections, $focusAssetId);
+            $componentAssetIds = $this->buses->expandConnectedAssetIds($buses, $componentAssetIds);
+
+            // Re-expand until peer edges and buses stop adding assets.
+            $previousCount = 0;
+            while (count($componentAssetIds) !== $previousCount) {
+                $previousCount = count($componentAssetIds);
+                $componentAssetIds = $this->connectedAssetIds($connections, $focusAssetId, $componentAssetIds);
+                $componentAssetIds = $this->buses->expandConnectedAssetIds($buses, $componentAssetIds);
+            }
+
             $connections = $connections->filter(function (AssetConnection $connection) use ($componentAssetIds): bool {
                 $assetAId = $connection->interfaceA?->asset_id;
                 $assetBId = $connection->interfaceB?->asset_id;
@@ -209,6 +224,12 @@ class AssetConnectionService
                 return $assetAId
                     && $assetBId
                     && isset($componentAssetIds[$assetAId], $componentAssetIds[$assetBId]);
+            })->values();
+
+            $buses = $buses->filter(function (ConnectionBus $bus) use ($componentAssetIds): bool {
+                return $bus->interfaces->contains(
+                    fn (AssetInterface $interface): bool => isset($componentAssetIds[(int) $interface->asset_id])
+                );
             })->values();
         }
 
@@ -230,6 +251,23 @@ class AssetConnectionService
             $assets[$assetB->id] = $assetB;
             $typesByAsset[$assetA->id][$type->id] = $type;
             $typesByAsset[$assetB->id][$type->id] = $type;
+        }
+
+        foreach ($buses as $bus) {
+            $type = $bus->connectionType;
+            if (! $type) {
+                continue;
+            }
+
+            foreach ($bus->interfaces as $interface) {
+                $asset = $interface->asset;
+                if (! $asset) {
+                    continue;
+                }
+
+                $assets[$asset->id] = $asset;
+                $typesByAsset[$asset->id][$type->id] = $type;
+            }
         }
 
         /** @var list<array<string, mixed>> $nodes */
@@ -284,6 +322,67 @@ class AssetConnectionService
                     'asset_b_url' => route('assets.show', [$assetB, 'tab' => 'connections']),
                 ],
             ];
+        }
+
+        foreach ($buses as $bus) {
+            $type = $bus->connectionType;
+            if (! $type) {
+                continue;
+            }
+
+            $busNodeId = 'bus-'.$bus->id;
+            $nodes[] = [
+                'data' => [
+                    'id' => $busNodeId,
+                    'kind' => 'bus',
+                    'bus_id' => $bus->id,
+                    'name' => $bus->name,
+                    'label' => $bus->name,
+                    'type_name' => $type->name,
+                    'connection_type_id' => $type->id,
+                    'color' => $type->color ?: '#64748b',
+                    'icon' => $type->icon ?: 'generic',
+                    'notes' => $bus->notes,
+                    'member_count' => $bus->interfaces->count(),
+                    'url' => null,
+                    'focus' => false,
+                ],
+                'classes' => 'bus',
+            ];
+
+            foreach ($bus->interfaces as $interface) {
+                $asset = $interface->asset;
+                if (! $asset) {
+                    continue;
+                }
+
+                $source = $endpointByAssetType[$asset->id.':'.$type->id] ?? 'asset-'.$asset->id;
+
+                $edges[] = [
+                    'data' => [
+                        'id' => 'bus-'.$bus->id.'-iface-'.$interface->id,
+                        'bus_id' => $bus->id,
+                        'connection_type_id' => $type->id,
+                        'source' => $source,
+                        'target' => $busNodeId,
+                        'label' => $type->name,
+                        'color' => $type->color ?: '#64748b',
+                        'icon' => $type->icon ?: 'generic',
+                        'protocol' => null,
+                        'connection_label' => $bus->name,
+                        'notes' => $bus->notes,
+                        'interface_a' => $interface->name,
+                        'interface_b' => $bus->name,
+                        'asset_a_id' => $asset->id,
+                        'asset_a_name' => $asset->name,
+                        'asset_b_id' => null,
+                        'asset_b_name' => $bus->name,
+                        'asset_a_url' => route('assets.show', [$asset, 'tab' => 'connections']),
+                        'asset_b_url' => null,
+                        'is_bus' => true,
+                    ],
+                ];
+            }
         }
 
         return [
@@ -342,9 +441,10 @@ class AssetConnectionService
      * Asset IDs in the undirected connected component containing $focusAssetId.
      *
      * @param  Collection<int, AssetConnection>  $connections
+     * @param  array<int, true>|null  $seedVisited  Optional seed set (e.g. after expanding buses).
      * @return array<int, true>
      */
-    public function connectedAssetIds(Collection $connections, int $focusAssetId): array
+    public function connectedAssetIds(Collection $connections, int $focusAssetId, ?array $seedVisited = null): array
     {
         /** @var array<int, list<int>> $adjacency */
         $adjacency = [];
@@ -361,12 +461,16 @@ class AssetConnectionService
             $adjacency[(int) $assetBId][] = (int) $assetAId;
         }
 
-        if (! isset($adjacency[$focusAssetId])) {
+        $visited = $seedVisited ?? [$focusAssetId => true];
+        if (! isset($visited[$focusAssetId])) {
+            $visited[$focusAssetId] = true;
+        }
+
+        if ($seedVisited === null && ! isset($adjacency[$focusAssetId])) {
             return [$focusAssetId => true];
         }
 
-        $visited = [$focusAssetId => true];
-        $queue = [$focusAssetId];
+        $queue = array_keys($visited);
 
         while ($queue !== []) {
             $current = array_shift($queue);

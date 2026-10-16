@@ -15,6 +15,11 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ReportController extends Controller
 {
+    public function index(): View
+    {
+        return view('reports.index');
+    }
+
     public function compareForm(): View
     {
         return view('reports.compare', [

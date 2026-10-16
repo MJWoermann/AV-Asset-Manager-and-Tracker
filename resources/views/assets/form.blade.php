@@ -43,6 +43,7 @@
                     'initialMac' => (string) old('mac_address', $asset->mac_address),
                 ]))"
                 @searchable-select-changed="if ($event.detail.name === 'item_type_id') itemTypeId = $event.detail.value"
+                @field-barcode-scanned="if ($event.detail.field === 'mac_address') macAddress = $event.detail.value"
             @endif
         >
             @csrf
@@ -202,24 +203,59 @@
                     'ip_address' => 'IP Address',
                     'mac_address' => 'MAC Address',
                 ] as $field => $label)
-                    <div>
+                    @php
+                        $fieldIsScannable = in_array($field, ['serial_number', 'tp_barcode', 'mac_address'], true);
+                    @endphp
+                    <div
+                        @if($fieldIsScannable)
+                            x-data="fieldBarcodeScanner('{{ $field }}')"
+                            class="space-y-2"
+                        @endif
+                    >
                         <x-input-label :for="$field" :value="$label" />
-                        {{-- Keep @if outside the component tag so Blade compiles it to <input> --}}
-                        @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
-                            <x-text-input
-                                :id="$field"
-                                :name="$field"
-                                class="mt-1 block w-full"
-                                :value="old($field, $asset->{$field})"
-                                x-model="macAddress"
-                            />
-                        @else
-                            <x-text-input
-                                :id="$field"
-                                :name="$field"
-                                class="mt-1 block w-full"
-                                :value="old($field, $asset->{$field})"
-                            />
+                        <div @class(['flex gap-2 items-stretch' => $fieldIsScannable])>
+                            <div @class(['flex-1 min-w-0' => $fieldIsScannable, 'w-full' => ! $fieldIsScannable])>
+                                {{-- Keep @if outside the component tag so Blade compiles it to <input> --}}
+                                @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
+                                    <x-text-input
+                                        :id="$field"
+                                        :name="$field"
+                                        class="mt-1 block w-full"
+                                        :value="old($field, $asset->{$field})"
+                                        x-model="macAddress"
+                                    />
+                                @else
+                                    <x-text-input
+                                        :id="$field"
+                                        :name="$field"
+                                        class="mt-1 block w-full"
+                                        :value="old($field, $asset->{$field})"
+                                    />
+                                @endif
+                            </div>
+                            @if($fieldIsScannable)
+                                <button
+                                    type="button"
+                                    class="mt-1 shrink-0 px-3 py-2 text-sm border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-black text-brand-charcoal dark:text-white hover:border-brand hover:text-brand"
+                                    @click="toggleCamera"
+                                    :aria-pressed="scanning.toString()"
+                                    :aria-label="scanning ? 'Stop camera' : 'Scan barcode into {{ $label }}'"
+                                >
+                                    <span x-text="scanning ? 'Stop' : 'Scan'"></span>
+                                </button>
+                            @endif
+                        </div>
+                        @if($fieldIsScannable)
+                            <div
+                                id="field-qr-{{ $field }}"
+                                class="scan-qr-reader w-full max-h-[28vh] overflow-hidden border border-brand-silver dark:border-brand-charcoal"
+                                x-show="scanning"
+                                x-cloak
+                            ></div>
+                            <p class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="scanning" x-cloak>
+                                Point the camera at a barcode. This field fills automatically, then the camera stops.
+                            </p>
+                            <p class="text-sm text-red-600" x-show="error" x-text="error" x-cloak></p>
                         @endif
                     </div>
                 @endforeach

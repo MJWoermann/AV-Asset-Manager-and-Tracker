@@ -43,6 +43,20 @@
         </form>
 
         @if($location->exists)
+            @if($location->aliases->isNotEmpty())
+                <div class="mt-6 rounded border border-gray-200 dark:border-brand-charcoal p-3 space-y-1">
+                    <p class="text-sm font-medium">Former names (import aliases)</p>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Spreadsheet rows using these names will use this location instead of creating a new one.
+                    </p>
+                    <ul class="text-sm list-disc list-inside">
+                        @foreach($location->aliases as $alias)
+                            <li>{{ $alias->former_name }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div class="mt-8 space-y-3">
                 <h3 class="font-semibold text-lg">Files</h3>
                 <x-file-attachments

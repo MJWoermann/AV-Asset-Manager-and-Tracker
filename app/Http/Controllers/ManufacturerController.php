@@ -52,6 +52,8 @@ class ManufacturerController extends Controller
 
     public function edit(Manufacturer $manufacturer): View
     {
+        $manufacturer->load('aliases');
+
         return view('manufacturers.form', [
             'manufacturer' => $manufacturer,
             'replacementManufacturers' => Manufacturer::query()

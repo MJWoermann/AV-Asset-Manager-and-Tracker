@@ -16,7 +16,7 @@ class ConnectionTypeController extends Controller
     public function index(): View
     {
         $connectionTypes = ConnectionType::query()
-            ->withCount('connections')
+            ->withCount(['connections', 'buses'])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -50,6 +50,7 @@ class ConnectionTypeController extends Controller
             'color' => strtolower($data['color']),
             'icon' => $data['icon'],
             'allows_protocol' => $request->boolean('allows_protocol'),
+            'allows_bus' => $request->boolean('allows_bus'),
             'sort_order' => (int) ($data['sort_order'] ?? 100),
         ]);
 
@@ -58,7 +59,7 @@ class ConnectionTypeController extends Controller
 
     public function edit(ConnectionType $connectionType): View
     {
-        $connectionType->loadCount('connections');
+        $connectionType->loadCount(['connections', 'buses']);
 
         return view('connection-types.form', [
             'connectionType' => $connectionType,
@@ -76,6 +77,7 @@ class ConnectionTypeController extends Controller
             'color' => strtolower($data['color']),
             'icon' => $data['icon'],
             'allows_protocol' => $request->boolean('allows_protocol'),
+            'allows_bus' => $request->boolean('allows_bus'),
             'sort_order' => (int) ($data['sort_order'] ?? $connectionType->sort_order),
         ]);
 
@@ -84,9 +86,9 @@ class ConnectionTypeController extends Controller
 
     public function destroy(ConnectionType $connectionType): RedirectResponse
     {
-        if ($connectionType->connections()->exists()) {
+        if ($connectionType->connections()->exists() || $connectionType->buses()->exists()) {
             return back()->withErrors([
-                'connection_type' => 'Cannot delete a connection type that is in use. Remove its connections first.',
+                'connection_type' => 'Cannot delete a connection type that is in use. Remove its connections and buses first.',
             ]);
         }
 
