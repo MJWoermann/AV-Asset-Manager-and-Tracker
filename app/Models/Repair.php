@@ -84,6 +84,11 @@ class Repair extends Model
         return $this->hasMany(SparePartMovement::class)->orderByDesc('recorded_at')->orderByDesc('id');
     }
 
+    public function checkouts(): HasMany
+    {
+        return $this->hasMany(AssetCheckout::class)->orderByDesc('created_at')->orderByDesc('id');
+    }
+
     public function files(): MorphToMany
     {
         return $this->morphToMany(File::class, 'linkable', 'file_links')

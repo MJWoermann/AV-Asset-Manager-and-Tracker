@@ -108,6 +108,25 @@ class User extends Authenticatable
         );
     }
 
+    public function isExternalRepairer(): bool
+    {
+        return $this->hasRole('external_repairer');
+    }
+
+    public function canAccessAssignedRepair(Repair $repair): bool
+    {
+        return (int) $repair->assignee_user_id === (int) $this->id;
+    }
+
+    public function canAccessAssetViaAssignedRepair(Asset $asset): bool
+    {
+        return Repair::query()
+            ->where('asset_id', $asset->id)
+            ->where('assignee_user_id', $this->id)
+            ->active()
+            ->exists();
+    }
+
     /**
      * Department ids this user may see on operational queries.
      * Null = unrestricted (admin with empty visibility preference).
@@ -118,6 +137,11 @@ class User extends Authenticatable
     {
         if ($this->hasRole('admin')) {
             return DepartmentVisibility::scopeIdsFromPreferences($this->preferences);
+        }
+
+        // External repairers are gated by repair assignment, not department membership.
+        if ($this->isExternalRepairer()) {
+            return null;
         }
 
         return $this->departments()
@@ -151,11 +175,16 @@ class User extends Authenticatable
      */
     public function needsDepartmentAssignment(): bool
     {
-        if ($this->hasRole('admin')) {
+        if ($this->hasRole('admin') || $this->isExternalRepairer()) {
             return false;
         }
 
         return $this->departments()->doesntExist();
+    }
+
+    public function homeRouteName(): string
+    {
+        return $this->isExternalRepairer() ? 'repairs.index' : 'dashboard';
     }
 
     /**

@@ -2,10 +2,14 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-14">
             <div class="flex items-center gap-6 min-w-0">
-                <a href="{{ route('dashboard') }}" class="shrink-0 inline-flex items-center" aria-label="{{ config('app.name', 'AV Asset Manager') }}">
+                <a href="{{ route(auth()->user()->homeRouteName()) }}" class="shrink-0 inline-flex items-center" aria-label="{{ config('app.name', 'AV Asset Manager') }}">
                     <img src="{{ asset('favicon.svg') }}" alt="" class="h-8 w-8 rounded-md" width="32" height="32">
                 </a>
                 <div class="hidden sm:flex items-center gap-1 text-sm">
+                    @role('external_repairer')
+                        <x-nav-link :href="route('repairs.index')" :active="request()->routeIs('repairs.*')">Repairs</x-nav-link>
+                        <x-nav-link :href="route('maintenance.index')" :active="request()->routeIs('maintenance.*')">Maintenance</x-nav-link>
+                    @else
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-nav-link>
                     <x-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">Scan</x-nav-link>
                     <x-nav-link :href="route('assets.index')" :active="request()->routeIs('assets.*')">Assets</x-nav-link>
@@ -106,6 +110,7 @@
                             </x-slot>
                         </x-dropdown>
                     @endfeature
+                    @endrole
                 </div>
             </div>
 
@@ -119,6 +124,7 @@
                     </x-slot>
                     <x-slot name="content">
                         <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
+                        @unlessrole('external_repairer')
                         <x-dropdown-link
                             href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"
                             target="_blank"
@@ -146,6 +152,7 @@
                                 @endunlessrole
                             @endrole
                         @endfeature
+                        @endunlessrole
 
                         <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
                         <form method="POST" action="{{ route('logout') }}">
@@ -169,6 +176,10 @@
 
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden border-t border-brand-charcoal">
         <div class="pt-2 pb-3 space-y-1">
+            @role('external_repairer')
+                <x-responsive-nav-link :href="route('repairs.index')" :active="request()->routeIs('repairs.*')">Repairs</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('maintenance.index')" :active="request()->routeIs('maintenance.*')">Maintenance</x-responsive-nav-link>
+            @else
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Dashboard</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">Scan</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('assets.index')" :active="request()->routeIs('assets.*')">Assets</x-responsive-nav-link>
@@ -188,9 +199,11 @@
             @feature('rigging')
                 <x-responsive-nav-link :href="route('rigging.index')" :active="request()->routeIs('rigging.*')">Rigging</x-responsive-nav-link>
             @endfeature
+            @endrole
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
             <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>
+            @unlessrole('external_repairer')
             <x-responsive-nav-link
                 href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"
                 target="_blank"
@@ -208,6 +221,7 @@
                     @endunlessrole
                 @endrole
             @endfeature
+            @endunlessrole
 
             <form method="POST" action="{{ route('logout') }}">
                 @csrf

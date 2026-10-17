@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AssetStatus;
+use App\Enums\CheckoutPurpose;
 use App\Enums\MaintenanceLogType;
 use App\Enums\NotificationEventKey;
 use App\Http\Requests\BulkUpdateAssetsRequest;
@@ -17,6 +18,7 @@ use App\Models\Location;
 use App\Models\Manufacturer;
 use App\Models\ManufacturerModel;
 use App\Models\UnknownScan;
+use App\Models\User;
 use App\Services\AssetConnectionService;
 use App\Services\AssetInterfaceService;
 use App\Services\BulkAssetUpdateService;
@@ -35,6 +37,7 @@ use App\Support\AssetMaintenanceFilters;
 use App\Support\AssetTableColumns;
 use App\Support\EmailIntegrationSettings;
 use App\Support\StockTracking;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -74,6 +77,41 @@ class AssetController extends Controller
                 ->get(['id', 'name', 'manufacturer_id']),
             'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
             'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
+        ]);
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        $term = trim($request->string('q')->toString());
+        $searchTerm = $term !== '' ? $term : null;
+
+        $assets = Asset::query()
+            ->with(['itemType:id,name'])
+            ->search($searchTerm)
+            ->orderBySearchRelevance($searchTerm)
+            ->limit(20)
+            ->get(['id', 'name', 'tp_barcode', 'fmi_ast', 'serial_number', 'item_type_id']);
+
+        return response()->json([
+            'data' => $assets->map(static function (Asset $asset): array {
+                $parts = array_filter([
+                    $asset->tp_barcode,
+                    $asset->fmi_ast,
+                    $asset->serial_number,
+                ]);
+
+                return [
+                    'id' => $asset->id,
+                    'name' => $asset->name,
+                    'tp_barcode' => $asset->tp_barcode,
+                    'fmi_ast' => $asset->fmi_ast,
+                    'serial_number' => $asset->serial_number,
+                    'item_type' => $asset->itemType?->name,
+                    'label' => $parts === []
+                        ? $asset->name
+                        : $asset->name.' ('.implode(' · ', $parts).')',
+                ];
+            })->values(),
         ]);
     }
 
@@ -194,6 +232,13 @@ class AssetController extends Controller
         StockChartService $stockCharts,
         KanbanTagService $kanbanTags,
     ): View {
+        $user = $request->user();
+        $isExternalRepairer = $user?->isExternalRepairer() ?? false;
+
+        if ($isExternalRepairer && ! $user->canAccessAssetViaAssignedRepair($asset)) {
+            abort(403, 'You can only view assets on repairs assigned to you.');
+        }
+
         $asset->load([
             'itemType.fieldSets.definitions',
             'location.parent.parent',
@@ -209,19 +254,23 @@ class AssetController extends Controller
         $asset->refresh();
 
         $requestedTab = $request->string('tab')->toString();
-        $connectionsEnabled = $request->user()?->hasFeature('asset_connections') ?? false;
-        $ruVisualiserEnabled = ($request->user()?->hasDeveloperFeature('ru_visualiser') ?? false)
+        $connectionsEnabled = ! $isExternalRepairer
+            && ($user?->hasFeature('asset_connections') ?? false);
+        $ruVisualiserEnabled = ! $isExternalRepairer
+            && ($user?->hasDeveloperFeature('ru_visualiser') ?? false)
             && (bool) $asset->itemType?->supports_ru_visualiser;
-        $stockEnabled = StockTracking::availableForAsset($request->user(), $asset);
+        $stockEnabled = ! $isExternalRepairer
+            && StockTracking::availableForAsset($user, $asset);
 
         $tab = match (true) {
-            $requestedTab === 'history' => 'history',
-            $requestedTab === 'files' => 'files',
+            $isExternalRepairer && ! in_array($requestedTab, ['', 'details', 'maintenance'], true) => 'details',
+            $requestedTab === 'history' && ! $isExternalRepairer => 'history',
+            $requestedTab === 'files' && ! $isExternalRepairer => 'files',
             $requestedTab === 'maintenance' => 'maintenance',
             $requestedTab === 'connections' && $connectionsEnabled => 'connections',
             $requestedTab === 'rack' && $ruVisualiserEnabled => 'rack',
             $requestedTab === 'stock' && $stockEnabled => 'stock',
-            $requestedTab === 'spares' => 'spares',
+            $requestedTab === 'spares' && ! $isExternalRepairer => 'spares',
             default => 'details',
         };
 
@@ -391,6 +440,8 @@ class AssetController extends Controller
         $openRepairs = collect();
         $openRepairsByFaultId = collect();
 
+        $repairAssigneeOptions = collect();
+
         if ($tab === 'maintenance') {
             $maintenanceQuery = $asset->maintenanceLogs()->with(['user', 'files']);
             AssetMaintenanceFilters::apply($maintenanceQuery, $request);
@@ -398,6 +449,14 @@ class AssetController extends Controller
             $maintenanceUserOptions = AssetMaintenanceFilters::userOptions($asset);
             $openRepairs = $asset->repairs()->active()->with('assignee')->get();
             $openRepairsByFaultId = $openRepairs->keyBy('maintenance_log_id');
+            if (! $isExternalRepairer) {
+                $repairAssigneeOptions = User::role([
+                    'admin',
+                    'inventory_manager',
+                    'scanner',
+                    'external_repairer',
+                ])->orderBy('name')->get(['id', 'name', 'email']);
+            }
         }
 
         $spareMovements = collect();
@@ -406,6 +465,27 @@ class AssetController extends Controller
                 ->with(['sparePart', 'user'])
                 ->limit(100)
                 ->get();
+        }
+
+        $openCheckout = $asset->checkouts()
+            ->open()
+            ->with(['checkedOutTo', 'checkedOutBy', 'repair'])
+            ->first();
+
+        $checkoutAssigneeOptions = collect();
+        $checkoutOpenRepairs = collect();
+        $canManageCheckouts = ! $isExternalRepairer
+            && ($user?->hasAnyRole(['admin', 'inventory_manager', 'scanner']) ?? false);
+
+        if ($canManageCheckouts && $tab === 'details') {
+            $checkoutAssigneeOptions = User::role([
+                'admin',
+                'inventory_manager',
+                'scanner',
+                'external_repairer',
+            ])->orderBy('name')->get(['id', 'name', 'email']);
+
+            $checkoutOpenRepairs = $asset->repairs()->active()->orderByDesc('started_at')->get(['id', 'summary']);
         }
 
         return view('assets.show', [
@@ -436,10 +516,17 @@ class AssetController extends Controller
             'maintenanceUserOptions' => $maintenanceUserOptions,
             'maintenanceLogTypes' => MaintenanceLogType::options(),
             'maintenanceStatuses' => AssetStatus::options(),
-            'canDeleteMaintenanceLogs' => $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false,
+            'canDeleteMaintenanceLogs' => $user?->hasAnyRole(['admin', 'inventory_manager']) ?? false,
             'openRepairs' => $openRepairs,
             'openRepairsByFaultId' => $openRepairsByFaultId,
+            'repairAssigneeOptions' => $repairAssigneeOptions,
             'spareMovements' => $spareMovements,
+            'isExternalRepairer' => $isExternalRepairer,
+            'openCheckout' => $openCheckout,
+            'canManageCheckouts' => $canManageCheckouts,
+            'checkoutPurposes' => CheckoutPurpose::options(),
+            'checkoutAssigneeOptions' => $checkoutAssigneeOptions,
+            'checkoutOpenRepairs' => $checkoutOpenRepairs,
         ]);
     }
 

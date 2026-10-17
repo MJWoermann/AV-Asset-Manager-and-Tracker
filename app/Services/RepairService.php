@@ -416,6 +416,13 @@ class RepairService
                 'repair.id' => (string) $repair->id,
             ]);
 
+            // Auto-return any open checkout linked to this repair.
+            app(AssetCheckoutService::class)->returnOpenForRepair(
+                $repair->fresh(),
+                $user,
+                skipStatusRestore: $statusAfter !== null,
+            );
+
             return $repair->fresh(['asset', 'maintenanceLog', 'steps', 'completedBy']);
         });
     }

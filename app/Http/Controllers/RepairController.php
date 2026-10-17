@@ -30,6 +30,7 @@ class RepairController extends Controller
     {
         $status = trim((string) $request->query('status', 'active'));
         $term = trim((string) $request->query('q', ''));
+        $user = $request->user();
 
         $query = Repair::query()
             ->with(['asset', 'assignee', 'maintenanceLog'])
@@ -54,8 +55,8 @@ class RepairController extends Controller
         }
 
         $assignee = trim((string) $request->query('assignee', ''));
-        if ($assignee === 'me') {
-            $query->where('assignee_user_id', $request->user()->id);
+        if ($user?->isExternalRepairer() || $assignee === 'me') {
+            $query->where('assignee_user_id', $user->id);
         }
 
         return view('repairs.index', [
@@ -69,8 +70,10 @@ class RepairController extends Controller
         ]);
     }
 
-    public function show(Repair $repair, RepairService $service): View
+    public function show(Request $request, Repair $repair, RepairService $service): View
     {
+        $this->authorizeRepairAccess($request, $repair);
+
         $repair->load([
             'asset.itemType',
             'asset.files',
@@ -197,6 +200,7 @@ class RepairController extends Controller
         RepairStep $step,
         RepairService $service,
     ): RedirectResponse {
+        $this->authorizeRepairAccess($request, $repair);
         abort_unless((int) $step->repair_id === (int) $repair->id, 404);
 
         if ($request->boolean('completed')) {
@@ -213,6 +217,7 @@ class RepairController extends Controller
         Repair $repair,
         RepairService $service,
     ): RedirectResponse {
+        $this->authorizeRepairAccess($request, $repair);
         $service->addAdHocStep($repair, $request->validated());
 
         return back()->with('status', 'Step added.');
@@ -223,6 +228,7 @@ class RepairController extends Controller
         Repair $repair,
         RepairService $service,
     ): RedirectResponse {
+        $this->authorizeRepairAccess($request, $repair);
         $data = $request->validated();
         $spare = SparePart::query()->findOrFail($data['spare_part_id']);
 
@@ -236,6 +242,7 @@ class RepairController extends Controller
         Repair $repair,
         RepairService $service,
     ): RedirectResponse {
+        $this->authorizeRepairAccess($request, $repair);
         $service->complete($repair, $request->validated(), $request->user());
 
         return redirect()
@@ -248,10 +255,19 @@ class RepairController extends Controller
         Repair $repair,
         RepairService $service,
     ): RedirectResponse {
+        abort_if($request->user()?->isExternalRepairer(), 403);
         $service->cancel($repair, $request->validated('reason'), $request->user());
 
         return redirect()
             ->route('repairs.show', $repair)
             ->with('status', 'Repair cancelled.');
+    }
+
+    protected function authorizeRepairAccess(Request $request, Repair $repair): void
+    {
+        $user = $request->user();
+        if ($user?->isExternalRepairer() && ! $user->canAccessAssignedRepair($repair)) {
+            abort(403, 'You can only access repairs assigned to you.');
+        }
     }
 }

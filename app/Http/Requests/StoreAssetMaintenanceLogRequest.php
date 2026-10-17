@@ -37,6 +37,7 @@ class StoreAssetMaintenanceLogRequest extends FormRequest
             'files.*' => ['file', 'max:'.$maxKb, 'mimes:'.$mimes],
             'start_repair_now' => ['nullable', 'boolean'],
             'repair_procedure_id' => ['nullable', 'integer', Rule::exists('repair_procedures', 'id')],
+            'assignee_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
         ];
     }
 
