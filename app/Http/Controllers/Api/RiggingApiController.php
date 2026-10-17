@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\RigEventController;
+use App\Http\Controllers\Concerns\ManagesRigEvents;
+use App\Http\Controllers\Controller;
 use App\Models\RigEvent;
 use App\Models\RiggingCalculationLog;
 use App\Services\Rigging\RiggingCalculatorRegistry;
@@ -11,8 +12,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 
-class RiggingApiController extends RigEventController
+class RiggingApiController extends Controller
 {
+    use ManagesRigEvents;
+
     public function __construct(private RiggingCalculatorRegistry $calculators) {}
 
     public function eventsIndex(Request $request): JsonResponse
