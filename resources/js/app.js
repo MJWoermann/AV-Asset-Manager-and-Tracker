@@ -4420,6 +4420,8 @@ Alpine.data('shelfTagPrintSetup', (assets = [], preselectedIds = [], maxBatch = 
                 asset.name,
                 asset.tp_barcode,
                 asset.fmi_ast,
+                asset.serial_number,
+                asset.mac_address,
                 asset.item_type,
                 asset.status,
             ]

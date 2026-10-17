@@ -20,6 +20,7 @@ use App\Models\Repair;
 use App\Models\RepairStep;
 use App\Models\SparePart;
 use App\Services\RepairService;
+use App\Support\ScannableIdentifierFields;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -46,9 +47,13 @@ class RepairController extends Controller
             $query->where(function ($q) use ($term): void {
                 $q->where('summary', 'like', "%{$term}%")
                     ->orWhereHas('asset', function ($assetQuery) use ($term): void {
-                        $assetQuery->where('name', 'like', "%{$term}%")
-                            ->orWhere('fmi_ast', 'like', "%{$term}%")
-                            ->orWhere('tp_barcode', 'like', "%{$term}%");
+                        $assetQuery->where(function ($q) use ($term): void {
+                            $like = "%{$term}%";
+                            $q->where('name', 'like', $like)
+                                ->orWhere('fmi_ast', 'like', $like)
+                                ->orWhere('rig_tag', 'like', $like);
+                            ScannableIdentifierFields::orWherePartialMatch($q, $term);
+                        });
                     });
             });
         }

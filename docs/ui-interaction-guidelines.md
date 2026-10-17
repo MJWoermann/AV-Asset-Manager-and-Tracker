@@ -80,6 +80,17 @@ Every control and label must be readable and hittable, with a consistent layout 
   - Use the same pattern everywhere that pattern appears so the viewport feels consistent.
 - Never stack unrelated primary/cancel buttons on top of inputs in a way that obscures labels, values, or errors.
 
+### Scannable identifier fields (barcode Scan control)
+
+Physical barcode fields must always offer in-field **Scan** (camera / wedge) when editable, and any search/filter that queries them must accept scan-to-fill.
+
+- **Scannable:** `serial_number`, `tp_barcode`, `mac_address` (plus custom fields that look like MAC).
+- **Typed only (no Scan):** `fmi_ast`, `rig_tag`.
+- Use `<x-scannable-text-input>` / `<x-scannable-search>` and `App\Support\ScannableIdentifierFields`.
+- Agent SOP: `.cursor/skills/scannable-identifier-fields/SKILL.md`; regression: `ScannableIdentifierFieldsComplianceTest`.
+
+*In this project:* asset create/edit, assets/list column filters, repairs/connection-map/compare/unknown-scans/shelf-tag search surfaces.
+
 ---
 
 ## 5. Pop-ups / modals (viewport-safe)
