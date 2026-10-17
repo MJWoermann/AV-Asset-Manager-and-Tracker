@@ -8,10 +8,17 @@
 
 <div
     class="space-y-6"
-    x-data="stockPanel(@js([
+    x-data="inventoryChartPanel(@js([
         'chart' => $chart,
         'initialAction' => $initialAction,
         'openDetailId' => old('highlight_movement_id'),
+        'showAnnotationLabels' => true,
+        'showLegend' => true,
+        'actionHints' => [
+            'count' => 'Absolute on-hand quantity after counting',
+            'restock' => 'Units added from a restock / Momentous PO',
+            'breakage' => 'Units removed due to breakage',
+        ],
     ]))"
 >
     @if (session('status'))
