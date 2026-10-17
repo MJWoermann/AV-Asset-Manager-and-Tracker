@@ -28,7 +28,7 @@ The app already has useful controls: Spatie roles on many admin routes, Sanctum 
 
 **Email verification is intentionally not used** for access control. Isolated LEMP installs often have no outbound mail; `User` does not implement `MustVerifyEmail`. Admins create users (or run `app:install`) with `email_verified_at` set and a role assigned — no mail required.
 
-**Availability (commit `1c18108`):** Auth and role gates are in good shape; the larger residual risk for a multi-user LAN deploy is **resource exhaustion by authenticated staff** (and leftover debug logging). Highest impact: unbounded debug log sinks on disk, full-sheet import/export/compare in the HTTP request, backup/migrate runnable synchronously or duplicated by queue `retry_after`, and several browse/scan paths that load entire catalogues into memory. Details: [Availability and multi-user impact](#availability-and-multi-user-impact).
+**Availability:** Auth and role gates are in good shape. **A1–A7 are mitigated in code** (debug sinks removed; import/export/compare caps; prepared rows off-session; backup/migrate unique + queued by default; `DB_QUEUE_RETRY_AFTER=3900`). Admins tune limits with `php artisan app:performance-limits` — see [Managing performance limits](#managing-performance-limits). **A8–A10 remain open recommendations** (scan UI, browse side-loads, search wildcards). Details: [Availability and multi-user impact](#availability-and-multi-user-impact).
 
 ---
 
@@ -86,9 +86,9 @@ Severity reflects impact if the host is reachable by untrusted users (or a compr
 
 ## Availability and multi-user impact
 
-Reviewed against commit `1c18108`. Focus: actions a user (or automated client) can take — intentionally or by accident — that **crash a worker**, **fill disk**, **hold DB locks**, or **starve PHP-FPM / queue workers**, so other users experience timeouts or a dead app. Severity assumes a shared LAN host with a finite FPM pool (deploy guide baseline `pm.max_children = 40`).
+Focus: actions a user (or automated client) can take — intentionally or by accident — that **crash a worker**, **fill disk**, **hold DB locks**, or **starve PHP-FPM / queue workers**, so other users experience timeouts or a dead app. Severity assumes a shared LAN host with a finite FPM pool (deploy guide baseline `pm.max_children = 40`).
 
-This is not an exploit cookbook. Mitigations are operational limits, throttles, queue hygiene, and code bounds — prefer running heavy work off-peak until code caps are in place.
+This is not an exploit cookbook. Soft limits are admin-tunable for large warehouses — see [Managing performance limits](#managing-performance-limits).
 
 ### What already helps
 
@@ -100,31 +100,98 @@ This is not an exploit cookbook. Mitigations are operational limits, throttles, 
 | API token mint | `throttle:10,1` on `POST /api/auth/token` |
 | Login lockout | 5 attempts via `LoginRequest` RateLimiter |
 | Scheduled backup | `withoutOverlapping(180)` + `onOneServer()` when `BACKUP_DISK` is set |
-| Default queue | `QUEUE_CONNECTION=database` (not `sync`) in `.env.example` |
+| Default queue | `QUEUE_CONNECTION=database` (not `sync`); `DB_QUEUE_RETRY_AFTER` defaults to **3900** |
+| Named throttles | `import`, `export`, `compare`, `backup` rate limiters (tunable) |
+| Soft row/list caps | `import_max_rows`, `export_max_rows`, `compare_max_list_items` via `PerformanceLimits` |
 | Scan identifiers | Equality lookups on indexed fields before expensive search fallback |
-| List compare algorithm | Set-based keyed collections (good) — still loads both lists fully (see A3) |
 
 ### Critical / High (availability)
 
-| ID | Area | Evidence | Risk to other users | Mitigation |
-|----|------|----------|---------------------|------------|
-| A1 | Debug log sink (route) | Authenticated `POST /__debug/agent-log` (`routes/web.php`) appends `$request->all()` to `base_path("debug-{$sessionId}.log")` with no size or rate limit. Also called from `resources/js/app.js` and asset form Blade. | Any app-role user can fill the app disk → write failures, deploy breakage, host instability for everyone. | Remove route and client callers from production builds; if temporary, gate on `APP_DEBUG` + admin + body/size caps; write only under `storage/logs` with rotation. |
-| A2 | Debug log sink (import path) | `ImportService::findExistingMatch()` appends multiple JSON lines to `base_path('debug-3c7602.log')` **per row / per key** during prepare. Similar leftover logging in `AssetController`. | Large imports amplify disk I/O and growth; slows prepare for that user and contends for disk with MariaDB/FPM. | Delete `#region agent log` blocks before production; never log under the app root. |
-| A3 | Import: no row cap; full sheet in request | `ImportUploadRequest` caps file size only. `AssetImport` / `ImportService::readRows()` load the whole sheet; prepare/process run in the HTTP request (web + API). | One dense 25MB xlsx/csv can OOM or time out an FPM worker; concurrent imports multiply the effect. | Hard max rows (e.g. 5–10k); `WithChunkReading`; queue prepare/commit; reject oversized sheets early; pre-check xlsx zip expansion. |
-| A4 | Import: session/cache + long transaction | `ImportController::prepare` stores full `$prepared` in session; API stores prepared rows in DB cache (`ImportApiState`). `ImportService::commit()` wraps the sheet in one `DB::transaction`. `findExistingMatch` can run up to ~6 queries per row. | Multi‑MB `sessions`/`cache` rows; long write locks on assets/list items → scanners and editors wait or time out. | Persist prepared rows to a temp table/file keyed by import id; chunk commits; prefetch matches in bulk; advisory lock so only one import runs. |
-| A5 | Export / unknown-scan export unbounded | `AssetsExport::collection()` and unknown-scan export use `->get()` then Excel download (web + API). No throttle on export routes. | Full-catalogue (or large history) export spikes RAM/CPU on a worker; parallel exports amplify. | Chunked/`FromQuery` export or queued job + download link; row cap; throttle export endpoints. |
-| A6 | List compare + PDF/API | `ListComparisonService::compare()` loads **all** items for both lists. Web report can render PDF/XLSX in-request; API returns full JSON. No throttle. | Two large stocktakes → large memory and long workers; concurrent compares starve the pool. | Cap list sizes for online compare; paginate UI detail; queue PDF/xlsx; throttle; reject oversized pairs. |
-| A7 | Backup / migrate: sync FPM + duplicate jobs | Admin `StorageController` can run backup/migrate **inline** when `queue` is false. Jobs set `$timeout = 3600` but `config/queue.php` `retry_after` defaults to **90**; jobs are not `ShouldBeUnique`. `AppBackupService` loads large tables with `->get()`, mirrors uploads, and can hold mysqldump output in memory. `keep` is optional (empty → no prune). | One admin action can monopolize an FPM worker for a long time; after ~90s another worker may start a second backup/migrate → doubled I/O and disk growth; unpruned backups fill backup disk. | Always queue from UI; `ShouldBeUnique`; set `DB_QUEUE_RETRY_AFTER` ≥ timeout + margin (e.g. 3900); stream dumps to disk; require retention `keep`; free-space check; run off-peak. |
-| A8 | Scan UI loads full event list | `ScanController::index()` loads all `AssetListItem` for the active event list and all session `UnknownScan` rows (`->get()`). Web `POST /scan/{scan}` is **unthrottled** (API scan is 60/min). | Big stocktakes make every scan page refresh expensive; many concurrent scanners amplify DB load; web miss path can flood `unknown_scans`. | Show recent N / paginate history; throttle web scan like API; optional unknown-scan dedupe/cap per session. |
-| A9 | Asset browse filter side-loads | `AssetController::index` (and list show) paginate rows but also load all parent assets, locations, types, manufacturers, models for filters. `Location::selfAndDescendantIds()` loads all locations on filtered browse. | Page cost grows with catalogue size even when the table is paged; shared DB/CPU impact. | Typeahead / lazy filters; cache hierarchy; avoid loading every parent on every index hit. |
-| A10 | Search leading wildcards | `AssetSearch::constrain()` tokenizes with no max length/token count; per token OR `%…%` across many columns + relations + custom fields. Used by asset index, API assets, and scan fallback. | Shared MariaDB CPU; leading `%` prevents normal index use. | Cap `q` length and token count; keep scan on identifier equality first (already done); consider prefix/FULLTEXT for free-text. |
+| ID | Area | Status | Notes |
+|----|------|--------|-------|
+| A1 | Debug log sink (route) | **Mitigated** | `POST /__debug/agent-log` and JS/Blade callers removed |
+| A2 | Debug log sink (import/asset paths) | **Mitigated** | `ImportService` / `AssetController` app-root `file_put_contents` debug blocks removed |
+| A3 | Import row cap | **Mitigated** | `import_max_rows` (default 10 000) enforced in `ImportService::readRows()`; oversize sheets rejected with raise hint |
+| A4 | Import session + long transaction | **Mitigated** | Prepared rows stored under `storage/app/imports/prepared/`; session/API cache keep only the path; commit uses `import_commit_chunk` transactions |
+| A5 | Export unbounded | **Mitigated** | `export_max_rows` (default 25 000) checked before asset/list/unknown-scan Excel downloads; `throttle:export` |
+| A6 | List compare unbounded | **Mitigated** | `compare_max_list_items` (default 15 000) per list before load; `throttle:compare` |
+| A7 | Backup / migrate queue hygiene | **Mitigated** | Jobs `ShouldBeUnique`; UI defaults force queue (`backup_force_queue` / `migrate_force_queue`); `backup_default_keep` (default 7) required; `DB_QUEUE_RETRY_AFTER` default 3900; `throttle:backup` |
+| A8 | Scan UI loads full event list | **Open — recommendation** | See [A8–A10 recommendations](#a8a10-recommendations-not-yet-implemented) |
+| A9 | Asset browse filter side-loads | **Open — recommendation** | See below |
+| A10 | Search leading wildcards | **Open — recommendation** | See below |
+
+### A8–A10 recommendations (not yet implemented)
+
+These remain the highest residual browse/scan costs for large catalogues. Prefer operational workarounds until code lands.
+
+| ID | Recommendation | Why | Interim ops |
+|----|----------------|-----|-------------|
+| **A8** | Paginate or “recent N” for scan page event items and unknown scans; add `throttle` on web `POST /scan/{scan}` aligned with API (60/min); optional per-session unknown-scan cap/dedupe | Full `->get()` of a warehouse-sized event list on every scan refresh + unthrottled web scan can starve FPM/DB during stocktake | Split stocktakes into multiple event lists; avoid one 10k-row scan session ([hardware-sizing.md](hardware-sizing.md)) |
+| **A9** | Replace full parent/location/type/manufacturer/model filter payloads with typeahead / lazy endpoints; cache `Location::selfAndDescendantIds` (or materialize paths) | Index pages stay O(catalogue) even when the asset table is paginated | Keep location/manufacturer trees lean; do not open Assets index as a “dashboard refresh” spam |
+| **A10** | Cap search `q` length and token count; prefer prefix/`FULLTEXT` for free-text; keep identifier equality first on scan (already done) | Leading `%…%` OR across many columns + relations burns shared MariaDB CPU | Train staff to search by barcode/FMI/serial when possible; avoid multi-word fuzzy searches during peak scan |
+
+### Managing performance limits
+
+Soft limits live in `config/performance.php` (env `PERF_*`) and can be overridden at runtime in the `settings` table without a code deploy.
+
+**Show effective limits (SSH on the app host):**
+
+```bash
+cd /var/www/av-asset-manager   # adjust path
+sudo -u www-data php artisan app:performance-limits show
+```
+
+**Raise a limit for a large warehouse (example: 40 000-asset export):**
+
+```bash
+sudo -u www-data php artisan app:performance-limits set export_max_rows 50000
+sudo -u www-data php artisan app:performance-limits set import_max_rows 20000
+sudo -u www-data php artisan app:performance-limits set compare_max_list_items 25000
+```
+
+**Reset one key or all overrides back to config/.env:**
+
+```bash
+sudo -u www-data php artisan app:performance-limits reset export_max_rows
+sudo -u www-data php artisan app:performance-limits reset
+```
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `import_max_rows` | 10000 | Max spreadsheet data rows accepted on import |
+| `import_commit_chunk` | 250 | Rows per DB transaction during import commit |
+| `export_max_rows` | 25000 | Max rows for asset / list / unknown-scan Excel export |
+| `compare_max_list_items` | 15000 | Max items per list for online compare / PDF / API |
+| `backup_default_keep` | 7 | Retention count when Admin/CLI backup omits `--keep` |
+| `backup_force_queue` | true | Admin UI always queues backups (hides sync checkbox) |
+| `migrate_force_queue` | true | Admin UI always queues attachment migrations |
+| `throttle_import_per_minute` | 10 | Named `throttle:import` |
+| `throttle_export_per_minute` | 10 | Named `throttle:export` |
+| `throttle_compare_per_minute` | 10 | Named `throttle:compare` |
+| `throttle_backup_per_minute` | 3 | Named `throttle:backup` (backup + migrate) |
+
+**Compatibility with large data sets**
+
+- Prefer raising limits gradually and watching PHP-FPM busy workers, MariaDB slow queries, and RAM ([hardware-sizing.md](hardware-sizing.md) — 512M `memory_limit` if full-list compare/import is routine).
+- Very large imports: split CSVs under `import_max_rows`, or raise the limit and run off-peak; commit chunking already reduces lock duration.
+- Full-catalogue export above `export_max_rows`: raise the limit or export filtered list subsets.
+- Compare of two huge lists: raise `compare_max_list_items` or compare smaller event batches.
+- Env defaults (`.env` / `PERF_*`) apply until an artisan `set` stores an override; after `reset`, config/env wins again. Overrides survive deploys (stored in DB).
+- Queue workers: `php artisan queue:work --timeout=3600` (or higher) with `DB_QUEUE_RETRY_AFTER=3900` (or higher than timeout).
+
+**Allow sync backup/migrate only in break-glass** (not recommended on shared hosts):
+
+```bash
+sudo -u www-data php artisan app:performance-limits set backup_force_queue false
+sudo -u www-data php artisan app:performance-limits set migrate_force_queue false
+```
 
 ### Medium (availability)
 
 | ID | Area | Evidence | Risk to other users | Mitigation |
 |----|------|----------|---------------------|------------|
 | A11 | Bulk asset/location update | `asset_ids` / `location_ids` arrays have **no `max:`**; single DB transaction; notes may be unbounded `string`. Location bulk may reload full hierarchy per selected id. | “Select all” (~10k) → long locks, attachment cleanup on deletes, FPM timeouts. | Cap selection (e.g. 500); chunk transactions; `max` on notes; throttle. |
-| A12 | Missing throttles on heavy routes | Throttles today: guest stock, API token, API scan, SSO, email verify/test. **Not** on: import, export, compare, file upload/bulk, backup/migrate, bulk update, web scan, most other API reads. No global `throttleApi()` in `bootstrap/app.php`. | Authenticated users or stolen tokens can parallelize expensive work. | Named limiters (`import`, `export`, `backup`, `upload`); baseline API throttle. |
+| A12 | Missing throttles on heavy routes | **Partially mitigated** — named `import` / `export` / `compare` / `backup` limiters added. Still open: file upload/bulk, bulk update, web scan, global `throttleApi()`. | Residual parallel abuse on unthrottled paths. | Finish remaining limiters; optional baseline API throttle. |
 | A13 | File upload memory | `FileAttachmentService::processUpload()` reads full file into memory; GD decode for images; bulk upload up to 20 × 25MB. No upload throttle. | Concurrent bulk uploads exhaust FPM memory. | Stream to disk; pixel/dimension limits; throttle; queue image processing. |
 | A14 | API list show unbounded | `AssetListApiController::show()` loads all `items.asset` (web show paginates at 50). | Multi‑MB JSON and heavy hydration for large event lists. | Paginate items; optional include with limits. |
 | A15 | Dashboard / connection map | `DashboardStatsService::stats()` runs fresh aggregates every hit (multiple COUNTs). Connection map `buildGraph()` can `->get()` large filtered graphs. | Concurrent dashboard opens compete with scan/search; dense connection fleets spike CPU/RAM. | Short-TTL cache; keep expensive modules off by default; require focus filters on maps. |
@@ -133,7 +200,7 @@ This is not an exploit cookbook. Mitigations are operational limits, throttles, 
 | A18 | Sanctum token growth | API mint throttled; profile token create has no dedicated throttle; no per-user token cap. | Scripted minting grows `personal_access_tokens` and auth lookup cost. | Max tokens per user; throttle profile create; revoke-oldest policy. |
 | A19 | Password-reset / register throttle gaps | `forgot-password` / `reset-password` lack route throttles (broker has per-email delay). Register unthrottled when enabled. | Email spray or signup spam (register only if `ALLOW_REGISTRATION=true`). | Route throttle like login/SSO; keep registration off in production. |
 | A20 | Custom field / notes size | Custom field values and some asset text fields validated as `string` without `max`; DB `text`. | Large strings inflate backups, asset show, and search. | `max:…` on notes, description, custom values. |
-| A21 | Queue worker ops gap | Default driver is `database`, but long jobs need `queue:work --timeout` ≥ job timeout and `retry_after` larger still. Sync checkbox on storage UI bypasses the queue. | Misconfigured production blocks FPM or duplicates long jobs (see A7). | Supervisor example with correct timeouts; refuse sync backup/migrate in UI; alert on queue depth. |
+| A21 | Queue worker ops gap | **Mostly mitigated** — `retry_after` default 3900; force-queue defaults; unique jobs. Still need correct supervisor `--timeout` in production. | Mis-set worker timeout can kill long backups mid-run. | Document/ship supervisor with `--timeout=3600`; alert on queue depth. |
 
 ### Low / informational (availability)
 
@@ -146,15 +213,11 @@ This is not an exploit cookbook. Mitigations are operational limits, throttles, 
 | Duplicate scan | Same asset on an event list warns rather than double-inserting. |
 | Health `/up` | Liveness only; keep non-sensitive. |
 
-### Priority order (availability fixes)
+### Priority order (remaining)
 
-1. **Remove leftover agent debug logging** (A1, A2) — immediate disk-fill and I/O risk with no product value.
-2. **Queue hygiene for backup/migrate** (A7, A21) — force queue, uniquify jobs, raise `DB_QUEUE_RETRY_AFTER`, require backup retention.
-3. **Bound import / export / compare** (A3–A6) — row caps, chunking, queue heavy formats, throttle.
-4. **Slim scan + asset browse** (A8–A10) — recent items, lazy filters, search caps, throttle web scan.
-5. **Cap bulk and uploads; baseline API throttle** (A11–A14, A18–A20).
-
-Operational stopgaps until code ships: run import/compare/export/backup/migrate **off-peak**; one admin at a time for storage jobs; monitor disk under the app root for `debug-*.log`; keep event lists sized so the scan UI stays responsive ([hardware-sizing.md](hardware-sizing.md)).
+1. **Slim scan + asset browse + search** (A8–A10) — see recommendations above.
+2. **Cap bulk and uploads; finish throttles** (A11–A14, A18–A20).
+3. Keep performance limits reviewed after catalogue growth ([Managing performance limits](#managing-performance-limits)).
 
 ---
 
@@ -294,13 +357,13 @@ Notes:
 - Alert on disk use under the app root (watch for unexpected `debug-*.log`), PHP-FPM busy workers, MariaDB slow queries, and queue depth / failed jobs.
 - Retain audit_logs; never grant app UPDATE/DELETE on that table.
 
-### 8. Availability operations (until code caps land)
+### 8. Availability operations
 
-- Run large Excel import, full-list compare/PDF, full catalogue export, attachment disk migration, and on-demand backup **off-peak**; preferably one at a time.
-- Always leave “Run on queue” checked for Admin → Storage backup/migrate; ensure `queue:work` runs with `--timeout` at least 3600 and set `DB_QUEUE_RETRY_AFTER` higher than that (e.g. 3900) so long jobs are not reserved twice.
-- Prefer multiple smaller event lists over one warehouse-sized scan list so the scan UI stays responsive.
-- After deploy, confirm no `debug-*.log` files appear in the application root; treat any that appear as a defect (A1/A2).
-- Size host RAM and FPM as in [hardware-sizing.md](hardware-sizing.md); raise `memory_limit` toward 512M only if full-list compare/import is routine.
+- Tune soft caps with `php artisan app:performance-limits` when catalogues exceed defaults ([Managing performance limits](#managing-performance-limits)).
+- Ensure `queue:work --timeout=3600` (or higher) and `DB_QUEUE_RETRY_AFTER=3900` (or higher than timeout).
+- Prefer multiple smaller event lists over one warehouse-sized scan list until A8 is implemented.
+- After deploy, confirm no `debug-*.log` files appear in the application root.
+- Size host RAM and FPM as in [hardware-sizing.md](hardware-sizing.md); raise `memory_limit` toward 512M if you raise compare/import limits for large data sets.
 
 ---
 
@@ -432,17 +495,18 @@ These are the highest-value code/config changes relative to the findings above. 
 10. SSO: store provider subject IDs; require verified email claims for Azure comparable to Google; keep domain allow-list non-empty in production.
 11. Guest stock kill-switch — **done** (`STOCK_GUEST_ENABLED`); optional token expiry, quantity `max`, and tighter throttle remain open.
 
-### P2b — Availability / multi-user (open as of `1c18108`)
+### P2b — Availability / multi-user
 
-See [Availability and multi-user impact](#availability-and-multi-user-impact) for evidence (A1–A21). Highest-value application changes:
+See [Availability and multi-user impact](#availability-and-multi-user-impact).
 
-16. **Remove leftover agent debug instrumentation** — delete `POST /__debug/agent-log`, JS/Blade callers, and `file_put_contents` debug regions in `ImportService` / `AssetController`.
-17. **Import bounds** — max rows; chunked read/commit; do not store full prepared sheets in session/cache; queue commit for large files.
-18. **Export / compare bounds** — chunked or queued Excel/PDF; cap online compare list sizes; paginate API list items.
-19. **Backup / migrate safety** — force queue from Admin UI; `ShouldBeUnique`; `DB_QUEUE_RETRY_AFTER` ≥ job timeout; require `keep`; stream dumps.
-20. **Throttles** — web scan, import, export, compare, uploads, backup; optional global `throttleApi()`.
-21. **Browse/scan memory** — paginate scan recent items; lazy-load asset filter catalogues; cap search query tokens/length.
-22. **Bulk / string caps** — `max` on bulk ID arrays, notes, custom field values, guest quantity.
+16. **Remove leftover agent debug instrumentation** — **done** (A1/A2).
+17. **Import bounds** — **done** (`import_max_rows`, prepared files, `import_commit_chunk`).
+18. **Export / compare bounds** — **done** for row/list caps + throttles (queued Excel/PDF and API list pagination still optional follow-ups).
+19. **Backup / migrate safety** — **done** (force queue defaults, unique jobs, retention default, `DB_QUEUE_RETRY_AFTER`).
+20. **Throttles** — **partial** (import/export/compare/backup); still open: web scan, uploads, global API.
+21. **Browse/scan memory** — **open** (A8–A10 recommendations).
+22. **Bulk / string caps** — **open** (`max` on bulk ID arrays, notes, custom field values, guest quantity).
+23. **Admin limit CLI** — **done** (`php artisan app:performance-limits`).
 
 ### P3 — Defence in depth
 

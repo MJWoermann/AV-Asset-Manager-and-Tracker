@@ -60,9 +60,10 @@ Core database size for ~10k assets is typically well under 1–2 GB unless `audi
 
 ## Operational caveats
 
-- Prefer multiple event lists (or smaller stocktake batches) so the scan UI does not render ~10k rows on every refresh.
+- Prefer multiple event lists (or smaller stocktake batches) so the scan UI does not render ~10k rows on every refresh (A8 still open — see [security-hardening.md](security-hardening.md)).
+- Soft caps (`import_max_rows`, `export_max_rows`, `compare_max_list_items`) protect the shared host; raise them with `php artisan app:performance-limits` when the catalogue outgrows defaults — see [Managing performance limits](security-hardening.md#managing-performance-limits).
 - Run large Excel import, comparison PDF, and disk migration off-peak; they monopolize a worker and can spike RAM.
-- Size backup disk from attachment library × retention, not from “10,000 assets.”
+- Size backup disk from attachment library × retention (`backup_default_keep`, default 7), not from “10,000 assets.”
 - Monitor `audit_logs` growth over years (immutable; can dominate DB size long-term).
 
 ## Summary
