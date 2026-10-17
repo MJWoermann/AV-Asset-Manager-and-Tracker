@@ -156,3 +156,12 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Run `vendor/bin/phpunit` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
 
 </laravel-boost-guidelines>
+
+## Cursor Cloud specific instructions
+
+- PHP 8.5 and Composer come from the environment snapshot (Ondřej PHP PPA). `composer.json` requires `php: ^8.5`. Node.js 22 is on the base image.
+- Create `storage/framework/views` before `composer install`. Laravel resolves the compiled view path with `realpath()`, which is empty when that directory is missing, and `package:discover` then fails. The directory is tracked by `storage/framework/views/.gitignore`.
+- Local data is SQLite (`DB_CONNECTION=sqlite`, `database/database.sqlite`). On boot the app copies `.env.example` to `.env` when needed, generates `APP_KEY`, and runs `php artisan app:install`. It listens on http://127.0.0.1:8000.
+- Sign in as `admin@example.com` / `ChangeMeNow!` (same example password as the README).
+- `npm run build` runs during install so pages have CSS and JS. Use `npm run dev` when editing frontend assets.
+- Tests: `php artisan test --compact` (in-memory SQLite via `phpunit.xml`).
