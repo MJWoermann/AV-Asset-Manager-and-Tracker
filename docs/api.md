@@ -132,7 +132,7 @@ Authenticated routes require `admin`, `inventory_manager`, or `scanner`. See `ro
 | Catalogue | `/api/manufacturers`, nested models, `/api/item-types`, `/api/custom-field-sets` |
 | Spares | `/api/spares`, `/api/spares/groups`, movements, supersede, chart |
 | Repairs | `/api/repairs`, workflow actions, `/api/repair-procedures` |
-| Reports | `/api/unknown-scans`, export, `GET /api/dashboard/stats`, `GET /api/export/assets` |
+| Reports | `/api/unknown-scans`, export, note update, `POST /api/unknown-scans/{id}/link`, admin clear/dedupe; `GET /api/dashboard/stats`, `GET /api/export/assets` |
 | Files | `/api/files/search`, upload, link, download (manager index/show/destroy) |
 | Import | `GET/POST /api/import/status|upload|prepare|process` (inventory_manager+) |
 | Admin | `/api/admin/users`, `/api/admin/departments` (admin only) |
@@ -149,9 +149,38 @@ Authenticated routes require `admin`, `inventory_manager`, or `scanner`. See `ro
 3. **Import assets:** `POST /api/import/upload` → `POST /api/import/prepare` with `mapping` → `POST /api/import/process`.
 4. **Scoped token:** Issue with explicit `abilities` array; use `*` only for full automation accounts.
 
+### Link unknown scan to an existing asset
+
+```http
+POST /api/unknown-scans/{id}/link
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+Ability: `reports:write`. Roles: `admin`, `inventory_manager`, or `scanner`.
+
+```json
+{
+  "asset_id": 123,
+  "add_to_event_list": true,
+  "set_identifier": true
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `asset_id` | yes | Existing asset to resolve the unknown scan against |
+| `add_to_event_list` | no | If true and the unknown scan has an event list, add the asset to that list |
+| `set_identifier` | no | If true, set the asset’s `tp_barcode` from the scanned code when the field is empty and the code is unique |
+
+Returns **200** with `unknown_scan` summary (resolved). Already-resolved scans are rejected.
+
+Asset **checkout / return** is web-only (`POST /assets/{asset}/checkouts` …) — not exposed on this API.
+
 ## Web-only features (not on this API)
 
-- Password change, SSO/storage/email **settings**, export column admin, UI preferences (columns, dashboard modules).
+- Password change, SSO/storage/email **settings** (including digest toggles), export column admin, UI preferences (columns, dashboard modules).
+- Asset checkout and return (hire / repair / other).
 - Guest stock QR (`/stock/t/{token}`) and print HTML wizards.
 - Audit log **mutation** (history is read-only via API).
 - Profile API token UI is web-only, but tokens work on all `/api/*` routes above.

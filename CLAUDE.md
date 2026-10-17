@@ -2,7 +2,7 @@
 
 ## Product
 
-Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset management (inspired by Asset Tiger / Snipe-IT). Phase 1 is an **online-only** stocktake MVP.
+Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset management (inspired by Asset Tiger / Snipe-IT). Online-only PWA (installable shell; **no offline scan sync** unless explicitly requested).
 
 ## Stack
 
@@ -10,7 +10,7 @@ Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset manage
 - Blade + Alpine.js + Tailwind CSS (TP brand tokens in `tailwind.config.js`)
 - MariaDB in production; SQLite acceptable for local/dev
 - Laravel Sanctum Bearer tokens for `/api/*`
-- Spatie Laravel Permission roles: `admin`, `inventory_manager`, `scanner`
+- Spatie Laravel Permission roles: `admin`, `inventory_manager`, `scanner`, `external_repairer`
 - Maatwebsite Excel for CSV/XLSX
 - `html5-qrcode` for mobile barcode scanning
 - `vite-plugin-pwa` — installable shell only; **no offline data sync**
@@ -26,14 +26,19 @@ Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset manage
 | Inventory list | Source/expected stock table |
 | Event list | Scanned/usage table (stocktake event) |
 | Scan session | Active user session scanning into an event list, optionally compared to an inventory list |
+| Unknown scan | Unmatched barcode parked for follow-up; can link to an existing asset (`UnknownScan::linkToExisting`, web + `POST /api/unknown-scans/{id}/link`) |
+| Checkout | Hire / repair / other hand-off (`AssetCheckoutService`); guest or user assignee; repair purpose links repairs; return blocked while linked repair open; auto-return on repair complete |
+| Repair / procedure / spare | Always-on maintenance workflow; spares ≠ preview asset Stock tab |
+| Department | Multi-department isolation on operational tables; Admin → Departments |
+| Email digests | Warranty / test & tag / low-stock digests when `EmailIntegrationSettings::digestsAvailable()`; `email:send-digests` daily |
 | Audit log | Immutable append-only change history (asset show → History tab) |
-| User preferences | JSON on `users.preferences`; currently `asset_table_columns` for shared Assets/list table columns |
+| User preferences | JSON on `users.preferences`; e.g. `asset_table_columns`, `dashboard_modules`, active department |
 
 ## Hard rules
 
 1. **Never update or delete `audit_logs`.** `AuditLog` model throws on update/delete.
 2. Do not put secrets in the repo (`.env`, credentials, tokens).
-3. Do not implement Phase 2 features unless asked: Guest QR tokens, RU visualiser, maintenance file records, asset manuals/photos gallery, M365 SSO, offline scan sync.
+3. Do **not** implement **offline scan sync** (IndexedDB / queued offline stocktake) unless explicitly asked. Guest QR stock tokens, RU visualiser, maintenance files, manuals/photos, M365/Google SSO, checkout, repairs/spares, and email digests already exist — extend them only when requested; do not re-build as greenfield Phase 2.
 4. Prefer indexed identifier lookups (`fmi_ast`, `tp_barcode`, `rig_tag`, `device_sn`, IP/MAC) over leading-wildcard `LIKE` for primary scan paths.
 5. Comparison of large lists must use set-based SQL / keyed collections, not N+1 loops.
 6. Uploads: jpg/png/pdf/docx/xlsx/csv, max 25MB. Phase 1 import focuses on xlsx/csv.
@@ -45,7 +50,7 @@ Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset manage
 ## Key paths
 
 - Models: `app/Models/`
-- Scan / compare: `app/Services/ScanService.php`, `ListComparisonService.php`
+- Scan / compare / checkout: `app/Services/ScanService.php`, `ListComparisonService.php`, `AssetCheckoutService.php`
 - Web routes: `routes/web.php`
 - API: `routes/api.php`
 - Seed / install: `php artisan app:install`
@@ -70,9 +75,10 @@ php artisan serve
 
 | Role | Access |
 |------|--------|
-| admin | Full, including user management |
-| inventory_manager | Lists, import/export, reports, CRUD assets/types |
-| scanner | Scan, view inventory, edit asset details |
+| admin | Full, including user management, departments, email/SSO/storage |
+| inventory_manager | Lists, import/export, reports, CRUD assets/types, repairs/spares/procedures |
+| scanner | Scan, view inventory, edit asset details, checkout/return |
+| external_repairer | Maintenance hub + assigned repairs only; asset show for those assets; no scan/lists/import/catalogue/admin/hire checkout |
 
 ## Testing mindset
 

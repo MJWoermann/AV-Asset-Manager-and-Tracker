@@ -11,8 +11,9 @@ The Maintenance tab itself is always available and does **not** require this fea
 3. [B. Outlook / Microsoft 365 (Graph)](#b-outlook--microsoft-365-graph)
 4. [C. Manual SMTP](#c-manual-smtp)
 5. [Recipients, templates, and MAC onboarding](#2-recipients-templates-and-mac-onboarding)
-6. [Inbound polling and review](#3-inbound-polling-and-review)
-7. [Troubleshooting](#4-troubleshooting)
+6. [Common notifications / Digests](#common-notifications--digests)
+7. [Inbound polling and review](#3-inbound-polling-and-review)
+8. [Troubleshooting](#4-troubleshooting)
 
 ---
 
@@ -24,13 +25,13 @@ The Maintenance tab itself is always available and does **not** require this fea
 4. Set `APP_URL` to the public site URL (used in `{{asset.url}}` placeholders).
 5. Align the from-address with the mailbox that is allowed to send (SPF/DKIM on your DNS — follow your provider’s guide).
 6. **Secrets only in `.env`**. Never paste passwords or client secrets into the admin UI.
-7. Scheduler (inbound poll):
+7. Scheduler (inbound poll + digests):
 
 ```bash
 * * * * * cd /var/www/av-asset-manager && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Poll cadence is controlled by **Poll interval (minutes)** in Admin → Email. The command is `email:poll-inbound`.
+Poll cadence is controlled by **Poll interval (minutes)** in Admin → Email. The command is `email:poll-inbound`. When email integration is enabled, the scheduler also runs `email:send-digests` **daily** (see [Common notifications / Digests](#common-notifications--digests)).
 
 8. Queue (optional but recommended if you later queue mailables):
 
@@ -179,9 +180,29 @@ EHLO/domain alignment and DNS (SPF/DKIM/DMARC) are provider-specific — use the
    - Successful send stores an outbound thread (for reply matching) and appends a short Maintenance Note.
    - Create-only in v1 (not on edit).
 
-Other event keys: `maintenance_log_created`, `maintenance_fault_status_changed`, `inbound_match_pending`, `inbound_match_applied`, `inbound_match_rejected`.
+Other event keys: `maintenance_log_created`, `maintenance_fault_status_changed`, `inbound_match_pending`, `inbound_match_applied`, `inbound_match_rejected`, plus digest keys `warranty_expiry_digest`, `test_tag_expiry_digest`, `low_stock_digest`.
 
 Inbound Notes with `source=email` do **not** re-trigger outbound notifications (loop guard).
+
+---
+
+## Common notifications / Digests
+
+On **Admin → Email → Settings**, the **Common notifications / Digests** block appears only when digests are available: email integration is **enabled** and the chosen driver has credentials configured (`EmailIntegrationSettings::digestsAvailable()` — SMTP/Gmail need mail credentials; Outlook needs Graph client id/secret/tenant).
+
+When available, admins can toggle:
+
+| Digest | What it covers |
+|--------|----------------|
+| **Warranty expiry** | Assets whose `warranty_expiry` falls within **Days ahead** |
+| **Test & Tag expiry** | Assets whose `test_tag_expiry` falls within **Days ahead** |
+| **Low stock** | Assets with Stock levels at or below their minimum (asset Stock module) |
+
+Configure matching **templates** and **recipients** under Email → Templates (event keys above). Digests do not send unless the toggle is on, templates/recipients are set, and the scheduler is running.
+
+```bash
+php artisan email:send-digests   # also scheduled daily via schedule:run when integration is enabled
+```
 
 ---
 
@@ -201,6 +222,8 @@ Asset resolution fallbacks for non-thread mail: exact match on `fmi_ast`, `tp_ba
 | Symptom | Checks |
 |---------|--------|
 | Email admin links missing / 404 | Profile → enable **Email integration** |
+| Digests section missing | Integration enabled **and** credentials present for the driver (mail `.env` or Graph keys) |
+| Digests not arriving | Toggle on; template + recipients for the digest event key; cron running `schedule:run`; check `email:send-digests` |
 | Checkbox missing on create | Feature on, mail enabled in Admin → Email, and a MAC value typed |
 | Send skipped with warning | Recipient required fields empty (name and at least one MAC) |
 | Auth failures (SMTP) | App password, username=full email, port/encryption |

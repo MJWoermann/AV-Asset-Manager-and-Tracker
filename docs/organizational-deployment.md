@@ -18,12 +18,13 @@ Point your systems team at existing docs. Do **not** treat this guide as a serve
 | Hardening and backup posture | [security-hardening.md](security-hardening.md) |
 | Host sizing (~10k assets / ~20 users) | [hardware-sizing.md](hardware-sizing.md) |
 
-**Phase 1 facts IT and sponsors should share**
+**Facts IT and sponsors should share**
 
-- Online-only PWA: installable shortcut, but scanning and saving need a network connection.
+- Online-only PWA: installable shortcut, but scanning and saving need a network connection (offline scan sync is not available).
 - Mobile camera scan requires **HTTPS** (secure context).
-- **No self-registration.** Admins create accounts and assign roles.
+- **No self-registration.** Admins create accounts and assign roles (including optional `external_repairer` for assigned workshop jobs).
 - Optional SSO signs in **existing** users only — it does not auto-provision new people.
+- Hire-out / return can use asset **Checkout** (not only manual status edits).
 
 ---
 
@@ -37,7 +38,7 @@ AV Asset Manager replaces spreadsheet drift and “ask the person who last moved
 
 | Criterion | What “done” looks like |
 |-----------|------------------------|
-| Roles assigned | Every active user has `admin`, `inventory_manager`, or `scanner` (see [roles](features-and-usage.md#who-can-do-what-roles)) |
+| Roles assigned | Every active user has `admin`, `inventory_manager`, `scanner`, or (workshop vendors) `external_repairer` (see [roles](features-and-usage.md#who-can-do-what-roles)) |
 | Champions named | At least one peer coach per site or shift who can unblock scanners |
 | Master data ready | Locations, item types, and identifier/barcode fields populated for the pilot scope |
 | First real stocktake | Scan session → event list → [Reports → Compare](features-and-usage.md#1-stocktake-scan--compare) on live kit |
@@ -100,9 +101,9 @@ Questions: [champion name] or [inventory lead]. IT issues: [IT contact].
 
 | Question | Answer |
 |----------|--------|
-| Does it work offline? | No. Phase 1 is online-only. The PWA is an installable shell; scans and saves need connectivity. |
+| Does it work offline? | No. The app is online-only. The PWA is an installable shell; scans and saves need connectivity. |
 | Why HTTPS on phones? | Browser camera APIs require a secure context. IT must provide TLS (public cert or trusted self-signed / private CA). |
-| Who gets which role? | **Scanner** — scan and edit details. **Inventory manager** — lists, import/export, compare, types/locations. **Admin** — users, storage, SSO, export columns. |
+| Who gets which role? | **Scanner** — scan and edit details; can checkout/return. **Inventory manager** — lists, import/export, compare, types/locations, spares/procedures. **Admin** — users, departments, storage, SSO, email, export columns. **External repairer** — only Maintenance/Repairs assigned to them (no scan, lists, import, or full catalogue). |
 | Can I sign up myself? | No. An admin creates your account. SSO (if enabled) only works after that. |
 | Can we edit History? | No. History is append-only for trust and compliance. |
 
@@ -116,7 +117,8 @@ Questions: [champion name] or [inventory lead]. IT issues: [IT contact].
 |------|---------|
 | **Scanner** | Faster aisle walks; duplicate-scan warnings; rack scans can expand children; less “is this on the list?” guesswork |
 | **Inventory manager** | Import/export, compare reports (matched / inventory-only / scanned-only), bulk updates, clear unknown-scan follow-up |
-| **Admin** | Controlled access, optional SSO for existing users, storage/backup hooks, export column policy |
+| **Admin** | Controlled access, departments, optional SSO for existing users, storage/backup hooks, email digests, export column policy |
+| **External repairer** | Focused repair queue without warehouse navigation noise |
 
 ### Champion network and early wins
 
@@ -222,8 +224,9 @@ Adoption fails quietly when locations drift and nobody owns the tidy-up.
 |---------|-------------|
 | Kit moved between sites / stores | Scanner or assigned location owner — **Details** in-app |
 | Repair / service | Person logging the work — **Maintenance** (+ Files if needed) |
-| Hire-out / return | Inventory lead or designated hire owner |
-| Unknown scan after a stocktake | Inventory lead clears or creates the asset |
+| Hire-out / return | Inventory lead or designated hire owner — use asset **Checkout** (hire purpose) and **Return**, not only manual status edits |
+| Repair send-out | Checkout with purpose **Repair** (link/create repair); return blocked until the linked repair is closed |
+| Unknown scan after a stocktake | Inventory lead clears, **links to an existing asset**, or creates the asset |
 
 ### Cadence
 
@@ -322,9 +325,10 @@ and flag [inventory lead].
 | Run stocktakes | Scanners via Scan → event list; managers prepare inventory lists |
 | Judge the stocktake | Reports → Compare (matched / inventory-only / scanned-only) |
 | Update after moves | Details (location/status) in the app the same day |
-| Log faults | Maintenance on the asset |
+| Hire-out / return | Asset Checkout (hire) → Return when kit comes back |
+| Log faults / repairs | Maintenance on the asset; Repairs workflow under Maintenance |
 | Trust the past | History is read-only — no editing the audit trail |
-| Add fancy modules later | Labels, stock, connections, RU — only when core habit is solid |
+| Add fancy modules later | Labels, asset Stock, connections, RU — only when core habit is solid (spares/repairs are always on) |
 
 ### Training agenda — scanners (30 minutes)
 
@@ -447,8 +451,8 @@ AV Asset Manager branding: black headline, white background, charcoal body,
 turquoise #00adb7 used sparingly on checkmark icons only. Four clear rows:
 • Moved site / store / room → update Details (location / status) same day
 • Faulty or in service → log Maintenance on the asset
-• Hire-out or return → inventory lead or hire owner updates
-• After a stocktake unknown → inventory lead clears or creates the asset
+• Hire-out or return → Checkout / Return on the asset (or designated hire owner)
+• After a stocktake unknown → inventory lead links existing, clears, or creates the asset
 Bottom banner in black: “Chat coordinates. The app is the record.”
 Small footer: “History is read-only — changes are appended, not edited.”
 Clean warehouse signage look, no stock photos, no cluttered cards.

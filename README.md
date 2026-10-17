@@ -1,8 +1,6 @@
 # AV Asset Manager & Tracker
 
-Self-hosted Progressive Web App for AV equipment stocktake and asset management.
-
-**Phase 1 (Stocktake MVP):** local auth & roles, assets with parent/child racks, custom field templates, barcode scan-to-event, list comparison reports, CSV/Excel import-export, per-user asset table columns, asset audit History tab, Sanctum REST API, online-only installable PWA.
+Self-hosted Progressive Web App for AV equipment stocktake and asset management: local auth & roles (including external repairers), assets with parent/child racks, custom field templates, barcode scan-to-event, list comparison, unknown-scan follow-up (including link to existing asset), asset checkout/return (hire/repair/other), maintenance/repairs/spares, departments, CSV/Excel import-export, per-user asset table columns, audit History, Sanctum REST API, optional SSO and email digests, online-only installable PWA.
 
 ## Requirements
 
@@ -81,9 +79,10 @@ Full assumptions, minimum/comfortable tiers, and PHP/MariaDB tuning notes: [docs
 
 | Role | Capabilities |
 |------|----------------|
-| `admin` | Full access, user management |
-| `inventory_manager` | Assets, lists, import/export, reports |
-| `scanner` | Scan sessions, view inventory, edit asset details |
+| `admin` | Full access, users, departments, email/SSO/storage settings |
+| `inventory_manager` | Assets, lists, import/export, reports, repairs/spares/procedures |
+| `scanner` | Scan sessions, view inventory, edit asset details, checkout/return |
+| `external_repairer` | Maintenance hub + repairs assigned to them (and those assets’ show pages only) |
 
 ## REST API
 
@@ -97,7 +96,7 @@ Google Workspace and Microsoft Entra (single-tenant) OAuth for existing users. S
 
 ## Email integration (optional)
 
-Developer-flagged Gmail / Outlook Graph / SMTP notifications for MAC onboarding and maintenance events, plus inbound helpdesk reply logging. See [docs/email-setup.md](docs/email-setup.md). Requires `schedule:run` (and optionally `queue:work`) in production.
+Developer-flagged Gmail / Outlook Graph / SMTP notifications for MAC onboarding and maintenance events, inbound helpdesk reply logging, and (when integration is enabled with credentials) configurable **warranty / test & tag / low-stock digests** via Admin → Email (`email:send-digests`, scheduled daily). See [docs/email-setup.md](docs/email-setup.md). Requires `schedule:run` (and optionally `queue:work`) in production.
 
 ```bash
 curl -X POST /api/auth/token \
@@ -112,7 +111,7 @@ curl -X POST /api/auth/token \
 
 ## Preview features and deferred work
 
-Connections, RU visualiser, labels, and stock/consumables ship as opt-in **Developer features** on each user’s Profile (see [features and usage](docs/features-and-usage.md)). Optional Google / Microsoft Entra SSO: [docs/sso-setup.md](docs/sso-setup.md).
+Connections, RU visualiser, labels, asset **Stock**/consumables, and the email-integration flag ship as opt-in **Developer features** on each user’s Profile (see [features and usage](docs/features-and-usage.md)). Always-on areas include checkout, repairs, spares, departments, files/manuals, and unknown-scan link. Optional Google / Microsoft Entra SSO: [docs/sso-setup.md](docs/sso-setup.md) (existing users only — no JIT provisioning).
 
 Still deferred: offline scan sync.
 
