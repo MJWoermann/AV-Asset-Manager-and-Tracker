@@ -19,6 +19,7 @@ use App\Models\SparePart;
 use App\Models\SparePartMovement;
 use App\Models\User;
 use App\Support\EmailIntegrationSettings;
+use App\Support\NullableString;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -85,7 +86,7 @@ class RepairService
                 'status' => RepairStatus::Open,
                 'assignee_user_id' => $options['assignee_user_id'] ?? $user?->id,
                 'summary' => $summary,
-                'notes' => $this->nullableString($options['notes'] ?? null),
+                'notes' => NullableString::from($options['notes'] ?? null),
                 'started_at' => now(),
                 'asset_status_before' => $statusBefore,
                 'asset_status_after' => $statusAfter,
@@ -159,7 +160,7 @@ class RepairService
         $fault = $this->maintenanceLogs->create($asset, [
             'type' => MaintenanceLogType::Fault,
             'summary' => $summary,
-            'body' => $this->nullableString($options['notes'] ?? null),
+            'body' => NullableString::from($options['notes'] ?? null),
             'status' => AssetStatus::Maintenance->value,
         ], $user);
 
@@ -195,7 +196,7 @@ class RepairService
         $faultInput = [
             'type' => MaintenanceLogType::Fault,
             'summary' => $summary,
-            'body' => $this->nullableString($options['body'] ?? $options['notes'] ?? null),
+            'body' => NullableString::from($options['body'] ?? $options['notes'] ?? null),
         ];
 
         if (filled($options['status'] ?? null)) {
@@ -228,7 +229,7 @@ class RepairService
         $step->update([
             'completed_at' => now(),
             'completed_by_user_id' => $user?->id,
-            'notes' => $notes !== null ? $this->nullableString($notes) : $step->notes,
+            'notes' => $notes !== null ? NullableString::from($notes) : $step->notes,
         ]);
 
         if ($repair->status === RepairStatus::Open) {
@@ -279,7 +280,7 @@ class RepairService
             'repair_id' => $repair->id,
             'sort_order' => $maxOrder + 1,
             'title' => $title,
-            'body' => $this->nullableString($input['body'] ?? null),
+            'body' => NullableString::from($input['body'] ?? null),
             'is_required' => (bool) ($input['is_required'] ?? true),
         ]);
     }
@@ -384,7 +385,7 @@ class RepairService
             $repair->update([
                 'status' => RepairStatus::Completed,
                 'resolution_summary' => $resolution,
-                'notes' => $this->nullableString($input['notes'] ?? $repair->notes),
+                'notes' => NullableString::from($input['notes'] ?? $repair->notes),
                 'completed_at' => now(),
                 'completed_by_user_id' => $user?->id,
                 'asset_status_after' => $statusAfter ?? $repair->asset_status_after,
@@ -621,16 +622,5 @@ class RepairService
         }
 
         app(NotificationDispatchService::class)->dispatch($key, $asset, $user, $context);
-    }
-
-    protected function nullableString(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $trimmed = trim((string) $value);
-
-        return $trimmed === '' ? null : $trimmed;
     }
 }

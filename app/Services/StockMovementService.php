@@ -9,6 +9,8 @@ use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Support\NullableString;
+use App\Support\UploadedFiles;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -99,7 +101,7 @@ class StockMovementService
             }
         }
 
-        $uploads = $this->normalizeUploads($pdfs);
+        $uploads = UploadedFiles::normalize($pdfs);
         if ($uploads !== [] && ! $allowPdf) {
             throw ValidationException::withMessages([
                 'pdfs' => 'PDF attachments are only available when signed in.',
@@ -120,9 +122,9 @@ class StockMovementService
                 'quantity_after' => $after,
                 'quantity_delta' => $after - $before,
                 'user_id' => $user?->id,
-                'external_po_number' => $this->nullableString($input['external_po_number'] ?? null),
-                'external_po_url' => $this->nullableString($input['external_po_url'] ?? null),
-                'notes' => $this->nullableString($input['notes'] ?? null),
+                'external_po_number' => NullableString::from($input['external_po_number'] ?? null),
+                'external_po_url' => NullableString::from($input['external_po_url'] ?? null),
+                'notes' => NullableString::from($input['notes'] ?? null),
                 'source' => $source,
                 'recorded_at' => $input['recorded_at'] ?? now(),
             ]);
@@ -218,30 +220,5 @@ class StockMovementService
         }
 
         return (int) $value;
-    }
-
-    protected function nullableString(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $trimmed = trim((string) $value);
-
-        return $trimmed === '' ? null : $trimmed;
-    }
-
-    /**
-     * @return list<UploadedFile>
-     */
-    protected function normalizeUploads(UploadedFile|array|null $pdfs): array
-    {
-        if ($pdfs === null) {
-            return [];
-        }
-
-        $list = is_array($pdfs) ? $pdfs : [$pdfs];
-
-        return array_values(array_filter($list, fn ($file): bool => $file instanceof UploadedFile));
     }
 }

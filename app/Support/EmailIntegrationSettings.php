@@ -118,17 +118,17 @@ class EmailIntegrationSettings
         $payload = [
             'enabled' => $enabled,
             'driver' => $driver,
-            'from_name' => self::nullableString($input['from_name'] ?? null),
-            'from_address' => self::nullableString($input['from_address'] ?? null),
-            'outlook_mailbox' => self::nullableString($input['outlook_mailbox'] ?? null),
-            'inbound_folder' => self::nullableString($input['inbound_folder'] ?? null) ?? 'INBOX',
+            'from_name' => NullableString::from($input['from_name'] ?? null),
+            'from_address' => NullableString::from($input['from_address'] ?? null),
+            'outlook_mailbox' => NullableString::from($input['outlook_mailbox'] ?? null),
+            'inbound_folder' => NullableString::from($input['inbound_folder'] ?? null) ?? 'INBOX',
             'poll_interval_minutes' => max(1, (int) ($input['poll_interval_minutes'] ?? 5)),
-            'imap_host' => self::nullableString($input['imap_host'] ?? null),
+            'imap_host' => NullableString::from($input['imap_host'] ?? null),
             'imap_port' => isset($input['imap_port']) && $input['imap_port'] !== ''
                 ? (int) $input['imap_port']
                 : null,
-            'imap_encryption' => self::nullableString($input['imap_encryption'] ?? null),
-            'imap_username' => self::nullableString($input['imap_username'] ?? null),
+            'imap_encryption' => NullableString::from($input['imap_encryption'] ?? null),
+            'imap_username' => NullableString::from($input['imap_username'] ?? null),
         ];
 
         // Digest options only apply when integration is enabled; otherwise preserve prior values.
@@ -223,16 +223,5 @@ class EmailIntegrationSettings
             'mail' => $mailConfigured,
             'graph' => $graph,
         ];
-    }
-
-    protected static function nullableString(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $trimmed = trim((string) $value);
-
-        return $trimmed === '' ? null : $trimmed;
     }
 }

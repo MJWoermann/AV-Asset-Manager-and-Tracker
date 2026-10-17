@@ -10,6 +10,8 @@ use App\Models\Asset;
 use App\Models\AssetMaintenanceLog;
 use App\Models\User;
 use App\Support\EmailIntegrationSettings;
+use App\Support\NullableString;
+use App\Support\UploadedFiles;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
@@ -38,7 +40,7 @@ class AssetMaintenanceLogService
             ? $input['type']
             : MaintenanceLogType::from((string) $input['type']);
 
-        $uploads = $this->normalizeUploads($files);
+        $uploads = UploadedFiles::normalize($files);
         $source = isset($input['source']) ? (string) $input['source'] : null;
 
         $log = DB::transaction(function () use ($asset, $type, $input, $user, $uploads): AssetMaintenanceLog {
@@ -66,7 +68,7 @@ class AssetMaintenanceLogService
                 'user_id' => $user?->id,
                 'type' => $type,
                 'summary' => (string) $input['summary'],
-                'body' => $this->nullableString($input['body'] ?? null),
+                'body' => NullableString::from($input['body'] ?? null),
                 'occurred_at' => $input['occurred_at'] ?? now(),
                 'status_before' => $statusBefore,
                 'status_after' => $statusAfter,
@@ -125,33 +127,5 @@ class AssetMaintenanceLogService
                 'log.status_after' => (string) ($log->status_after ?? ''),
             ]);
         }
-    }
-
-    /**
-     * @param  list<UploadedFile>|UploadedFile|null  $files
-     * @return list<UploadedFile>
-     */
-    protected function normalizeUploads(UploadedFile|array|null $files): array
-    {
-        if ($files === null) {
-            return [];
-        }
-
-        if ($files instanceof UploadedFile) {
-            return [$files];
-        }
-
-        return array_values(array_filter($files, fn ($file): bool => $file instanceof UploadedFile));
-    }
-
-    protected function nullableString(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $trimmed = trim((string) $value);
-
-        return $trimmed === '' ? null : $trimmed;
     }
 }

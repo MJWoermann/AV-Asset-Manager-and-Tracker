@@ -11,7 +11,7 @@ class ScanVibrate
      */
     public static function enabled(?array $preferences): bool
     {
-        return (bool) ($preferences[self::PREFERENCE_KEY] ?? false);
+        return BoolPreference::enabled($preferences, self::PREFERENCE_KEY);
     }
 
     /**
@@ -22,9 +22,6 @@ class ScanVibrate
      */
     public static function mergeIntoPreferences(?array $preferences, bool $enabled): array
     {
-        $preferences ??= [];
-        $preferences[self::PREFERENCE_KEY] = $enabled;
-
-        return $preferences;
+        return BoolPreference::mergeIntoPreferences($preferences, self::PREFERENCE_KEY, $enabled);
     }
 }
