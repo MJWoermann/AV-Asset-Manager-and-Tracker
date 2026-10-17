@@ -6,6 +6,7 @@ use App\Models\Asset;
 use App\Models\AssetListItem;
 use App\Models\CustomFieldDefinition;
 use App\Support\AssetExportColumns;
+use App\Support\ExportRowLimiter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -40,19 +41,27 @@ class AssetsExport implements FromCollection, WithHeadings
                 $with[] = 'asset.'.$relation;
             }
 
-            return AssetListItem::query()
+            $query = AssetListItem::query()
                 ->with($with)
                 ->where('asset_list_id', $this->listId)
-                ->whereHas('asset')
+                ->whereHas('asset');
+
+            ExportRowLimiter::constrain($query, 'list export');
+
+            return $query
                 ->get()
                 ->sortBy(fn (AssetListItem $item) => Str::lower((string) $item->asset?->name))
                 ->values()
                 ->map(fn (AssetListItem $item) => AssetExportColumns::row($item->asset, $this->columns, $item));
         }
 
-        return Asset::query()
+        $query = Asset::query()
             ->with($relations)
-            ->orderBy('name')
+            ->orderBy('name');
+
+        ExportRowLimiter::constrain($query, 'asset export');
+
+        return $query
             ->get()
             ->map(fn (Asset $asset) => AssetExportColumns::row($asset, $this->columns));
     }

@@ -11,14 +11,16 @@ class BackupApplicationCommand extends Command
 {
     protected $signature = 'app:backup
                             {--disk= : Backup target disk (defaults to BACKUP_DISK)}
-                            {--keep= : Keep only the newest N backups on that disk}';
+                            {--keep= : Keep only the newest N backups (defaults to performance limit backup_default_keep)}';
 
     protected $description = 'Write a dated database + config + attachments backup to a remote disk';
 
     public function handle(AppBackupService $backups): int
     {
         $disk = $this->option('disk') ? (string) $this->option('disk') : null;
-        $keep = $this->option('keep') !== null ? (int) $this->option('keep') : null;
+        $keep = $this->option('keep') !== null && $this->option('keep') !== ''
+            ? (int) $this->option('keep')
+            : null;
 
         try {
             $result = $backups->backup($disk, $keep);

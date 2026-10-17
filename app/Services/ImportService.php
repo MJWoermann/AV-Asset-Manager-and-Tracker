@@ -16,10 +16,12 @@ use App\Models\ItemType;
 use App\Models\ItemTypeAlias;
 use App\Models\Location;
 use App\Models\LocationAlias;
+use App\Support\PerformanceLimits;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Exceptions\NoSheetsFoundException;
@@ -176,11 +178,69 @@ class ImportService
             $reader = new AssetImport;
             Excel::import($reader, $absolutePath);
 
+            $maxRows = PerformanceLimits::int('import_max_rows');
+            if ($reader->rows->count() > $maxRows) {
+                throw ValidationException::withMessages([
+                    'file' => sprintf(
+                        'This spreadsheet has %d data rows; the import limit is %d. Split the file or raise the limit (%s).',
+                        $reader->rows->count(),
+                        $maxRows,
+                        PerformanceLimits::raiseHint('import_max_rows'),
+                    ),
+                ]);
+            }
+
             return $reader->rows;
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (Throwable $e) {
             throw ValidationException::withMessages([
                 'file' => $this->userFacingReadError($e),
             ]);
+        }
+    }
+
+    /**
+     * Persist prepared import rows outside the session/cache payload.
+     *
+     * @param  list<array<string, mixed>>  $prepared
+     */
+    public function storePreparedRows(array $prepared, ?int $userId = null): string
+    {
+        $token = Str::lower(Str::random(24));
+        $path = 'imports/prepared/'.($userId ?: 'anon').'-'.$token.'.json';
+        Storage::put($path, json_encode($prepared, JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function loadPreparedRows(string $path): array
+    {
+        if (! Storage::exists($path)) {
+            throw ValidationException::withMessages([
+                'file' => 'Import session expired. Upload again.',
+            ]);
+        }
+
+        $decoded = json_decode((string) Storage::get($path), true);
+
+        if (! is_array($decoded)) {
+            throw ValidationException::withMessages([
+                'file' => 'Import session expired. Upload again.',
+            ]);
+        }
+
+        /** @var list<array<string, mixed>> $decoded */
+        return $decoded;
+    }
+
+    public function forgetPreparedRows(?string $path): void
+    {
+        if ($path && Storage::exists($path)) {
+            Storage::delete($path);
         }
     }
 
@@ -645,19 +705,15 @@ class ImportService
         $includeUpdated = (bool) ($listOptions['include_updated'] ?? false);
         $listDestination = $listOptions['destination'] ?? 'none';
 
-        $runner = function () use (
-            $prepared,
+        $processRows = function (array $chunk) use (
             $actions,
             $dryRun,
             $defaultDuplicateAction,
-            $listOptions,
-            $listDestination,
             $includeUpdated,
-            $userId,
             &$counts,
             &$assetsForList,
         ): void {
-            foreach ($prepared as $row) {
+            foreach ($chunk as $row) {
                 $existingId = $row['existing_id'] ?? null;
 
                 if ($existingId) {
@@ -724,17 +780,29 @@ class ImportService
                 $counts['created']++;
                 $assetsForList[] = ['id' => $asset->id, 'kind' => 'created'];
             }
+        };
 
-            if ($listDestination === 'none' || $assetsForList === []) {
-                return;
+        $chunkSize = max(1, PerformanceLimits::int('import_commit_chunk'));
+
+        if ($dryRun) {
+            $processRows($prepared);
+        } else {
+            foreach (array_chunk($prepared, $chunkSize) as $chunk) {
+                DB::transaction(fn () => $processRows($chunk));
             }
+        }
 
-            if ($dryRun) {
-                $counts['added_to_list'] = count($assetsForList);
+        if ($listDestination === 'none' || $assetsForList === []) {
+            return $counts;
+        }
 
-                return;
-            }
+        if ($dryRun) {
+            $counts['added_to_list'] = count($assetsForList);
 
+            return $counts;
+        }
+
+        DB::transaction(function () use ($listOptions, $userId, $assetsForList, &$counts): void {
             $list = $this->resolveImportTargetList($listOptions, $userId);
             if (! $list) {
                 return;
@@ -747,13 +815,7 @@ class ImportService
                 array_values(array_filter(array_column($assetsForList, 'id'))),
                 $userId,
             );
-        };
-
-        if ($dryRun) {
-            $runner();
-        } else {
-            DB::transaction($runner);
-        }
+        });
 
         return $counts;
     }

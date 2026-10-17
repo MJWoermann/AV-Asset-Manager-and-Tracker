@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Models\AssetList;
+use App\Models\AssetListItem;
+use App\Support\PerformanceLimits;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ListComparisonService
 {
@@ -15,6 +18,9 @@ class ListComparisonService
      */
     public function compare(AssetList $scannedList, AssetList $inventoryList): array
     {
+        $this->assertWithinLimit($scannedList, 'scanned');
+        $this->assertWithinLimit($inventoryList, 'inventory');
+
         $scanned = DB::table('asset_list_items as s')
             ->join('assets as a', 'a.id', '=', 's.asset_id')
             ->where('s.asset_list_id', $scannedList->id)
@@ -62,5 +68,24 @@ class ListComparisonService
             'inventory_only' => $inventoryOnly->values(),
             'scanned_only' => $scannedOnly->values(),
         ];
+    }
+
+    protected function assertWithinLimit(AssetList $list, string $label): void
+    {
+        $max = PerformanceLimits::int('compare_max_list_items');
+        $count = AssetListItem::query()->where('asset_list_id', $list->id)->count();
+
+        if ($count > $max) {
+            throw ValidationException::withMessages([
+                'scanned_list_id' => sprintf(
+                    'The %s list "%s" has %d items; the online compare limit is %d. Split the list or raise the limit (%s).',
+                    $label,
+                    $list->name,
+                    $count,
+                    $max,
+                    PerformanceLimits::raiseHint('compare_max_list_items'),
+                ),
+            ]);
+        }
     }
 }

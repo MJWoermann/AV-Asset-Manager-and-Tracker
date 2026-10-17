@@ -8,6 +8,7 @@ use App\Jobs\MigrateAttachmentDiskJob;
 use App\Models\Setting;
 use App\Services\AppBackupService;
 use App\Services\AttachmentDiskMigrator;
+use App\Support\PerformanceLimits;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -25,6 +26,9 @@ class StorageController extends Controller
             'allowedDisks' => $allowed,
             'qnapDriver' => (string) config('filesystems.disks.qnap.driver', 'local'),
             'lastRun' => Setting::getValue(AppBackupService::LAST_RUN_KEY),
+            'backupDefaultKeep' => PerformanceLimits::int('backup_default_keep'),
+            'backupForceQueue' => PerformanceLimits::bool('backup_force_queue'),
+            'migrateForceQueue' => PerformanceLimits::bool('migrate_force_queue'),
         ]);
     }
 
@@ -42,7 +46,8 @@ class StorageController extends Controller
 
         $dryRun = $request->boolean('dry_run');
         $deleteSource = $request->boolean('delete_source');
-        $queue = $request->boolean('queue');
+        $forceQueue = PerformanceLimits::bool('migrate_force_queue');
+        $queue = $forceQueue || $request->boolean('queue');
 
         if ($queue) {
             MigrateAttachmentDiskJob::dispatch($data['from'], $data['to'], $deleteSource, $dryRun);
@@ -67,22 +72,25 @@ class StorageController extends Controller
     public function backup(Request $request, AppBackupService $backups): RedirectResponse
     {
         $allowed = config('attachments.allowed_disks', ['local', 'qnap', 'sharepoint']);
+        $defaultKeep = PerformanceLimits::int('backup_default_keep');
 
         $request->merge([
             'disk' => $request->filled('disk') ? $request->input('disk') : null,
-            'keep' => $request->filled('keep') ? $request->input('keep') : null,
+            'keep' => $request->filled('keep') ? $request->input('keep') : $defaultKeep,
         ]);
 
         $data = $request->validate([
             'disk' => ['nullable', 'string', Rule::in($allowed)],
-            'keep' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'keep' => ['required', 'integer', 'min:1', 'max:100'],
             'queue' => ['sometimes', 'boolean'],
         ]);
 
         $disk = $data['disk'] ?? null;
-        $keep = isset($data['keep']) ? (int) $data['keep'] : null;
+        $keep = (int) $data['keep'];
+        $forceQueue = PerformanceLimits::bool('backup_force_queue');
+        $queue = $forceQueue || $request->boolean('queue');
 
-        if ($request->boolean('queue')) {
+        if ($queue) {
             BackupApplicationJob::dispatch($disk, $keep);
 
             return redirect()

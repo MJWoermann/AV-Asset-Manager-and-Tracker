@@ -7,6 +7,7 @@ use App\Http\Requests\LinkUnknownScanRequest;
 use App\Models\Asset;
 use App\Models\UnknownScan;
 use App\Services\ScanService;
+use App\Support\ExportRowLimiter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,7 +57,7 @@ class UnknownScanController extends Controller
         $status = $data['status'] ?? 'open';
         $format = $data['format'] ?? 'xlsx';
 
-        $scans = UnknownScan::query()
+        $query = UnknownScan::query()
             ->with(['user', 'location.parent.parent', 'eventList', 'inventoryList', 'resolvedAsset'])
             ->when($status === 'open', fn ($query) => $query->unresolved())
             ->when($status === 'resolved', fn ($query) => $query->whereNotNull('resolved_asset_id'))
@@ -67,12 +68,13 @@ class UnknownScanController extends Controller
                         ->orWhere('note', 'like', $term);
                 });
             })
-            ->latest()
-            ->get();
+            ->latest();
+
+        ExportRowLimiter::constrain($query, 'unknown-scan export');
 
         $filename = 'unknown-scans-'.now()->format('Ymd-His').'.'.$format;
 
-        return Excel::download(new UnknownScansExport($scans), $filename);
+        return Excel::download(new UnknownScansExport($query->get()), $filename);
     }
 
     public function update(Request $request, UnknownScan $unknownScan, ScanService $scanService): JsonResponse|RedirectResponse

@@ -70,10 +70,15 @@
                         <input type="checkbox" name="delete_source" value="1" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" @checked(old('delete_source'))>
                         Delete source after copy
                     </label>
-                    <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="queue" value="1" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" @checked(old('queue', true))>
-                        Run on queue
-                    </label>
+                    @if ($migrateForceQueue)
+                        <input type="hidden" name="queue" value="1">
+                        <span class="text-brand-charcoal/80 dark:text-brand-silver">Runs on the queue (required by performance limits).</span>
+                    @else
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" name="queue" value="1" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" @checked(old('queue', true))>
+                            Run on queue
+                        </label>
+                    @endif
                 </div>
                 <x-primary-button>Migrate</x-primary-button>
             </form>
@@ -99,15 +104,21 @@
                         <x-input-error class="mt-2" :messages="$errors->get('disk')" />
                     </div>
                     <div>
-                        <x-input-label for="keep" value="Keep newest (optional)" />
-                        <x-text-input id="keep" name="keep" type="number" min="1" max="100" class="mt-1 block w-full" :value="old('keep')" />
+                        <x-input-label for="keep" value="Keep newest" />
+                        <x-text-input id="keep" name="keep" type="number" min="1" max="100" class="mt-1 block w-full" :value="old('keep', $backupDefaultKeep)" />
+                        <p class="mt-1 text-xs text-brand-charcoal/70 dark:text-brand-silver">Default {{ $backupDefaultKeep }} (performance limit <code class="text-xs">backup_default_keep</code>).</p>
                         <x-input-error class="mt-2" :messages="$errors->get('keep')" />
                     </div>
                 </div>
-                <label class="inline-flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="queue" value="1" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" @checked(old('queue', true))>
-                    Run on queue
-                </label>
+                @if ($backupForceQueue)
+                    <input type="hidden" name="queue" value="1">
+                    <p class="text-sm text-brand-charcoal/80 dark:text-brand-silver">Runs on the queue (required by performance limits).</p>
+                @else
+                    <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="queue" value="1" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" @checked(old('queue', true))>
+                        Run on queue
+                    </label>
+                @endif
                 <div>
                     <x-primary-button>Backup now</x-primary-button>
                 </div>

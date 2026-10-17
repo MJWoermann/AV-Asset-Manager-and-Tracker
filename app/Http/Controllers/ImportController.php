@@ -43,12 +43,17 @@ class ImportController extends Controller
             throw $e;
         }
 
+        $previousPrepared = session('import.prepared_path');
+        if (is_string($previousPrepared)) {
+            $this->imports->forgetPreparedRows($previousPrepared);
+        }
+
         session([
             'import.path' => $path,
             'import.columns' => $columns,
             'import.original_filename' => $uploaded->getClientOriginalName(),
         ]);
-        session()->forget(['import.mapping', 'import.prepared']);
+        session()->forget(['import.mapping', 'import.prepared', 'import.prepared_path']);
 
         $previous = $this->imports->recalledMapping($request->user()?->id);
         $suggestedMappings = $this->imports->suggestMappings($columns, $previous);
@@ -84,7 +89,7 @@ class ImportController extends Controller
             $rows = $this->imports->readRows(Storage::path($path));
         } catch (ValidationException $e) {
             Storage::delete($path);
-            session()->forget(['import.path', 'import.columns', 'import.original_filename', 'import.mapping', 'import.prepared']);
+            session()->forget(['import.path', 'import.columns', 'import.original_filename', 'import.mapping', 'import.prepared', 'import.prepared_path']);
 
             return redirect()->route('import.create')->withErrors($e->errors());
         }
@@ -93,10 +98,18 @@ class ImportController extends Controller
 
         $this->imports->rememberMapping($mapping, $request->user()?->id);
 
+        $previousPrepared = session('import.prepared_path');
+        if (is_string($previousPrepared)) {
+            $this->imports->forgetPreparedRows($previousPrepared);
+        }
+
+        $preparedPath = $this->imports->storePreparedRows($prepared, $request->user()?->id);
+
         session([
             'import.mapping' => $mapping,
-            'import.prepared' => $prepared,
+            'import.prepared_path' => $preparedPath,
         ]);
+        session()->forget('import.prepared');
 
         $duplicates = array_values(array_filter($prepared, fn (array $row) => $row['existing_id'] !== null));
         $newCount = count($prepared) - count($duplicates);
@@ -113,7 +126,10 @@ class ImportController extends Controller
     public function process(Request $request): RedirectResponse
     {
         $path = session('import.path');
-        $prepared = session('import.prepared');
+        $preparedPath = session('import.prepared_path');
+        $prepared = is_string($preparedPath)
+            ? $this->imports->loadPreparedRows($preparedPath)
+            : (is_array(session('import.prepared')) ? session('import.prepared') : null);
 
         if (! $path || ! is_array($prepared)) {
             return redirect()->route('import.create')->withErrors(['file' => 'Import session expired. Upload again.']);
@@ -166,7 +182,10 @@ class ImportController extends Controller
         if (! $dryRun) {
             $archivedToLibrary = $this->archiveProcessedImport($path);
             Storage::delete($path);
-            session()->forget(['import.path', 'import.columns', 'import.original_filename', 'import.mapping', 'import.prepared']);
+            if (is_string($preparedPath)) {
+                $this->imports->forgetPreparedRows($preparedPath);
+            }
+            session()->forget(['import.path', 'import.columns', 'import.original_filename', 'import.mapping', 'import.prepared', 'import.prepared_path']);
         }
 
         $message = sprintf(

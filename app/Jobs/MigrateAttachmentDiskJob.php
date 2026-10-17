@@ -3,11 +3,12 @@
 namespace App\Jobs;
 
 use App\Services\AttachmentDiskMigrator;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 
-class MigrateAttachmentDiskJob implements ShouldQueue
+class MigrateAttachmentDiskJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
@@ -15,12 +16,19 @@ class MigrateAttachmentDiskJob implements ShouldQueue
 
     public int $tries = 1;
 
+    public int $uniqueFor = 3900;
+
     public function __construct(
         public string $from,
         public string $to,
         public bool $deleteSource = false,
         public bool $dryRun = false,
     ) {}
+
+    public function uniqueId(): string
+    {
+        return 'attachment-migrate:'.$this->from.':'.$this->to.':'.($this->dryRun ? 'dry' : 'live');
+    }
 
     public function handle(AttachmentDiskMigrator $migrator): void
     {
