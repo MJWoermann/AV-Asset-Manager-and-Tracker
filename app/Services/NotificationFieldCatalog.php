@@ -49,6 +49,10 @@ class NotificationFieldCatalog
             ['key' => 'asset.location', 'label' => 'Location'],
             ['key' => 'asset.item_type', 'label' => 'Item type'],
             ['key' => 'asset.url', 'label' => 'Asset URL'],
+            ['key' => 'asset.warranty_expiry', 'label' => 'Warranty expiry'],
+            ['key' => 'asset.test_tag_expiry', 'label' => 'Test & Tag expiry'],
+            ['key' => 'asset.quantity', 'label' => 'Quantity on hand'],
+            ['key' => 'asset.min_stock_level', 'label' => 'Min stock level'],
             ['key' => 'user.name', 'label' => 'Acting user'],
         ];
     }
@@ -114,6 +118,10 @@ class NotificationFieldCatalog
             'asset.location' => (string) ($asset->location?->name ?? ''),
             'asset.item_type' => (string) ($asset->itemType?->name ?? ''),
             'asset.url' => route('assets.show', $asset),
+            'asset.warranty_expiry' => $asset->warranty_expiry?->format('Y-m-d') ?? '',
+            'asset.test_tag_expiry' => $asset->test_tag_expiry?->format('Y-m-d') ?? '',
+            'asset.quantity' => $asset->quantity === null ? '' : (string) $asset->quantity,
+            'asset.min_stock_level' => $asset->min_stock_level === null ? '' : (string) $asset->min_stock_level,
             'user.name' => (string) ($user?->name ?? ''),
         ];
 

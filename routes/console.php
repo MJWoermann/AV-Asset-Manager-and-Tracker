@@ -28,3 +28,8 @@ Schedule::command('email:poll-inbound')
 
         return now()->minute % $interval === 0;
     });
+
+Schedule::command('email:send-digests')
+    ->daily()
+    ->withoutOverlapping(60)
+    ->when(fn (): bool => EmailIntegrationSettings::isEnabled());

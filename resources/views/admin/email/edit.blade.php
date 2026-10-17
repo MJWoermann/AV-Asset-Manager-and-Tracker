@@ -115,7 +115,45 @@
                 </div>
             </fieldset>
 
-            <div class="flex flex-wrap gap-2">
+            @if ($digestsAvailable)
+                <fieldset class="space-y-3 border border-brand-silver dark:border-brand-charcoal p-3">
+                    <legend class="px-1 text-sm font-medium">Common notifications / Digests</legend>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Daily digests for matching assets. Configure templates and recipients under Email → Templates.
+                        Scheduled via <code class="text-xs">email:send-digests</code>.
+                    </p>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="hidden" name="digest_warranty_enabled" value="0">
+                        <input type="checkbox" name="digest_warranty_enabled" value="1" class="rounded text-brand" @checked(old('digest_warranty_enabled', $settings['digest_warranty_enabled']))>
+                        <span>Warranty expiry digest</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="hidden" name="digest_test_tag_enabled" value="0">
+                        <input type="checkbox" name="digest_test_tag_enabled" value="1" class="rounded text-brand" @checked(old('digest_test_tag_enabled', $settings['digest_test_tag_enabled']))>
+                        <span>Test &amp; Tag expiry digest</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="hidden" name="digest_low_stock_enabled" value="0">
+                        <input type="checkbox" name="digest_low_stock_enabled" value="1" class="rounded text-brand" @checked(old('digest_low_stock_enabled', $settings['digest_low_stock_enabled']))>
+                        <span>Low stock digest</span>
+                    </label>
+                    <div class="max-w-xs">
+                        <x-input-label for="digest_days_ahead" value="Days ahead (expiry digests)" />
+                        <x-text-input
+                            id="digest_days_ahead"
+                            name="digest_days_ahead"
+                            type="number"
+                            min="1"
+                            max="365"
+                            class="mt-1 block w-full"
+                            :value="old('digest_days_ahead', $settings['digest_days_ahead'])"
+                        />
+                        <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">Includes overdue and dates within this window.</p>
+                    </div>
+                </fieldset>
+            @endif
+
+            <div class="flex flex-wrap justify-end gap-2">
                 <x-primary-button>Save settings</x-primary-button>
             </div>
         </form>
