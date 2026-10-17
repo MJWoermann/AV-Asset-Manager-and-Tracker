@@ -466,7 +466,6 @@ class AssetConnectionFeatureTest extends TestCase
         $response = $this->actingAs($user)->get(route('reports.connection-map', $filters));
 
         $response->assertOk();
-<<<<<<< HEAD
         $graphNames = collect($response->viewData('graph')['nodes'] ?? [])
             ->map(fn (array $node): string => (string) ($node['data']['name'] ?? ''))
             ->filter()
@@ -475,21 +474,6 @@ class AssetConnectionFeatureTest extends TestCase
 
         $this->assertSame(['Router', 'Switch'], $graphNames);
         $this->assertNotContains('Spare', $graphNames);
-=======
-        $response->assertSee('Router', false);
-        $response->assertSee('Switch', false);
-        $response->assertDontSee('Isolated Stage Unit', false);
-
-        $graph = $service->buildGraph($filters);
-        $nodeNames = collect($graph['nodes'])
-            ->map(fn (array $node): string => (string) ($node['data']['name'] ?? $node['data']['label'] ?? ''))
-            ->filter()
-            ->values()
-            ->all();
-        $this->assertContains('Router', $nodeNames);
-        $this->assertContains('Switch', $nodeNames);
-        $this->assertNotContains('Isolated Stage Unit', $nodeNames);
->>>>>>> 198b329 (Harden connection-map filter test against Spares nav collision.)
     }
 
     public function test_connections_tab_lists_peer_assets(): void
