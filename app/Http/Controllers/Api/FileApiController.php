@@ -3,20 +3,27 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\FileCategory;
-use App\Http\Controllers\FileController;
+use App\Http\Controllers\Concerns\AuthorizesFileAttachments;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\LinkFileRequest;
 use App\Http\Requests\StoreBulkFileUploadRequest;
 use App\Http\Requests\StoreFileUploadRequest;
 use App\Http\Requests\StoreFileUrlRequest;
 use App\Models\File;
 use App\Models\FileLink;
+use App\Models\User;
+use App\Services\FileAttachmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class FileApiController extends FileController
+class FileApiController extends Controller
 {
+    use AuthorizesFileAttachments;
+
+    public function __construct(protected FileAttachmentService $attachments) {}
+
     public function index(Request $request): JsonResponse
     {
         $this->authorizeManager();
@@ -36,6 +43,37 @@ class FileApiController extends FileController
         $file->load(['uploader', 'links.linkable']);
 
         return response()->json($file);
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        $term = trim((string) $request->string('q'));
+        /** @var User|null $user */
+        $user = $request->user();
+        $manager = $user?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+
+        $files = File::query()
+            ->when(! $manager, function ($query): void {
+                $query->whereHas('links');
+            })
+            ->when($term !== '', function ($query) use ($term): void {
+                $query->where(function ($builder) use ($term): void {
+                    $builder->where('title', 'like', '%'.$term.'%')
+                        ->orWhere('original_filename', 'like', '%'.$term.'%');
+                });
+            })
+            ->orderBy('title')
+            ->limit(20)
+            ->get(['id', 'title', 'category', 'source_type', 'mime_type']);
+
+        return response()->json([
+            'data' => $files->map(fn (File $file): array => [
+                'id' => $file->id,
+                'title' => $file->title,
+                'category' => $file->category->label(),
+                'source_type' => $file->source_type->value,
+            ]),
+        ]);
     }
 
     public function upload(StoreFileUploadRequest $request): JsonResponse
