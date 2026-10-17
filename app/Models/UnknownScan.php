@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AssetStatus;
 use App\Models\Concerns\BelongsToDepartment;
+use App\Support\TextSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -129,6 +130,17 @@ class UnknownScan extends Model
     public function scopeUnresolved(Builder $query): Builder
     {
         return $query->whereNull('resolved_asset_id');
+    }
+
+    /**
+     * Multi-token search across scanned code and note.
+     *
+     * @param  Builder<UnknownScan>  $query
+     * @return Builder<UnknownScan>
+     */
+    public function scopeSearch(Builder $query, ?string $term): Builder
+    {
+        return TextSearch::constrainColumns($query, $term, ['scanned_code', 'note']);
     }
 
     /**

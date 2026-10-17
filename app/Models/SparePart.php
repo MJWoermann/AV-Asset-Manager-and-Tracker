@@ -9,6 +9,7 @@ use App\Enums\SparePartStandbyMode;
 use App\Enums\SparePartStockStatus;
 use App\Models\Concerns\BelongsToDepartment;
 use App\Services\FileAttachmentService;
+use App\Support\TextSearch;
 use Database\Factories\SparePartFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -178,5 +179,30 @@ class SparePart extends Model
     public function scopeActiveLifecycle(Builder $query): Builder
     {
         return $query->where('lifecycle_status', SparePartLifecycleStatus::Active);
+    }
+
+    /**
+     * Multi-token search across spare codes and labels.
+     *
+     * @param  Builder<SparePart>  $query
+     * @return Builder<SparePart>
+     */
+    public function scopeSearch(Builder $query, ?string $term): Builder
+    {
+        return TextSearch::constrain($query, $term, function (Builder $group, string $like): void {
+            $group->orWhereLike('code', $like)
+                ->orWhereLike('component', $like)
+                ->orWhereLike('product_code', $like)
+                ->orWhereLike('supplier', $like)
+                ->orWhereLike('notes', $like)
+                ->orWhereHas(
+                    'manufacturer',
+                    fn (Builder $related) => $related->whereLike('name', $like)
+                )
+                ->orWhereHas(
+                    'manufacturerModel',
+                    fn (Builder $related) => $related->whereLike('name', $like)
+                );
+        });
     }
 }

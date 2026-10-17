@@ -35,11 +35,7 @@ class FileController extends Controller
             ->latest();
 
         if ($search = trim((string) $request->string('q'))) {
-            $query->where(function ($builder) use ($search): void {
-                $builder->where('title', 'like', '%'.$search.'%')
-                    ->orWhere('original_filename', 'like', '%'.$search.'%')
-                    ->orWhere('external_url', 'like', '%'.$search.'%');
-            });
+            $query->search($search);
         }
 
         if ($category = $request->string('category')->toString()) {
@@ -75,12 +71,7 @@ class FileController extends Controller
             ->when(! $manager, function ($query): void {
                 $query->whereHas('links');
             })
-            ->when($term !== '', function ($query) use ($term): void {
-                $query->where(function ($builder) use ($term): void {
-                    $builder->where('title', 'like', '%'.$term.'%')
-                        ->orWhere('original_filename', 'like', '%'.$term.'%');
-                });
-            })
+            ->when($term !== '', fn ($query) => $query->search($term))
             ->orderBy('title')
             ->limit(20)
             ->get(['id', 'title', 'category', 'source_type', 'mime_type']);

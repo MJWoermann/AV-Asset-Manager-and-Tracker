@@ -41,11 +41,7 @@ class SparePartController extends Controller
         }
 
         if ($term !== '') {
-            $query->where(function ($q) use ($term): void {
-                $q->where('code', 'like', "%{$term}%")
-                    ->orWhere('component', 'like', "%{$term}%")
-                    ->orWhere('product_code', 'like', "%{$term}%");
-            });
+            $query->search($term);
         }
 
         if (filled($kind)) {

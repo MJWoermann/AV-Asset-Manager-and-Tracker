@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 
+// TextSearch used for multi-token column filters.
+
 class AssetBrowseFilters
 {
     /**
@@ -167,18 +169,18 @@ class AssetBrowseFilters
                 continue;
             }
 
-            $like = '%'.AssetSearch::escapeLike($value).'%';
-            $query->whereLike($column, $like);
+            TextSearch::constrainColumn($query, $value, $column);
         }
 
         if ($allows('parent')) {
             $parent = trim($request->string('parent')->toString());
             if ($parent !== '') {
-                $like = '%'.AssetSearch::escapeLike($parent).'%';
-                $query->whereHas(
-                    'parent',
-                    fn (Builder $builder) => $builder->whereLike('name', $like)
-                );
+                TextSearch::constrain($query, $parent, function (Builder $group, string $like): void {
+                    $group->whereHas(
+                        'parent',
+                        fn (Builder $builder) => $builder->whereLike('name', $like)
+                    );
+                });
             }
         }
 

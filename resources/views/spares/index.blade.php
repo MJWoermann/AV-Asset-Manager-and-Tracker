@@ -25,9 +25,17 @@
                 || $includeEol;
         @endphp
         <form method="get" class="flex flex-wrap gap-2 items-end text-sm">
-            <div>
-                <label class="block text-xs text-brand-charcoal dark:text-brand-silver">Search</label>
-                <input type="search" name="q" value="{{ $term }}" class="border border-brand-silver dark:border-brand-charcoal px-2 py-1 w-48" placeholder="Code, component…">
+            <div class="min-w-[14rem] flex-1 sm:flex-none sm:w-64">
+                <label for="spares-search-q" class="block text-xs text-brand-charcoal dark:text-brand-silver">Search</label>
+                <x-scannable-search
+                    id="spares-search-q"
+                    name="q"
+                    :value="$term"
+                    placeholder="Code, component…"
+                    class="mt-1"
+                    input-class="border border-brand-silver dark:border-brand-charcoal px-2 py-1 text-sm"
+                    scan-aria-label="Scan barcode into spares search"
+                />
             </div>
             <div class="min-w-[9rem]">
                 <label class="block text-xs text-brand-charcoal dark:text-brand-silver" for="spares_kind">Kind</label>

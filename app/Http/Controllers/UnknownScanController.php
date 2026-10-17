@@ -29,11 +29,7 @@ class UnknownScanController extends Controller
             ->when($status === 'open', fn ($query) => $query->unresolved())
             ->when($status === 'resolved', fn ($query) => $query->whereNotNull('resolved_asset_id'))
             ->when($request->filled('q'), function ($query) use ($request) {
-                $term = '%'.$request->string('q')->toString().'%';
-                $query->where(function ($inner) use ($term) {
-                    $inner->where('scanned_code', 'like', $term)
-                        ->orWhere('note', 'like', $term);
-                });
+                $query->search($request->string('q')->toString());
             })
             ->latest()
             ->paginate(50)
@@ -62,11 +58,7 @@ class UnknownScanController extends Controller
             ->when($status === 'open', fn ($query) => $query->unresolved())
             ->when($status === 'resolved', fn ($query) => $query->whereNotNull('resolved_asset_id'))
             ->when(! empty($data['q']), function ($query) use ($data) {
-                $term = '%'.$data['q'].'%';
-                $query->where(function ($inner) use ($term) {
-                    $inner->where('scanned_code', 'like', $term)
-                        ->orWhere('note', 'like', $term);
-                });
+                $query->search($data['q']);
             })
             ->latest();
 

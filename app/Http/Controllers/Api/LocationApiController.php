@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\BulkUpdateLocationsRequest;
 use App\Models\Location;
 use App\Services\BulkLocationUpdateService;
+use App\Support\TextSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class LocationApiController extends Controller
         }
 
         if ($q = trim($request->string('q')->toString())) {
-            $query->where('name', 'like', '%'.$q.'%');
+            TextSearch::constrainColumn($query, $q, 'name');
         }
 
         $locations = $query->orderByHierarchy()->paginate(min($request->integer('per_page', 100), 200));

@@ -45,18 +45,7 @@ class RepairController extends Controller
         }
 
         if ($term !== '') {
-            $query->where(function ($q) use ($term): void {
-                $q->where('summary', 'like', "%{$term}%")
-                    ->orWhereHas('asset', function ($assetQuery) use ($term): void {
-                        $assetQuery->where(function ($q) use ($term): void {
-                            $like = "%{$term}%";
-                            $q->where('name', 'like', $like)
-                                ->orWhere('fmi_ast', 'like', $like)
-                                ->orWhere('rig_tag', 'like', $like);
-                            ScannableIdentifierFields::orWherePartialMatch($q, $term);
-                        });
-                    });
-            });
+            $query->search($term);
         }
 
         $assignee = trim((string) $request->query('assignee', ''));

@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Enums\FileCategory;
 use App\Enums\FileSourceType;
 use App\Models\Concerns\BelongsToDepartment;
+use App\Support\TextSearch;
 use Database\Factories\FileFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -149,5 +151,20 @@ class File extends Model
     public function hasThumbnail(): bool
     {
         return filled($this->thumbnail_path);
+    }
+
+    /**
+     * Multi-token search across title, filename, and external URL.
+     *
+     * @param  Builder<File>  $query
+     * @return Builder<File>
+     */
+    public function scopeSearch(Builder $query, ?string $term): Builder
+    {
+        return TextSearch::constrainColumns($query, $term, [
+            'title',
+            'original_filename',
+            'external_url',
+        ]);
     }
 }

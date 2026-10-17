@@ -38,10 +38,7 @@ class RepairApiController extends Controller
         }
 
         if ($term !== '') {
-            $query->where(function ($q) use ($term): void {
-                $q->where('summary', 'like', "%{$term}%")
-                    ->orWhereHas('asset', fn ($aq) => $aq->where('name', 'like', "%{$term}%"));
-            });
+            $query->search($term);
         }
 
         return response()->json($query->paginate(min($request->integer('per_page', 25), 100)));

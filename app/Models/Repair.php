@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\RepairStatus;
 use App\Services\FileAttachmentService;
+use App\Support\AssetSearch;
+use App\Support\TextSearch;
 use Database\Factories\RepairFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -111,5 +113,23 @@ class Repair extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->whereIn('status', RepairStatus::activeValues());
+    }
+
+    /**
+     * Multi-token search across summary and related asset fields.
+     *
+     * @param  Builder<Repair>  $query
+     * @return Builder<Repair>
+     */
+    public function scopeSearch(Builder $query, ?string $term): Builder
+    {
+        return TextSearch::constrain($query, $term, function (Builder $group, string $like, string $token): void {
+            $group->orWhereLike('summary', $like)
+                ->orWhereLike('notes', $like)
+                ->orWhereHas(
+                    'asset',
+                    fn (Builder $assetQuery) => AssetSearch::constrain($assetQuery, $token)
+                );
+        });
     }
 }

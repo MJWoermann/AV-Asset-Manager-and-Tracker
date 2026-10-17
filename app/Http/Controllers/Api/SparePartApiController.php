@@ -26,10 +26,7 @@ class SparePartApiController extends Controller
         }
 
         if ($term = trim($request->string('q')->toString())) {
-            $query->where(function ($q) use ($term): void {
-                $q->where('code', 'like', "%{$term}%")
-                    ->orWhere('component', 'like', "%{$term}%");
-            });
+            $query->search($term);
         }
 
         return response()->json($query->paginate(min($request->integer('per_page', 25), 100)));

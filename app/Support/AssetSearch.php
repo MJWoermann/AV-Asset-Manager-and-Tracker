@@ -81,55 +81,43 @@ class AssetSearch
      */
     public static function tokens(?string $term): array
     {
-        if ($term === null) {
-            return [];
-        }
-
-        $trimmed = trim($term);
-
-        if ($trimmed === '') {
-            return [];
-        }
-
-        return preg_split('/\s+/u', $trimmed, -1, PREG_SPLIT_NO_EMPTY) ?: [$trimmed];
+        return TextSearch::tokens($term);
     }
 
     public static function escapeLike(string $value): string
     {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+        return TextSearch::escapeLike($value);
+    }
+
+    /**
+     * OR a single token's like-pattern across asset searchable fields (for nested queries).
+     */
+    public static function orWhereTokenMatches(Builder $group, string $like): void
+    {
+        foreach (self::COLUMNS as $column) {
+            $group->orWhereLike($column, $like);
+        }
+
+        foreach (self::RELATION_COLUMNS as $relation => $column) {
+            $group->orWhereHas(
+                $relation,
+                fn (Builder $related) => $related->whereLike($column, $like)
+            );
+        }
+
+        $group->orWhereHas(
+            'customFieldValues',
+            fn (Builder $cf) => $cf->whereLike('value', $like)
+        );
     }
 
     public static function constrain(Builder $query, ?string $term): Builder
     {
-        $tokens = self::tokens($term);
-
-        if ($tokens === []) {
-            return $query;
-        }
-
-        foreach ($tokens as $token) {
-            $like = '%'.self::escapeLike($token).'%';
-
-            $query->where(function (Builder $group) use ($like) {
-                foreach (self::COLUMNS as $column) {
-                    $group->orWhereLike($column, $like);
-                }
-
-                foreach (self::RELATION_COLUMNS as $relation => $column) {
-                    $group->orWhereHas(
-                        $relation,
-                        fn (Builder $related) => $related->whereLike($column, $like)
-                    );
-                }
-
-                $group->orWhereHas(
-                    'customFieldValues',
-                    fn (Builder $cf) => $cf->whereLike('value', $like)
-                );
-            });
-        }
-
-        return $query;
+        return TextSearch::constrain(
+            $query,
+            $term,
+            fn (Builder $group, string $like) => self::orWhereTokenMatches($group, $like)
+        );
     }
 
     public static function orderByRelevance(Builder $query, ?string $term): Builder
@@ -357,20 +345,6 @@ class AssetSearch
      */
     public static function matchesText(string $haystack, ?string $term): bool
     {
-        $tokens = self::tokens($term);
-
-        if ($tokens === []) {
-            return true;
-        }
-
-        $lower = mb_strtolower($haystack);
-
-        foreach ($tokens as $token) {
-            if (! str_contains($lower, mb_strtolower($token))) {
-                return false;
-            }
-        }
-
-        return true;
+        return TextSearch::matchesText($haystack, $term);
     }
 }
