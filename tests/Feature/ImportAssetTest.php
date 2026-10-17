@@ -656,6 +656,34 @@ class ImportAssetTest extends TestCase
         $this->assertContains('rig_tag', $rows[1]['matched_on']);
     }
 
+    public function test_service_matches_duplicates_on_ip_address(): void
+    {
+        $itemType = ItemType::create(['name' => 'Network Item', 'slug' => 'network-item']);
+        $existing = Asset::create([
+            'name' => 'Existing',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'ip_address' => '10.20.30.40',
+        ]);
+
+        $service = app(ImportService::class);
+        $rows = $service->prepareRows(collect([
+            collect([
+                'name' => 'Incoming',
+                'type' => 'Network Item',
+                'ip' => '10.20.30.40',
+            ]),
+        ]), [
+            'name' => 'name',
+            'type' => 'item_type',
+            'ip' => 'ip_address',
+        ]);
+
+        $this->assertNotNull($rows[0]['existing_id']);
+        $this->assertSame($existing->id, $rows[0]['existing_id']);
+        $this->assertContains('ip_address', $rows[0]['matched_on']);
+    }
+
     public function test_import_can_create_new_list_and_add_created_assets(): void
     {
         Storage::fake('local');

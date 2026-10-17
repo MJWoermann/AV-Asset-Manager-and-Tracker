@@ -68,7 +68,7 @@
                                         <td class="py-3 pr-3">
                                             <div class="font-medium">{{ $dup['payload']['name'] ?? '—' }}</div>
                                             <div class="text-xs text-gray-600 dark:text-brand-silver space-y-0.5 mt-1">
-                                                @foreach(['serial_number','fmi_ast','mac_address','rig_tag','tp_barcode'] as $key)
+                                                @foreach(['serial_number','fmi_ast','mac_address','rig_tag','tp_barcode','ip_address'] as $key)
                                                     @if(!empty($dup['payload'][$key]))
                                                         <div>{{ $fieldLabels[$key] ?? $key }}: {{ $dup['payload'][$key] }}</div>
                                                     @endif
@@ -79,7 +79,7 @@
                                             <div class="font-medium">{{ $dup['existing_summary']['name'] ?? '—' }}</div>
                                             <div class="text-xs text-gray-600 dark:text-brand-silver space-y-0.5 mt-1">
                                                 <div>ID: {{ $dup['existing_id'] }}</div>
-                                                @foreach(['serial_number','fmi_ast','mac_address','rig_tag','tp_barcode'] as $key)
+                                                @foreach(['serial_number','fmi_ast','mac_address','rig_tag','tp_barcode','ip_address'] as $key)
                                                     @if(!empty($dup['existing_summary'][$key]))
                                                         <div>{{ $fieldLabels[$key] ?? $key }}: {{ $dup['existing_summary'][$key] }}</div>
                                                     @endif
