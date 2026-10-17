@@ -1185,31 +1185,6 @@ class ImportService
         $matchedOn = [];
         $asset = null;
 
-        // #region agent log
-        $debugLogPath = base_path('debug-3c7602.log');
-        $ipInPayload = $payload['ip_address'] ?? null;
-        $ipInKeys = in_array('ip_address', self::DUPLICATE_KEYS, true);
-        $ipDbHit = null;
-        if ($ipInPayload !== null && $ipInPayload !== '') {
-            $ipDbHit = Asset::query()->where('ip_address', $ipInPayload)->value('id');
-        }
-        file_put_contents($debugLogPath, json_encode([
-            'sessionId' => '3c7602',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'A',
-            'location' => 'ImportService.php:findExistingMatch:entry',
-            'message' => 'Duplicate match entry',
-            'data' => [
-                'duplicateKeys' => self::DUPLICATE_KEYS,
-                'ipInDuplicateKeys' => $ipInKeys,
-                'ipInPayload' => $ipInPayload,
-                'payloadKeys' => array_keys($payload),
-                'ipDbHitAssetId' => $ipDbHit,
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
-
         foreach (self::DUPLICATE_KEYS as $key) {
             $value = $payload[$key] ?? null;
             if ($value === null || $value === '') {
@@ -1217,21 +1192,6 @@ class ImportService
             }
 
             $found = Asset::query()->where($key, $value)->first();
-            // #region agent log
-            file_put_contents($debugLogPath, json_encode([
-                'sessionId' => '3c7602',
-                'runId' => 'post-fix',
-                'hypothesisId' => $key === 'ip_address' ? 'A' : 'B',
-                'location' => 'ImportService.php:findExistingMatch:key',
-                'message' => 'Checked duplicate key',
-                'data' => [
-                    'key' => $key,
-                    'valuePresent' => $value !== null && $value !== '',
-                    'foundAssetId' => $found?->id,
-                ],
-                'timestamp' => (int) (microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-            // #endregion
             if ($found) {
                 if ($asset && $asset->id !== $found->id) {
                     // Prefer the first match; still record the key that hit.
@@ -1243,22 +1203,6 @@ class ImportService
                 $matchedOn[] = $key;
             }
         }
-
-        // #region agent log
-        file_put_contents($debugLogPath, json_encode([
-            'sessionId' => '3c7602',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'C',
-            'location' => 'ImportService.php:findExistingMatch:exit',
-            'message' => 'Duplicate match result',
-            'data' => [
-                'matchedAssetId' => $asset?->id,
-                'matchedOn' => $matchedOn,
-                'ipWouldMatchButSkipped' => $ipInKeys === false && $ipDbHit !== null,
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
 
         return ['asset' => $asset, 'matched_on' => $matchedOn];
     }

@@ -124,7 +124,6 @@
                     modelsByManufacturer: @js($modelsByManufacturer),
                 })"
                 @searchable-select-changed="onSearchableChanged($event.detail)"
-                data-debug-catalogue="114b8c"
             >
                 <div>
                     <x-input-label for="manufacturer_id" value="Manufacturer" />
@@ -172,89 +171,6 @@
                         <x-input-error :messages="$errors->get('new_manufacturer_model')" class="mt-1" />
                     </div>
                 </div>
-                {{-- #region agent log --}}
-                <script>
-                    (function () {
-                        function postDebug(payload) {
-                            try {
-                                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '114b8c' },
-                                    body: JSON.stringify(payload),
-                                }).catch(function () {});
-                            } catch (e) {}
-                            try {
-                                var csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-                                fetch('/__debug/agent-log', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        Accept: 'application/json',
-                                        'X-Requested-With': 'XMLHttpRequest',
-                                        ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
-                                    },
-                                    credentials: 'same-origin',
-                                    body: JSON.stringify(payload),
-                                }).catch(function () {});
-                            } catch (e) {}
-                        }
-
-                        function probe() {
-                            var root = document.querySelector('[data-debug-catalogue="114b8c"]');
-                            if (!root || !window.Alpine) {
-                                postDebug({
-                                    sessionId: '114b8c',
-                                    runId: 'pre-fix',
-                                    hypothesisId: 'H1_H5',
-                                    location: 'assets/form.blade.php:inline-probe',
-                                    message: 'catalogue probe missing root or Alpine',
-                                    data: { hasRoot: !!root, hasAlpine: !!window.Alpine, path: location.pathname },
-                                    timestamp: Date.now(),
-                                });
-                                return;
-                            }
-                            var data = Alpine.$data(root);
-                            var refEl = root._x_refs ? root._x_refs.modelSelect : null;
-                            var modelInput = root.querySelector('#manufacturer_model_id');
-                            var modelRoot = modelInput ? modelInput.closest('[x-data]') : null;
-                            var modelData = modelRoot && window.Alpine ? Alpine.$data(modelRoot) : null;
-                            var modelOwnRef = modelRoot && modelRoot._x_refs ? modelRoot._x_refs.modelSelect : null;
-                            postDebug({
-                                sessionId: '114b8c',
-                                runId: 'pre-fix',
-                                hypothesisId: 'H1_H2_H5',
-                                location: 'assets/form.blade.php:inline-probe',
-                                message: 'catalogue $refs vs closest x-data probe',
-                                data: {
-                                    path: location.pathname,
-                                    manufacturerId: data ? data.manufacturerId : null,
-                                    modelId: data ? data.modelId : null,
-                                    parentHasRef: !!refEl,
-                                    refOnModelRootInstead: !!modelOwnRef,
-                                    modelRootIsSelf: !!(modelRoot && modelRoot !== root),
-                                    mapKeyCount: data && data.modelsByManufacturer ? Object.keys(data.modelsByManufacturer).length : null,
-                                    optionsViaMap: data && data.manufacturerId && data.modelsByManufacturer
-                                        ? (data.modelsByManufacturer[data.manufacturerId] || []).length
-                                        : null,
-                                    modelDataOk: !!(modelData && typeof modelData.setOptions === 'function'),
-                                    modelOptionsLen: modelData && Array.isArray(modelData.options) ? modelData.options.length : null,
-                                    modelDisabled: modelData ? modelData.disabled : null,
-                                },
-                                timestamp: Date.now(),
-                            });
-                        }
-
-                        document.addEventListener('alpine:initialized', function () {
-                            queueMicrotask(probe);
-                        });
-                        queueMicrotask(function () {
-                            if (window.Alpine) {
-                                probe();
-                            }
-                        });
-                    })();
-                </script>
-                {{-- #endregion --}}
                 @foreach([
                     'serial_number' => 'Serial Number',
                     'supplier' => 'Supplier',

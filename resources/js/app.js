@@ -263,139 +263,6 @@ async function loadHtml5Qrcode() {
     return html5QrcodeModulePromise;
 }
 
-// #region agent log
-/**
- * Debug-only NDJSON ingest for session 500f94 (CODE_128 camera scan).
- *
- * @param {string} location
- * @param {string} message
- * @param {string} hypothesisId
- * @param {Record<string, unknown>} [data]
- */
-function agentDebugLog500f94(location, message, hypothesisId, data = {}) {
-    const payload = {
-        sessionId: '500f94',
-        runId: 'pre-fix',
-        hypothesisId,
-        location,
-        message,
-        data,
-        timestamp: Date.now(),
-    };
-    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '500f94' },
-        body: JSON.stringify(payload),
-    }).catch(() => {});
-    // Same-origin fallback (works when camera is on phone/LAN and 127.0.0.1 ingest is unreachable).
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    fetch('/__debug/agent-log', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify(payload),
-    }).catch(() => {});
-}
-
-/**
- * Debug-only NDJSON ingest for session 114b8c (asset edit manufacturer→model options).
- *
- * @param {string} location
- * @param {string} message
- * @param {string} hypothesisId
- * @param {Record<string, unknown>} [data]
- */
-function agentDebugLog114b8c(location, message, hypothesisId, data = {}) {
-    const payload = {
-        sessionId: '114b8c',
-        runId: 'pre-fix',
-        hypothesisId,
-        location,
-        message,
-        data,
-        timestamp: Date.now(),
-    };
-    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '114b8c' },
-        body: JSON.stringify(payload),
-    }).catch(() => {});
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    fetch('/__debug/agent-log', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify(payload),
-    }).catch(() => {});
-}
-
-/**
- * Debug-only: probe camera / secure-context APIs and ship NDJSON.
- *
- * @param {string} logLocation
- * @param {string} message
- * @param {string} hypothesisId
- * @param {Record<string, unknown>} [extra]
- */
-function agentLogCameraContext(logLocation, message, hypothesisId, extra = {}) {
-    const page = window.location;
-    const host = page.hostname || '';
-    const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
-    const payload = {
-        sessionId: '456cae',
-        runId: 'post-fix',
-        hypothesisId,
-        location: logLocation,
-        message,
-        data: {
-            href: page.href,
-            protocol: page.protocol,
-            host: page.host,
-            hostname: host,
-            isLoopback,
-            isSecureContext: Boolean(window.isSecureContext),
-            hasMediaDevices: Boolean(navigator.mediaDevices),
-            hasGetUserMedia: typeof navigator.mediaDevices?.getUserMedia === 'function',
-            hasEnumerateDevices: typeof navigator.mediaDevices?.enumerateDevices === 'function',
-            permissionsPolicyCamera:
-                typeof document.featurePolicy?.allowsFeature === 'function'
-                    ? document.featurePolicy.allowsFeature('camera')
-                    : typeof document.permissionsPolicy?.allowsFeature === 'function'
-                      ? document.permissionsPolicy.allowsFeature('camera')
-                      : null,
-            ...extra,
-        },
-        timestamp: Date.now(),
-    };
-    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '456cae' },
-        body: JSON.stringify(payload),
-    }).catch(() => {});
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    fetch('/__debug/agent-log', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify(payload),
-    }).catch(() => {});
-}
-// #endregion
 
 /** @type {{ stopCamera: () => Promise<void> } | null} */
 let activeFieldBarcodeScanner = null;
@@ -550,29 +417,6 @@ async function startBarcodeCamera(elementId, onDecoded) {
               width: { ideal: 1920 },
               height: { ideal: 1080 },
           };
-    // #region agent log
-    agentLogCameraContext('app.js:startBarcodeCamera:entry', 'Camera start capability probe', 'A', {
-        elementId,
-        batteryOptimised,
-        compactCamera,
-    });
-    let lastQrbox = null;
-    let decodeFailCount = 0;
-    let decodeOkCount = 0;
-    let lastFailLogAt = 0;
-    agentDebugLog500f94('app.js:startBarcodeCamera:formats', 'Configured barcode formats', 'E', {
-        elementId,
-        formatsToSupport,
-        code128Enum: Html5QrcodeSupportedFormats.CODE_128,
-        code39Enum: Html5QrcodeSupportedFormats.CODE_39,
-        qrEnum: Html5QrcodeSupportedFormats.QR_CODE,
-        batteryOptimised,
-        compactCamera,
-        fps,
-        disableFlip: true,
-        aspectRatio: compactCamera ? 2.2 : 1.777778,
-    });
-    // #endregion
     await scanner.start(
         { facingMode: 'environment' },
         {
@@ -584,152 +428,26 @@ async function startBarcodeCamera(elementId, onDecoded) {
                     width: Math.floor(viewfinderWidth * 0.9),
                     height: Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35)),
                 };
-                // #region agent log
-                lastQrbox = { viewfinderWidth, viewfinderHeight, ...box };
-                // #endregion
                 return box;
             },
             videoConstraints: requestedVideoConstraints,
         },
         (decoded) => {
-            // #region agent log
-            decodeOkCount += 1;
-            const text = String(decoded ?? '');
-            agentDebugLog500f94('app.js:startBarcodeCamera:decoded', 'Camera decode success', 'C', {
-                elementId,
-                decodeOkCount,
-                decodeFailCount,
-                length: text.length,
-                preview: text.slice(0, 24),
-                looksNumeric: /^\d+$/.test(text),
-                lastQrbox,
-            });
-            // #endregion
             void onDecoded(decoded);
         },
-        (errorMessage) => {
-            // #region agent log
-            decodeFailCount += 1;
-            const now = Date.now();
-            // Sample: first failure, then every ~2s while failing (avoid flood).
-            if (decodeFailCount === 1 || now - lastFailLogAt >= 2000) {
-                lastFailLogAt = now;
-                agentDebugLog500f94('app.js:startBarcodeCamera:decodeFail', 'Camera decode miss sample', 'C', {
-                    elementId,
-                    decodeFailCount,
-                    decodeOkCount,
-                    errorPreview: String(errorMessage || '').slice(0, 120),
-                    lastQrbox,
-                });
-            }
-            // #endregion
-        }
+        () => {}
     );
 
-    // #region agent log
-    let zoomApply = { attempted: false, ok: null, error: null };
-    // #endregion
     if (!batteryOptimised) {
         try {
-            // #region agent log
-            zoomApply.attempted = true;
-            // #endregion
             await scanner.applyVideoConstraints({
                 focusMode: 'continuous',
                 advanced: [{ zoom: 1.5 }],
             });
-            // #region agent log
-            zoomApply.ok = true;
-            // #endregion
-        } catch (zoomErr) {
-            // #region agent log
-            zoomApply.ok = false;
-            zoomApply.error = String(zoomErr?.message || zoomErr).slice(0, 120);
-            // #endregion
+        } catch (_) {
+            // Zoom / focus constraints are best-effort; ignore unsupported devices.
         }
     }
-
-    // #region agent log
-    try {
-        const host = document.getElementById(elementId);
-        const video = host?.querySelector('video') || null;
-        let trackSettings = null;
-        let trackCapabilities = null;
-        try {
-            trackSettings = typeof scanner.getRunningTrackSettings === 'function'
-                ? scanner.getRunningTrackSettings()
-                : null;
-        } catch (_) {}
-        try {
-            trackCapabilities = typeof scanner.getRunningTrackCapabilities === 'function'
-                ? scanner.getRunningTrackCapabilities()
-                : null;
-        } catch (_) {}
-        if (!trackSettings && video?.srcObject instanceof MediaStream) {
-            const track = video.srcObject.getVideoTracks()[0];
-            trackSettings = track?.getSettings?.() || null;
-            trackCapabilities = track?.getCapabilities?.() || null;
-        }
-        agentLogCameraContext('app.js:startBarcodeCamera:started', 'Camera stream negotiated after start', 'E', {
-            elementId,
-            batteryOptimised,
-            compactCamera,
-            viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio },
-            fps,
-            lastQrbox,
-            trackSettings: trackSettings
-                ? {
-                      width: trackSettings.width,
-                      height: trackSettings.height,
-                      frameRate: trackSettings.frameRate,
-                      facingMode: trackSettings.facingMode,
-                  }
-                : null,
-            videoEl: video
-                ? {
-                      videoWidth: video.videoWidth,
-                      videoHeight: video.videoHeight,
-                      clientWidth: video.clientWidth,
-                      clientHeight: video.clientHeight,
-                  }
-                : null,
-        });
-        agentDebugLog500f94('app.js:startBarcodeCamera:started', 'Negotiated stream + qrbox + zoom', 'A', {
-            elementId,
-            batteryOptimised,
-            compactCamera,
-            fps,
-            lastQrbox,
-            qrboxAspect: lastQrbox ? Number((lastQrbox.width / Math.max(lastQrbox.height, 1)).toFixed(3)) : null,
-            zoomApply,
-            trackSettings: trackSettings
-                ? {
-                      width: trackSettings.width,
-                      height: trackSettings.height,
-                      frameRate: trackSettings.frameRate,
-                      facingMode: trackSettings.facingMode,
-                      zoom: trackSettings.zoom ?? null,
-                      focusMode: trackSettings.focusMode ?? null,
-                  }
-                : null,
-            trackZoomCapability: trackCapabilities?.zoom
-                ? {
-                      min: trackCapabilities.zoom.min,
-                      max: trackCapabilities.zoom.max,
-                      step: trackCapabilities.zoom.step,
-                  }
-                : null,
-            videoEl: video
-                ? {
-                      videoWidth: video.videoWidth,
-                      videoHeight: video.videoHeight,
-                      clientWidth: video.clientWidth,
-                      clientHeight: video.clientHeight,
-                  }
-                : null,
-        });
-    } catch (_) {}
-    // #endregion
 
     return scanner;
 }
@@ -1273,42 +991,8 @@ Alpine.data('catalogueManufacturerModelFields', (config = {}) => ({
     },
 
     syncModelSelect({ emit = false } = {}) {
-        const refEl = this.$refs.modelSelect;
         const model = this.modelData();
-        const mapKeys = Object.keys(this.modelsByManufacturer || {});
-        const direct = this.modelsByManufacturer?.[this.manufacturerId];
-        const asString = this.modelsByManufacturer?.[String(this.manufacturerId)];
-        const asNumber = this.modelsByManufacturer?.[Number(this.manufacturerId)];
-        // #region agent log
-        agentDebugLog114b8c('app.js:catalogueManufacturerModelFields.syncModelSelect', 'syncModelSelect entry', 'H1_H2_H3_H5', {
-            emit,
-            runId: 'post-fix',
-            manufacturerId: this.manufacturerId,
-            manufacturerIdType: typeof this.manufacturerId,
-            modelId: this.modelId,
-            hasRef: !!refEl,
-            resolvedViaFieldId: !!model,
-            refTag: refEl?.tagName ?? null,
-            hasXData: !!(refEl?.__x || refEl?._x_dataStack),
-            modelDataOk: !!model && typeof model.setOptions === 'function',
-            mapIsArray: Array.isArray(this.modelsByManufacturer),
-            mapKeyCount: mapKeys.length,
-            mapKeysSample: mapKeys.slice(0, 8),
-            directIsArray: Array.isArray(direct),
-            directLen: Array.isArray(direct) ? direct.length : (direct == null ? null : -1),
-            asStringLen: Array.isArray(asString) ? asString.length : (asString == null ? null : -1),
-            asNumberLen: Array.isArray(asNumber) ? asNumber.length : (asNumber == null ? null : -1),
-            path: window.location.pathname,
-        });
-        // #endregion
         if (!model) {
-            // #region agent log
-            agentDebugLog114b8c('app.js:catalogueManufacturerModelFields.syncModelSelect', 'sync aborted: no modelData', 'H1_H5', {
-                hasRef: !!refEl,
-                manufacturerId: this.manufacturerId,
-                runId: 'post-fix',
-            });
-            // #endregion
             return;
         }
 
@@ -1331,18 +1015,6 @@ Alpine.data('catalogueManufacturerModelFields', (config = {}) => ({
         const options = this.modelsByManufacturer[this.manufacturerId] || [];
         model.setOptions(options);
         model.setDisabled(false);
-
-        // #region agent log
-        agentDebugLog114b8c('app.js:catalogueManufacturerModelFields.syncModelSelect', 'after setOptions', 'H2_H3_H4', {
-            runId: 'post-fix',
-            manufacturerId: this.manufacturerId,
-            optionsLen: options.length,
-            modelOptionsLen: Array.isArray(model.options) ? model.options.length : null,
-            modelDisabled: model.disabled,
-            modelValue: model.value,
-            sampleLabels: options.slice(0, 5).map((o) => o.label),
-        });
-        // #endregion
 
         const ids = options.map((row) => String(row.value));
         if (this.modelId === '__new__' || ids.includes(this.modelId)) {
@@ -2997,10 +2669,6 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
             return;
         }
 
-        // #region agent log
-        let _dbgIconSample = null;
-        // #endregion
-
         this.cy.batch(() => {
             this.cy.nodes().forEach((node) => {
                 const data = node.data();
@@ -3013,22 +2681,6 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                 if (canShowIcon && data.icon) {
                     node.data('icon_url', connectionTypeIconDataUri(data.icon));
                     node.style('background-image', node.data('icon_url'));
-                    // #region agent log
-                    if (! _dbgIconSample) {
-                        _dbgIconSample = {
-                            id: data.id,
-                            kind: data.kind,
-                            width: node.width(),
-                            height: node.height(),
-                            bgWidth: node.style('background-width'),
-                            bgHeight: node.style('background-height'),
-                            bgFit: node.style('background-fit'),
-                            bgPosX: node.style('background-position-x'),
-                            bgPosY: node.style('background-position-y'),
-                            hasRoomRackOpt: Object.prototype.hasOwnProperty.call(this.display, 'mapRoomRack'),
-                        };
-                    }
-                    // #endregion
                 } else {
                     node.style('background-image', 'none');
                 }
@@ -3041,12 +2693,6 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                 );
             });
         });
-
-        // #region agent log
-        if (_dbgIconSample) {
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'117f63'},body:JSON.stringify({sessionId:'117f63',location:'app.js:applyDisplayOptions',message:'connection map icon styles',data:_dbgIconSample,timestamp:Date.now(),hypothesisId:'A',runId:'post-fix'})}).catch(()=>{});
-        }
-        // #endregion
     },
 
     persistDisplayOptions() {
@@ -3761,15 +3407,7 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         const needed = this.elements.length
             ? this.contentFeedExtentMm() + this.autoPaddingMm
             : this.continuousMinMm;
-        // #region agent log
-        const contentBottom = this.elements.length ? this.contentBottomMm() : 0;
-        const contentRight = this.elements.length ? this.contentRightMm() : 0;
-        const beforeH = this.heightMm;
-        // #endregion
         this.heightMm = this.clampContinuousHeight(needed);
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9bd8ee'},body:JSON.stringify({sessionId:'9bd8ee',runId:'post-fix',hypothesisId:'A',location:'app.js:syncAutoHeight',message:'auto length sync',data:{isLandscape:this.isLandscape,orientation:this.orientation,lengthMode:this.lengthMode,feedAxis:this.isLandscape?'x':'y',contentBottom,contentRight,needed,heightMmBefore:beforeH,heightMmAfter:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
     },
 
     maybeExtendAlongFeed(extentMm) {
@@ -3794,9 +3432,6 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             ? Math.max(...list.map((el) => Number(el.x) + Number(el.width)))
             : 0;
         const extent = this.isLandscape ? right : bottom;
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9bd8ee'},body:JSON.stringify({sessionId:'9bd8ee',runId:'post-fix',hypothesisId:'C',location:'app.js:afterGeometryChange',message:'geometry change extents',data:{isLandscape:this.isLandscape,lengthMode:this.lengthMode,feedAxis:this.isLandscape?'x':'y',bottom,right,extent,heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,elCount:list.length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         this.maybeExtendAlongFeed(extent);
         if (this.lengthMode === 'auto') {
             this.syncAutoHeight();
@@ -4272,14 +3907,6 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
                 el.y = this.applyCoord(Math.max(0, orig.y + dy), this.displayHeightMm);
             });
             const moved = this.elements.filter((item) => this.drag.ids.includes(item.id));
-            // #region agent log
-            if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-                const sample = moved[0];
-                const elRight = sample ? Number(sample.x) + Number(sample.width) : null;
-                const elBottom = sample ? Number(sample.y) + Number(sample.height) : null;
-                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9bd8ee'},body:JSON.stringify({sessionId:'9bd8ee',runId:'post-fix',hypothesisId:'D',location:'app.js:onPointerMove',message:'drag move',data:{isLandscape:this.isLandscape,dx,dy,elX:sample?.x,elY:sample?.y,elRight,elBottom,outsideX:elRight!=null&&(sample.x<0||elRight>this.displayWidthMm),outsideY:elBottom!=null&&(sample.y<0||elBottom>this.displayHeightMm),heightMm:this.heightMm,displayWidthMm:this.displayWidthMm,displayHeightMm:this.displayHeightMm},timestamp:Date.now()})}).catch(()=>{});
-            }
-            // #endregion
             this.afterGeometryChange(moved);
         }
         if (this.resize) {
@@ -4558,13 +4185,6 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     },
 
     init() {
-        // #region agent log
-        agentLogCameraContext('app.js:barcodeScanner.init', 'Scan page camera context on init', 'A', {
-            insecureOriginBlocked: cameraBlockedByInsecureOrigin(),
-            localhostCameraUrl: cameraLocalhostUrl(),
-            httpsCameraUrl: cameraHttpsUrl(),
-        });
-        // #endregion
         this.eventItems = (initialEventItems || []).map((entry, index) => this.normalizeEventItem(entry, index));
         this.serverUnknowns = (initialUnknownScans || []).map((scan, index) =>
             this.normalizeEntry(
@@ -4944,14 +4564,6 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         this.message = '';
 
         if (cameraBlockedByInsecureOrigin()) {
-            // #region agent log
-            agentLogCameraContext('app.js:barcodeScanner.startCamera:blocked', 'Camera start blocked before library', 'A', {
-                insecureOriginBlocked: true,
-                formattedError: formatCameraStartError(),
-                localhostCameraUrl: cameraLocalhostUrl(),
-                httpsCameraUrl: cameraHttpsUrl(),
-            });
-            // #endregion
             this.error = formatCameraStartError();
             this.scanning = false;
             this.clearIdleTimer();
@@ -4967,53 +4579,21 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
             this.scanner = await startBarcodeCamera('qr-reader', async (decoded) => {
                 // Rest decode CPU while a scan POST is in flight.
                 if (this.busy) {
-                    // #region agent log
-                    agentDebugLog500f94('app.js:barcodeScanner:dropBusy', 'Decode dropped because busy', 'D', {
-                        length: String(decoded || '').length,
-                        preview: String(decoded || '').slice(0, 24),
-                        queueLen: this.queue?.length ?? null,
-                    });
-                    // #endregion
                     return;
                 }
                 const now = Date.now();
                 if (decoded === this.lastCameraCode && now - this.lastCameraAt < CAMERA_SAME_CODE_DEBOUNCE_MS) {
-                    // #region agent log
-                    agentDebugLog500f94('app.js:barcodeScanner:dropDebounce', 'Decode dropped by same-code debounce', 'D', {
-                        length: String(decoded || '').length,
-                        preview: String(decoded || '').slice(0, 24),
-                        ageMs: now - this.lastCameraAt,
-                    });
-                    // #endregion
                     return;
                 }
                 this.lastCameraCode = decoded;
                 this.lastCameraAt = now;
                 this.bumpIdleTimer();
                 this.code = decoded;
-                // #region agent log
-                agentDebugLog500f94('app.js:barcodeScanner:accept', 'Decode accepted for submit', 'D', {
-                    length: String(decoded || '').length,
-                    preview: String(decoded || '').slice(0, 24),
-                });
-                // #endregion
                 await this.submitCode();
             });
             this.bumpIdleTimer();
         } catch (e) {
-            // #region agent log
-            const errText = String(e?.message || e);
-            const formatted = formatCameraStartError(e);
-            agentLogCameraContext('app.js:barcodeScanner.startCamera:catch', 'Camera start failed', 'A', {
-                errorName: e?.name || null,
-                errorMessage: errText,
-                formattedError: formatted,
-                insecureOriginBlocked: cameraBlockedByInsecureOrigin(),
-                looksLikeStreamingUnsupported: errText.includes('Camera streaming not supported'),
-                looksLikeInsecureContext: errText.toLowerCase().includes('secure context'),
-            });
-            // #endregion
-            this.error = formatted;
+            this.error = formatCameraStartError(e);
             this.scanning = false;
             this.clearIdleTimer();
             this.$nextTick(() => this.focusInput());

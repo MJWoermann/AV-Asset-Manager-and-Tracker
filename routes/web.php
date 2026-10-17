@@ -60,7 +60,6 @@ use App\Http\Controllers\SparePartMovementController;
 use App\Http\Controllers\SparePartShelfTagPrintController;
 use App\Http\Controllers\TrustedExternalDomainPreferenceController;
 use App\Http\Controllers\UnknownScanController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -111,22 +110,8 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner,external_repair
 
 // Broad staff group — external_repairer is intentionally excluded.
 Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(function () {
-    // #region agent log
-    Route::post('/__debug/agent-log', function (Request $request) {
-        $payload = $request->all();
-        $payload['sessionId'] = $payload['sessionId'] ?? '114b8c';
-        $payload['timestamp'] = $payload['timestamp'] ?? (int) round(microtime(true) * 1000);
-        $sessionId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $payload['sessionId']) ?: '114b8c';
-        file_put_contents(
-            base_path("debug-{$sessionId}.log"),
-            json_encode($payload, JSON_UNESCAPED_SLASHES)."\n",
-            FILE_APPEND | LOCK_EX
-        );
-
-        return response()->noContent();
-    })->name('debug.agent-log');
-    // #endregion
-
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/profile/api-tokens', [ProfileApiTokenController::class, 'store'])
         ->name('profile.api-tokens.store');
