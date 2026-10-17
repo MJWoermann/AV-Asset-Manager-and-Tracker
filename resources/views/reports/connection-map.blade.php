@@ -28,8 +28,16 @@
 
             <div class="flex flex-wrap gap-2 items-end">
                 <div class="min-w-[10rem] flex-1 sm:flex-none sm:w-52">
-                    <x-input-label for="search" value="Search" class="sr-only" />
-                    <x-text-input id="search" name="search" class="block w-full text-sm" :value="$filters['search'] ?? ''" placeholder="Search asset / barcode" />
+                    <x-input-label for="connection-map-search" value="Search" class="sr-only" />
+                    <x-scannable-search
+                        id="connection-map-search"
+                        name="search"
+                        :value="$filters['search'] ?? ''"
+                        placeholder="Search asset / barcode"
+                        input-class="text-sm"
+                        aria-label="Search connected assets"
+                        scan-aria-label="Scan barcode into connection map search"
+                    />
                 </div>
                 <div class="min-w-[8rem] flex-1 sm:flex-none sm:w-44">
                     <x-input-label for="location_id" value="Location" class="sr-only" />

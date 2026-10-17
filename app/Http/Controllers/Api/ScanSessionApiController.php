@@ -92,7 +92,7 @@ class ScanSessionApiController extends Controller
     }
 
     /**
-     * @return array{event_list_id: int, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, department_id: int}
+     * @return array{event_list_id: int|null, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, department_id: int}
      */
     protected function validatedSessionLists(Request $request): array
     {
@@ -100,7 +100,7 @@ class ScanSessionApiController extends Controller
 
         $data = $request->validate([
             'event_list_id' => [
-                'required',
+                'nullable',
                 Rule::exists('asset_lists', 'id')->where('type', 'event'),
             ],
             'inventory_list_id' => [
@@ -130,13 +130,18 @@ class ScanSessionApiController extends Controller
             'new_location.parent_id.exists' => 'Racks cannot be a parent for another location.',
         ]);
 
-        $eventList = AssetList::query()->find($data['event_list_id']);
-        if ($eventList === null) {
-            throw ValidationException::withMessages([
-                'event_list_id' => 'Selected event list is not available.',
-            ]);
+        $data['event_list_id'] = $data['event_list_id'] ?? null;
+        $eventList = null;
+        if ($data['event_list_id'] !== null) {
+            $eventList = AssetList::query()->find($data['event_list_id']);
+            if ($eventList === null) {
+                throw ValidationException::withMessages([
+                    'event_list_id' => 'Selected event list is not available.',
+                ]);
+            }
         }
 
+        $inventoryList = null;
         if (! empty($data['inventory_list_id'])) {
             $inventoryList = AssetList::query()->find($data['inventory_list_id']);
             if ($inventoryList === null) {
@@ -145,7 +150,7 @@ class ScanSessionApiController extends Controller
                 ]);
             }
 
-            if ((int) $inventoryList->department_id !== (int) $eventList->department_id) {
+            if ($eventList !== null && (int) $inventoryList->department_id !== (int) $eventList->department_id) {
                 throw ValidationException::withMessages([
                     'inventory_list_id' => 'Event and inventory lists must belong to the same department.',
                 ]);
@@ -156,7 +161,7 @@ class ScanSessionApiController extends Controller
         $data['asset_status'] = isset($data['asset_status']) && $data['asset_status'] instanceof AssetStatus
             ? $data['asset_status']->value
             : ($data['asset_status'] ?? null);
-        $data['department_id'] = (int) $eventList->department_id;
+        $data['department_id'] = $this->resolveSessionDepartmentId($request, $eventList, $inventoryList);
 
         if ($creatingLocation) {
             $location = Location::create([
@@ -174,5 +179,26 @@ class ScanSessionApiController extends Controller
         unset($data['new_location']);
 
         return $data;
+    }
+
+    protected function resolveSessionDepartmentId(Request $request, ?AssetList $eventList, ?AssetList $inventoryList): int
+    {
+        if ($eventList !== null) {
+            return (int) $eventList->department_id;
+        }
+
+        if ($inventoryList !== null) {
+            return (int) $inventoryList->department_id;
+        }
+
+        $departmentId = $request->user()?->resolveActiveDepartmentId();
+
+        if ($departmentId === null) {
+            throw ValidationException::withMessages([
+                'event_list_id' => 'Select an active department before starting a scan session without lists.',
+            ]);
+        }
+
+        return $departmentId;
     }
 }

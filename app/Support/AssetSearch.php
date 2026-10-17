@@ -34,6 +34,8 @@ class AssetSearch
     public const RELATION_COLUMNS = [
         'manufacturer' => 'name',
         'manufacturerModel' => 'name',
+        'location' => 'name',
+        'itemType' => 'name',
     ];
 
     /**
@@ -60,6 +62,8 @@ class AssetSearch
             'description' => 'Description',
             'manufacturer' => 'Manufacturer',
             'manufacturerModel' => 'Model',
+            'location' => 'Location',
+            'itemType' => 'Type',
             'serial_number' => 'Serial',
             'fmi_ast' => 'FMI AST#',
             'tp_barcode' => 'TP Barcode',
@@ -273,8 +277,14 @@ class AssetSearch
             $rankedScore = $score + 1;
 
             if ($best === null || $rankedScore < $best['score']) {
+                $field = match ($relation) {
+                    'manufacturerModel' => 'model',
+                    'itemType' => 'item_type',
+                    default => $relation,
+                };
+
                 $best = [
-                    'field' => $relation,
+                    'field' => $field,
                     'label' => self::fieldLabels()[$relation] ?? $relation,
                     'value' => $value,
                     'score' => $rankedScore,

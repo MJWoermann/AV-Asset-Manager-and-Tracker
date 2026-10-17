@@ -12,7 +12,6 @@ use App\Models\ManufacturerModel;
 use App\Services\ManufacturerCatalogueService;
 use App\Support\SparePartLuhn;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -22,28 +21,6 @@ class StoreSparePartRequest extends FormRequest
     public function authorize(): bool
     {
         return $this->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
-    }
-
-    protected function failedValidation(Validator $validator): void
-    {
-        // #region agent log
-        $logPath = base_path('debug-b15581.log');
-        file_put_contents($logPath, json_encode([
-            'sessionId' => 'b15581',
-            'hypothesisId' => 'H2',
-            'location' => 'StoreSparePartRequest.php:failedValidation',
-            'message' => 'Spare store validation failed',
-            'data' => [
-                'manufacturer_id' => $this->input('manufacturer_id'),
-                'manufacturer_model_id' => $this->input('manufacturer_model_id'),
-                'new_manufacturer' => $this->filled('new_manufacturer'),
-                'errors' => $validator->errors()->messages(),
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
-
-        parent::failedValidation($validator);
     }
 
     /**

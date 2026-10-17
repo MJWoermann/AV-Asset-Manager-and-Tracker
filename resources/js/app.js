@@ -265,6 +265,81 @@ async function loadHtml5Qrcode() {
 
 // #region agent log
 /**
+ * Debug-only NDJSON ingest for session 500f94 (CODE_128 camera scan).
+ *
+ * @param {string} location
+ * @param {string} message
+ * @param {string} hypothesisId
+ * @param {Record<string, unknown>} [data]
+ */
+function agentDebugLog500f94(location, message, hypothesisId, data = {}) {
+    const payload = {
+        sessionId: '500f94',
+        runId: 'pre-fix',
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now(),
+    };
+    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '500f94' },
+        body: JSON.stringify(payload),
+    }).catch(() => {});
+    // Same-origin fallback (works when camera is on phone/LAN and 127.0.0.1 ingest is unreachable).
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    fetch('/__debug/agent-log', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+    }).catch(() => {});
+}
+
+/**
+ * Debug-only NDJSON ingest for session 114b8c (asset edit manufacturer→model options).
+ *
+ * @param {string} location
+ * @param {string} message
+ * @param {string} hypothesisId
+ * @param {Record<string, unknown>} [data]
+ */
+function agentDebugLog114b8c(location, message, hypothesisId, data = {}) {
+    const payload = {
+        sessionId: '114b8c',
+        runId: 'pre-fix',
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now(),
+    };
+    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '114b8c' },
+        body: JSON.stringify(payload),
+    }).catch(() => {});
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    fetch('/__debug/agent-log', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+    }).catch(() => {});
+}
+
+/**
  * Debug-only: probe camera / secure-context APIs and ship NDJSON.
  *
  * @param {string} logLocation
@@ -452,12 +527,13 @@ function formatCameraStartError(error) {
  */
 async function startBarcodeCamera(elementId, onDecoded) {
     const { Html5Qrcode, Html5QrcodeSupportedFormats } = await loadHtml5Qrcode();
+    const formatsToSupport = [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.QR_CODE,
+    ];
     const scanner = new Html5Qrcode(elementId, {
-        formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.QR_CODE,
-        ],
+        formatsToSupport,
         verbose: false,
     });
     const compactCamera = window.matchMedia('(max-width: 639px)').matches;
@@ -481,6 +557,21 @@ async function startBarcodeCamera(elementId, onDecoded) {
         compactCamera,
     });
     let lastQrbox = null;
+    let decodeFailCount = 0;
+    let decodeOkCount = 0;
+    let lastFailLogAt = 0;
+    agentDebugLog500f94('app.js:startBarcodeCamera:formats', 'Configured barcode formats', 'E', {
+        elementId,
+        formatsToSupport,
+        code128Enum: Html5QrcodeSupportedFormats.CODE_128,
+        code39Enum: Html5QrcodeSupportedFormats.CODE_39,
+        qrEnum: Html5QrcodeSupportedFormats.QR_CODE,
+        batteryOptimised,
+        compactCamera,
+        fps,
+        disableFlip: true,
+        aspectRatio: compactCamera ? 2.2 : 1.777778,
+    });
     // #endregion
     await scanner.start(
         { facingMode: 'environment' },
@@ -501,18 +592,61 @@ async function startBarcodeCamera(elementId, onDecoded) {
             videoConstraints: requestedVideoConstraints,
         },
         (decoded) => {
+            // #region agent log
+            decodeOkCount += 1;
+            const text = String(decoded ?? '');
+            agentDebugLog500f94('app.js:startBarcodeCamera:decoded', 'Camera decode success', 'C', {
+                elementId,
+                decodeOkCount,
+                decodeFailCount,
+                length: text.length,
+                preview: text.slice(0, 24),
+                looksNumeric: /^\d+$/.test(text),
+                lastQrbox,
+            });
+            // #endregion
             void onDecoded(decoded);
         },
-        () => {}
+        (errorMessage) => {
+            // #region agent log
+            decodeFailCount += 1;
+            const now = Date.now();
+            // Sample: first failure, then every ~2s while failing (avoid flood).
+            if (decodeFailCount === 1 || now - lastFailLogAt >= 2000) {
+                lastFailLogAt = now;
+                agentDebugLog500f94('app.js:startBarcodeCamera:decodeFail', 'Camera decode miss sample', 'C', {
+                    elementId,
+                    decodeFailCount,
+                    decodeOkCount,
+                    errorPreview: String(errorMessage || '').slice(0, 120),
+                    lastQrbox,
+                });
+            }
+            // #endregion
+        }
     );
 
+    // #region agent log
+    let zoomApply = { attempted: false, ok: null, error: null };
+    // #endregion
     if (!batteryOptimised) {
         try {
+            // #region agent log
+            zoomApply.attempted = true;
+            // #endregion
             await scanner.applyVideoConstraints({
                 focusMode: 'continuous',
                 advanced: [{ zoom: 1.5 }],
             });
-        } catch (_) {}
+            // #region agent log
+            zoomApply.ok = true;
+            // #endregion
+        } catch (zoomErr) {
+            // #region agent log
+            zoomApply.ok = false;
+            zoomApply.error = String(zoomErr?.message || zoomErr).slice(0, 120);
+            // #endregion
+        }
     }
 
     // #region agent log
@@ -549,6 +683,40 @@ async function startBarcodeCamera(elementId, onDecoded) {
                       height: trackSettings.height,
                       frameRate: trackSettings.frameRate,
                       facingMode: trackSettings.facingMode,
+                  }
+                : null,
+            videoEl: video
+                ? {
+                      videoWidth: video.videoWidth,
+                      videoHeight: video.videoHeight,
+                      clientWidth: video.clientWidth,
+                      clientHeight: video.clientHeight,
+                  }
+                : null,
+        });
+        agentDebugLog500f94('app.js:startBarcodeCamera:started', 'Negotiated stream + qrbox + zoom', 'A', {
+            elementId,
+            batteryOptimised,
+            compactCamera,
+            fps,
+            lastQrbox,
+            qrboxAspect: lastQrbox ? Number((lastQrbox.width / Math.max(lastQrbox.height, 1)).toFixed(3)) : null,
+            zoomApply,
+            trackSettings: trackSettings
+                ? {
+                      width: trackSettings.width,
+                      height: trackSettings.height,
+                      frameRate: trackSettings.frameRate,
+                      facingMode: trackSettings.facingMode,
+                      zoom: trackSettings.zoom ?? null,
+                      focusMode: trackSettings.focusMode ?? null,
+                  }
+                : null,
+            trackZoomCapability: trackCapabilities?.zoom
+                ? {
+                      min: trackCapabilities.zoom.min,
+                      max: trackCapabilities.zoom.max,
+                      step: trackCapabilities.zoom.step,
                   }
                 : null,
             videoEl: video
@@ -737,6 +905,15 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
           }
         : null,
     highlight: -1,
+    /** Stable root — Alpine `$el` is contextual and becomes the clicked option during `@click`. */
+    rootEl: null,
+    fieldName: '',
+
+    init() {
+        this.rootEl = this.$el;
+        const input = this.rootEl?.querySelector('input[type="hidden"]');
+        this.fieldName = input?.name || '';
+    },
 
     get selectedLabel() {
         if (this.createOption && this.value === this.createOption.value) {
@@ -785,11 +962,15 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     },
 
     emitChanged() {
-        const input = this.$el.querySelector('input[type="hidden"]');
-        this.$dispatch('searchable-select-changed', {
-            value: this.value,
-            name: input?.name || '',
-        });
+        const root = this.rootEl || this.$el;
+        const input = root?.querySelector('input[type="hidden"]');
+        const name = this.fieldName || input?.name || '';
+        // Dispatch from the stable root — do not use contextual this.$dispatch during option clicks.
+        root.dispatchEvent(new CustomEvent('searchable-select-changed', {
+            detail: { value: this.value, name },
+            bubbles: true,
+            composed: true,
+        }));
     },
 
     select(option) {
@@ -1001,17 +1182,54 @@ Alpine.data('catalogueManufacturerModelFields', (config = {}) => ({
     },
 
     modelData() {
-        const el = this.$refs.modelSelect;
-        if (!el) {
+        // x-ref on a nested x-data root is registered on the child, not this parent —
+        // resolve the model searchableSelect via its field id instead.
+        const input = this.$el?.querySelector('#manufacturer_model_id');
+        const root = input?.closest('[x-data]');
+        if (!root || root === this.$el) {
             return null;
         }
 
-        return Alpine.$data(el);
+        return Alpine.$data(root);
     },
 
     syncModelSelect({ emit = false } = {}) {
+        const refEl = this.$refs.modelSelect;
         const model = this.modelData();
+        const mapKeys = Object.keys(this.modelsByManufacturer || {});
+        const direct = this.modelsByManufacturer?.[this.manufacturerId];
+        const asString = this.modelsByManufacturer?.[String(this.manufacturerId)];
+        const asNumber = this.modelsByManufacturer?.[Number(this.manufacturerId)];
+        // #region agent log
+        agentDebugLog114b8c('app.js:catalogueManufacturerModelFields.syncModelSelect', 'syncModelSelect entry', 'H1_H2_H3_H5', {
+            emit,
+            runId: 'post-fix',
+            manufacturerId: this.manufacturerId,
+            manufacturerIdType: typeof this.manufacturerId,
+            modelId: this.modelId,
+            hasRef: !!refEl,
+            resolvedViaFieldId: !!model,
+            refTag: refEl?.tagName ?? null,
+            hasXData: !!(refEl?.__x || refEl?._x_dataStack),
+            modelDataOk: !!model && typeof model.setOptions === 'function',
+            mapIsArray: Array.isArray(this.modelsByManufacturer),
+            mapKeyCount: mapKeys.length,
+            mapKeysSample: mapKeys.slice(0, 8),
+            directIsArray: Array.isArray(direct),
+            directLen: Array.isArray(direct) ? direct.length : (direct == null ? null : -1),
+            asStringLen: Array.isArray(asString) ? asString.length : (asString == null ? null : -1),
+            asNumberLen: Array.isArray(asNumber) ? asNumber.length : (asNumber == null ? null : -1),
+            path: window.location.pathname,
+        });
+        // #endregion
         if (!model) {
+            // #region agent log
+            agentDebugLog114b8c('app.js:catalogueManufacturerModelFields.syncModelSelect', 'sync aborted: no modelData', 'H1_H5', {
+                hasRef: !!refEl,
+                manufacturerId: this.manufacturerId,
+                runId: 'post-fix',
+            });
+            // #endregion
             return;
         }
 
@@ -1034,6 +1252,18 @@ Alpine.data('catalogueManufacturerModelFields', (config = {}) => ({
         const options = this.modelsByManufacturer[this.manufacturerId] || [];
         model.setOptions(options);
         model.setDisabled(false);
+
+        // #region agent log
+        agentDebugLog114b8c('app.js:catalogueManufacturerModelFields.syncModelSelect', 'after setOptions', 'H2_H3_H4', {
+            runId: 'post-fix',
+            manufacturerId: this.manufacturerId,
+            optionsLen: options.length,
+            modelOptionsLen: Array.isArray(model.options) ? model.options.length : null,
+            modelDisabled: model.disabled,
+            modelValue: model.value,
+            sampleLabels: options.slice(0, 5).map((o) => o.label),
+        });
+        // #endregion
 
         const ids = options.map((row) => String(row.value));
         if (this.modelId === '__new__' || ids.includes(this.modelId)) {
@@ -1368,13 +1598,15 @@ Alpine.data('assetFormFields', (config = {}) => ({
 }));
 
 /**
- * Camera barcode fill for a single form input (asset create/edit identifiers).
+ * Camera barcode fill for a single form/search input (asset identifiers, browse search).
  *
- * @param {string} fieldId Input element id / name to populate
+ * @param {string} fieldId Input element id to populate
+ * @param {{ submitOnScan?: boolean }} [options]
  */
-Alpine.data('fieldBarcodeScanner', (fieldId) => ({
+Alpine.data('fieldBarcodeScanner', (fieldId, options = {}) => ({
     fieldId: String(fieldId || ''),
     readerId: `field-qr-${String(fieldId || 'input')}`,
+    submitOnScan: Boolean(options?.submitOnScan),
     scanning: false,
     scanner: null,
     error: '',
@@ -1451,6 +1683,10 @@ Alpine.data('fieldBarcodeScanner', (fieldId) => ({
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
         this.$dispatch('field-barcode-scanned', { field: this.fieldId, value });
+
+        if (this.submitOnScan && input.form) {
+            input.form.requestSubmit();
+        }
     },
 
     async destroy() {
@@ -4610,7 +4846,10 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     },
 
     normalizeEntry(entry, index = 0) {
-        const asset = entry.asset || {};
+        const asset = { ...(entry.asset || {}) };
+        if (asset.id && !asset.url) {
+            asset.url = `/assets/${asset.id}`;
+        }
         const unknownScan = entry.unknown_scan || null;
         return {
             key: String(entry.id ?? `${asset.id || unknownScan?.id || 'asset'}-${index}-${Date.now()}`),
@@ -4688,7 +4927,10 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     },
 
     normalizeEventItem(entry, index = 0) {
-        const asset = entry.asset || {};
+        const asset = { ...(entry.asset || {}) };
+        if (asset.id && !asset.url) {
+            asset.url = `/assets/${asset.id}`;
+        }
         return {
             id: entry.id ?? `event-${asset.id || index}-${Date.now()}`,
             quantity: entry.quantity ?? 1,
@@ -4725,16 +4967,36 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
             this.scanner = await startBarcodeCamera('qr-reader', async (decoded) => {
                 // Rest decode CPU while a scan POST is in flight.
                 if (this.busy) {
+                    // #region agent log
+                    agentDebugLog500f94('app.js:barcodeScanner:dropBusy', 'Decode dropped because busy', 'D', {
+                        length: String(decoded || '').length,
+                        preview: String(decoded || '').slice(0, 24),
+                        queueLen: this.queue?.length ?? null,
+                    });
+                    // #endregion
                     return;
                 }
                 const now = Date.now();
                 if (decoded === this.lastCameraCode && now - this.lastCameraAt < CAMERA_SAME_CODE_DEBOUNCE_MS) {
+                    // #region agent log
+                    agentDebugLog500f94('app.js:barcodeScanner:dropDebounce', 'Decode dropped by same-code debounce', 'D', {
+                        length: String(decoded || '').length,
+                        preview: String(decoded || '').slice(0, 24),
+                        ageMs: now - this.lastCameraAt,
+                    });
+                    // #endregion
                     return;
                 }
                 this.lastCameraCode = decoded;
                 this.lastCameraAt = now;
                 this.bumpIdleTimer();
                 this.code = decoded;
+                // #region agent log
+                agentDebugLog500f94('app.js:barcodeScanner:accept', 'Decode accepted for submit', 'D', {
+                    length: String(decoded || '').length,
+                    preview: String(decoded || '').slice(0, 24),
+                });
+                // #endregion
                 await this.submitCode();
             });
             this.bumpIdleTimer();
@@ -4900,7 +5162,13 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                 this.persistRecent();
             }
 
-            if (!data.duplicate && !data.unknown && Array.isArray(data.items) && data.items.length > 0) {
+            if (
+                this.eventListId &&
+                !data.duplicate &&
+                !data.unknown &&
+                Array.isArray(data.items) &&
+                data.items.length > 0
+            ) {
                 const added = data.items.map((item, index) => this.normalizeEventItem(item, index));
                 this.eventItems = [...added, ...this.eventItems];
             }

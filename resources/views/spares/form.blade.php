@@ -35,7 +35,7 @@
                 </div>
 
                 <div
-                    class="contents"
+                    class="sm:col-span-2 grid sm:grid-cols-2 gap-3"
                     x-data="catalogueManufacturerModelFields({
                         manufacturerId: @js($initialManufacturerId !== null && $initialManufacturerId !== '' ? (string) $initialManufacturerId : ''),
                         modelId: @js($initialModelId !== null && $initialModelId !== '' ? (string) $initialModelId : ''),
@@ -43,7 +43,7 @@
                     })"
                     @searchable-select-changed="onSearchableChanged($event.detail)"
                 >
-                    <div data-debug-spare-mfr="1">
+                    <div>
                         <label class="block text-xs" for="manufacturer_id">Manufacturer</label>
                         <x-searchable-select
                             name="manufacturer_id"
@@ -64,17 +64,6 @@
                             >
                             @error('new_manufacturer')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                         </div>
-                        {{-- #region agent log --}}
-                        <script>
-                            (() => {
-                                const root = document.querySelector('[data-debug-spare-mfr="1"]');
-                                const hasSearchable = !!root?.querySelector('[aria-haspopup="listbox"]');
-                                const hasAddNewInput = !!document.getElementById('new_manufacturer');
-                                const hasMulti = !!document.querySelector('[data-debug-spare-compatible="1"]');
-                                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b15581'},body:JSON.stringify({sessionId:'b15581',runId:'post-fix',hypothesisId:'H1_H5',location:'spares/form.blade.php:manufacturer',message:'Spare manufacturer UI after fix',data:{hasSearchable,hasAddNewInput,hasCompatibleMultiSearchable:hasMulti},timestamp:Date.now()})}).catch(()=>{});
-                            })();
-                        </script>
-                        {{-- #endregion --}}
                     </div>
                     <div>
                         <label class="block text-xs" for="manufacturer_model_id">Model</label>
@@ -140,13 +129,16 @@
                 </div>
                 <div class="grid sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs">Stock location</label>
-                        <select name="location_id" class="w-full border px-2 py-1">
-                            <option value="">—</option>
-                            @foreach($locations as $loc)
-                                <option value="{{ $loc->id }}" @selected((string) old('location_id', $spare->location_id) === (string) $loc->id)>{{ $loc->name }}</option>
-                            @endforeach
-                        </select>
+                        <label class="block text-xs" for="location_id">Stock location</label>
+                        <x-searchable-select
+                            name="location_id"
+                            id="location_id"
+                            :options="$locations->map(fn ($location) => ['value' => $location->id, 'label' => $location->name])"
+                            :selected="old('location_id', $spare->location_id)"
+                            nullable
+                            placeholder="Search locations…"
+                        />
+                        @error('location_id')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label class="block text-xs">Shelf / bin</label>
@@ -179,7 +171,7 @@
                 <textarea name="notes" rows="3" class="w-full border px-2 py-1">{{ old('notes', $spare->notes) }}</textarea>
             </div>
 
-            <div data-debug-spare-compatible="1">
+            <div>
                 <label class="block text-xs mb-1" for="compatible_model_ids">Also fits models</label>
                 <x-searchable-multi-select
                     name="compatible_model_ids[]"

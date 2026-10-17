@@ -41,14 +41,22 @@
             </div>
         @endif
 
-        <form id="asset-filters" method="GET" class="mb-4 flex flex-col sm:flex-row gap-2">
-            <input type="search" name="q" value="{{ $q }}" placeholder="Search FMI, barcode, SN, IP, MAC…" class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white">
+        <form id="asset-filters" method="GET" class="mb-4 flex flex-col sm:flex-row gap-2 sm:items-start">
+            <x-scannable-search
+                id="list-search-q"
+                name="q"
+                :value="$q"
+                placeholder="Search FMI, barcode, SN, IP, MAC…"
+                class="flex-1"
+                aria-label="Search list assets"
+                scan-aria-label="Scan barcode into list search"
+            />
             @foreach($preservedFilters as $param => $value)
                 <input type="hidden" name="{{ $param }}" value="{{ $value }}">
             @endforeach
-            <button class="px-4 py-2 bg-black text-white dark:bg-brand">Filter</button>
+            <button class="px-4 py-2 bg-black text-white dark:bg-brand shrink-0">Filter</button>
             @if(\App\Support\AssetBrowseFilters::hasActiveFilters(request()))
-                <a href="{{ route('lists.show', $list) }}" class="px-4 py-2 border text-sm inline-flex items-center">Clear</a>
+                <a href="{{ route('lists.show', $list) }}" class="px-4 py-2 border text-sm inline-flex items-center shrink-0">Clear</a>
             @endif
         </form>
 

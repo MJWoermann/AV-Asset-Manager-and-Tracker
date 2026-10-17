@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
+use App\Enums\LocationType;
 use App\Models\Asset;
 use App\Models\ItemType;
+use App\Models\Location;
 use App\Models\Manufacturer;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -28,6 +30,19 @@ class AssetSearchTest extends TestCase
         $user->assignRole('scanner');
 
         return $user;
+    }
+
+    public function test_assets_index_offers_camera_scan_on_search(): void
+    {
+        $user = $this->scanner();
+
+        $response = $this->actingAs($user)->get(route('assets.index'));
+
+        $response->assertOk();
+        $response->assertSee("fieldBarcodeScanner('asset-search-q'", false);
+        $response->assertSee('id="asset-search-q"', false);
+        $response->assertSee('id="field-qr-asset-search-q"', false);
+        $response->assertSee('submitOnScan: true', false);
     }
 
     public function test_search_matches_partial_identifier_fields(): void
@@ -110,6 +125,41 @@ class AssetSearchTest extends TestCase
         $response->assertSee('FOH Console');
         $this->assertSame(
             ['FOH Console'],
+            $response->viewData('assets')->pluck('name')->all()
+        );
+    }
+
+    public function test_multi_token_search_matches_location_and_name_parts(): void
+    {
+        $user = $this->scanner();
+        $itemType = $this->itemType();
+        $location = Location::create([
+            'name' => 'Bealey 3',
+            'type' => LocationType::Room,
+        ]);
+
+        Asset::create([
+            'name' => 'NVX352-A1-1-FLOATING',
+            'item_type_id' => $itemType->id,
+            'location_id' => $location->id,
+            'status' => AssetStatus::Available,
+            'serial_number' => '1917NEJ11659',
+            'ip_address' => '10.30.73.9',
+            'mac_address' => '00.10.7f.c4.f9.59',
+        ]);
+
+        Asset::create([
+            'name' => 'Other Bealey Device',
+            'item_type_id' => $itemType->id,
+            'location_id' => $location->id,
+            'status' => AssetStatus::Available,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('assets.index', ['q' => 'Bealey 3 Floating']));
+
+        $response->assertOk();
+        $this->assertSame(
+            ['NVX352-A1-1-FLOATING'],
             $response->viewData('assets')->pluck('name')->all()
         );
     }

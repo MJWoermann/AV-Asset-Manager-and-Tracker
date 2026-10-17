@@ -80,56 +80,14 @@ class SparePartController extends Controller
 
     public function create(): View
     {
-        $formData = $this->formData(new SparePart([
+        return view('spares.form', $this->formData(new SparePart([
             'code' => SparePartLuhn::generate(),
-        ]));
-
-        // #region agent log
-        $logPath = base_path('debug-b15581.log');
-        file_put_contents($logPath, json_encode([
-            'sessionId' => 'b15581',
-            'hypothesisId' => 'H1_H4',
-            'location' => 'SparePartController.php:create',
-            'runId' => 'post-fix',
-            'message' => 'Spare create form data shape',
-            'data' => [
-                'hasModelsByManufacturer' => array_key_exists('modelsByManufacturer', $formData),
-                'modelsByManufacturerKeys' => array_key_exists('modelsByManufacturer', $formData)
-                    ? count($formData['modelsByManufacturer'])
-                    : null,
-                'manufacturerCount' => is_countable($formData['manufacturers'] ?? null) ? count($formData['manufacturers']) : null,
-                'flatModelCount' => is_countable($formData['models'] ?? null) ? count($formData['models']) : null,
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
-
-        return view('spares.form', $formData);
+        ])));
     }
 
     public function store(StoreSparePartRequest $request, SparePartService $service): RedirectResponse
     {
         $data = $request->spareAttributes();
-
-        // #region agent log
-        $logPath = base_path('debug-b15581.log');
-        file_put_contents($logPath, json_encode([
-            'sessionId' => 'b15581',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'H2_H3',
-            'location' => 'SparePartController.php:store',
-            'message' => 'Spare store after catalogue resolve',
-            'data' => [
-                'raw_manufacturer_id' => $request->input('manufacturer_id'),
-                'raw_manufacturer_model_id' => $request->input('manufacturer_model_id'),
-                'resolved_manufacturer_id' => $data['manufacturer_id'] ?? null,
-                'resolved_manufacturer_model_id' => $data['manufacturer_model_id'] ?? null,
-                'has_new_manufacturer' => $request->filled('new_manufacturer'),
-                'has_new_manufacturer_model' => $request->filled('new_manufacturer_model'),
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
 
         $part = $service->create(
             $data,

@@ -52,19 +52,21 @@
         </div>
 
         @if($selectedListId)
-            <div class="flex flex-col sm:flex-row gap-2">
-                <input
-                    type="search"
+            <div class="flex flex-col sm:flex-row gap-2 sm:items-start">
+                <x-scannable-search
+                    id="shelf-tag-search-q"
                     name="q"
-                    value="{{ $q }}"
+                    :value="$q"
                     placeholder="Search FMI, barcode, SN, IP, MAC…"
-                    class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                >
-                <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand text-sm">Filter</button>
+                    class="flex-1"
+                    aria-label="Search assets for shelf tags"
+                    scan-aria-label="Scan barcode into shelf tag search"
+                />
+                <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand text-sm shrink-0">Filter</button>
                 @if($q !== '')
                     <a
                         href="{{ route('labels.index', array_filter(['asset_list_id' => $selectedListId, 'shelf_tag_layout_id' => $selectedLayoutId])) }}"
-                        class="px-4 py-2 border text-sm inline-flex items-center justify-center"
+                        class="px-4 py-2 border text-sm inline-flex items-center justify-center shrink-0"
                     >Clear</a>
                 @endif
             </div>

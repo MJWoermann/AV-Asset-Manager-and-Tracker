@@ -21,8 +21,15 @@
                 </select>
             </div>
             <div class="flex-1 min-w-[12rem]">
-                <x-input-label for="q" value="Search" />
-                <x-text-input id="q" name="q" class="mt-1 block w-full" :value="$term" placeholder="Summary or asset…" />
+                <x-input-label for="repairs-search-q" value="Search" />
+                <x-scannable-search
+                    id="repairs-search-q"
+                    name="q"
+                    :value="$term"
+                    placeholder="Summary or asset…"
+                    class="mt-1"
+                    scan-aria-label="Scan barcode into repairs search"
+                />
             </div>
             <div class="flex items-end">
                 <x-primary-button>Filter</x-primary-button>

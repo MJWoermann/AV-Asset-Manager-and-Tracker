@@ -85,10 +85,11 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     // #region agent log
     Route::post('/__debug/agent-log', function (Request $request) {
         $payload = $request->all();
-        $payload['sessionId'] = $payload['sessionId'] ?? '456cae';
+        $payload['sessionId'] = $payload['sessionId'] ?? '114b8c';
         $payload['timestamp'] = $payload['timestamp'] ?? (int) round(microtime(true) * 1000);
+        $sessionId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $payload['sessionId']) ?: '114b8c';
         file_put_contents(
-            base_path('debug-456cae.log'),
+            base_path("debug-{$sessionId}.log"),
             json_encode($payload, JSON_UNESCAPED_SLASHES)."\n",
             FILE_APPEND | LOCK_EX
         );

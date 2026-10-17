@@ -116,7 +116,9 @@ class SparePartRegisterTest extends TestCase
             ->assertSee('searchableMultiSelect(', false)
             ->assertSee('catalogueManufacturerModelFields(', false)
             ->assertSee('+ Add new manufacturer…', false)
-            ->assertSee('+ Add new model…', false);
+            ->assertSee('+ Add new model…', false)
+            ->assertSee('id="location_id"', false)
+            ->assertSee('Search locations…', false);
     }
 
     public function test_manager_can_create_spare_with_inline_manufacturer_and_model(): void

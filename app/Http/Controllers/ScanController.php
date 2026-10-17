@@ -32,11 +32,13 @@ class ScanController extends Controller
         $unknownScans = collect();
 
         if ($active) {
-            $eventListItems = AssetListItem::query()
-                ->where('asset_list_id', $active->event_list_id)
-                ->with(['asset.itemType'])
-                ->latest('id')
-                ->get();
+            if ($active->event_list_id) {
+                $eventListItems = AssetListItem::query()
+                    ->where('asset_list_id', $active->event_list_id)
+                    ->with(['asset.itemType'])
+                    ->latest('id')
+                    ->get();
+            }
 
             $unknownScans = UnknownScan::query()
                 ->where('scan_session_id', $active->id)
@@ -88,7 +90,7 @@ class ScanController extends Controller
         $data = $this->validatedSessionLists($request);
         $scan->update($data);
 
-        $eventListChanged = (int) $previousEventListId !== (int) ($data['event_list_id'] ?? 0);
+        $eventListChanged = (int) ($previousEventListId ?? 0) !== (int) ($data['event_list_id'] ?? 0);
 
         return redirect()
             ->route('scan.index')
@@ -145,11 +147,15 @@ class ScanController extends Controller
         abort_unless($scan->user_id === $request->user()->id, 403);
         $scan->update(['status' => 'closed']);
 
-        return redirect()->route('lists.show', $scan->event_list_id)->with('status', 'Scan session closed.');
+        if ($scan->event_list_id) {
+            return redirect()->route('lists.show', $scan->event_list_id)->with('status', 'Scan session closed.');
+        }
+
+        return redirect()->route('scan.index')->with('status', 'Scan session closed.');
     }
 
     /**
-     * @return array{event_list_id: int, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, department_id: int}
+     * @return array{event_list_id: int|null, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, department_id: int}
      */
     protected function validatedSessionLists(Request $request): array
     {
@@ -157,7 +163,7 @@ class ScanController extends Controller
 
         $data = $request->validate([
             'event_list_id' => [
-                'required',
+                'nullable',
                 Rule::exists('asset_lists', 'id')->where('type', 'event'),
             ],
             'inventory_list_id' => [
@@ -187,11 +193,15 @@ class ScanController extends Controller
             'new_location.parent_id.exists' => 'Racks cannot be a parent for another location.',
         ]);
 
-        $eventList = AssetList::query()->find($data['event_list_id']);
-        if ($eventList === null) {
-            throw ValidationException::withMessages([
-                'event_list_id' => 'Selected event list is not available.',
-            ]);
+        $data['event_list_id'] = $data['event_list_id'] ?? null;
+        $eventList = null;
+        if ($data['event_list_id'] !== null) {
+            $eventList = AssetList::query()->find($data['event_list_id']);
+            if ($eventList === null) {
+                throw ValidationException::withMessages([
+                    'event_list_id' => 'Selected event list is not available.',
+                ]);
+            }
         }
 
         $inventoryList = null;
@@ -203,7 +213,7 @@ class ScanController extends Controller
                 ]);
             }
 
-            if ((int) $inventoryList->department_id !== (int) $eventList->department_id) {
+            if ($eventList !== null && (int) $inventoryList->department_id !== (int) $eventList->department_id) {
                 throw ValidationException::withMessages([
                     'inventory_list_id' => 'Event and inventory lists must belong to the same department.',
                 ]);
@@ -212,7 +222,7 @@ class ScanController extends Controller
 
         $data['inventory_list_id'] = $data['inventory_list_id'] ?? null;
         $data['asset_status'] = $data['asset_status'] ?? null;
-        $data['department_id'] = (int) $eventList->department_id;
+        $data['department_id'] = $this->resolveSessionDepartmentId($request, $eventList, $inventoryList);
 
         if ($creatingLocation) {
             $location = Location::create([
@@ -230,5 +240,26 @@ class ScanController extends Controller
         unset($data['new_location']);
 
         return $data;
+    }
+
+    protected function resolveSessionDepartmentId(Request $request, ?AssetList $eventList, ?AssetList $inventoryList): int
+    {
+        if ($eventList !== null) {
+            return (int) $eventList->department_id;
+        }
+
+        if ($inventoryList !== null) {
+            return (int) $inventoryList->department_id;
+        }
+
+        $departmentId = $request->user()?->resolveActiveDepartmentId();
+
+        if ($departmentId === null) {
+            throw ValidationException::withMessages([
+                'event_list_id' => 'Select an active department before starting a scan session without lists.',
+            ]);
+        }
+
+        return $departmentId;
     }
 }

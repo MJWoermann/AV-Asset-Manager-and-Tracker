@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Enums\FileCategory;
 use App\Enums\SparePartLifecycleStatus;
 use App\Enums\SparePartMovementType;
+use App\Enums\SparePartSeverity;
+use App\Enums\SparePartStandbyMode;
+use App\Enums\SparePartStockStatus;
 use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\SparePart;
@@ -278,6 +281,20 @@ class SparePartService
      */
     protected function partAttributes(array $data, string $code, ?SparePart $existing = null): array
     {
+        // Create form omits these; MySQL rejects explicit NULL even when columns have defaults.
+        $resolvedStockStatus = $data['stock_status']
+            ?? $existing?->stock_status
+            ?? SparePartStockStatus::InStock;
+        $resolvedStandby = $data['standby_mode']
+            ?? $existing?->standby_mode
+            ?? SparePartStandbyMode::None;
+        $resolvedLifecycle = $data['lifecycle_status']
+            ?? $existing?->lifecycle_status
+            ?? SparePartLifecycleStatus::Active;
+        $resolvedSeverity = $data['severity']
+            ?? $existing?->severity
+            ?? SparePartSeverity::Moderate;
+
         $attrs = [
             'code' => $code,
             'kind' => $data['kind'] ?? $existing?->kind,
@@ -291,16 +308,16 @@ class SparePartService
             'max_holding' => $data['max_holding'] ?? $existing?->max_holding,
             'location_id' => $data['location_id'] ?? $existing?->location_id,
             'shelf_location' => $data['shelf_location'] ?? $existing?->shelf_location,
-            'stock_status' => $data['stock_status'] ?? $existing?->stock_status,
-            'standby_mode' => $data['standby_mode'] ?? $existing?->standby_mode,
+            'stock_status' => $resolvedStockStatus,
+            'standby_mode' => $resolvedStandby,
             'supplier' => $data['supplier'] ?? $existing?->supplier,
             'unit_cost' => $data['unit_cost'] ?? $existing?->unit_cost,
             'lead_time' => $data['lead_time'] ?? $existing?->lead_time,
             'replacement_time' => $data['replacement_time'] ?? $existing?->replacement_time,
             'lead_time_days' => $data['lead_time_days'] ?? $existing?->lead_time_days,
             'replacement_time_minutes' => $data['replacement_time_minutes'] ?? $existing?->replacement_time_minutes,
-            'severity' => $data['severity'] ?? $existing?->severity,
-            'lifecycle_status' => $data['lifecycle_status'] ?? $existing?->lifecycle_status,
+            'severity' => $resolvedSeverity,
+            'lifecycle_status' => $resolvedLifecycle,
             'superseded_by_id' => $data['superseded_by_id'] ?? $existing?->superseded_by_id,
             'superseded_at' => $data['superseded_at'] ?? $existing?->superseded_at,
             'ordered_at' => $data['ordered_at'] ?? $existing?->ordered_at,

@@ -10,8 +10,15 @@
 
         <form method="GET" action="{{ route('reports.unknown-scans') }}" class="flex flex-col sm:flex-row flex-wrap gap-3 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
             <div class="flex-1 min-w-[12rem]">
-                <x-input-label for="q" value="Search code / note" />
-                <x-text-input id="q" name="q" class="mt-1 block w-full" :value="$q" placeholder="Barcode or note…" />
+                <x-input-label for="unknown-scans-q" value="Search code / note" />
+                <x-scannable-search
+                    id="unknown-scans-q"
+                    name="q"
+                    :value="$q"
+                    placeholder="Barcode or note…"
+                    class="mt-1"
+                    scan-aria-label="Scan barcode into unknown-scan search"
+                />
             </div>
             <div>
                 <x-input-label for="status" value="Status" />

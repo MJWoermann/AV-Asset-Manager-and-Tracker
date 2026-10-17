@@ -60,15 +60,21 @@
         </form>
 
         @if($comparisonSections)
-            <div x-data="comparisonSearch(@js($comparisonSections))" class="space-y-6">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">{{ $source->name }} vs {{ $target->name }}</p>
-                    <input
-                        type="search"
-                        x-model="query"
+            <div
+                x-data="comparisonSearch(@js($comparisonSections))"
+                @field-barcode-scanned="query = $event.detail.value"
+                class="space-y-6"
+            >
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver sm:pt-2">{{ $source->name }} vs {{ $target->name }}</p>
+                    <x-scannable-search
+                        id="comparison-filter-q"
+                        :submit-on-scan="false"
                         placeholder="Filter results by name, barcode, FMI, SN…"
-                        class="w-full sm:max-w-md rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                    >
+                        class="w-full sm:max-w-md"
+                        scan-aria-label="Scan barcode into comparison filter"
+                        x-model="query"
+                    />
                 </div>
 
                 <template x-for="section in sections" :key="section.key">

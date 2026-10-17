@@ -75,14 +75,48 @@ class ScanService
         }
 
         return DB::transaction(function () use ($session, $asset, $quantity) {
+            $inventoryStatus = $this->inventoryStatus($session, $asset);
+            $warning = $this->inventoryWarning($inventoryStatus, $asset, (bool) $session->event_list_id);
+
+            if (! $session->event_list_id) {
+                $this->applySessionAssetUpdates($session, $asset);
+
+                $added = [
+                    $this->syntheticItemSummary($asset, $quantity, false),
+                ];
+
+                if ($asset->isContainer() || $asset->children->isNotEmpty()) {
+                    foreach ($asset->children as $child) {
+                        $child->loadMissing('itemType');
+                        $added[] = $this->syntheticItemSummary($child, 1, true);
+                    }
+                }
+
+                $message = count($added) > 1
+                    ? "Scanned {$asset->name} with ".(count($added) - 1).' child asset(s).'
+                    : "Scanned {$asset->name}.";
+
+                if ($session->asset_status instanceof AssetStatus) {
+                    $message .= ' Status updated to '.$session->asset_status->label().'.';
+                }
+
+                return [
+                    'items' => $added,
+                    'duplicate' => false,
+                    'unknown' => false,
+                    'inventory_status' => $inventoryStatus,
+                    'warning' => $warning,
+                    'message' => $message,
+                    'asset' => $this->assetSummary($asset->fresh(['itemType'])),
+                    'unknown_scan' => null,
+                ];
+            }
+
             $added = [];
             $duplicate = AssetListItem::query()
                 ->where('asset_list_id', $session->event_list_id)
                 ->where('asset_id', $asset->id)
                 ->exists();
-
-            $inventoryStatus = $this->inventoryStatus($session, $asset);
-            $warning = $this->inventoryWarning($inventoryStatus, $asset);
 
             if (! $duplicate) {
                 $added[] = $this->itemSummary(
@@ -280,13 +314,19 @@ class ScanService
         return $onInventory ? 'matched' : 'not_on_inventory';
     }
 
-    protected function inventoryWarning(string $inventoryStatus, Asset $asset): ?string
+    protected function inventoryWarning(string $inventoryStatus, Asset $asset, bool $addedToEventList = true): ?string
     {
         if ($inventoryStatus !== 'not_on_inventory') {
             return null;
         }
 
-        return "{$asset->name} is in the asset register but not on the selected inventory list. It was still added to the event list.";
+        $message = "{$asset->name} is in the asset register but not on the selected inventory list.";
+
+        if ($addedToEventList) {
+            $message .= ' It was still added to the event list.';
+        }
+
+        return $message;
     }
 
     /**
@@ -302,6 +342,25 @@ class ScanService
             'rig_tag' => $asset->rig_tag,
             'serial_number' => $asset->serial_number,
             'item_type' => $asset->itemType?->name,
+            'url' => route('assets.show', $asset),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     id: null,
+     *     quantity: int,
+     *     is_child_expand: bool,
+     *     asset: array<string, mixed>
+     * }
+     */
+    protected function syntheticItemSummary(Asset $asset, int $quantity, bool $isChild): array
+    {
+        return [
+            'id' => null,
+            'quantity' => $quantity,
+            'is_child_expand' => $isChild,
+            'asset' => $this->assetSummary($asset),
         ];
     }
 
