@@ -1,8 +1,10 @@
 # Security hardening and best practices
 
-This guide evaluates the current AV Asset Manager codebase and deploy/setup instructions for areas that could be abused, then recommends hardening steps for production (typically LAN LEMP). It is defensive guidance only — not a penetration-test report or exploit walkthrough.
+This guide evaluates the current AV Asset Manager codebase and deploy/setup instructions for areas that could be abused, then recommends hardening steps for production (typically LAN LEMP). It covers both **authorization / confidentiality** and **availability** (intentional or accidental actions that crash, hang, or slow the host for other users). It is defensive guidance only — not a penetration-test report or exploit walkthrough.
 
-Related docs: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md), [sso-setup.md](sso-setup.md), [api.md](api.md).
+**Code baseline for the availability review:** git commit `1c18108` (*Make Cloud Agent installs boot Laravel*, 2026-10-18). Re-check this section after large import/export/scan/storage changes.
+
+Related docs: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md), [hardware-sizing.md](hardware-sizing.md), [sso-setup.md](sso-setup.md), [api.md](api.md).
 
 ---
 
@@ -11,9 +13,10 @@ Related docs: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md), [sso-setup.md](s
 | Assumption | Implication |
 |------------|-------------|
 | Hosted on an internal LAN or VPN, optionally with TLS | Internet exposure raises severity of every finding below |
-| Trusted staff roles: `admin`, `inventory_manager`, `scanner` | Privilege separation only works if users cannot self-enroll into full access |
+| Trusted staff roles: `admin`, `inventory_manager`, `scanner` | Privilege separation only works if users cannot self-enroll into full access; **trusted users can still DoS the shared host** via heavy features |
 | Attachments and backups may hold manuals, PO notes, and password hashes | Treat storage disks and backup archives as confidential |
 | Guest Kanban QR may be printed and shared | Anyone with a live token URL can adjust that asset’s stock |
+| Shared LEMP host (~20 concurrent users, PHP-FPM pool) | One long FPM/worker job or disk-fill path affects scanners and stocktake for everyone — see [hardware-sizing.md](hardware-sizing.md) |
 
 ---
 
@@ -24,6 +27,8 @@ The app already has useful controls: Spatie roles on many admin routes, Sanctum 
 **P0/P1 hardening is implemented in code:** public registration defaults off (`ALLOW_REGISTRATION=false`), authenticated web/API access requires a Spatie app role (`admin`, `inventory_manager`, or `scanner`), API tokens are refused without a role, developer feature flags are admin-only, connection/RU writes are manager-gated, URL file downloads allow only `http`/`https`, and guest stock QR can be disabled with `STOCK_GUEST_ENABLED=false`.
 
 **Email verification is intentionally not used** for access control. Isolated LEMP installs often have no outbound mail; `User` does not implement `MustVerifyEmail`. Admins create users (or run `app:install`) with `email_verified_at` set and a role assigned — no mail required.
+
+**Availability (commit `1c18108`):** Auth and role gates are in good shape; the larger residual risk for a multi-user LAN deploy is **resource exhaustion by authenticated staff** (and leftover debug logging). Highest impact: unbounded debug log sinks on disk, full-sheet import/export/compare in the HTTP request, backup/migrate runnable synchronously or duplicated by queue `retry_after`, and several browse/scan paths that load entire catalogues into memory. Details: [Availability and multi-user impact](#availability-and-multi-user-impact).
 
 ---
 
@@ -79,13 +84,87 @@ Severity reflects impact if the host is reachable by untrusted users (or a compr
 
 ---
 
+## Availability and multi-user impact
+
+Reviewed against commit `1c18108`. Focus: actions a user (or automated client) can take — intentionally or by accident — that **crash a worker**, **fill disk**, **hold DB locks**, or **starve PHP-FPM / queue workers**, so other users experience timeouts or a dead app. Severity assumes a shared LAN host with a finite FPM pool (deploy guide baseline `pm.max_children = 40`).
+
+This is not an exploit cookbook. Mitigations are operational limits, throttles, queue hygiene, and code bounds — prefer running heavy work off-peak until code caps are in place.
+
+### What already helps
+
+| Control | Notes |
+|---------|--------|
+| Upload size | `config/attachments.php` / validation ~25MB; Nginx `client_max_body_size 25M` when deploy guide is followed |
+| Guest stock | `throttle:30,1` + `STOCK_GUEST_ENABLED` kill-switch |
+| API scan | `throttle:60,1` on `POST /api/scan` |
+| API token mint | `throttle:10,1` on `POST /api/auth/token` |
+| Login lockout | 5 attempts via `LoginRequest` RateLimiter |
+| Scheduled backup | `withoutOverlapping(180)` + `onOneServer()` when `BACKUP_DISK` is set |
+| Default queue | `QUEUE_CONNECTION=database` (not `sync`) in `.env.example` |
+| Scan identifiers | Equality lookups on indexed fields before expensive search fallback |
+| List compare algorithm | Set-based keyed collections (good) — still loads both lists fully (see A3) |
+
+### Critical / High (availability)
+
+| ID | Area | Evidence | Risk to other users | Mitigation |
+|----|------|----------|---------------------|------------|
+| A1 | Debug log sink (route) | Authenticated `POST /__debug/agent-log` (`routes/web.php`) appends `$request->all()` to `base_path("debug-{$sessionId}.log")` with no size or rate limit. Also called from `resources/js/app.js` and asset form Blade. | Any app-role user can fill the app disk → write failures, deploy breakage, host instability for everyone. | Remove route and client callers from production builds; if temporary, gate on `APP_DEBUG` + admin + body/size caps; write only under `storage/logs` with rotation. |
+| A2 | Debug log sink (import path) | `ImportService::findExistingMatch()` appends multiple JSON lines to `base_path('debug-3c7602.log')` **per row / per key** during prepare. Similar leftover logging in `AssetController`. | Large imports amplify disk I/O and growth; slows prepare for that user and contends for disk with MariaDB/FPM. | Delete `#region agent log` blocks before production; never log under the app root. |
+| A3 | Import: no row cap; full sheet in request | `ImportUploadRequest` caps file size only. `AssetImport` / `ImportService::readRows()` load the whole sheet; prepare/process run in the HTTP request (web + API). | One dense 25MB xlsx/csv can OOM or time out an FPM worker; concurrent imports multiply the effect. | Hard max rows (e.g. 5–10k); `WithChunkReading`; queue prepare/commit; reject oversized sheets early; pre-check xlsx zip expansion. |
+| A4 | Import: session/cache + long transaction | `ImportController::prepare` stores full `$prepared` in session; API stores prepared rows in DB cache (`ImportApiState`). `ImportService::commit()` wraps the sheet in one `DB::transaction`. `findExistingMatch` can run up to ~6 queries per row. | Multi‑MB `sessions`/`cache` rows; long write locks on assets/list items → scanners and editors wait or time out. | Persist prepared rows to a temp table/file keyed by import id; chunk commits; prefetch matches in bulk; advisory lock so only one import runs. |
+| A5 | Export / unknown-scan export unbounded | `AssetsExport::collection()` and unknown-scan export use `->get()` then Excel download (web + API). No throttle on export routes. | Full-catalogue (or large history) export spikes RAM/CPU on a worker; parallel exports amplify. | Chunked/`FromQuery` export or queued job + download link; row cap; throttle export endpoints. |
+| A6 | List compare + PDF/API | `ListComparisonService::compare()` loads **all** items for both lists. Web report can render PDF/XLSX in-request; API returns full JSON. No throttle. | Two large stocktakes → large memory and long workers; concurrent compares starve the pool. | Cap list sizes for online compare; paginate UI detail; queue PDF/xlsx; throttle; reject oversized pairs. |
+| A7 | Backup / migrate: sync FPM + duplicate jobs | Admin `StorageController` can run backup/migrate **inline** when `queue` is false. Jobs set `$timeout = 3600` but `config/queue.php` `retry_after` defaults to **90**; jobs are not `ShouldBeUnique`. `AppBackupService` loads large tables with `->get()`, mirrors uploads, and can hold mysqldump output in memory. `keep` is optional (empty → no prune). | One admin action can monopolize an FPM worker for a long time; after ~90s another worker may start a second backup/migrate → doubled I/O and disk growth; unpruned backups fill backup disk. | Always queue from UI; `ShouldBeUnique`; set `DB_QUEUE_RETRY_AFTER` ≥ timeout + margin (e.g. 3900); stream dumps to disk; require retention `keep`; free-space check; run off-peak. |
+| A8 | Scan UI loads full event list | `ScanController::index()` loads all `AssetListItem` for the active event list and all session `UnknownScan` rows (`->get()`). Web `POST /scan/{scan}` is **unthrottled** (API scan is 60/min). | Big stocktakes make every scan page refresh expensive; many concurrent scanners amplify DB load; web miss path can flood `unknown_scans`. | Show recent N / paginate history; throttle web scan like API; optional unknown-scan dedupe/cap per session. |
+| A9 | Asset browse filter side-loads | `AssetController::index` (and list show) paginate rows but also load all parent assets, locations, types, manufacturers, models for filters. `Location::selfAndDescendantIds()` loads all locations on filtered browse. | Page cost grows with catalogue size even when the table is paged; shared DB/CPU impact. | Typeahead / lazy filters; cache hierarchy; avoid loading every parent on every index hit. |
+| A10 | Search leading wildcards | `AssetSearch::constrain()` tokenizes with no max length/token count; per token OR `%…%` across many columns + relations + custom fields. Used by asset index, API assets, and scan fallback. | Shared MariaDB CPU; leading `%` prevents normal index use. | Cap `q` length and token count; keep scan on identifier equality first (already done); consider prefix/FULLTEXT for free-text. |
+
+### Medium (availability)
+
+| ID | Area | Evidence | Risk to other users | Mitigation |
+|----|------|----------|---------------------|------------|
+| A11 | Bulk asset/location update | `asset_ids` / `location_ids` arrays have **no `max:`**; single DB transaction; notes may be unbounded `string`. Location bulk may reload full hierarchy per selected id. | “Select all” (~10k) → long locks, attachment cleanup on deletes, FPM timeouts. | Cap selection (e.g. 500); chunk transactions; `max` on notes; throttle. |
+| A12 | Missing throttles on heavy routes | Throttles today: guest stock, API token, API scan, SSO, email verify/test. **Not** on: import, export, compare, file upload/bulk, backup/migrate, bulk update, web scan, most other API reads. No global `throttleApi()` in `bootstrap/app.php`. | Authenticated users or stolen tokens can parallelize expensive work. | Named limiters (`import`, `export`, `backup`, `upload`); baseline API throttle. |
+| A13 | File upload memory | `FileAttachmentService::processUpload()` reads full file into memory; GD decode for images; bulk upload up to 20 × 25MB. No upload throttle. | Concurrent bulk uploads exhaust FPM memory. | Stream to disk; pixel/dimension limits; throttle; queue image processing. |
+| A14 | API list show unbounded | `AssetListApiController::show()` loads all `items.asset` (web show paginates at 50). | Multi‑MB JSON and heavy hydration for large event lists. | Paginate items; optional include with limits. |
+| A15 | Dashboard / connection map | `DashboardStatsService::stats()` runs fresh aggregates every hit (multiple COUNTs). Connection map `buildGraph()` can `->get()` large filtered graphs. | Concurrent dashboard opens compete with scan/search; dense connection fleets spike CPU/RAM. | Short-TTL cache; keep expensive modules off by default; require focus filters on maps. |
+| A16 | Guest stock quantity | Routes throttled 30/min; `quantity` is `integer\|min:0` with **no max** (notes capped). | Valid QR holder can set huge stock counts (data integrity + downstream report cost). | `max` on quantity; optional lower throttle; token expiry; kill-switch when unused. |
+| A17 | Inbound email poll | Schedule every minute, `withoutOverlapping(10)`; up to 25 messages; body capped 10k but identifier tokenization can run many lookups; notifications send synchronously in the poll. | Hung Graph/IMAP can contend for DB/CPU; second poll after 10 minutes if the first hangs. | Cap tokens tried; Http timeouts on Graph; queue notification sends; align overlap TTL with poll wall-clock. |
+| A18 | Sanctum token growth | API mint throttled; profile token create has no dedicated throttle; no per-user token cap. | Scripted minting grows `personal_access_tokens` and auth lookup cost. | Max tokens per user; throttle profile create; revoke-oldest policy. |
+| A19 | Password-reset / register throttle gaps | `forgot-password` / `reset-password` lack route throttles (broker has per-email delay). Register unthrottled when enabled. | Email spray or signup spam (register only if `ALLOW_REGISTRATION=true`). | Route throttle like login/SSO; keep registration off in production. |
+| A20 | Custom field / notes size | Custom field values and some asset text fields validated as `string` without `max`; DB `text`. | Large strings inflate backups, asset show, and search. | `max:…` on notes, description, custom values. |
+| A21 | Queue worker ops gap | Default driver is `database`, but long jobs need `queue:work --timeout` ≥ job timeout and `retry_after` larger still. Sync checkbox on storage UI bypasses the queue. | Misconfigured production blocks FPM or duplicates long jobs (see A7). | Supervisor example with correct timeouts; refuse sync backup/migrate in UI; alert on queue depth. |
+
+### Low / informational (availability)
+
+| Area | Notes |
+|------|--------|
+| External file URLs | Download redirects away; app does **not** proxy remote bytes (good against server-side bandwidth DoS / SSRF fetch). |
+| Preferences JSON | Column/module/domain writers use allow-lists; low DoS risk. |
+| Recursive scan expansion | Rack scan expands **one** child level only — no unbounded grandchild recursion. |
+| Regex hang | Audited search/scan paths use `preg_quote` / simple digit strips — no clear ReDoS. |
+| Duplicate scan | Same asset on an event list warns rather than double-inserting. |
+| Health `/up` | Liveness only; keep non-sensitive. |
+
+### Priority order (availability fixes)
+
+1. **Remove leftover agent debug logging** (A1, A2) — immediate disk-fill and I/O risk with no product value.
+2. **Queue hygiene for backup/migrate** (A7, A21) — force queue, uniquify jobs, raise `DB_QUEUE_RETRY_AFTER`, require backup retention.
+3. **Bound import / export / compare** (A3–A6) — row caps, chunking, queue heavy formats, throttle.
+4. **Slim scan + asset browse** (A8–A10) — recent items, lazy filters, search caps, throttle web scan.
+5. **Cap bulk and uploads; baseline API throttle** (A11–A14, A18–A20).
+
+Operational stopgaps until code ships: run import/compare/export/backup/migrate **off-peak**; one admin at a time for storage jobs; monitor disk under the app root for `debug-*.log`; keep event lists sized so the scan UI stays responsive ([hardware-sizing.md](hardware-sizing.md)).
+
+---
+
 ## Recommended hardening (operations)
 
 Do these on every production host. Many are already sketched in [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md); this section expands and prioritizes them.
 
 ### 1. Network and TLS
 
-- Prefer VPN / LAN-only access. UFW: allow SSH from admin networks only; allow HTTP/HTTPS only from trusted subnets.
+- Prefer VPN / LAN-only access. UFW: allow SSH from admin networks only; allow HTTP/HTTPS only from trusted subnets. Network restriction reduces anonymous abuse but **does not** stop authenticated staff from overloading import/export/backup on a shared host.
 - **HTTPS is required for mobile camera scanning and reliable PWA install** (secure context). Prefer a corporate internal CA or Certbot when you have a public name; otherwise follow **[self-signed-tls.md](self-signed-tls.md)** (private CA, Nginx `443`, device trust on iOS/Android).
 - After HTTPS:
   - `APP_URL=https://…`
@@ -212,7 +291,16 @@ Notes:
 
 - Ship Nginx + Laravel logs off-box.
 - Alert on spikes of `POST /register`, `POST /api/auth/token`, `POST /stock/t/*`, and 401/403 rates.
+- Alert on disk use under the app root (watch for unexpected `debug-*.log`), PHP-FPM busy workers, MariaDB slow queries, and queue depth / failed jobs.
 - Retain audit_logs; never grant app UPDATE/DELETE on that table.
+
+### 8. Availability operations (until code caps land)
+
+- Run large Excel import, full-list compare/PDF, full catalogue export, attachment disk migration, and on-demand backup **off-peak**; preferably one at a time.
+- Always leave “Run on queue” checked for Admin → Storage backup/migrate; ensure `queue:work` runs with `--timeout` at least 3600 and set `DB_QUEUE_RETRY_AFTER` higher than that (e.g. 3900) so long jobs are not reserved twice.
+- Prefer multiple smaller event lists over one warehouse-sized scan list so the scan UI stays responsive.
+- After deploy, confirm no `debug-*.log` files appear in the application root; treat any that appear as a defect (A1/A2).
+- Size host RAM and FPM as in [hardware-sizing.md](hardware-sizing.md); raise `memory_limit` toward 512M only if full-list compare/import is routine.
 
 ---
 
@@ -342,7 +430,19 @@ These are the highest-value code/config changes relative to the findings above. 
 8. Throttle `POST /register` (if kept for non-prod) and `POST /forgot-password` like login/SSO.
 9. Shared `Password::defaults()` for register / reset / profile / Admin → Users / `app:install` — **done** (min 8, uppercase, number or symbol). Optional further tightening (longer min, `mixedCase()`, both numbers and symbols, `uncompromised()`) is a server-side edit — see [Password complexity](#password-complexity).
 10. SSO: store provider subject IDs; require verified email claims for Azure comparable to Google; keep domain allow-list non-empty in production.
-11. Guest stock kill-switch — **done** (`STOCK_GUEST_ENABLED`); optional token expiry and tighter throttle remain open.
+11. Guest stock kill-switch — **done** (`STOCK_GUEST_ENABLED`); optional token expiry, quantity `max`, and tighter throttle remain open.
+
+### P2b — Availability / multi-user (open as of `1c18108`)
+
+See [Availability and multi-user impact](#availability-and-multi-user-impact) for evidence (A1–A21). Highest-value application changes:
+
+16. **Remove leftover agent debug instrumentation** — delete `POST /__debug/agent-log`, JS/Blade callers, and `file_put_contents` debug regions in `ImportService` / `AssetController`.
+17. **Import bounds** — max rows; chunked read/commit; do not store full prepared sheets in session/cache; queue commit for large files.
+18. **Export / compare bounds** — chunked or queued Excel/PDF; cap online compare list sizes; paginate API list items.
+19. **Backup / migrate safety** — force queue from Admin UI; `ShouldBeUnique`; `DB_QUEUE_RETRY_AFTER` ≥ job timeout; require `keep`; stream dumps.
+20. **Throttles** — web scan, import, export, compare, uploads, backup; optional global `throttleApi()`.
+21. **Browse/scan memory** — paginate scan recent items; lazy-load asset filter catalogues; cap search query tokens/length.
+22. **Bulk / string caps** — `max` on bulk ID arrays, notes, custom field values, guest quantity.
 
 ### P3 — Defence in depth
 
@@ -350,6 +450,8 @@ These are the highest-value code/config changes relative to the findings above. 
 13. Encrypt backup archives at rest; document restore as break-glass.
 14. Explicit CORS allow-list if any browser client calls `/api` cross-origin (default Sanctum/SPA setup should stay same-origin when possible).
 15. Content sniffing / forced download headers for attachment responses.
+23. Cap Sanctum tokens per user; queue outbound notifications off the request/email-poll path.
+24. Explicit Http timeouts on all Graph/SharePoint calls; inbound email token-lookup cap.
 
 ---
 
@@ -374,8 +476,10 @@ Use alongside the checklist in the deploy guide.
 - [ ] SSO secrets and Graph/QNAP credentials only in `.env`; domain allow-list set if SSO on
 - [ ] Guest stock tokens inventoried; unused tokens revoked
 - [ ] Backup disk private; restore tested on staging; schedule + queue workers running if used
+- [ ] `queue:work` timeout and `DB_QUEUE_RETRY_AFTER` sized for backup/migrate jobs (≥ job `$timeout`, retry_after larger still)
+- [ ] No leftover `debug-*.log` / `__debug/agent-log` in production tree (or accepted temporary with APP_DEBUG gate)
 - [ ] `composer audit` clean (or findings accepted)
-- [ ] Health check `/up` not exposing debug; monitoring on auth failures
+- [ ] Health check `/up` not exposing debug; monitoring on auth failures, disk, FPM busy, queue depth
 
 ### After each update
 
@@ -383,6 +487,7 @@ Use alongside the checklist in the deploy guide.
 - [ ] Re-apply audit_logs privilege revoke if DB grants were reset
 - [ ] Confirm registration still disabled and `APP_DEBUG` still false
 - [ ] Spot-check role middleware on new routes
+- [ ] Spot-check that heavy new routes have throttle and/or size caps (import, export, compare, upload, backup)
 
 ---
 
@@ -414,8 +519,9 @@ Use alongside the checklist in the deploy guide.
 2. **Dependency hygiene** — `composer update` / `npm update` on a cadence; watch Laravel security releases.
 3. **Secret rotation** — DB password, `APP_KEY` (planned), OAuth secrets, Sanctum tokens on offboarding.
 4. **Backup drills** — Quarterly restore test; treat dumps as production data.
-5. **Change review** — New routes must declare `auth` + role/policy; never add public mutating endpoints without throttle + token/CSRF design.
+5. **Change review** — New routes must declare `auth` + role/policy; never add public mutating endpoints without throttle + token/CSRF design. Also ask: can this load unbounded rows, hold a long DB transaction, or fill disk?
 6. **Do not weaken audit immutability** — No update/delete APIs for `AuditLog`; keep DB grants aligned.
+7. **No production debug sinks** — Do not leave agent/session file appenders under the app root or on authenticated routes.
 
 ---
 
@@ -425,5 +531,6 @@ Use alongside the checklist in the deploy guide.
 - Host OS CIS benchmarks beyond the LEMP deploy guide
 - Physical security of printed Kanban labels
 - Legal/compliance retention of personal data in exports and backups
+- Load-test numbers for a specific warehouse (use [hardware-sizing.md](hardware-sizing.md) as a starting point and measure on staging)
 
 For deploy mechanics, see [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md). For OAuth IdP setup, see [sso-setup.md](sso-setup.md).
