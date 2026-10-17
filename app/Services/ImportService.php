@@ -511,34 +511,65 @@ class ImportService
      */
     protected function fuzzyGuessField(string $column, array $usedFields): ?string
     {
-        $hay = Str::lower($column);
+        $normalizedColumn = $this->normalizeColumnName($column);
+        $hay = Str::lower(trim($column));
+        // Maatwebsite HeadingRowImport slugifies headers (Item Type → item_type);
+        // compare against space-separated forms so both styles match.
+        $hayAsWords = str_replace('_', ' ', $normalizedColumn);
 
+        // Prefer exact matches on core asset field keys / normalized labels.
         foreach (self::ASSET_FIELDS as $field => $label) {
             if (isset($usedFields[$field])) {
                 continue;
             }
 
             if (
-                str_contains($hay, str_replace('_', ' ', $field))
-                || str_contains($hay, Str::lower($label))
+                $normalizedColumn === $field
+                || $normalizedColumn === $this->normalizeColumnName($label)
             ) {
                 return $field;
             }
         }
 
+        // Fuzzy match human-readable (and slugified) headers to core fields first.
+        foreach (self::ASSET_FIELDS as $field => $label) {
+            if (isset($usedFields[$field])) {
+                continue;
+            }
+
+            $fieldAsWords = str_replace('_', ' ', $field);
+            $labelLower = Str::lower($label);
+
+            if (
+                str_contains($hayAsWords, $fieldAsWords)
+                || str_contains($hayAsWords, $labelLower)
+                || str_contains($hay, $fieldAsWords)
+                || str_contains($hay, $labelLower)
+            ) {
+                return $field;
+            }
+        }
+
+        // Custom fields: require strong equality so short labels (e.g. "Address")
+        // cannot steal core identifier columns like ip_address / mac_address.
         foreach ($this->importableCustomFieldDefinitions() as $definition) {
             $mappingKey = self::CUSTOM_FIELD_PREFIX.$definition->id;
             if (isset($usedFields[$mappingKey])) {
                 continue;
             }
 
-            $definitionName = Str::lower($definition->name);
-            $setName = Str::lower((string) ($definition->fieldSet?->name ?: ''));
-            $fullLabel = trim($setName.': '.$definitionName);
+            $definitionName = trim((string) $definition->name);
+            $setName = trim((string) ($definition->fieldSet?->name ?: ''));
+            $fullLabel = $setName !== ''
+                ? $setName.': '.$definitionName
+                : $definitionName;
+
+            $definitionSlug = $this->normalizeColumnName($definitionName);
+            $fullLabelSlug = $this->normalizeColumnName($fullLabel);
 
             if (
-                ($definitionName !== '' && str_contains($hay, $definitionName))
-                || ($fullLabel !== ':' && str_contains($hay, $fullLabel))
+                ($definitionSlug !== '' && $normalizedColumn === $definitionSlug)
+                || ($fullLabelSlug !== '' && $normalizedColumn === $fullLabelSlug)
             ) {
                 return $mappingKey;
             }

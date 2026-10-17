@@ -393,6 +393,113 @@ class ImportAssetTest extends TestCase
         $this->assertSame('item_type', $suggestions['Type']);
     }
 
+    public function test_suggest_mappings_maps_snake_case_headings_to_core_asset_fields(): void
+    {
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'DMX / sACN Details',
+            'slug' => 'dmx-sacn-details',
+        ]);
+        CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Address',
+            'slug' => 'address',
+            'type' => 'text',
+            'sort_order' => 0,
+        ]);
+        CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'IP Address',
+            'slug' => 'ip-address',
+            'type' => 'text',
+            'sort_order' => 1,
+        ]);
+
+        $service = app(ImportService::class);
+
+        $suggestions = $service->suggestMappings([
+            'item_type',
+            'serial_number',
+            'fmi_ast',
+            'tp_barcode',
+            'ip_address',
+            'mac_address',
+            'location_level',
+            'location_room',
+            'location_rack',
+        ]);
+
+        $this->assertSame('item_type', $suggestions['item_type']);
+        $this->assertSame('serial_number', $suggestions['serial_number']);
+        $this->assertSame('fmi_ast', $suggestions['fmi_ast']);
+        $this->assertSame('tp_barcode', $suggestions['tp_barcode']);
+        $this->assertSame('ip_address', $suggestions['ip_address']);
+        $this->assertSame('mac_address', $suggestions['mac_address']);
+        $this->assertSame('location_level', $suggestions['location_level']);
+        $this->assertSame('location_room', $suggestions['location_room']);
+        $this->assertSame('location_rack', $suggestions['location_rack']);
+
+        foreach ($suggestions as $field) {
+            $this->assertStringStartsNotWith(
+                ImportService::CUSTOM_FIELD_PREFIX,
+                $field,
+                'Snake_case core identifier columns must not map to custom fields.',
+            );
+        }
+    }
+
+    public function test_suggest_mappings_still_matches_human_readable_headers(): void
+    {
+        $service = app(ImportService::class);
+
+        $suggestions = $service->suggestMappings([
+            'Item Type',
+            'Serial Number',
+            'FMI AST#',
+            'TP Barcode',
+            'IP Address',
+            'MAC Address',
+            'Location: Level',
+            'Location: Room',
+            'Location: Rack',
+        ]);
+
+        $this->assertSame('item_type', $suggestions['Item Type']);
+        $this->assertSame('serial_number', $suggestions['Serial Number']);
+        $this->assertSame('fmi_ast', $suggestions['FMI AST#']);
+        $this->assertSame('tp_barcode', $suggestions['TP Barcode']);
+        $this->assertSame('ip_address', $suggestions['IP Address']);
+        $this->assertSame('mac_address', $suggestions['MAC Address']);
+        $this->assertSame('location_level', $suggestions['Location: Level']);
+        $this->assertSame('location_room', $suggestions['Location: Room']);
+        $this->assertSame('location_rack', $suggestions['Location: Rack']);
+    }
+
+    public function test_suggest_mappings_matches_custom_field_by_exact_slug_only(): void
+    {
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'DMX / sACN Details',
+            'slug' => 'dmx-sacn-details',
+        ]);
+        $definition = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Address',
+            'slug' => 'address',
+            'type' => 'text',
+            'sort_order' => 0,
+        ]);
+
+        $service = app(ImportService::class);
+        $mappingKey = ImportService::CUSTOM_FIELD_PREFIX.$definition->id;
+
+        $byDefinitionSlug = $service->suggestMappings(['address', 'ip_address']);
+        $this->assertSame($mappingKey, $byDefinitionSlug['address']);
+        $this->assertSame('ip_address', $byDefinitionSlug['ip_address']);
+
+        $byFullLabel = $service->suggestMappings(['DMX / sACN Details: Address', 'ip_address']);
+        $this->assertSame($mappingKey, $byFullLabel['DMX / sACN Details: Address']);
+        $this->assertSame('ip_address', $byFullLabel['ip_address']);
+    }
+
     public function test_prepare_lists_all_missing_required_mappings(): void
     {
         Storage::fake('local');
