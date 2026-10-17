@@ -9,6 +9,7 @@ use App\Models\AssetListItem;
 use App\Models\ItemType;
 use App\Models\Manufacturer;
 use App\Models\User;
+use App\Support\AssetTableColumns;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -41,6 +42,10 @@ class AssetColumnFilterTest extends TestCase
     public function test_assets_index_filters_by_column_text_fields(): void
     {
         $user = $this->user();
+        $user->preferences = [
+            AssetTableColumns::PREFERENCE_KEY => ['name', 'tp_barcode', 'manufacturer', 'status'],
+        ];
+        $user->save();
 
         $acme = Manufacturer::factory()->create(['name' => 'Acme']);
         $other = Manufacturer::factory()->create(['name' => 'OtherCo']);
@@ -218,5 +223,42 @@ class AssetColumnFilterTest extends TestCase
             ['Match Asset'],
             $response->viewData('items')->map(fn ($item) => $item->asset?->name)->all()
         );
+    }
+
+    public function test_hidden_column_status_filter_does_not_apply(): void
+    {
+        $user = $this->user();
+        $user->preferences = [
+            AssetTableColumns::PREFERENCE_KEY => ['name', 'tp_barcode', 'location'],
+        ];
+        $user->save();
+
+        Asset::create([
+            'name' => 'Available Fixture',
+            'item_type_id' => $this->itemType->id,
+            'status' => AssetStatus::Available,
+            'tp_barcode' => 'TP-AVAIL',
+        ]);
+        Asset::create([
+            'name' => 'Service Fixture',
+            'item_type_id' => $this->itemType->id,
+            'status' => AssetStatus::InService,
+            'tp_barcode' => 'TP-SVC',
+        ]);
+
+        // Stale status filter in the URL is stripped because the status column is hidden.
+        $response = $this->actingAs($user)->get(route('assets.index', [
+            'status' => AssetStatus::Available->value,
+        ]));
+
+        $response->assertRedirect(route('assets.index'));
+
+        $cleared = $this->actingAs($user)->get(route('assets.index'));
+        $cleared->assertOk();
+        $this->assertSame(
+            ['Available Fixture', 'Service Fixture'],
+            $cleared->viewData('assets')->pluck('name')->sort()->values()->all()
+        );
+        $cleared->assertDontSee('Filter by status', false);
     }
 }

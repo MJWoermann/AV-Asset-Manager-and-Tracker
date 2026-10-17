@@ -42,16 +42,23 @@ use Illuminate\View\View;
 
 class AssetController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
-        $term = AssetBrowseFilters::term($request);
         $selectedColumns = $request->user()->assetTableColumns();
+
+        if (AssetBrowseFilters::hasFilledHiddenColumnFilters($request, $selectedColumns)) {
+            return redirect()->to(
+                AssetBrowseFilters::urlWithoutHiddenColumnFilters($request->fullUrl(), $selectedColumns)
+            );
+        }
+
+        $term = AssetBrowseFilters::term($request);
 
         $assets = Asset::query()
             ->with(['itemType', 'location', 'parent', 'manufacturer', 'manufacturerModel', 'customFieldValues'])
             ->whereNull('parent_id');
 
-        AssetBrowseFilters::applyToAssetQuery($assets, $request);
+        AssetBrowseFilters::applyToAssetQuery($assets, $request, selectedColumns: $selectedColumns);
 
         $assets = $assets
             ->orderBySearchRelevance($term)
@@ -64,7 +71,6 @@ class AssetController extends Controller
             'q' => $term ?? '',
             'availableColumns' => AssetTableColumns::definitions(),
             'selectedColumns' => $selectedColumns,
-            'preservedFilters' => AssetBrowseFilters::hiddenPreservedParams($request, $selectedColumns),
             'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
             'itemTypes' => ItemType::orderBy('name')->get(),
             'manufacturers' => Manufacturer::query()->orderBy('name')->get(['id', 'name']),

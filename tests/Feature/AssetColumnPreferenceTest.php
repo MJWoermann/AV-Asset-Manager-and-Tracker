@@ -150,4 +150,40 @@ class AssetColumnPreferenceTest extends TestCase
             $user->fresh()->assetTableColumns()
         );
     }
+
+    public function test_hiding_a_column_clears_its_filter_from_redirect(): void
+    {
+        $user = $this->scanner();
+
+        $response = $this->actingAs($user)
+            ->from(route('assets.index', [
+                'status' => AssetStatus::Available->value,
+                'q' => 'mixer',
+            ]))
+            ->patch(route('preferences.asset-columns'), [
+                'columns' => ['name', 'location', 'tp_barcode'],
+            ]);
+
+        $response->assertRedirect(route('assets.index', ['q' => 'mixer']));
+        $this->assertSame(
+            ['name', 'location', 'tp_barcode'],
+            $user->fresh()->assetTableColumns()
+        );
+    }
+
+    public function test_assets_index_redirects_to_drop_filters_for_hidden_columns(): void
+    {
+        $user = $this->scanner();
+        $user->preferences = [
+            AssetTableColumns::PREFERENCE_KEY => ['name', 'location', 'tp_barcode'],
+        ];
+        $user->save();
+
+        $response = $this->actingAs($user)->get(route('assets.index', [
+            'status' => AssetStatus::InService->value,
+            'q' => 'road',
+        ]));
+
+        $response->assertRedirect(route('assets.index', ['q' => 'road']));
+    }
 }

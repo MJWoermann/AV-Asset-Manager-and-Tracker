@@ -42,10 +42,17 @@ class AssetListController extends Controller
         return redirect()->route('lists.show', $list)->with('status', 'List created.');
     }
 
-    public function show(Request $request, AssetList $list): View
+    public function show(Request $request, AssetList $list): View|RedirectResponse
     {
-        $term = AssetBrowseFilters::term($request);
         $selectedColumns = $request->user()->assetTableColumns();
+
+        if (AssetBrowseFilters::hasFilledHiddenColumnFilters($request, $selectedColumns)) {
+            return redirect()->to(
+                AssetBrowseFilters::urlWithoutHiddenColumnFilters($request->fullUrl(), $selectedColumns)
+            );
+        }
+
+        $term = AssetBrowseFilters::term($request);
 
         $items = $list->items()
             ->with([
@@ -58,10 +65,15 @@ class AssetListController extends Controller
             ])
             ->whereHas(
                 'asset',
-                fn ($query) => AssetBrowseFilters::applyToAssetQuery($query, $request, includeQuantity: false)
+                fn ($query) => AssetBrowseFilters::applyToAssetQuery(
+                    $query,
+                    $request,
+                    includeQuantity: false,
+                    selectedColumns: $selectedColumns,
+                )
             );
 
-        AssetBrowseFilters::applyToListItemQuery($items, $request);
+        AssetBrowseFilters::applyToListItemQuery($items, $request, $selectedColumns);
 
         $items = $items
             ->join('assets', 'assets.id', '=', 'asset_list_items.asset_id')
@@ -78,7 +90,6 @@ class AssetListController extends Controller
             'q' => $term ?? '',
             'availableColumns' => AssetTableColumns::definitions(),
             'selectedColumns' => $selectedColumns,
-            'preservedFilters' => AssetBrowseFilters::hiddenPreservedParams($request, $selectedColumns),
             'statuses' => AssetStatus::options(),
             'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
             'itemTypes' => ItemType::orderBy('name')->get(),
