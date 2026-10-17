@@ -443,25 +443,30 @@ class AssetConnectionFeatureTest extends TestCase
         $type = $this->makeItemType();
         $assetA = $this->makeAsset($type, $room, 'Router');
         $assetB = $this->makeAsset($type, $room, 'Switch');
-        $assetC = $this->makeAsset($type, $otherRoom, 'Spare');
+        // Unique name — "Spare" collides with nav "Spares" / interface labels in HTML.
+        $assetC = $this->makeAsset($type, $otherRoom, 'Isolated Stage Unit');
 
         $ifaceA = AssetInterface::factory()->create(['asset_id' => $assetA->id]);
         $ifaceB = AssetInterface::factory()->create(['asset_id' => $assetB->id]);
         $ifaceC = AssetInterface::factory()->create(['asset_id' => $assetC->id]);
-        $ifaceD = AssetInterface::factory()->create(['asset_id' => $assetA->id, 'name' => 'Spare port']);
+        $ifaceD = AssetInterface::factory()->create(['asset_id' => $assetA->id, 'name' => 'Aux port']);
 
         $network = ConnectionType::query()->where('slug', 'network')->firstOrFail();
         $hdmi = ConnectionType::query()->where('slug', 'hdmi')->firstOrFail();
 
-        app(AssetConnectionService::class)->create($ifaceA, $ifaceB, $network);
-        app(AssetConnectionService::class)->create($ifaceC, $ifaceD, $hdmi);
+        $service = app(AssetConnectionService::class);
+        $service->create($ifaceA, $ifaceB, $network);
+        $service->create($ifaceC, $ifaceD, $hdmi);
 
-        $response = $this->actingAs($user)->get(route('reports.connection-map', [
+        $filters = [
             'location_id' => $room->id,
             'connection_type_ids' => [$network->id],
-        ]));
+        ];
+
+        $response = $this->actingAs($user)->get(route('reports.connection-map', $filters));
 
         $response->assertOk();
+<<<<<<< HEAD
         $graphNames = collect($response->viewData('graph')['nodes'] ?? [])
             ->map(fn (array $node): string => (string) ($node['data']['name'] ?? ''))
             ->filter()
@@ -470,6 +475,21 @@ class AssetConnectionFeatureTest extends TestCase
 
         $this->assertSame(['Router', 'Switch'], $graphNames);
         $this->assertNotContains('Spare', $graphNames);
+=======
+        $response->assertSee('Router', false);
+        $response->assertSee('Switch', false);
+        $response->assertDontSee('Isolated Stage Unit', false);
+
+        $graph = $service->buildGraph($filters);
+        $nodeNames = collect($graph['nodes'])
+            ->map(fn (array $node): string => (string) ($node['data']['name'] ?? $node['data']['label'] ?? ''))
+            ->filter()
+            ->values()
+            ->all();
+        $this->assertContains('Router', $nodeNames);
+        $this->assertContains('Switch', $nodeNames);
+        $this->assertNotContains('Isolated Stage Unit', $nodeNames);
+>>>>>>> 198b329 (Harden connection-map filter test against Spares nav collision.)
     }
 
     public function test_connections_tab_lists_peer_assets(): void
