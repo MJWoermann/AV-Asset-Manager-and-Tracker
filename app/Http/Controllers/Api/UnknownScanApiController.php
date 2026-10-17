@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Exports\UnknownScansExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\LinkUnknownScanRequest;
+use App\Models\Asset;
 use App\Models\UnknownScan;
 use App\Services\ScanService;
 use Illuminate\Http\JsonResponse;
@@ -80,6 +82,26 @@ class UnknownScanApiController extends Controller
         return response()->json([
             'message' => 'Note saved.',
             'unknown_scan' => $scanService->unknownScanSummary($unknownScan->fresh()),
+        ]);
+    }
+
+    public function link(
+        LinkUnknownScanRequest $request,
+        UnknownScan $unknownScan,
+        ScanService $scanService,
+    ): JsonResponse {
+        $asset = Asset::query()->findOrFail($request->integer('asset_id'));
+
+        $unknownScan->linkToExisting(
+            $asset,
+            $request->boolean('add_to_event_list'),
+            $request->boolean('set_identifier'),
+            $request->user()?->id,
+        );
+
+        return response()->json([
+            'message' => 'Unknown scan linked to existing asset.',
+            'unknown_scan' => $scanService->unknownScanSummary($unknownScan->fresh(['resolvedAsset'])),
         ]);
     }
 

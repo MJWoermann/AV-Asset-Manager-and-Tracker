@@ -106,7 +106,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner,external_repair
     Route::post('/repairs/{repair}/complete', [RepairController::class, 'complete'])
         ->name('repairs.complete');
 
-    Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
+    Route::get('/assets/{asset}', [AssetController::class, 'show'])->whereNumber('asset')->name('assets.show');
 });
 
 // Broad staff group — external_repairer is intentionally excluded.

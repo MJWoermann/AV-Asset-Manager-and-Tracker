@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToDepartment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Validation\ValidationException;
 
 class UnknownScan extends Model
 {
@@ -76,6 +77,49 @@ class UnknownScan extends Model
             'resolved_asset_id' => $asset->id,
             'resolved_at' => now(),
         ]);
+    }
+
+    /**
+     * Resolve this unknown scan against an existing asset.
+     *
+     * Optionally sets tp_barcode from the scanned code when empty and unique,
+     * and adds the asset to the related event list without duplicating.
+     */
+    public function linkToExisting(Asset $asset, bool $addToEventList = false, bool $setIdentifier = false, ?int $userId = null): void
+    {
+        if ($this->isResolved()) {
+            throw ValidationException::withMessages([
+                'asset_id' => 'This unknown scan is already resolved.',
+            ]);
+        }
+
+        if ($setIdentifier && blank($asset->tp_barcode)) {
+            $code = $this->scanned_code;
+            $collision = Asset::query()
+                ->where('tp_barcode', $code)
+                ->where('id', '!=', $asset->id)
+                ->exists();
+
+            if (! $collision) {
+                $asset->update(['tp_barcode' => $code]);
+            }
+        }
+
+        $this->markResolved($asset);
+
+        if ($addToEventList && $this->event_list_id) {
+            AssetListItem::query()->firstOrCreate(
+                [
+                    'asset_list_id' => $this->event_list_id,
+                    'asset_id' => $asset->id,
+                ],
+                [
+                    'quantity' => max(1, (int) $this->quantity),
+                    'is_child_expand' => (bool) $asset->parent_id,
+                    'added_by' => $userId,
+                ]
+            );
+        }
     }
 
     /**

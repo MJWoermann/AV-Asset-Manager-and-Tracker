@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Enums\LocationType;
 use App\Models\Asset;
 use App\Models\AssetList;
+use App\Models\AssetListItem;
 use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\ScanSession;
@@ -13,6 +14,7 @@ use App\Models\UnknownScan;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class UnknownScanTest extends TestCase
@@ -304,5 +306,251 @@ class UnknownScanTest extends TestCase
             ->assertOk()
             ->assertDontSee('Remove duplicates')
             ->assertDontSee('Clear all');
+    }
+
+    public function test_unknown_scans_report_offers_link_existing_for_open_rows(): void
+    {
+        $user = $this->scanner();
+        UnknownScan::create([
+            'scanned_code' => 'LINK-UI-1',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('reports.unknown-scans'))
+            ->assertOk()
+            ->assertSee('Add asset')
+            ->assertSee('Link existing')
+            ->assertSee('Link to existing asset');
+    }
+
+    public function test_linking_unknown_scan_to_existing_asset_marks_it_resolved(): void
+    {
+        $user = $this->scanner();
+        $asset = Asset::factory()->create([
+            'name' => 'Existing Fixture',
+            'item_type_id' => $this->itemType->id,
+            'tp_barcode' => 'ALREADY-SET',
+        ]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'LINK-ME-1',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('unknown-scans.link', $unknown), [
+            'asset_id' => $asset->id,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status', 'Unknown scan linked to Existing Fixture.');
+
+        $unknown->refresh();
+        $this->assertTrue($unknown->isResolved());
+        $this->assertSame($asset->id, $unknown->resolved_asset_id);
+        $this->assertNotNull($unknown->resolved_at);
+        $this->assertSame('ALREADY-SET', $asset->fresh()->tp_barcode);
+    }
+
+    public function test_linking_can_add_asset_to_event_list_without_duplicating(): void
+    {
+        $user = $this->scanner();
+        $event = AssetList::create([
+            'name' => 'Event Link',
+            'type' => 'event',
+            'created_by' => $user->id,
+        ]);
+        $asset = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+        ]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'LINK-EVENT-1',
+            'user_id' => $user->id,
+            'event_list_id' => $event->id,
+            'quantity' => 3,
+        ]);
+
+        $this->actingAs($user)->post(route('unknown-scans.link', $unknown), [
+            'asset_id' => $asset->id,
+            'add_to_event_list' => true,
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('asset_list_items', [
+            'asset_list_id' => $event->id,
+            'asset_id' => $asset->id,
+            'quantity' => 3,
+            'added_by' => $user->id,
+        ]);
+        $this->assertSame(1, AssetListItem::query()->where('asset_list_id', $event->id)->where('asset_id', $asset->id)->count());
+
+        $unknown2 = UnknownScan::create([
+            'scanned_code' => 'LINK-EVENT-2',
+            'user_id' => $user->id,
+            'event_list_id' => $event->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)->post(route('unknown-scans.link', $unknown2), [
+            'asset_id' => $asset->id,
+            'add_to_event_list' => true,
+        ])->assertRedirect();
+
+        $this->assertSame(1, AssetListItem::query()->where('asset_list_id', $event->id)->where('asset_id', $asset->id)->count());
+    }
+
+    public function test_linking_can_set_tp_barcode_when_empty_and_not_colliding(): void
+    {
+        $user = $this->scanner();
+        $asset = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'tp_barcode' => null,
+        ]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'NEW-BARCODE-9',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)->post(route('unknown-scans.link', $unknown), [
+            'asset_id' => $asset->id,
+            'set_identifier' => true,
+        ])->assertRedirect();
+
+        $this->assertSame('NEW-BARCODE-9', $asset->fresh()->tp_barcode);
+    }
+
+    public function test_linking_skips_tp_barcode_when_another_asset_already_uses_code(): void
+    {
+        $user = $this->scanner();
+        Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'tp_barcode' => 'TAKEN-CODE',
+        ]);
+        $asset = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'tp_barcode' => null,
+        ]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'TAKEN-CODE',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)->post(route('unknown-scans.link', $unknown), [
+            'asset_id' => $asset->id,
+            'set_identifier' => true,
+        ])->assertRedirect();
+
+        $this->assertTrue($unknown->fresh()->isResolved());
+        $this->assertNull($asset->fresh()->tp_barcode);
+    }
+
+    public function test_cannot_link_already_resolved_unknown_scan(): void
+    {
+        $user = $this->scanner();
+        $resolvedAsset = Asset::factory()->create(['item_type_id' => $this->itemType->id]);
+        $otherAsset = Asset::factory()->create(['item_type_id' => $this->itemType->id]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'ALREADY-DONE',
+            'user_id' => $user->id,
+            'quantity' => 1,
+            'resolved_asset_id' => $resolvedAsset->id,
+            'resolved_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('reports.unknown-scans'))
+            ->post(route('unknown-scans.link', $unknown), [
+                'asset_id' => $otherAsset->id,
+            ])
+            ->assertRedirect(route('reports.unknown-scans'))
+            ->assertSessionHasErrors('asset_id');
+
+        $this->assertSame($resolvedAsset->id, $unknown->fresh()->resolved_asset_id);
+    }
+
+    public function test_link_unknown_scan_requires_existing_asset_id(): void
+    {
+        $user = $this->scanner();
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'NEED-ASSET',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('reports.unknown-scans'))
+            ->post(route('unknown-scans.link', $unknown), [])
+            ->assertRedirect(route('reports.unknown-scans'))
+            ->assertSessionHasErrors('asset_id');
+
+        $this->actingAs($user)
+            ->from(route('reports.unknown-scans'))
+            ->post(route('unknown-scans.link', $unknown), ['asset_id' => 999999])
+            ->assertRedirect(route('reports.unknown-scans'))
+            ->assertSessionHasErrors('asset_id');
+
+        $this->assertFalse($unknown->fresh()->isResolved());
+    }
+
+    public function test_guest_cannot_link_unknown_scan(): void
+    {
+        $user = $this->scanner();
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'GUEST-BLOCK',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+        $asset = Asset::factory()->create(['item_type_id' => $this->itemType->id]);
+
+        $this->post(route('unknown-scans.link', $unknown), [
+            'asset_id' => $asset->id,
+        ])->assertRedirect(route('login'));
+
+        $this->assertFalse($unknown->fresh()->isResolved());
+    }
+
+    public function test_api_can_link_unknown_scan_to_existing_asset(): void
+    {
+        $user = $this->scanner();
+        $asset = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'tp_barcode' => null,
+        ]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'API-LINK-1',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $this->ensureDepartmentContext($user);
+        Sanctum::actingAs($user, ['reports:write']);
+
+        $this->postJson('/api/unknown-scans/'.$unknown->id.'/link', [
+            'asset_id' => $asset->id,
+            'set_identifier' => true,
+        ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Unknown scan linked to existing asset.');
+
+        $this->assertTrue($unknown->fresh()->isResolved());
+        $this->assertSame('API-LINK-1', $asset->fresh()->tp_barcode);
+    }
+
+    public function test_asset_search_endpoint_returns_matching_assets(): void
+    {
+        $user = $this->scanner();
+        Asset::factory()->create([
+            'name' => 'Searchable Roadcase',
+            'item_type_id' => $this->itemType->id,
+            'tp_barcode' => 'SRC-999',
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('assets.search', ['q' => 'SRC-999']))
+            ->assertOk()
+            ->assertJsonFragment(['tp_barcode' => 'SRC-999'])
+            ->assertJsonFragment(['name' => 'Searchable Roadcase']);
     }
 }
