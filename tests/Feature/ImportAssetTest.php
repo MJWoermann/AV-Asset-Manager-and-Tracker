@@ -945,6 +945,51 @@ class ImportAssetTest extends TestCase
         $this->assertStringNotContainsString('=', $asset->name);
     }
 
+    public function test_xlsx_import_evaluates_excel_concat_formulas(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+
+        $xlsxPath = $this->makeConcatWorkbook();
+
+        $file = new UploadedFile(
+            $xlsxPath,
+            'concat.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true,
+        );
+
+        $upload = $this->actingAs($user)->post(route('import.upload'), ['file' => $file]);
+        $upload->assertOk();
+
+        /** @var array<string, string|null> $examples */
+        $examples = $upload->viewData('columnExamples');
+        $this->assertSame('Rack-A1', $examples['name']);
+        $this->assertSame('SN-CONCAT-42', $examples['serial']);
+        $this->assertDoesNotMatchRegularExpression('/^=/i', (string) $examples['name']);
+        $this->assertDoesNotMatchRegularExpression('/^=CONCAT/i', (string) $examples['serial']);
+
+        $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'name' => 'name',
+                'type' => 'item_type',
+                'serial' => 'serial_number',
+            ],
+        ])->assertOk();
+
+        $this->actingAs($user)->post(route('import.process'), [
+            'bulk_action' => 'update',
+        ])->assertRedirect(route('assets.index'));
+
+        @unlink($xlsxPath);
+
+        $asset = Asset::query()->where('serial_number', 'SN-CONCAT-42')->first();
+        $this->assertNotNull($asset);
+        $this->assertSame('Rack-A1', $asset->name);
+        $this->assertDoesNotMatchRegularExpression('/^=CONCAT/i', $asset->name);
+    }
+
     /**
      * Build a workbook whose Name and Quantity columns are Excel formulas.
      */
@@ -964,8 +1009,36 @@ class ImportAssetTest extends TestCase
         $sheet->setCellValue('H2', 50);
         $sheet->setCellValue('B2', 'Audio Equipment');
         $sheet->setCellValue('D2', 'SN-FORMULA-1');
-        $sheet->setCellValue('A2', '=E2&F2');
+        $sheet->setCellValue('A2', '=CONCAT(E2,F2)');
         $sheet->setCellValue('C2', '=G2+H2');
+
+        (new Xlsx($spreadsheet))->save($xlsxPath);
+
+        return $xlsxPath;
+    }
+
+    /**
+     * Build a workbook that uses Excel CONCAT with discrete args and a range.
+     */
+    protected function makeConcatWorkbook(): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'import');
+        $this->assertNotFalse($path);
+        $xlsxPath = $path.'.xlsx';
+        rename($path, $xlsxPath);
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray(['Name', 'Type', 'Serial', 'PartA', 'PartB', 'Prefix', 'Number'], null, 'A1');
+        $sheet->setCellValue('D2', 'Rack-');
+        $sheet->setCellValue('E2', 'A1');
+        $sheet->setCellValue('F2', 'SN-CONCAT-');
+        $sheet->setCellValue('G2', '42');
+        $sheet->setCellValue('B2', 'Audio Equipment');
+        // Discrete arguments (common Excel CONCAT usage).
+        $sheet->setCellValue('A2', '=CONCAT(D2,E2)');
+        // Range form — CONCAT flattens ranges; CONCATENATE historically did not.
+        $sheet->setCellValue('C2', '=CONCAT(F2:G2)');
 
         (new Xlsx($spreadsheet))->save($xlsxPath);
 
