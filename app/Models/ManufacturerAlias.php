@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MatchesFormerName;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str;
 
 class ManufacturerAlias extends Model
 {
+    use MatchesFormerName;
+
     protected $fillable = [
         'former_name',
         'manufacturer_id',
@@ -20,9 +22,9 @@ class ManufacturerAlias extends Model
 
     public static function recordMerge(Manufacturer $from, Manufacturer $to): void
     {
-        static::query()
-            ->where('manufacturer_id', $from->id)
-            ->update(['manufacturer_id' => $to->id]);
+        static::repointAliases('manufacturer_id', $from->id, [
+            'manufacturer_id' => $to->id,
+        ]);
 
         if ($from->name === $to->name) {
             return;
@@ -38,28 +40,13 @@ class ManufacturerAlias extends Model
 
     public static function forgetMatching(string $name): void
     {
-        $name = trim($name);
-
-        static::query()
-            ->where(function ($query) use ($name): void {
-                $query->where('former_name', $name)
-                    ->orWhereRaw('LOWER(former_name) = ?', [Str::lower($name)]);
-            })
-            ->delete();
+        static::deleteMatchingFormerName(trim($name));
     }
 
     public static function resolveManufacturer(string $name): ?Manufacturer
     {
-        $name = trim($name);
+        $resolved = static::resolveRelationByFormerName(trim($name), 'manufacturer');
 
-        $alias = static::query()
-            ->with('manufacturer')
-            ->where(function ($query) use ($name): void {
-                $query->where('former_name', $name)
-                    ->orWhereRaw('LOWER(former_name) = ?', [Str::lower($name)]);
-            })
-            ->first();
-
-        return $alias?->manufacturer;
+        return $resolved instanceof Manufacturer ? $resolved : null;
     }
 }

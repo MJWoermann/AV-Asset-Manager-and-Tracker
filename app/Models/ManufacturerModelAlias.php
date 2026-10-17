@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MatchesFormerName;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str;
 
 class ManufacturerModelAlias extends Model
 {
+    use MatchesFormerName;
+
     protected $fillable = [
         'former_name',
         'manufacturer_id',
@@ -26,12 +28,10 @@ class ManufacturerModelAlias extends Model
 
     public static function recordMerge(ManufacturerModel $from, ManufacturerModel $to): void
     {
-        static::query()
-            ->where('manufacturer_model_id', $from->id)
-            ->update([
-                'manufacturer_model_id' => $to->id,
-                'manufacturer_id' => $to->manufacturer_id,
-            ]);
+        static::repointAliases('manufacturer_model_id', $from->id, [
+            'manufacturer_model_id' => $to->id,
+            'manufacturer_id' => $to->manufacturer_id,
+        ]);
 
         // Same model name under the replacement manufacturer needs no name alias;
         // manufacturer aliases cover imports that still use the old manufacturer.
@@ -50,30 +50,17 @@ class ManufacturerModelAlias extends Model
 
     public static function forgetMatching(string $name, int $manufacturerId): void
     {
-        $name = trim($name);
-
-        static::query()
-            ->where('manufacturer_id', $manufacturerId)
-            ->where(function ($query) use ($name): void {
-                $query->where('former_name', $name)
-                    ->orWhereRaw('LOWER(former_name) = ?', [Str::lower($name)]);
-            })
-            ->delete();
+        static::deleteMatchingFormerName(trim($name), [
+            'manufacturer_id' => $manufacturerId,
+        ]);
     }
 
     public static function resolveModel(Manufacturer $manufacturer, string $name): ?ManufacturerModel
     {
-        $name = trim($name);
+        $resolved = static::resolveRelationByFormerName(trim($name), 'manufacturerModel', [
+            'manufacturer_id' => $manufacturer->id,
+        ]);
 
-        $alias = static::query()
-            ->with('manufacturerModel')
-            ->where('manufacturer_id', $manufacturer->id)
-            ->where(function ($query) use ($name): void {
-                $query->where('former_name', $name)
-                    ->orWhereRaw('LOWER(former_name) = ?', [Str::lower($name)]);
-            })
-            ->first();
-
-        return $alias?->manufacturerModel;
+        return $resolved instanceof ManufacturerModel ? $resolved : null;
     }
 }
