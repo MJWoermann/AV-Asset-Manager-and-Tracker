@@ -897,4 +897,78 @@ class ImportAssetTest extends TestCase
         $this->assertTrue(session()->has('import.path'));
         $this->assertDatabaseMissing('assets', ['serial_number' => 'SN-DRY-1']);
     }
+
+    public function test_xlsx_import_uses_calculated_formula_results_not_formula_text(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+
+        $xlsxPath = $this->makeFormulaWorkbook();
+
+        $file = new UploadedFile(
+            $xlsxPath,
+            'formulas.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true,
+        );
+
+        $upload = $this->actingAs($user)->post(route('import.upload'), ['file' => $file]);
+        $upload->assertOk();
+
+        /** @var array<string, string|null> $examples */
+        $examples = $upload->viewData('columnExamples');
+        $this->assertSame('Widget-Alpha', $examples['name']);
+        $this->assertSame('150', $examples['quantity']);
+        $this->assertStringNotContainsString('=', $examples['name']);
+        $this->assertStringNotContainsString('=', $examples['quantity']);
+
+        $this->actingAs($user)->post(route('import.prepare'), [
+            'mapping' => [
+                'name' => 'name',
+                'type' => 'item_type',
+                'quantity' => 'quantity',
+                'serial' => 'serial_number',
+            ],
+        ])->assertOk();
+
+        $this->actingAs($user)->post(route('import.process'), [
+            'bulk_action' => 'update',
+        ])->assertRedirect(route('assets.index'));
+
+        @unlink($xlsxPath);
+
+        $asset = Asset::query()->where('serial_number', 'SN-FORMULA-1')->first();
+        $this->assertNotNull($asset);
+        $this->assertSame('Widget-Alpha', $asset->name);
+        $this->assertSame(150, (int) $asset->quantity);
+        $this->assertStringNotContainsString('=', $asset->name);
+    }
+
+    /**
+     * Build a workbook whose Name and Quantity columns are Excel formulas.
+     */
+    protected function makeFormulaWorkbook(): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'import');
+        $this->assertNotFalse($path);
+        $xlsxPath = $path.'.xlsx';
+        rename($path, $xlsxPath);
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray(['Name', 'Type', 'Quantity', 'Serial', 'Prefix', 'Suffix', 'Left', 'Right'], null, 'A1');
+        $sheet->setCellValue('E2', 'Widget-');
+        $sheet->setCellValue('F2', 'Alpha');
+        $sheet->setCellValue('G2', 100);
+        $sheet->setCellValue('H2', 50);
+        $sheet->setCellValue('B2', 'Audio Equipment');
+        $sheet->setCellValue('D2', 'SN-FORMULA-1');
+        $sheet->setCellValue('A2', '=E2&F2');
+        $sheet->setCellValue('C2', '=G2+H2');
+
+        (new Xlsx($spreadsheet))->save($xlsxPath);
+
+        return $xlsxPath;
+    }
 }
