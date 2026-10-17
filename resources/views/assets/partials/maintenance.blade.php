@@ -160,35 +160,43 @@
             <input type="hidden" name="tab" value="maintenance">
             <div>
                 <x-input-label for="maintenance_date_from" value="From" />
-                <x-text-input id="maintenance_date_from" name="date_from" type="date" class="mt-1 block w-full" :value="request('date_from')" />
+                <x-text-input id="maintenance_date_from" name="date_from" type="date" class="mt-1 block w-full" :value="request('date_from')" onchange="this.form.requestSubmit()" />
             </div>
             <div>
                 <x-input-label for="maintenance_date_to" value="To" />
-                <x-text-input id="maintenance_date_to" name="date_to" type="date" class="mt-1 block w-full" :value="request('date_to')" />
+                <x-text-input id="maintenance_date_to" name="date_to" type="date" class="mt-1 block w-full" :value="request('date_to')" onchange="this.form.requestSubmit()" />
             </div>
             <div class="min-w-[10rem]">
                 <x-input-label for="maintenance_filter_type" value="Type" />
-                <select id="maintenance_filter_type" name="log_type" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                    <option value="">All</option>
-                    @foreach($types as $value => $label)
-                        <option value="{{ $value }}" @selected(request('log_type') === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="log_type"
+                    id="maintenance_filter_type"
+                    :options="collect($types)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                    :selected="request('log_type')"
+                    placeholder="All"
+                    nullable
+                    auto-submit
+                    aria-label="Filter by maintenance type"
+                />
             </div>
             <div class="min-w-[10rem]">
                 <x-input-label for="maintenance_filter_user_id" value="User" />
-                <select id="maintenance_filter_user_id" name="user_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                    <option value="">All</option>
-                    @foreach($userOptions as $option)
-                        <option value="{{ $option['value'] }}" @selected((string) request('user_id') === (string) $option['value'])>{{ $option['label'] }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="user_id"
+                    id="maintenance_filter_user_id"
+                    :options="$userOptions"
+                    :selected="request('user_id')"
+                    placeholder="All"
+                    nullable
+                    auto-submit
+                    aria-label="Filter by user"
+                />
             </div>
             <div class="flex items-end gap-2 flex-wrap">
-                <x-primary-button>Filter</x-primary-button>
-                @if($maintenanceFiltersActive)
-                    <a href="{{ route('assets.show', [$asset, 'tab' => 'maintenance']) }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Clear</a>
-                @endif
+                <x-clear-filters
+                    :href="route('assets.show', [$asset, 'tab' => 'maintenance'])"
+                    :active="$maintenanceFiltersActive"
+                />
             </div>
         </form>
 

@@ -16,47 +16,71 @@
             <p class="text-sm text-brand">{{ session('status') }}</p>
         @endif
 
+        @php
+            $sparesFiltersActive = filled($term)
+                || filled($kind)
+                || filled($severity)
+                || filled($stockStatus ?? null)
+                || ($belowMin ?? false)
+                || $includeEol;
+        @endphp
         <form method="get" class="flex flex-wrap gap-2 items-end text-sm">
             <div>
                 <label class="block text-xs text-brand-charcoal dark:text-brand-silver">Search</label>
                 <input type="search" name="q" value="{{ $term }}" class="border border-brand-silver dark:border-brand-charcoal px-2 py-1 w-48" placeholder="Code, component…">
             </div>
-            <div>
-                <label class="block text-xs text-brand-charcoal dark:text-brand-silver">Kind</label>
-                <select name="kind" class="border border-brand-silver dark:border-brand-charcoal px-2 py-1">
-                    <option value="">All</option>
-                    @foreach(\App\Enums\SparePartKind::options() as $value => $label)
-                        <option value="{{ $value }}" @selected($kind === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
+            <div class="min-w-[9rem]">
+                <label class="block text-xs text-brand-charcoal dark:text-brand-silver" for="spares_kind">Kind</label>
+                <x-searchable-select
+                    name="kind"
+                    id="spares_kind"
+                    :options="collect(\App\Enums\SparePartKind::options())->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                    :selected="$kind"
+                    placeholder="All"
+                    nullable
+                    auto-submit
+                    compact
+                    aria-label="Filter by kind"
+                />
             </div>
-            <div>
-                <label class="block text-xs text-brand-charcoal dark:text-brand-silver">Severity</label>
-                <select name="severity" class="border border-brand-silver dark:border-brand-charcoal px-2 py-1">
-                    <option value="">All</option>
-                    @foreach(\App\Enums\SparePartSeverity::options() as $value => $label)
-                        <option value="{{ $value }}" @selected($severity === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
+            <div class="min-w-[9rem]">
+                <label class="block text-xs text-brand-charcoal dark:text-brand-silver" for="spares_severity">Severity</label>
+                <x-searchable-select
+                    name="severity"
+                    id="spares_severity"
+                    :options="collect(\App\Enums\SparePartSeverity::options())->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                    :selected="$severity"
+                    placeholder="All"
+                    nullable
+                    auto-submit
+                    compact
+                    aria-label="Filter by severity"
+                />
             </div>
-            <div>
-                <label class="block text-xs text-brand-charcoal dark:text-brand-silver">Stock status</label>
-                <select name="stock_status" class="border border-brand-silver dark:border-brand-charcoal px-2 py-1">
-                    <option value="">All</option>
-                    @foreach(\App\Enums\SparePartStockStatus::options() as $value => $label)
-                        <option value="{{ $value }}" @selected(($stockStatus ?? null) === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
+            <div class="min-w-[9rem]">
+                <label class="block text-xs text-brand-charcoal dark:text-brand-silver" for="spares_stock_status">Stock status</label>
+                <x-searchable-select
+                    name="stock_status"
+                    id="spares_stock_status"
+                    :options="collect(\App\Enums\SparePartStockStatus::options())->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                    :selected="$stockStatus ?? null"
+                    placeholder="All"
+                    nullable
+                    auto-submit
+                    compact
+                    aria-label="Filter by stock status"
+                />
             </div>
             <label class="flex items-center gap-2 pb-1">
-                <input type="checkbox" name="below_min" value="1" @checked($belowMin ?? false)>
+                <input type="checkbox" name="below_min" value="1" @checked($belowMin ?? false) onchange="this.form.requestSubmit()">
                 <span>Below minimum</span>
             </label>
             <label class="flex items-center gap-2 pb-1">
-                <input type="checkbox" name="include_eol" value="1" @checked($includeEol)>
+                <input type="checkbox" name="include_eol" value="1" @checked($includeEol) onchange="this.form.requestSubmit()">
                 <span>Include EOL / superseded</span>
             </label>
-            <button type="submit" class="px-3 py-1 bg-black text-white">Filter</button>
+            <button type="submit" class="px-3 py-1 bg-black text-white">Search</button>
+            <x-clear-filters :href="route('spares.index')" :active="$sparesFiltersActive" class="!px-3 !py-1" />
         </form>
 
         @role('admin|inventory_manager')

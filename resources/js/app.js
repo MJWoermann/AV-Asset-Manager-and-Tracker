@@ -898,6 +898,8 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     placeholder: config.placeholder ?? '—',
     nullable: Boolean(config.nullable),
     disabled: Boolean(config.disabled),
+    autoSubmit: Boolean(config.autoSubmit),
+    compact: Boolean(config.compact),
     createOption: config.createOption
         ? {
               value: String(config.createOption.value),
@@ -908,11 +910,18 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     /** Stable root — Alpine `$el` is contextual and becomes the clicked option during `@click`. */
     rootEl: null,
     fieldName: '',
+    panelStyle: {},
+    _reposition: null,
 
     init() {
         this.rootEl = this.$el;
         const input = this.rootEl?.querySelector('input[type="hidden"]');
         this.fieldName = input?.name || '';
+        this._reposition = () => {
+            if (this.open) {
+                this.updatePanelPosition();
+            }
+        };
     },
 
     get selectedLabel() {
@@ -946,19 +955,84 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
         return highlightSearchTerm(label, this.query);
     },
 
+    updatePanelPosition() {
+        const trigger = this.$refs.trigger;
+        if (!trigger) {
+            return;
+        }
+
+        const rect = trigger.getBoundingClientRect();
+        const minWidth = this.compact ? 11 * 16 : rect.width;
+        const width = Math.max(rect.width, minWidth);
+        const estimatedHeight = 280;
+        const gap = 4;
+        const spaceBelow = window.innerHeight - rect.bottom - gap;
+        const openUp = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+        let top = openUp
+            ? Math.max(8, rect.top - estimatedHeight - gap)
+            : rect.bottom + gap;
+        let left = rect.left;
+        const maxLeft = window.innerWidth - width - 8;
+        left = Math.min(Math.max(8, left), Math.max(8, maxLeft));
+
+        this.panelStyle = {
+            position: 'fixed',
+            top: `${top}px`,
+            left: `${left}px`,
+            width: `${width}px`,
+            zIndex: '60',
+        };
+    },
+
+    bindPanelListeners() {
+        window.addEventListener('resize', this._reposition);
+        window.addEventListener('scroll', this._reposition, true);
+    },
+
+    unbindPanelListeners() {
+        window.removeEventListener('resize', this._reposition);
+        window.removeEventListener('scroll', this._reposition, true);
+    },
+
     openList() {
         if (this.disabled) {
             return;
         }
         this.open = true;
         this.highlight = -1;
-        this.$nextTick(() => this.$refs.search?.focus());
+        this.bindPanelListeners();
+        this.$nextTick(() => {
+            this.updatePanelPosition();
+            this.$refs.search?.focus();
+        });
     },
 
     closeList() {
         this.open = false;
         this.query = '';
         this.highlight = -1;
+        this.unbindPanelListeners();
+    },
+
+    associatedForm() {
+        const root = this.rootEl || this.$el;
+        const input = root?.querySelector('input[type="hidden"]');
+
+        return input?.form ?? null;
+    },
+
+    maybeAutoSubmit() {
+        if (!this.autoSubmit) {
+            return;
+        }
+
+        const form = this.associatedForm();
+        if (!form) {
+            return;
+        }
+
+        // Allow Alpine to flush the hidden input value before submit.
+        queueMicrotask(() => form.requestSubmit());
     },
 
     emitChanged() {
@@ -971,6 +1045,7 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             bubbles: true,
             composed: true,
         }));
+        this.maybeAutoSubmit();
     },
 
     select(option) {
@@ -1044,6 +1119,10 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             event.preventDefault();
             this.select(this.filtered[this.highlight]);
         }
+    },
+
+    destroy() {
+        this.unbindPanelListeners();
     },
 }));
 

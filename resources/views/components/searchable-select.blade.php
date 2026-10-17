@@ -9,10 +9,13 @@
     'disabled' => false,
     'createOption' => null,
     'form' => null,
+    'autoSubmit' => false,
+    'compact' => false,
 ])
 
 @php
     $id ??= $name;
+    $ariaLabel = $attributes->get('aria-label');
     $normalized = collect($options)->map(function ($option) {
         if (is_array($option)) {
             return [
@@ -34,15 +37,25 @@
             'label' => (string) ($createOption['label'] ?? '+ Add new…'),
         ];
     }
+
+    $triggerClass = $compact
+        ? 'flex min-w-0 flex-1 items-center justify-between gap-1 rounded border border-brand-charcoal/30 bg-white px-2 py-1.5 text-left text-xs dark:border-brand-charcoal dark:bg-black dark:text-white disabled:cursor-not-allowed disabled:opacity-60'
+        : 'flex min-w-0 flex-1 items-center justify-between gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm dark:border-brand-charcoal dark:bg-black dark:text-white disabled:cursor-not-allowed disabled:opacity-60';
+
+    $clearClass = $compact
+        ? 'rounded border border-brand-charcoal/30 px-1.5 text-xs text-brand-charcoal hover:text-black dark:border-brand-charcoal dark:text-brand-silver dark:hover:text-white'
+        : 'rounded border border-gray-300 px-2 text-sm text-brand-charcoal hover:text-black dark:border-brand-charcoal dark:text-brand-silver dark:hover:text-white';
 @endphp
 
 <div
-    {{ $attributes->class('relative mt-1') }}
+    {{ $attributes->except('aria-label')->class($compact ? 'relative' : 'relative mt-1') }}
     x-data="searchableSelect(@js($normalized), @js($selected !== null ? (string) $selected : ''), {
         placeholder: @js($placeholder),
         nullable: @js((bool) $nullable),
         disabled: @js((bool) $disabled),
         createOption: @js($create),
+        autoSubmit: @js((bool) $autoSubmit),
+        compact: @js((bool) $compact),
     })"
     @keydown="onKeydown($event)"
     @click.outside="closeList()"
@@ -52,15 +65,19 @@
     <div class="flex gap-1">
         <button
             type="button"
-            class="flex min-w-0 flex-1 items-center justify-between gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm dark:border-brand-charcoal dark:bg-black dark:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            x-ref="trigger"
+            class="{{ $triggerClass }}"
             @click="open ? closeList() : openList()"
             :disabled="disabled"
             :aria-expanded="open.toString()"
             aria-haspopup="listbox"
             aria-controls="{{ $id }}-listbox"
+            @if($ariaLabel)
+                aria-label="{{ $ariaLabel }}"
+            @endif
         >
             <span class="truncate" :class="value ? '' : 'text-brand-charcoal dark:text-brand-silver'" x-text="selectedLabel"></span>
-            <svg class="h-4 w-4 shrink-0 text-brand-charcoal dark:text-brand-silver" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="{{ $compact ? 'h-3.5 w-3.5' : 'h-4 w-4' }} shrink-0 text-brand-charcoal dark:text-brand-silver" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" />
             </svg>
         </button>
@@ -68,7 +85,7 @@
             type="button"
             x-show="nullable && value && ! disabled"
             x-cloak
-            class="rounded border border-gray-300 px-2 text-sm text-brand-charcoal hover:text-black dark:border-brand-charcoal dark:text-brand-silver dark:hover:text-white"
+            class="{{ $clearClass }}"
             @click="clear()"
             aria-label="Clear selection"
         >&times;</button>
@@ -77,7 +94,9 @@
     <div
         x-show="open"
         x-cloak
-        class="absolute z-20 mt-1 w-full border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
+        x-ref="panel"
+        :style="panelStyle"
+        class="border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
         id="{{ $id }}-listbox"
         role="listbox"
     >
@@ -95,7 +114,7 @@
             <template x-if="filtered.length === 0">
                 <li class="px-3 py-2 text-brand-charcoal dark:text-brand-silver">No matches</li>
             </template>
-            <template x-for="(option, index) in filtered" :key="option.value">
+            <template x-for="(option, index) in filtered" :key="option.value === '' ? '__empty__' : option.value">
                 <li>
                     <button
                         type="button"

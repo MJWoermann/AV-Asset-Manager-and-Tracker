@@ -90,7 +90,43 @@ class AssetColumnFilterTest extends TestCase
         $response->assertSee('name="tp_barcode"', false);
         $response->assertSee('name="status"', false);
         $response->assertSee('Filter by status', false);
-        $response->assertSee('>Filter</button>', false);
+        $response->assertSee('searchableSelect(', false);
+        $response->assertSee('autoSubmit: true', false);
+        $response->assertSee('>Search</button>', false);
+    }
+
+    public function test_assets_index_shows_clear_all_filters_when_active(): void
+    {
+        $user = $this->user();
+
+        $response = $this->actingAs($user)->get(route('assets.index', [
+            'status' => AssetStatus::Available->value,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Clear all filters', false);
+        $response->assertSee('href="'.route('assets.index').'"', false);
+    }
+
+    public function test_list_show_uses_searchable_auto_submit_column_filters(): void
+    {
+        $user = $this->user();
+        $list = AssetList::create([
+            'name' => 'Event A',
+            'type' => 'event',
+            'created_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('lists.show', [
+            'list' => $list,
+            'status' => AssetStatus::Available->value,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('searchableSelect(', false);
+        $response->assertSee('autoSubmit: true', false);
+        $response->assertSee('Clear all filters', false);
+        $response->assertSee('>Search</button>', false);
     }
 
     public function test_list_show_filters_items_by_status_and_search(): void

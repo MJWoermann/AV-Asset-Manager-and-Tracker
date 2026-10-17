@@ -11,15 +11,23 @@
 
     <div class="max-w-5xl mx-auto px-4 space-y-4">
         <form method="GET" class="flex flex-wrap gap-2 items-end">
-            <div>
+            <div class="min-w-[12rem]">
                 <x-input-label for="status" value="Status" />
-                <select id="status" name="status" class="mt-1 rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white text-sm" onchange="this.form.submit()">
-                    <option value="">All</option>
-                    @foreach($statuses as $value => $label)
-                        <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="status"
+                    id="status"
+                    :options="collect($statuses)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                    :selected="request('status')"
+                    placeholder="All"
+                    nullable
+                    auto-submit
+                    aria-label="Filter by rig event status"
+                />
             </div>
+            <x-clear-filters
+                :href="route('rigging.events.index')"
+                :active="filled(request('status'))"
+            />
         </form>
 
         <div class="overflow-x-auto border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate">

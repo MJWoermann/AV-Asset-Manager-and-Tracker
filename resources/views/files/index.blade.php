@@ -62,17 +62,25 @@
                 <x-input-label for="q" value="Search" />
                 <x-text-input id="q" name="q" class="mt-1 block w-full" :value="request('q')" placeholder="Title or filename" />
             </div>
-            <div>
+            <div class="min-w-[12rem]">
                 <x-input-label for="category" value="Category" />
-                <select id="category" name="category" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                    <option value="">All</option>
-                    @foreach($categories as $value => $label)
-                        <option value="{{ $value }}" @selected(request('category') === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="category"
+                    id="category"
+                    :options="collect($categories)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                    :selected="request('category')"
+                    placeholder="All"
+                    nullable
+                    auto-submit
+                    aria-label="Filter by category"
+                />
             </div>
-            <div class="flex items-end">
-                <x-primary-button>Filter</x-primary-button>
+            <div class="flex items-end gap-2 flex-wrap">
+                <x-primary-button>Search</x-primary-button>
+                <x-clear-filters
+                    :href="route('files.index')"
+                    :active="filled(request('q')) || filled(request('category'))"
+                />
             </div>
         </form>
 

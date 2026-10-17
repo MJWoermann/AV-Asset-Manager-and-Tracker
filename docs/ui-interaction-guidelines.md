@@ -28,6 +28,7 @@ Dense browse surfaces should be filterable and, where users spend real time, cus
 
 - Prefer **per-user preferences** for view layout (columns, widget order/visibility) over one global layout for everyone.
 - Data tables that users browse often should support **search and/or per-column filters**; preserve active filters when columns are hidden.
+- List/dropdown filters use **searchable** option lists. Choosing (or clearing) a list value **applies immediately** — do not require a separate Apply/Filter click for dropdowns. Keep an explicit Search submit for free-text fields. Provide a **Clear all filters** control whenever any filter is active.
 - **Site-wide** export/report column defaults may be admin-owned; day-to-day browse layout stays per-user.
 - When adding a new dense list page, plan **filters + customize affordances up front** — do not ship a bare unfilterable grid as the long-term UX.
 - Do **not** require column pickers on every admin CRUD index; apply them where browse density and frequency justify them.

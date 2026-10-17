@@ -20,16 +20,27 @@
                     scan-aria-label="Scan barcode into unknown-scan search"
                 />
             </div>
-            <div>
+            <div class="min-w-[10rem]">
                 <x-input-label for="status" value="Status" />
-                <select id="status" name="status" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                    <option value="open" @selected($status === 'open')>Open</option>
-                    <option value="resolved" @selected($status === 'resolved')>Resolved</option>
-                    <option value="all" @selected($status === 'all')>All</option>
-                </select>
+                <x-searchable-select
+                    name="status"
+                    id="status"
+                    :options="[
+                        ['value' => 'open', 'label' => 'Open'],
+                        ['value' => 'resolved', 'label' => 'Resolved'],
+                        ['value' => 'all', 'label' => 'All'],
+                    ]"
+                    :selected="$status"
+                    auto-submit
+                    aria-label="Filter by status"
+                />
             </div>
             <div class="flex items-end gap-2 flex-wrap">
-                <x-primary-button>Filter</x-primary-button>
+                <x-primary-button>Search</x-primary-button>
+                <x-clear-filters
+                    :href="route('reports.unknown-scans')"
+                    :active="filled($q) || $status !== 'open'"
+                />
                 <a href="{{ route('reports.unknown-scans.export', ['format' => 'xlsx', 'status' => $status, 'q' => $q]) }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Export XLSX</a>
                 <a href="{{ route('reports.unknown-scans.export', ['format' => 'csv', 'status' => $status, 'q' => $q]) }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Export CSV</a>
             </div>

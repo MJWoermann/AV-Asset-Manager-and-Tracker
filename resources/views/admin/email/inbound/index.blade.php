@@ -14,16 +14,21 @@
         @endif
 
         <form method="GET" action="{{ route('admin.email.inbound.index') }}" class="flex flex-wrap gap-3 items-end">
-            <div>
+            <div class="min-w-[12rem]">
                 <x-input-label for="status" value="Status" />
-                <select id="status" name="status" class="mt-1 block rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                    <option value="all" @selected($status === 'all')>All</option>
-                    @foreach($statuses as $value => $label)
-                        <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="status"
+                    id="status"
+                    :options="collect(['all' => 'All'])->union($statuses)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                    :selected="$status"
+                    auto-submit
+                    aria-label="Filter by inbound status"
+                />
             </div>
-            <x-primary-button>Filter</x-primary-button>
+            <x-clear-filters
+                :href="route('admin.email.inbound.index')"
+                :active="$status !== 'all'"
+            />
         </form>
 
         @forelse($actions as $action)
