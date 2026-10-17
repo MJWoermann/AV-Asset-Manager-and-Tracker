@@ -214,25 +214,6 @@ class ConnectionBusService
     }
 
     /**
-     * @param  Collection<int, ConnectionBus>  $buses
-     * @return array<int, true>
-     */
-    public function assetIdsOnBuses(Collection $buses): array
-    {
-        $ids = [];
-
-        foreach ($buses as $bus) {
-            foreach ($bus->interfaces as $interface) {
-                if ($interface->asset_id) {
-                    $ids[(int) $interface->asset_id] = true;
-                }
-            }
-        }
-
-        return $ids;
-    }
-
-    /**
      * Expand connected component membership through shared buses.
      *
      * @param  Collection<int, ConnectionBus>  $buses

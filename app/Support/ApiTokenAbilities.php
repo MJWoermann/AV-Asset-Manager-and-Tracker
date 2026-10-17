@@ -58,27 +58,9 @@ class ApiTokenAbilities
         return array_keys(self::definitions());
     }
 
-    /**
-     * Named scopes only (excludes wildcard full access).
-     *
-     * @return list<string>
-     */
-    public static function scoped(): array
-    {
-        return array_values(array_filter(
-            self::all(),
-            fn (string $ability): bool => $ability !== self::FULL,
-        ));
-    }
-
     public static function label(string $ability): string
     {
         return self::definitions()[$ability] ?? $ability;
-    }
-
-    public static function isAllowed(string $ability): bool
-    {
-        return array_key_exists($ability, self::definitions());
     }
 
     /**

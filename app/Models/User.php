@@ -40,11 +40,6 @@ class User extends Authenticatable
         return $this->belongsToMany(Department::class)->withTimestamps();
     }
 
-    public function prefersDarkMode(): bool
-    {
-        return $this->theme === 'dark';
-    }
-
     /**
      * Whether the user has opted into a developer feature via preferences.features.{feature}.
      */

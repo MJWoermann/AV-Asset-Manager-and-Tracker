@@ -75,22 +75,6 @@ class NotificationFieldCatalog
             ->all();
     }
 
-    /**
-     * @return list<string>
-     */
-    public function macFieldKeys(): array
-    {
-        $keys = ['asset.mac_address'];
-
-        foreach ($this->customFields() as $field) {
-            if ($this->looksLikeMac($field['key'], $field['label'])) {
-                $keys[] = $field['key'];
-            }
-        }
-
-        return array_values(array_unique($keys));
-    }
-
     public function looksLikeMac(string $key, ?string $label = null): bool
     {
         $haystack = strtolower($key.' '.($label ?? ''));

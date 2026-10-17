@@ -1290,18 +1290,6 @@ Alpine.data('interfaceTemplateForm', (initialTemplates = []) => ({
     },
 }));
 
-Alpine.data('assetRuFields', (config = {}) => ({
-    supportsByType: config.supportsByType || {},
-    itemTypeId: config.initialTypeId === null || config.initialTypeId === undefined
-        ? ''
-        : String(config.initialTypeId),
-    forceShow: Boolean(config.forceShow),
-
-    get showRuFields() {
-        return this.forceShow || Boolean(this.supportsByType[this.itemTypeId]);
-    },
-}));
-
 Alpine.data('assetFormFields', (config = {}) => ({
     ruSupportsByType: config.ruSupportsByType || {},
     stockSupportsByType: config.stockSupportsByType || {},
