@@ -72,6 +72,9 @@ run_as_deploy npm run build
 echo "==> migrate"
 run_as_deploy php artisan migrate --force
 
+echo "==> ensure application roles"
+run_as_deploy php artisan db:seed --class=RoleSeeder --force
+
 echo "==> cache config / routes / views"
 run_as_deploy php artisan config:cache
 run_as_deploy php artisan route:cache
