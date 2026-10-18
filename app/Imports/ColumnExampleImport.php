@@ -4,13 +4,14 @@ namespace App\Imports;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithLimit;
 
 /**
  * Reads a limited set of spreadsheet data rows for mapping-step previews.
  */
-class ColumnExampleImport implements ToCollection, WithHeadingRow, WithLimit
+class ColumnExampleImport implements ToCollection, WithCalculatedFormulas, WithHeadingRow, WithLimit
 {
     public const DEFAULT_LIMIT = 50;
 
