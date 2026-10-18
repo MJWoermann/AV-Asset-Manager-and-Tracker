@@ -17,7 +17,7 @@ class BulkUpdateAssetsRequest extends FormRequest
             return false;
         }
 
-        if ($this->input('action') === 'delete') {
+        if (in_array($this->input('action'), ['delete', 'merge'], true)) {
             return $user->hasAnyRole(['admin', 'inventory_manager']);
         }
 
@@ -40,6 +40,7 @@ class BulkUpdateAssetsRequest extends FormRequest
             'clear_notes',
             'remove_from_list',
             'confirm_delete',
+            'confirm_merge',
         ];
 
         $merged = [];
@@ -68,8 +69,14 @@ class BulkUpdateAssetsRequest extends FormRequest
         return [
             'asset_ids' => ['required', 'array', 'min:1'],
             'asset_ids.*' => ['integer', 'distinct', 'exists:assets,id'],
-            'action' => ['required', Rule::in(['update', 'delete'])],
+            'action' => ['required', Rule::in(['update', 'delete', 'merge'])],
             'confirm_delete' => ['exclude_unless:action,delete', 'accepted'],
+            'confirm_merge' => ['exclude_unless:action,merge', 'accepted'],
+            'keep_asset_id' => [
+                Rule::requiredIf(fn () => $this->input('action') === 'merge'),
+                'integer',
+                'exists:assets,id',
+            ],
 
             'update_status' => ['sometimes', 'boolean'],
             'status' => [
@@ -136,7 +143,16 @@ class BulkUpdateAssetsRequest extends FormRequest
                 return;
             }
 
-            if ($this->input('action') === 'delete') {
+            if (in_array($this->input('action'), ['delete', 'merge'], true)) {
+                if ($this->input('action') === 'merge') {
+                    $keepId = (int) $this->input('keep_asset_id');
+                    $selected = collect($this->input('asset_ids', []))->map(fn ($id) => (int) $id);
+
+                    if ($keepId > 0 && ! $selected->contains($keepId)) {
+                        $validator->errors()->add('keep_asset_id', 'The kept asset must be one of the selected assets.');
+                    }
+                }
+
                 return;
             }
 
@@ -181,6 +197,7 @@ class BulkUpdateAssetsRequest extends FormRequest
      *     fields?: array<string, mixed>,
      *     add_to_list_id?: int|null,
      *     remove_from_list_id?: int|null,
+     *     keep_asset_id?: int|null,
      * }
      */
     public function bulkPayload(): array
@@ -191,6 +208,12 @@ class BulkUpdateAssetsRequest extends FormRequest
         ];
 
         if ($payload['action'] === 'delete') {
+            return $payload;
+        }
+
+        if ($payload['action'] === 'merge') {
+            $payload['keep_asset_id'] = (int) $this->validated('keep_asset_id');
+
             return $payload;
         }
 

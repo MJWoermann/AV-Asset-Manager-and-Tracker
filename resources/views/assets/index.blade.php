@@ -85,12 +85,20 @@
                 </thead>
                 <tbody>
                     @forelse($assets as $asset)
+                        @php
+                            $bulkAssetLabel = $asset->name;
+                            $bulkLabelParts = array_filter([$asset->tp_barcode, $asset->fmi_ast, $asset->rig_tag]);
+                            if ($bulkLabelParts !== []) {
+                                $bulkAssetLabel .= ' ('.implode(' · ', $bulkLabelParts).')';
+                            }
+                        @endphp
                         <tr class="border-t border-brand-silver dark:border-brand-charcoal">
                             <td class="px-3 py-2">
                                 <input
                                     type="checkbox"
                                     class="rounded border-brand-charcoal/40"
                                     data-bulk-asset-id="{{ $asset->id }}"
+                                    data-bulk-asset-label="{{ $bulkAssetLabel }}"
                                     :checked="!!selected[{{ $asset->id }}]"
                                     @change="setSelected({{ $asset->id }}, $event.target.checked)"
                                     aria-label="Select {{ $asset->name }}"

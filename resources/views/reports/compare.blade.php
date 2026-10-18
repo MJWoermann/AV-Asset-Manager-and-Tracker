@@ -35,19 +35,27 @@
             @csrf
             <div>
                 <x-input-label for="scanned_list_id" value="Scanned / event list" />
-                <select id="scanned_list_id" name="scanned_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
-                    @foreach($lists as $list)
-                        <option value="{{ $list->id }}" @selected(old('scanned_list_id', request('scanned_list_id')) == $list->id)>{{ $list->compareOptionLabel() }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="scanned_list_id"
+                    id="scanned_list_id"
+                    :options="$lists->map(fn ($list) => ['value' => $list->id, 'label' => $list->compareOptionLabel()])->values()"
+                    :selected="old('scanned_list_id', request('scanned_list_id'))"
+                    placeholder="Select scanned / event list…"
+                    required
+                    aria-label="Scanned / event list"
+                />
             </div>
             <div>
                 <x-input-label for="inventory_list_id" value="Inventory / source list" />
-                <select id="inventory_list_id" name="inventory_list_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
-                    @foreach($lists as $list)
-                        <option value="{{ $list->id }}" @selected(old('inventory_list_id', request('inventory_list_id')) == $list->id)>{{ $list->compareOptionLabel() }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="inventory_list_id"
+                    id="inventory_list_id"
+                    :options="$lists->map(fn ($list) => ['value' => $list->id, 'label' => $list->compareOptionLabel()])->values()"
+                    :selected="old('inventory_list_id', request('inventory_list_id'))"
+                    placeholder="Select inventory / source list…"
+                    required
+                    aria-label="Inventory / source list"
+                />
             </div>
             <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
                 <x-primary-button>Run comparison</x-primary-button>

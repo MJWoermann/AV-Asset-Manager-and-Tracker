@@ -38,6 +38,12 @@
             @endfeature
             <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="clearSelection()">Clear</button>
             @if($canDelete)
+                <button
+                    type="button"
+                    class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver"
+                    x-show="selectedCount >= 2"
+                    @click="openMergeConfirm()"
+                >Merge selected</button>
                 <button type="button" class="px-3 py-2 text-sm bg-red-700 text-white" @click="openDeleteConfirm()">Delete selected</button>
             @endif
         </div>
@@ -47,12 +53,12 @@
         method="POST"
         action="{{ route('assets.bulk-update') }}"
         class="mt-4 space-y-4 border-t border-brand-silver dark:border-brand-charcoal pt-4"
-        x-show="panelOpen"
+        x-show="panelOpen || pendingDelete || pendingMerge"
         x-ref="bulkForm"
         @submit="prepareSubmit($event)"
     >
         @csrf
-        <input type="hidden" name="action" :value="pendingDelete ? 'delete' : 'update'">
+        <input type="hidden" name="action" :value="pendingDelete ? 'delete' : (pendingMerge ? 'merge' : 'update')">
         <template x-for="id in selectedIds" :key="id">
             <input type="hidden" name="asset_ids[]" :value="id">
         </template>
@@ -199,6 +205,41 @@
             <div class="flex justify-end gap-2">
                 <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="cancelDelete()">Cancel</button>
                 <button type="button" class="px-3 py-2 text-sm bg-red-700 text-white" @click="confirmDelete()">Delete permanently</button>
+            </div>
+        </div>
+    </div>
+
+    <div
+        x-cloak
+        x-show="mergeConfirmOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6"
+        role="dialog"
+        aria-modal="true"
+    >
+        <div class="fixed inset-0 bg-black/50" @click="cancelMerge()"></div>
+        <div class="relative w-full max-w-lg max-h-[calc(100vh-3rem)] overflow-y-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-6 space-y-4 shadow-xl">
+            <h3 class="text-lg font-semibold">Merge selected assets</h3>
+            <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                The kept asset keeps its values; blank fields are filled from merged assets. Lists, history, repairs, and related records move to the kept asset. Other selected assets are permanently deleted.
+            </p>
+            <fieldset class="space-y-2 text-sm">
+                <legend class="font-medium text-brand-black dark:text-white">Keep this asset</legend>
+                <template x-for="option in selectedMergeOptions()" :key="'merge-'+option.id">
+                    <label class="flex items-start gap-2 border border-brand-silver dark:border-brand-charcoal p-2 cursor-pointer">
+                        <input
+                            type="radio"
+                            name="merge_keep_preview"
+                            class="mt-1"
+                            :value="option.id"
+                            x-model.number="keepAssetId"
+                        >
+                        <span x-text="option.label"></span>
+                    </label>
+                </template>
+            </fieldset>
+            <div class="flex justify-end gap-2">
+                <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="cancelMerge()">Cancel</button>
+                <button type="button" class="px-3 py-2 text-sm bg-brand text-white" @click="confirmMerge()">Merge permanently</button>
             </div>
         </div>
     </div>

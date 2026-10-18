@@ -156,6 +156,7 @@ class ComparisonReportPdfTest extends TestCase
         $response = $this->actingAs($user)->get(route('reports.compare'));
 
         $response->assertOk();
+        $response->assertSee('searchableSelect(', false);
         $response->assertSee('Event Stocktake (event) — 1 item, updated 2026-10-15 14:45', false);
     }
 

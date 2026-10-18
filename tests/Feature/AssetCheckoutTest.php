@@ -62,7 +62,7 @@ class AssetCheckoutTest extends TestCase
             'notes' => 'Weekend hire',
         ]);
 
-        $checkoutResponse->assertRedirect(route('assets.show', $asset));
+        $checkoutResponse->assertRedirect(route('assets.show', [$asset, 'tab' => 'checkout']));
 
         $checkout = AssetCheckout::query()->first();
         $this->assertNotNull($checkout);
@@ -82,7 +82,7 @@ class AssetCheckoutTest extends TestCase
             'notes' => 'Back in rack',
         ]);
 
-        $returnResponse->assertRedirect(route('assets.show', $asset));
+        $returnResponse->assertRedirect(route('assets.show', [$asset, 'tab' => 'checkout']));
         $checkout->refresh();
         $this->assertNotNull($checkout->returned_at);
         $asset->refresh();
@@ -91,6 +91,31 @@ class AssetCheckoutTest extends TestCase
             'auditable_id' => $asset->id,
             'action' => 'asset_returned',
         ]);
+    }
+
+    public function test_checkout_tab_shows_form_and_history(): void
+    {
+        $user = $this->manager();
+        $asset = $this->makeAsset();
+        $past = AssetCheckout::factory()->for($asset)->returned($user)->create([
+            'checked_out_by_user_id' => $user->id,
+            'checked_out_to_name' => 'Past Guest',
+            'notes' => 'Previous hire',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', [$asset, 'tab' => 'checkout']))
+            ->assertOk()
+            ->assertSee('Checkout history', false)
+            ->assertSee('Past Guest', false)
+            ->assertSee('Previous hire', false)
+            ->assertSee('Check out', false)
+            ->assertSee($past->created_at->format('Y-m-d'), false);
+
+        $this->actingAs($user)
+            ->get(route('assets.show', $asset))
+            ->assertOk()
+            ->assertDontSee('name="purpose"', false);
     }
 
     public function test_guest_assignee_checkout_requires_name_and_validates_email(): void
@@ -108,7 +133,7 @@ class AssetCheckoutTest extends TestCase
             'checked_out_to_name' => 'Acme Tech',
             'checked_out_to_email' => 'tech@example.com',
             'checked_out_to_company' => 'Acme',
-        ])->assertRedirect(route('assets.show', $asset));
+        ])->assertRedirect(route('assets.show', [$asset, 'tab' => 'checkout']));
 
         $this->assertDatabaseHas('asset_checkouts', [
             'asset_id' => $asset->id,
@@ -142,7 +167,7 @@ class AssetCheckoutTest extends TestCase
             'purpose' => CheckoutPurpose::Repair->value,
             'checked_out_to_name' => 'Guest Repairer',
             'repair_id' => $repair->id,
-        ])->assertRedirect(route('assets.show', $asset));
+        ])->assertRedirect(route('assets.show', [$asset, 'tab' => 'checkout']));
 
         $checkout = AssetCheckout::query()->first();
         $this->assertNotNull($checkout);
@@ -203,7 +228,7 @@ class AssetCheckoutTest extends TestCase
             'checked_out_to_name' => 'Bench Tech',
             'create_repair' => '1',
             'repair_summary' => 'Power supply RMA',
-        ])->assertRedirect(route('assets.show', $asset));
+        ])->assertRedirect(route('assets.show', [$asset, 'tab' => 'checkout']));
 
         $checkout = AssetCheckout::query()->first();
         $this->assertNotNull($checkout?->repair_id);

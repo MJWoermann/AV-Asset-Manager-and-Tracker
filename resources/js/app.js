@@ -2887,6 +2887,7 @@ Alpine.data('dashboardModules', (initialModules = []) => ({
 function createBulkSelection(config = {}) {
     const idAttribute = config.idAttribute || 'data-bulk-id';
     const nameAttribute = config.nameAttribute || null;
+    const labelAttribute = config.labelAttribute || 'data-bulk-asset-label';
     const enableMerge = Boolean(config.enableMerge);
     const enableTreeCollapse = Boolean(config.enableTreeCollapse);
     const collapsibleAttribute = config.collapsibleAttribute || 'data-location-collapsible';
@@ -2901,6 +2902,8 @@ function createBulkSelection(config = {}) {
         selected: {},
         panelOpen: false,
         deleteConfirmOpen: false,
+        mergeConfirmOpen: false,
+        keepAssetId: null,
         pendingDelete: false,
         pendingMerge: false,
         collapsed: {},
@@ -3007,8 +3010,73 @@ function createBulkSelection(config = {}) {
             this.selected = {};
             this.panelOpen = false;
             this.deleteConfirmOpen = false;
+            this.mergeConfirmOpen = false;
+            this.keepAssetId = null;
             this.pendingDelete = false;
             this.pendingMerge = false;
+        },
+
+        selectedMergeOptions() {
+            return this.selectedIds.map((id) => {
+                const el = this.$root.querySelector(`[${idAttribute}="${id}"]`);
+                const label = el?.getAttribute(labelAttribute) || `Asset #${id}`;
+
+                return { id, label };
+            });
+        },
+
+        openMergeConfirm() {
+            if (this.selectedCount < 2) {
+                return;
+            }
+
+            this.pendingDelete = false;
+            this.pendingMerge = false;
+            this.keepAssetId = this.selectedIds[0] ?? null;
+            this.mergeConfirmOpen = true;
+        },
+
+        cancelMerge() {
+            this.mergeConfirmOpen = false;
+            this.pendingMerge = false;
+            this.keepAssetId = null;
+        },
+
+        confirmMerge() {
+            if (this.selectedCount < 2 || !this.keepAssetId) {
+                return;
+            }
+
+            this.pendingMerge = true;
+            this.pendingDelete = false;
+            this.mergeConfirmOpen = false;
+
+            this.$nextTick(() => {
+                const form = this.$refs.bulkForm;
+                if (!form) {
+                    return;
+                }
+
+                let keepInput = form.querySelector('input[name="keep_asset_id"]');
+                if (!keepInput) {
+                    keepInput = document.createElement('input');
+                    keepInput.type = 'hidden';
+                    keepInput.name = 'keep_asset_id';
+                    form.appendChild(keepInput);
+                }
+                keepInput.value = String(this.keepAssetId);
+
+                let confirmInput = form.querySelector('input[name="confirm_merge"]');
+                if (!confirmInput) {
+                    confirmInput = document.createElement('input');
+                    confirmInput.type = 'hidden';
+                    confirmInput.name = 'confirm_merge';
+                    form.appendChild(confirmInput);
+                }
+                confirmInput.value = '1';
+
+                form.requestSubmit();
+            });
         },
 
         openDeleteConfirm() {
@@ -3099,8 +3167,9 @@ Alpine.data('bulkSelection', createBulkSelection);
 /** Assets index / list show — flat page selection + asset field toggles. */
 Alpine.data('bulkAssets', (config = {}) => createBulkSelection({
     idAttribute: 'data-bulk-asset-id',
+    labelAttribute: 'data-bulk-asset-label',
     fields: BULK_ASSET_FIELDS,
-    enableMerge: false,
+    enableMerge: true,
     enableTreeCollapse: false,
     ...config,
 }));

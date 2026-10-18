@@ -129,11 +129,15 @@ class AssetController extends Controller
     }
 
     /**
-     * @param  array{updated: int, deleted: int, added_to_list: int, removed_from_list: int}  $result
+     * @param  array{updated: int, deleted: int, merged: int, added_to_list: int, removed_from_list: int}  $result
      */
     protected function bulkStatusMessage(array $result): string
     {
         $parts = [];
+
+        if (($result['merged'] ?? 0) > 0) {
+            $parts[] = $result['merged'].' asset'.($result['merged'] === 1 ? '' : 's').' merged';
+        }
 
         if ($result['deleted'] > 0) {
             $parts[] = $result['deleted'].' asset'.($result['deleted'] === 1 ? '' : 's').' deleted';
@@ -272,6 +276,7 @@ class AssetController extends Controller
             $isExternalRepairer && ! in_array($requestedTab, ['', 'details', 'maintenance'], true) => 'details',
             $requestedTab === 'history' && ! $isExternalRepairer => 'history',
             $requestedTab === 'files' && ! $isExternalRepairer => 'files',
+            $requestedTab === 'checkout' && ! $isExternalRepairer => 'checkout',
             $requestedTab === 'maintenance' => 'maintenance',
             $requestedTab === 'connections' && $connectionsEnabled => 'connections',
             $requestedTab === 'rack' && $ruVisualiserEnabled => 'rack',
@@ -473,25 +478,34 @@ class AssetController extends Controller
                 ->get();
         }
 
-        $openCheckout = $asset->checkouts()
-            ->open()
-            ->with(['checkedOutTo', 'checkedOutBy', 'repair'])
-            ->first();
-
+        $openCheckout = null;
+        $checkoutHistory = null;
         $checkoutAssigneeOptions = collect();
         $checkoutOpenRepairs = collect();
         $canManageCheckouts = ! $isExternalRepairer
             && ($user?->hasAnyRole(['admin', 'inventory_manager', 'scanner']) ?? false);
 
-        if ($canManageCheckouts && $tab === 'details') {
-            $checkoutAssigneeOptions = User::role([
-                'admin',
-                'inventory_manager',
-                'scanner',
-                'external_repairer',
-            ])->orderBy('name')->get(['id', 'name', 'email']);
+        if ($tab === 'checkout') {
+            $openCheckout = $asset->checkouts()
+                ->open()
+                ->with(['checkedOutTo', 'checkedOutBy', 'repair'])
+                ->first();
 
-            $checkoutOpenRepairs = $asset->repairs()->active()->orderByDesc('started_at')->get(['id', 'summary']);
+            $checkoutHistory = $asset->checkouts()
+                ->with(['checkedOutTo', 'checkedOutBy', 'returnedBy', 'repair'])
+                ->paginate(25)
+                ->withQueryString();
+
+            if ($canManageCheckouts) {
+                $checkoutAssigneeOptions = User::role([
+                    'admin',
+                    'inventory_manager',
+                    'scanner',
+                    'external_repairer',
+                ])->orderBy('name')->get(['id', 'name', 'email']);
+
+                $checkoutOpenRepairs = $asset->repairs()->active()->orderByDesc('started_at')->get(['id', 'summary']);
+            }
         }
 
         return view('assets.show', [
@@ -529,6 +543,7 @@ class AssetController extends Controller
             'spareMovements' => $spareMovements,
             'isExternalRepairer' => $isExternalRepairer,
             'openCheckout' => $openCheckout,
+            'checkoutHistory' => $checkoutHistory,
             'canManageCheckouts' => $canManageCheckouts,
             'checkoutPurposes' => CheckoutPurpose::options(),
             'checkoutAssigneeOptions' => $checkoutAssigneeOptions,

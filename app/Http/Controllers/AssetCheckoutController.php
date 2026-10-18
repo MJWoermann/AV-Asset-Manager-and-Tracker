@@ -20,7 +20,7 @@ class AssetCheckoutController extends Controller
         $checkout = $service->checkout($asset, $request->validated(), $request->user());
 
         return redirect()
-            ->route('assets.show', $asset)
+            ->route('assets.show', [$asset, 'tab' => 'checkout'])
             ->with('status', 'Asset checked out ('.$checkout->purpose->label().').');
     }
 
@@ -39,7 +39,7 @@ class AssetCheckoutController extends Controller
         }
 
         return redirect()
-            ->route('assets.show', $asset)
+            ->route('assets.show', [$asset, 'tab' => 'checkout'])
             ->with('status', 'Asset returned from checkout.');
     }
 }

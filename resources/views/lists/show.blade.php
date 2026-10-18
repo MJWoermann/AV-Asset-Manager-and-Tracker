@@ -103,6 +103,13 @@
                     @forelse($items as $item)
                         @php
                             $indent = $item->is_child_expand || $item->asset?->parent_id;
+                            $bulkAssetLabel = $item->asset?->name;
+                            if ($item->asset) {
+                                $bulkLabelParts = array_filter([$item->asset->tp_barcode, $item->asset->fmi_ast, $item->asset->rig_tag]);
+                                if ($bulkLabelParts !== []) {
+                                    $bulkAssetLabel .= ' ('.implode(' · ', $bulkLabelParts).')';
+                                }
+                            }
                         @endphp
                         <tr class="border-t border-brand-silver dark:border-brand-charcoal">
                             <td class="px-3 py-2 {{ $indent ? 'pl-8' : '' }}">
@@ -111,6 +118,7 @@
                                         type="checkbox"
                                         class="rounded border-brand-charcoal/40"
                                         data-bulk-asset-id="{{ $item->asset->id }}"
+                                        data-bulk-asset-label="{{ $bulkAssetLabel }}"
                                         :checked="!!selected[{{ $item->asset->id }}]"
                                         @change="setSelected({{ $item->asset->id }}, $event.target.checked)"
                                         aria-label="Select {{ $item->asset->name }}"

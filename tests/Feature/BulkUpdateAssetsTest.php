@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
+use App\Enums\CheckoutPurpose;
 use App\Enums\LocationType;
 use App\Models\Asset;
+use App\Models\AssetCheckout;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\ItemType;
@@ -232,9 +234,139 @@ class BulkUpdateAssetsTest extends TestCase
         $response->assertOk();
         $response->assertSee('bulkSelection(', false);
         $response->assertSee('Bulk edit');
+        $response->assertSee('Merge selected');
         $response->assertSee('data-bulk-asset-id', false);
+        $response->assertSee('data-bulk-asset-label', false);
         $response->assertSee('toggleAll($event.target.checked)', false);
         $response->assertSee('setSelected(', false);
+    }
+
+    public function test_bulk_merge_moves_list_membership_children_and_fills_blank_barcode(): void
+    {
+        $user = $this->manager();
+        $list = AssetList::create([
+            'name' => 'Inventory merge',
+            'type' => 'inventory',
+            'created_by' => $user->id,
+        ]);
+
+        $keep = $this->makeAsset(['name' => 'Keep me', 'tp_barcode' => null]);
+        $duplicate = $this->makeAsset(['name' => 'Remove me', 'tp_barcode' => 'TP-MERGE-001']);
+        $child = $this->makeAsset(['name' => 'Child gear', 'parent_id' => $duplicate->id]);
+
+        AssetListItem::create([
+            'asset_list_id' => $list->id,
+            'asset_id' => $duplicate->id,
+            'quantity' => 1,
+            'added_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('assets.bulk-update'), [
+            'action' => 'merge',
+            'asset_ids' => [$keep->id, $duplicate->id],
+            'keep_asset_id' => $keep->id,
+            'confirm_merge' => '1',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status');
+
+        $this->assertDatabaseMissing('assets', ['id' => $duplicate->id]);
+        $this->assertSame('TP-MERGE-001', $keep->fresh()->tp_barcode);
+        $this->assertSame($keep->id, $child->fresh()->parent_id);
+        $this->assertDatabaseHas('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => $keep->id,
+        ]);
+        $this->assertDatabaseMissing('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => $duplicate->id,
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_id' => $keep->id,
+            'action' => 'merged',
+        ]);
+    }
+
+    public function test_bulk_merge_requires_confirmation_and_keep_asset_in_selection(): void
+    {
+        $user = $this->manager();
+        $a = $this->makeAsset(['name' => 'A']);
+        $b = $this->makeAsset(['name' => 'B']);
+
+        $response = $this->actingAs($user)->from(route('assets.index'))->post(route('assets.bulk-update'), [
+            'action' => 'merge',
+            'asset_ids' => [$a->id, $b->id],
+            'keep_asset_id' => $a->id,
+        ]);
+
+        $response->assertRedirect(route('assets.index'));
+        $response->assertSessionHasErrors('confirm_merge');
+        $this->assertModelExists($a);
+        $this->assertModelExists($b);
+
+        $other = $this->makeAsset(['name' => 'Outside']);
+
+        $response = $this->actingAs($user)->from(route('assets.index'))->post(route('assets.bulk-update'), [
+            'action' => 'merge',
+            'asset_ids' => [$a->id, $b->id],
+            'keep_asset_id' => $other->id,
+            'confirm_merge' => '1',
+        ]);
+
+        $response->assertRedirect(route('assets.index'));
+        $response->assertSessionHasErrors('keep_asset_id');
+    }
+
+    public function test_scanner_cannot_bulk_merge_assets(): void
+    {
+        $user = $this->scanner();
+        $a = $this->makeAsset();
+        $b = $this->makeAsset();
+
+        $response = $this->actingAs($user)->post(route('assets.bulk-update'), [
+            'action' => 'merge',
+            'asset_ids' => [$a->id, $b->id],
+            'keep_asset_id' => $a->id,
+            'confirm_merge' => '1',
+        ]);
+
+        $response->assertForbidden();
+        $this->assertModelExists($a);
+        $this->assertModelExists($b);
+    }
+
+    public function test_bulk_merge_rejects_open_checkouts_on_keep_and_duplicate(): void
+    {
+        $user = $this->manager();
+        $keep = $this->makeAsset(['name' => 'Checked out keep']);
+        $duplicate = $this->makeAsset(['name' => 'Checked out duplicate']);
+
+        AssetCheckout::query()->create([
+            'asset_id' => $keep->id,
+            'checked_out_by_user_id' => $user->id,
+            'purpose' => CheckoutPurpose::Hire,
+            'asset_status_before' => $keep->status->value,
+        ]);
+
+        AssetCheckout::query()->create([
+            'asset_id' => $duplicate->id,
+            'checked_out_by_user_id' => $user->id,
+            'purpose' => CheckoutPurpose::Hire,
+            'asset_status_before' => $duplicate->status->value,
+        ]);
+
+        $response = $this->actingAs($user)->from(route('assets.index'))->post(route('assets.bulk-update'), [
+            'action' => 'merge',
+            'asset_ids' => [$keep->id, $duplicate->id],
+            'keep_asset_id' => $keep->id,
+            'confirm_merge' => '1',
+        ]);
+
+        $response->assertRedirect(route('assets.index'));
+        $response->assertSessionHasErrors('asset_ids');
+        $this->assertModelExists($duplicate);
     }
 
     public function test_list_show_renders_bulk_controls(): void

@@ -68,6 +68,16 @@
                     Stock
                 </a>
             @endif
+            @unless($isExternalRepairer ?? false)
+            <a
+                href="{{ route('assets.show', [$asset, 'tab' => 'checkout']) }}"
+                role="tab"
+                aria-selected="{{ $tab === 'checkout' ? 'true' : 'false' }}"
+                class="px-4 py-2 text-sm border-b-2 -mb-px {{ $tab === 'checkout' ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white' }}"
+            >
+                Checkout
+            </a>
+            @endunless
             <a
                 href="{{ route('assets.show', [$asset, 'tab' => 'maintenance']) }}"
                 role="tab"
@@ -122,6 +132,16 @@
                 'connectionTypes' => $connectionTypes ?? collect(),
                 'peerAssetOptions' => $peerAssetOptions ?? [],
                 'canApplyInterfaceTemplates' => $canApplyInterfaceTemplates ?? false,
+            ])
+        @elseif($tab === 'checkout')
+            @include('assets.partials.checkout', [
+                'asset' => $asset,
+                'openCheckout' => $openCheckout ?? null,
+                'checkoutHistory' => $checkoutHistory ?? null,
+                'canManageCheckouts' => $canManageCheckouts ?? false,
+                'checkoutPurposes' => $checkoutPurposes ?? [],
+                'checkoutAssigneeOptions' => $checkoutAssigneeOptions ?? collect(),
+                'checkoutOpenRepairs' => $checkoutOpenRepairs ?? collect(),
             ])
         @elseif($tab === 'files')
             <x-file-attachments
@@ -302,7 +322,6 @@
                 'grid gap-4 items-start',
                 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]' => $ruDetailsPreview,
             ])>
-                <div class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
                     <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div>{{ $asset->description ?: '—' }}</div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name }}</div></div>
@@ -318,16 +337,6 @@
                     @if($asset->parent)
                         <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Parent</span><div><a class="text-brand" href="{{ route('assets.show', $asset->parent) }}">{{ $asset->parent->name }}</a></div></div>
                     @endif
-                </div>
-
-                @include('assets.partials.checkout', [
-                    'asset' => $asset,
-                    'openCheckout' => $openCheckout ?? null,
-                    'canManageCheckouts' => $canManageCheckouts ?? false,
-                    'checkoutPurposes' => $checkoutPurposes ?? [],
-                    'checkoutAssigneeOptions' => $checkoutAssigneeOptions ?? collect(),
-                    'checkoutOpenRepairs' => $checkoutOpenRepairs ?? collect(),
-                ])
                 </div>
 
                 @if($ruDetailsPreview)
