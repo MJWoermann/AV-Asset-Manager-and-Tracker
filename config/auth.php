@@ -42,6 +42,15 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        /*
+         * Passport OAuth2 guard for Copilot Studio / MCP (`auth:api`).
+         * Sanctum personal access tokens remain on `/api/*` via `auth:sanctum`.
+         */
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'users',
+        ],
     ],
 
     /*
