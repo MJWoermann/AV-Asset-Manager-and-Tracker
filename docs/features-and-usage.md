@@ -418,6 +418,13 @@ That path covers the core value: catalogue → scan → compare → keep records
 
 - **Offline scanning** with later sync when the network returns  
 - Automatic **user provisioning** / JIT account creation purely from SSO (an admin must create the account first)
+- **Microsoft Teams** surface for the app UI (not built yet). Methods to consider when this is scheduled:
+  - **Website / custom Teams tab** — pin `APP_URL` (or deep links) as a personal or channel tab; needs framing headers (`frame-ancestors` / no blanket deny of Teams hosts), cookie/`SameSite` behaviour, and a URL staff clients can reach (public, VPN, or split DNS). Best for browse / lists / reports / maintenance.
+  - **Teams SSO on top of existing Entra** — reuse the Microsoft Entra app registration and [SSO setup](sso-setup.md) (existing users + domain allow-list only); exchange a Teams token for an app session so staff are not re-prompted.
+  - **Open in browser / PWA** — Teams link or button that leaves the Teams shell for Scan and other camera flows; Teams iframes often block or degrade `getUserMedia`, so stocktake should stay on the HTTPS browser/PWA path.
+  - **Deep links / Adaptive Cards** — notifications and “open this asset/repair” jumps without embedding the full UI (pairs with digests/ops chat).
+  - **Bot / message extension** — chat search or quick actions via the Sanctum API; higher cost, only if Teams chat becomes a primary workflow.
+  - Prefer tab or pinned link for in-Teams presence first; keep Scan on browser/PWA; add Teams SSO only if IT requires silent sign-in; defer bots until a concrete chat use case exists.
 
 Everything else described above is available in the current product. Preview modules (connections, RU rack view, labels, asset Stock, email integration flag) need enabling on each user’s profile where noted.
 
