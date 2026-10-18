@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Exports\UnknownScansExport;
+use App\Http\Requests\LinkUnknownScanRequest;
+use App\Models\Asset;
 use App\Models\UnknownScan;
 use App\Services\ScanService;
 use Illuminate\Http\JsonResponse;
@@ -91,6 +93,32 @@ class UnknownScanController extends Controller
         }
 
         return back()->with('status', 'Note saved.');
+    }
+
+    public function link(
+        LinkUnknownScanRequest $request,
+        UnknownScan $unknownScan,
+        ScanService $scanService,
+    ): JsonResponse|RedirectResponse {
+        $asset = Asset::query()->findOrFail($request->integer('asset_id'));
+
+        $unknownScan->linkToExisting(
+            $asset,
+            $request->boolean('add_to_event_list'),
+            $request->boolean('set_identifier'),
+            $request->user()?->id,
+        );
+
+        $unknownScan = $unknownScan->fresh(['resolvedAsset']);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Unknown scan linked to existing asset.',
+                'unknown_scan' => $scanService->unknownScanSummary($unknownScan),
+            ]);
+        }
+
+        return back()->with('status', 'Unknown scan linked to '.$asset->name.'.');
     }
 
     public function destroyAll(): RedirectResponse

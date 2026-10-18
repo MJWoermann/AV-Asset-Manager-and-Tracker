@@ -188,6 +188,16 @@ class Asset extends Model
         return $this->hasMany(Repair::class)->orderByDesc('started_at')->orderByDesc('id');
     }
 
+    public function checkouts(): HasMany
+    {
+        return $this->hasMany(AssetCheckout::class)->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    public function openCheckout(): ?AssetCheckout
+    {
+        return $this->checkouts()->open()->first();
+    }
+
     public function auditLogs(): MorphMany
     {
         return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');

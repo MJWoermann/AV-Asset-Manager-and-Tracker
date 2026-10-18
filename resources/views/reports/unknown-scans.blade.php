@@ -3,7 +3,65 @@
         <h2 class="font-semibold text-xl">Unknown barcode scans</h2>
     </x-slot>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6"
+        x-data="{
+            searchUrl: @js(route('assets.search')),
+            linkUrlTemplate: @js(route('unknown-scans.link', ['unknownScan' => '__ID__'])),
+            scanId: null,
+            scannedCode: '',
+            hasEventList: false,
+            query: '',
+            results: [],
+            selectedId: null,
+            selectedLabel: '',
+            searching: false,
+            searchTimer: null,
+            linkAction() {
+                return this.linkUrlTemplate.replace('__ID__', String(this.scanId ?? ''));
+            },
+            openLink(id, code, hasEventList) {
+                this.scanId = id;
+                this.scannedCode = code;
+                this.hasEventList = Boolean(hasEventList);
+                this.query = '';
+                this.results = [];
+                this.selectedId = null;
+                this.selectedLabel = '';
+                this.searching = false;
+                this.$dispatch('open-modal', 'link-unknown-scan');
+                this.$nextTick(() => this.$refs.linkSearch?.focus());
+            },
+            scheduleSearch() {
+                clearTimeout(this.searchTimer);
+                this.searchTimer = setTimeout(() => this.search(), 250);
+            },
+            async search() {
+                const term = this.query.trim();
+                if (term.length < 1) {
+                    this.results = [];
+                    return;
+                }
+                this.searching = true;
+                try {
+                    const response = await fetch(this.searchUrl + '?q=' + encodeURIComponent(term), {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    const json = await response.json();
+                    this.results = json.data || [];
+                } finally {
+                    this.searching = false;
+                }
+            },
+            pick(asset) {
+                this.selectedId = asset.id;
+                this.selectedLabel = asset.label || asset.name;
+                this.query = asset.label || asset.name;
+                this.results = [];
+            },
+        }"
+    >
         <p class="text-sm text-brand-charcoal dark:text-brand-silver">
             Codes scanned during stocktake that were not found in the asset register. Export this report to identify and add missing assets.
         </p>
@@ -96,15 +154,22 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap text-right">
                                 @unless($scan->isResolved())
-                                    <a
-                                        href="{{ route('assets.create', [
-                                            'tp_barcode' => $scan->scanned_code,
-                                            'location_id' => $scan->location_id,
-                                            'unknown_scan_id' => $scan->id,
-                                            'status' => $scan->asset_status?->value,
-                                        ]) }}"
-                                        class="text-brand underline text-xs"
-                                    >Add asset</a>
+                                    <div class="inline-flex items-center gap-3">
+                                        <a
+                                            href="{{ route('assets.create', [
+                                                'tp_barcode' => $scan->scanned_code,
+                                                'location_id' => $scan->location_id,
+                                                'unknown_scan_id' => $scan->id,
+                                                'status' => $scan->asset_status?->value,
+                                            ]) }}"
+                                            class="text-brand underline text-xs"
+                                        >Add asset</a>
+                                        <button
+                                            type="button"
+                                            class="text-brand underline text-xs"
+                                            @click="openLink({{ $scan->id }}, @js($scan->scanned_code), {{ $scan->event_list_id ? 'true' : 'false' }})"
+                                        >Link existing</button>
+                                    </div>
                                 @endunless
                             </td>
                         </tr>
@@ -122,5 +187,81 @@
         <div>
             {{ $scans->links() }}
         </div>
+
+        <x-modal name="link-unknown-scan" :show="$errors->has('asset_id')" focusable maxWidth="md">
+            <form method="POST" :action="linkAction()" class="p-6 space-y-4" @submit="if (!selectedId) { $event.preventDefault(); }">
+                @csrf
+
+                <h2 class="text-lg font-medium text-gray-900 dark:text-white">
+                    Link to existing asset
+                </h2>
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    Resolve scanned code
+                    <span class="font-medium text-gray-900 dark:text-white" x-text="scannedCode"></span>
+                    by attaching it to an asset that already exists.
+                </p>
+
+                <div class="relative">
+                    <x-input-label for="link-asset-search" value="Search assets" />
+                    <input type="hidden" name="asset_id" :value="selectedId ?? ''" required>
+                    <x-text-input
+                        id="link-asset-search"
+                        x-ref="linkSearch"
+                        type="search"
+                        class="mt-1 block w-full"
+                        x-model="query"
+                        @input="scheduleSearch()"
+                        placeholder="Name, barcode, FMI, serial…"
+                        autocomplete="off"
+                    />
+                    <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver" x-show="searching" x-cloak>Searching…</p>
+                    <p class="mt-1 text-xs text-brand" x-show="selectedId" x-cloak>
+                        Selected: <span x-text="selectedLabel"></span>
+                    </p>
+                    <ul
+                        class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
+                        x-show="results.length > 0"
+                        x-cloak
+                    >
+                        <template x-for="asset in results" :key="asset.id">
+                            <li>
+                                <button
+                                    type="button"
+                                    class="block w-full px-3 py-2 text-left text-sm hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal"
+                                    @click="pick(asset)"
+                                >
+                                    <span x-text="asset.label || asset.name"></span>
+                                    <span
+                                        class="ml-1 text-xs text-brand-charcoal dark:text-brand-silver"
+                                        x-show="asset.item_type"
+                                        x-text="asset.item_type"
+                                    ></span>
+                                </button>
+                            </li>
+                        </template>
+                    </ul>
+                    <x-input-error :messages="$errors->get('asset_id')" class="mt-2" />
+                </div>
+
+                <label class="flex items-start gap-2 text-sm" x-show="hasEventList" x-cloak>
+                    <input type="checkbox" name="add_to_event_list" value="1" class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand dark:border-brand-charcoal dark:bg-black">
+                    <span>Add asset to the event list from this scan (skip if already on the list)</span>
+                </label>
+
+                <label class="flex items-start gap-2 text-sm">
+                    <input type="checkbox" name="set_identifier" value="1" class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand dark:border-brand-charcoal dark:bg-black">
+                    <span>Set TP barcode to scanned code when the asset has none (skipped if another asset already uses it)</span>
+                </label>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <x-secondary-button type="button" x-on:click="$dispatch('close')">
+                        Cancel
+                    </x-secondary-button>
+                    <x-primary-button x-bind:disabled="!selectedId">
+                        Link asset
+                    </x-primary-button>
+                </div>
+            </form>
+        </x-modal>
     </div>
 </x-app-layout>

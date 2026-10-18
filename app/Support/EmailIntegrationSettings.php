@@ -12,6 +12,8 @@ class EmailIntegrationSettings
     /** @var list<string> */
     public const DRIVERS = ['gmail', 'outlook', 'smtp'];
 
+    public const DEFAULT_DIGEST_DAYS_AHEAD = 30;
+
     /**
      * @return array{
      *     enabled: bool,
@@ -25,6 +27,10 @@ class EmailIntegrationSettings
      *     imap_port: int|null,
      *     imap_encryption: string|null,
      *     imap_username: string|null,
+     *     digest_warranty_enabled: bool,
+     *     digest_test_tag_enabled: bool,
+     *     digest_low_stock_enabled: bool,
+     *     digest_days_ahead: int,
      * }
      */
     public static function defaults(): array
@@ -41,6 +47,10 @@ class EmailIntegrationSettings
             'imap_port' => null,
             'imap_encryption' => 'ssl',
             'imap_username' => null,
+            'digest_warranty_enabled' => false,
+            'digest_test_tag_enabled' => false,
+            'digest_low_stock_enabled' => false,
+            'digest_days_ahead' => self::DEFAULT_DIGEST_DAYS_AHEAD,
         ];
     }
 
@@ -57,6 +67,10 @@ class EmailIntegrationSettings
      *     imap_port: int|null,
      *     imap_encryption: string|null,
      *     imap_username: string|null,
+     *     digest_warranty_enabled: bool,
+     *     digest_test_tag_enabled: bool,
+     *     digest_low_stock_enabled: bool,
+     *     digest_days_ahead: int,
      * }
      */
     public static function get(): array
@@ -76,6 +90,10 @@ class EmailIntegrationSettings
         $merged['inbound_folder'] = filled($merged['inbound_folder'] ?? null)
             ? (string) $merged['inbound_folder']
             : 'INBOX';
+        $merged['digest_warranty_enabled'] = (bool) ($merged['digest_warranty_enabled'] ?? false);
+        $merged['digest_test_tag_enabled'] = (bool) ($merged['digest_test_tag_enabled'] ?? false);
+        $merged['digest_low_stock_enabled'] = (bool) ($merged['digest_low_stock_enabled'] ?? false);
+        $merged['digest_days_ahead'] = max(1, (int) ($merged['digest_days_ahead'] ?? self::DEFAULT_DIGEST_DAYS_AHEAD));
 
         if ($driver === 'gmail') {
             $merged = array_merge($merged, self::gmailImapPresets());
@@ -94,8 +112,11 @@ class EmailIntegrationSettings
             throw new InvalidArgumentException('Unknown email driver: '.$driver);
         }
 
+        $previous = self::get();
+        $enabled = (bool) ($input['enabled'] ?? false);
+
         $payload = [
-            'enabled' => (bool) ($input['enabled'] ?? false),
+            'enabled' => $enabled,
             'driver' => $driver,
             'from_name' => self::nullableString($input['from_name'] ?? null),
             'from_address' => self::nullableString($input['from_address'] ?? null),
@@ -110,6 +131,22 @@ class EmailIntegrationSettings
             'imap_username' => self::nullableString($input['imap_username'] ?? null),
         ];
 
+        // Digest options only apply when integration is enabled; otherwise preserve prior values.
+        if ($enabled && array_key_exists('digest_warranty_enabled', $input)) {
+            $payload['digest_warranty_enabled'] = (bool) $input['digest_warranty_enabled'];
+            $payload['digest_test_tag_enabled'] = (bool) ($input['digest_test_tag_enabled'] ?? false);
+            $payload['digest_low_stock_enabled'] = (bool) ($input['digest_low_stock_enabled'] ?? false);
+            $payload['digest_days_ahead'] = max(
+                1,
+                (int) ($input['digest_days_ahead'] ?? self::DEFAULT_DIGEST_DAYS_AHEAD)
+            );
+        } else {
+            $payload['digest_warranty_enabled'] = (bool) $previous['digest_warranty_enabled'];
+            $payload['digest_test_tag_enabled'] = (bool) $previous['digest_test_tag_enabled'];
+            $payload['digest_low_stock_enabled'] = (bool) $previous['digest_low_stock_enabled'];
+            $payload['digest_days_ahead'] = max(1, (int) $previous['digest_days_ahead']);
+        }
+
         if ($driver === 'gmail') {
             $payload = array_merge($payload, self::gmailImapPresets());
         }
@@ -120,6 +157,25 @@ class EmailIntegrationSettings
     public static function isEnabled(): bool
     {
         return self::get()['enabled'] === true;
+    }
+
+    /**
+     * Digests UI and scheduled sends require integration on and driver credentials present.
+     */
+    public static function digestsAvailable(): bool
+    {
+        if (! self::isEnabled()) {
+            return false;
+        }
+
+        $settings = self::get();
+        $credentials = self::credentialsStatus();
+
+        if ($settings['driver'] === 'outlook') {
+            return $credentials['graph'];
+        }
+
+        return $credentials['mail'];
     }
 
     /**

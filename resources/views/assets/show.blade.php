@@ -3,15 +3,17 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="font-semibold text-xl">{{ $asset->name }}</h2>
             <div class="flex flex-wrap gap-2">
-                @if($asset->ip_address)
+                @if(! ($isExternalRepairer ?? false) && $asset->ip_address)
                     <a href="http://{{ $asset->ip_address }}" target="_blank" rel="noopener" class="px-3 py-2 bg-brand text-white text-sm">Open IP</a>
                 @endif
-                <a href="{{ route('assets.edit', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
-                @role('admin|inventory_manager')
-                    @feature('shelf_tag_generator')
-                        <a href="{{ route('assets.label', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
-                    @endfeature
-                @endrole
+                @unless($isExternalRepairer ?? false)
+                    <a href="{{ route('assets.edit', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
+                    @role('admin|inventory_manager')
+                        @feature('shelf_tag_generator')
+                            <a href="{{ route('assets.label', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
+                        @endfeature
+                    @endrole
+                @endunless
             </div>
         </div>
     </x-slot>
@@ -26,6 +28,7 @@
             >
                 Details
             </a>
+            @unless($isExternalRepairer ?? false)
             <a
                 href="{{ route('assets.show', [$asset, 'tab' => 'files']) }}"
                 role="tab"
@@ -34,6 +37,7 @@
             >
                 Files
             </a>
+            @endunless
             @if($connectionsEnabled ?? false)
                 <a
                     href="{{ route('assets.show', [$asset, 'tab' => 'connections']) }}"
@@ -72,6 +76,7 @@
             >
                 Maintenance
             </a>
+            @unless($isExternalRepairer ?? false)
             <a
                 href="{{ route('assets.show', [$asset, 'tab' => 'spares']) }}"
                 role="tab"
@@ -88,6 +93,7 @@
             >
                 History
             </a>
+            @endunless
         </div>
 
         @if($tab === 'rack')
@@ -132,6 +138,7 @@
                 'maintenanceLogTypes' => $maintenanceLogTypes ?? [],
                 'maintenanceStatuses' => $maintenanceStatuses ?? [],
                 'canDeleteMaintenanceLogs' => $canDeleteMaintenanceLogs ?? false,
+                'repairAssigneeOptions' => $repairAssigneeOptions ?? collect(),
             ])
         @elseif($tab === 'history')
             @php
@@ -287,6 +294,7 @@
                 'grid gap-4 items-start',
                 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]' => $ruDetailsPreview,
             ])>
+                <div class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
                     <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div>{{ $asset->description ?: '—' }}</div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name }}</div></div>
@@ -302,6 +310,16 @@
                     @if($asset->parent)
                         <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Parent</span><div><a class="text-brand" href="{{ route('assets.show', $asset->parent) }}">{{ $asset->parent->name }}</a></div></div>
                     @endif
+                </div>
+
+                @include('assets.partials.checkout', [
+                    'asset' => $asset,
+                    'openCheckout' => $openCheckout ?? null,
+                    'canManageCheckouts' => $canManageCheckouts ?? false,
+                    'checkoutPurposes' => $checkoutPurposes ?? [],
+                    'checkoutAssigneeOptions' => $checkoutAssigneeOptions ?? collect(),
+                    'checkoutOpenRepairs' => $checkoutOpenRepairs ?? collect(),
+                ])
                 </div>
 
                 @if($ruDetailsPreview)

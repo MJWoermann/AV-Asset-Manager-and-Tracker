@@ -12,6 +12,9 @@ enum NotificationEventKey: string
     case InboundMatchRejected = 'inbound_match_rejected';
     case RepairStarted = 'repair_started';
     case RepairCompleted = 'repair_completed';
+    case WarrantyExpiryDigest = 'warranty_expiry_digest';
+    case TestTagExpiryDigest = 'test_tag_expiry_digest';
+    case LowStockDigest = 'low_stock_digest';
 
     public function label(): string
     {
@@ -24,6 +27,9 @@ enum NotificationEventKey: string
             self::InboundMatchRejected => 'Inbound match rejected',
             self::RepairStarted => 'Repair started',
             self::RepairCompleted => 'Repair completed',
+            self::WarrantyExpiryDigest => 'Warranty expiry digest',
+            self::TestTagExpiryDigest => 'Test & Tag expiry digest',
+            self::LowStockDigest => 'Low stock digest',
         };
     }
 

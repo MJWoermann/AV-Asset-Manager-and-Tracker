@@ -150,6 +150,7 @@ Route::middleware(['auth:sanctum', 'role:admin,inventory_manager,scanner'])->gro
     Route::get('/unknown-scans', [UnknownScanApiController::class, 'index'])->middleware('abilities:reports:read');
     Route::get('/unknown-scans/export', [UnknownScanApiController::class, 'export'])->middleware('abilities:reports:read');
     Route::patch('/unknown-scans/{unknownScan}', [UnknownScanApiController::class, 'update'])->middleware('abilities:reports:write');
+    Route::post('/unknown-scans/{unknownScan}/link', [UnknownScanApiController::class, 'link'])->middleware('abilities:reports:write');
     Route::delete('/unknown-scans', [UnknownScanApiController::class, 'destroyAll'])->middleware('abilities:reports:write');
     Route::post('/unknown-scans/deduplicate', [UnknownScanApiController::class, 'deduplicate'])->middleware('abilities:reports:write');
 

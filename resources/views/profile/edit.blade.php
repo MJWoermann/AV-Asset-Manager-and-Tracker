@@ -13,7 +13,9 @@
                 </div>
             </div>
 
-            <x-department-controls />
+            @unlessrole('external_repairer')
+                <x-department-controls />
+            @endunlessrole
 
             <div class="p-4 sm:p-8 bg-white dark:bg-brand-slate border border-transparent dark:border-brand-charcoal shadow sm:rounded-lg">
                 <div class="max-w-xl">
@@ -21,17 +23,19 @@
                 </div>
             </div>
 
-            <div class="p-4 sm:p-8 bg-white dark:bg-brand-slate border border-transparent dark:border-brand-charcoal shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.api-tokens')
+            @unlessrole('external_repairer')
+                <div class="p-4 sm:p-8 bg-white dark:bg-brand-slate border border-transparent dark:border-brand-charcoal shadow sm:rounded-lg">
+                    <div class="max-w-xl">
+                        @include('profile.partials.api-tokens')
+                    </div>
                 </div>
-            </div>
 
-            <div class="p-4 sm:p-8 bg-white dark:bg-brand-slate border border-transparent dark:border-brand-charcoal shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.delete-user-form')
+                <div class="p-4 sm:p-8 bg-white dark:bg-brand-slate border border-transparent dark:border-brand-charcoal shadow sm:rounded-lg">
+                    <div class="max-w-xl">
+                        @include('profile.partials.delete-user-form')
+                    </div>
                 </div>
-            </div>
+            @endunlessrole
         </div>
     </div>
 </x-app-layout>

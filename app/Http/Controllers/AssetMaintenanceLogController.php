@@ -35,6 +35,7 @@ class AssetMaintenanceLogController extends Controller
                 'body' => $payload['body'] ?? null,
                 'status' => $payload['status'] ?? null,
                 'repair_procedure_id' => $request->validated('repair_procedure_id'),
+                'assignee_user_id' => $request->validated('assignee_user_id'),
             ], $request->user());
 
             $fault = $repair->maintenanceLog;

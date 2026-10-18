@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\OutboundEmailThreadController;
 use App\Http\Controllers\Admin\SsoSettingsController;
 use App\Http\Controllers\Admin\StorageController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\AssetCheckoutController;
 use App\Http\Controllers\AssetColumnPreferenceController;
 use App\Http\Controllers\AssetConnectionBusController;
 use App\Http\Controllers\AssetConnectionController;
@@ -63,9 +64,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return auth()->check()
-        ? redirect()->route('dashboard')
-        : redirect()->route('login');
+    if (! auth()->check()) {
+        return redirect()->route('login');
+    }
+
+    return redirect()->route(auth()->user()->homeRouteName());
 });
 
 Route::middleware('throttle:30,1')->group(function () {
@@ -81,6 +84,32 @@ Route::get('/dashboard', DashboardController::class)
     ->middleware(['auth', 'role:admin,inventory_manager,scanner'])
     ->name('dashboard');
 
+/*
+ * Shared routes for staff and external_repairer.
+ * Controllers enforce assignment-only access for external_repairer.
+ * Do not add external_repairer to the broad staff group below.
+ */
+Route::middleware(['auth', 'role:admin,inventory_manager,scanner,external_repairer'])->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::get('/maintenance', [MaintenanceHubController::class, 'index'])->name('maintenance.index');
+
+    Route::get('/repairs', [RepairController::class, 'index'])->name('repairs.index');
+    Route::get('/repairs/{repair}', [RepairController::class, 'show'])->name('repairs.show');
+    Route::post('/repairs/{repair}/steps', [RepairController::class, 'storeStep'])
+        ->name('repairs.steps.store');
+    Route::patch('/repairs/{repair}/steps/{step}', [RepairController::class, 'updateStep'])
+        ->name('repairs.steps.update');
+    Route::post('/repairs/{repair}/parts', [RepairController::class, 'storePart'])
+        ->name('repairs.parts.store');
+    Route::post('/repairs/{repair}/complete', [RepairController::class, 'complete'])
+        ->name('repairs.complete');
+
+    Route::get('/assets/{asset}', [AssetController::class, 'show'])->whereNumber('asset')->name('assets.show');
+});
+
+// Broad staff group — external_repairer is intentionally excluded.
 Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(function () {
     // #region agent log
     Route::post('/__debug/agent-log', function (Request $request) {
@@ -98,8 +127,6 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     })->name('debug.agent-log');
     // #endregion
 
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/profile/api-tokens', [ProfileApiTokenController::class, 'store'])
         ->name('profile.api-tokens.store');
@@ -119,14 +146,19 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
 
     Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
     Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.create');
+    Route::get('/assets/search', [AssetController::class, 'search'])->name('assets.search');
     Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
     Route::post('/assets/bulk-update', [AssetController::class, 'bulkUpdate'])->name('assets.bulk-update');
-    Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
     Route::get('/assets/{asset}/edit', [AssetController::class, 'edit'])->name('assets.edit');
     Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])
         ->middleware('role:admin,inventory_manager')
         ->name('assets.destroy');
+
+    Route::post('/assets/{asset}/checkouts', [AssetCheckoutController::class, 'store'])
+        ->name('assets.checkouts.store');
+    Route::post('/assets/{asset}/checkouts/{checkout}/return', [AssetCheckoutController::class, 'returnCheckout'])
+        ->name('assets.checkouts.return');
 
     Route::post('/assets/{asset}/maintenance-logs', [AssetMaintenanceLogController::class, 'store'])
         ->name('assets.maintenance-logs.store');
@@ -134,22 +166,12 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
         ->middleware('role:admin,inventory_manager')
         ->name('assets.maintenance-logs.destroy');
 
-    Route::get('/repairs', [RepairController::class, 'index'])->name('repairs.index');
-    Route::get('/repairs/{repair}', [RepairController::class, 'show'])->name('repairs.show');
     Route::post('/assets/{asset}/repairs', [RepairController::class, 'storeFromFault'])
         ->name('assets.repairs.store');
     Route::post('/assets/{asset}/repairs/with-fault', [RepairController::class, 'storeWithNewFault'])
         ->name('assets.repairs.store-with-fault');
     Route::post('/spares/{spare}/repairs', [RepairController::class, 'storeFromSpare'])
         ->name('spares.repairs.store');
-    Route::post('/repairs/{repair}/steps', [RepairController::class, 'storeStep'])
-        ->name('repairs.steps.store');
-    Route::patch('/repairs/{repair}/steps/{step}', [RepairController::class, 'updateStep'])
-        ->name('repairs.steps.update');
-    Route::post('/repairs/{repair}/parts', [RepairController::class, 'storePart'])
-        ->name('repairs.parts.store');
-    Route::post('/repairs/{repair}/complete', [RepairController::class, 'complete'])
-        ->name('repairs.complete');
     Route::post('/repairs/{repair}/cancel', [RepairController::class, 'cancel'])
         ->name('repairs.cancel');
 
@@ -181,7 +203,6 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     });
 
     Route::get('/data', [DataHubController::class, 'index'])->name('data.index');
-    Route::get('/maintenance', [MaintenanceHubController::class, 'index'])->name('maintenance.index');
 
     Route::get('/spares', [SparePartController::class, 'index'])->name('spares.index');
     Route::get('/spares/lookup', [SparePartController::class, 'lookup'])->name('spares.lookup');
@@ -255,6 +276,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::get('/reports/unknown-scans', [UnknownScanController::class, 'index'])->name('reports.unknown-scans');
     Route::get('/reports/unknown-scans/export', [UnknownScanController::class, 'export'])->name('reports.unknown-scans.export');
     Route::patch('/unknown-scans/{unknownScan}', [UnknownScanController::class, 'update'])->name('unknown-scans.update');
+    Route::post('/unknown-scans/{unknownScan}/link', [UnknownScanController::class, 'link'])->name('unknown-scans.link');
     Route::middleware('role:admin')->group(function () {
         Route::delete('/reports/unknown-scans', [UnknownScanController::class, 'destroyAll'])
             ->name('reports.unknown-scans.destroy-all');

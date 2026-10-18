@@ -18,6 +18,7 @@ class EmailSettingsController extends Controller
             'settings' => EmailIntegrationSettings::get(),
             'credentials' => EmailIntegrationSettings::credentialsStatus(),
             'drivers' => EmailIntegrationSettings::DRIVERS,
+            'digestsAvailable' => EmailIntegrationSettings::digestsAvailable(),
         ]);
     }
 

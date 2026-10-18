@@ -243,7 +243,9 @@
             <section class="space-y-4" x-data="{ mode: 'complete' }">
                 <div class="flex gap-2">
                     <button type="button" @click="mode = 'complete'" class="px-3 py-1 border text-xs" :class="mode === 'complete' && 'bg-brand text-white border-brand'">Complete</button>
-                    <button type="button" @click="mode = 'cancel'" class="px-3 py-1 border text-xs" :class="mode === 'cancel' && 'border-red-600 text-red-600'">Cancel repair</button>
+                    @unlessrole('external_repairer')
+                        <button type="button" @click="mode = 'cancel'" class="px-3 py-1 border text-xs" :class="mode === 'cancel' && 'border-red-600 text-red-600'">Cancel repair</button>
+                    @endunlessrole
                 </div>
 
                 <form x-show="mode === 'complete'" method="post" action="{{ route('repairs.complete', $repair) }}" class="border border-brand-silver dark:border-brand-charcoal p-4 space-y-3">
@@ -267,6 +269,7 @@
                     </div>
                 </form>
 
+                @unlessrole('external_repairer')
                 <form x-show="mode === 'cancel'" x-cloak method="post" action="{{ route('repairs.cancel', $repair) }}" class="border border-red-600/40 p-4 space-y-3">
                     @csrf
                     <div>
@@ -278,6 +281,7 @@
                         <button type="submit" class="px-4 py-2 border border-red-600 text-red-600">Cancel repair</button>
                     </div>
                 </form>
+                @endunlessrole
             </section>
         @endif
     </div>

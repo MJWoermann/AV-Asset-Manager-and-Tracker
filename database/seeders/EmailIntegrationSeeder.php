@@ -116,6 +116,24 @@ class EmailIntegrationSeeder extends Seeder
                 'body' => "A repair was completed for {{asset.name}}.\n\nOpen: {{asset.url}}",
                 'selected_fields' => ['asset.name', 'asset.url'],
             ],
+            NotificationEventKey::WarrantyExpiryDigest->value => [
+                'name' => 'Warranty expiry digest',
+                'subject' => 'Warranty expiry: {{asset.name}}',
+                'body' => "Warranty for {{asset.name}} expires on {{asset.warranty_expiry}}.\n\nOpen: {{asset.url}}",
+                'selected_fields' => ['asset.name', 'asset.warranty_expiry', 'asset.url'],
+            ],
+            NotificationEventKey::TestTagExpiryDigest->value => [
+                'name' => 'Test & Tag expiry digest',
+                'subject' => 'Test & Tag expiry: {{asset.name}}',
+                'body' => "Test & Tag for {{asset.name}} expires on {{asset.test_tag_expiry}}.\n\nOpen: {{asset.url}}",
+                'selected_fields' => ['asset.name', 'asset.test_tag_expiry', 'asset.url'],
+            ],
+            NotificationEventKey::LowStockDigest->value => [
+                'name' => 'Low stock digest',
+                'subject' => 'Low stock: {{asset.name}}',
+                'body' => "{{asset.name}} is below minimum stock ({{asset.quantity}} / min {{asset.min_stock_level}}).\n\nOpen: {{asset.url}}",
+                'selected_fields' => ['asset.name', 'asset.quantity', 'asset.min_stock_level', 'asset.url'],
+            ],
         ];
 
         foreach ($defaults as $eventKey => $payload) {

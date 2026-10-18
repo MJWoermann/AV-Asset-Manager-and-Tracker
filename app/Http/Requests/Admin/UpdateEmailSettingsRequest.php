@@ -15,9 +15,18 @@ class UpdateEmailSettingsRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $merge = [
             'enabled' => $this->boolean('enabled'),
-        ]);
+        ];
+
+        // Only coerce digest flags when the digests section posted them (hidden + checkbox).
+        if ($this->has('digest_warranty_enabled')) {
+            $merge['digest_warranty_enabled'] = $this->boolean('digest_warranty_enabled');
+            $merge['digest_test_tag_enabled'] = $this->boolean('digest_test_tag_enabled');
+            $merge['digest_low_stock_enabled'] = $this->boolean('digest_low_stock_enabled');
+        }
+
+        $this->merge($merge);
     }
 
     /**
@@ -37,6 +46,10 @@ class UpdateEmailSettingsRequest extends FormRequest
             'imap_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'imap_encryption' => ['nullable', Rule::in(['ssl', 'tls', 'none'])],
             'imap_username' => ['nullable', 'string', 'max:255'],
+            'digest_warranty_enabled' => ['sometimes', 'boolean'],
+            'digest_test_tag_enabled' => ['sometimes', 'boolean'],
+            'digest_low_stock_enabled' => ['sometimes', 'boolean'],
+            'digest_days_ahead' => ['nullable', 'integer', 'min:1', 'max:365'],
         ];
     }
 
@@ -47,6 +60,19 @@ class UpdateEmailSettingsRequest extends FormRequest
     {
         $data = $this->validated();
         $data['enabled'] = $this->boolean('enabled');
+
+        if ($this->has('digest_warranty_enabled')) {
+            $data['digest_warranty_enabled'] = $this->boolean('digest_warranty_enabled');
+            $data['digest_test_tag_enabled'] = $this->boolean('digest_test_tag_enabled');
+            $data['digest_low_stock_enabled'] = $this->boolean('digest_low_stock_enabled');
+        } else {
+            unset(
+                $data['digest_warranty_enabled'],
+                $data['digest_test_tag_enabled'],
+                $data['digest_low_stock_enabled'],
+                $data['digest_days_ahead'],
+            );
+        }
 
         if (($data['imap_encryption'] ?? null) === 'none') {
             $data['imap_encryption'] = null;

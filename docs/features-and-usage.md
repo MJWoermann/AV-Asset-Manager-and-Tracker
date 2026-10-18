@@ -39,28 +39,42 @@ The app can be **installed on a phone or tablet** like a Progressive Web App (PW
 | **Inventory list** | “What we expect” — the source or warehouse list for a stocktake |
 | **Event list** | “What we scanned” — the list filled during a stocktake or job |
 | **Scan session** | Your active scanning job: which event list to write to, and optionally which inventory list to check against |
-| **Unknown scan** | A code that did not match any asset — parked for follow-up |
+| **Unknown scan** | A code that did not match any asset — parked for follow-up (link to an existing asset, create one, or note for later) |
+| **Checkout** | Formal hire / repair / other hand-off of an asset to a user or guest; open checkout blocks a second one until return |
+| **Repair** | Tracked work order (steps, parts, assignee) linked to an asset or spare; can pair with a repair-purpose checkout |
+| **Spare** | Stocked spare part or consumable part SKU (Maintenance → Spares) — distinct from the optional asset **Stock** preview tab |
+| **Department** | Isolation boundary for assets, lists, and related records; users belong to one or more departments |
 | **History** | Read-only log of important changes to an asset (cannot be edited or deleted) |
 
 ---
 
 ## Who can do what (roles)
 
-Access is controlled by three roles. Your administrator assigns these when creating your account.
+Access is controlled by four roles. Your administrator assigns these when creating your account.
 
-| Capability | Admin | Inventory manager | Scanner |
-|------------|:-----:|:-----------------:|:-------:|
-| Dashboard, Scan, view/edit assets | ✓ | ✓ | ✓ |
-| Delete assets | ✓ | ✓ | |
-| View lists; use Reports | ✓ | ✓ | ✓ |
-| Create locations, manufacturers, and models | ✓ | ✓ | ✓ |
-| Edit/delete locations & catalogue; create/edit lists, item types, field sets | ✓ | ✓ | |
-| Import / export spreadsheets | ✓ | ✓ | |
-| File library (central index & delete) | ✓ | ✓ | |
-| Attach files on assets / maintenance | ✓ | ✓ | ✓ |
-| Add maintenance logs | ✓ | ✓ | ✓ |
-| Delete maintenance logs | ✓ | ✓ | |
-| Manage users, SSO, storage/backup, export columns | ✓ | | |
+| Capability | Admin | Inventory manager | Scanner | External repairer |
+|------------|:-----:|:-----------------:|:-------:|:-----------------:|
+| Dashboard, Scan, full Assets catalogue | ✓ | ✓ | ✓ | |
+| View/edit assets (catalogue) | ✓ | ✓ | ✓ | |
+| Asset show for assigned repairs only | | | | ✓ |
+| Delete assets | ✓ | ✓ | | |
+| View lists; use Reports | ✓ | ✓ | ✓ | |
+| Create / edit lists, item types, field sets | ✓ | ✓ | | |
+| Create locations, manufacturers, and models | ✓ | ✓ | ✓ | |
+| Edit/delete locations & catalogue | ✓ | ✓ | | |
+| Import / export spreadsheets | ✓ | ✓ | | |
+| File library (central index & delete) | ✓ | ✓ | | |
+| Attach files on assets / maintenance | ✓ | ✓ | ✓ | * |
+| Add maintenance logs | ✓ | ✓ | ✓ | * |
+| Delete maintenance logs | ✓ | ✓ | | |
+| Maintenance hub & repairs | ✓ | ✓ | ✓ | ✓* |
+| Repair procedures (templates) | ✓ | ✓ | | |
+| Spares catalogue & movements | ✓ | ✓ | ✓† | |
+| Asset checkout / return (hire, repair, other) | ✓ | ✓ | ✓ | |
+| Manage users, departments, SSO, storage/backup, export columns, email | ✓ | | | |
+
+\* External repairers only see **repairs assigned to them** (and those assets’ show pages), not the full catalogue or all repairs.  
+† Scanners can view and move spares; managers create/edit spare records and groups.
 
 **Signing in**
 
@@ -90,10 +104,13 @@ Main navigation (desktop and phone menu):
 | **Assets** | Full catalogue — search, filters, columns, bulk actions |
 | **Lists** | Inventory and event lists; open a list to browse its members |
 | **Reports** | Compare lists, unknown scans, and (if enabled) connection map and labels |
+| **Maintenance** | Hub for repairs, repair procedures (managers), and spares |
 | **Data** | Locations, item types, field sets, files, plus optional tools (connection types) |
 | **Import** | Spreadsheet import (managers) |
-| **Admin links** | Export columns, Storage, SSO (admins only) |
-| **Profile** | Your name/email, theme, and optional preview features |
+| **Admin links** | Users, Departments, Export columns, Storage, SSO, Email (admins only — under profile) |
+| **Profile** | Your name/email, theme, active department, and optional preview features |
+
+**External repairers** see a slim nav: **Repairs** and **Maintenance** only (plus Profile). They cannot open Scan, Lists, Import, the full Assets index, or Admin.
 
 On **Assets** and when browsing a **list**, use **Columns** to show or hide fields. Your choice is saved for your user and shared between those screens.
 
@@ -128,7 +145,7 @@ This is the main day-of-event workflow.
 5. When a match is found, the asset is added to the event list.
    - Scanning the same asset again on that list **warns** you — it does not create a duplicate row.
    - Scanning a **rack or container** can also bring in its **child** assets.
-6. Codes that do not match anything become **unknown scans** (see Reports).
+6. Codes that do not match anything become **unknown scans** (see Reports). From **Reports → Unknown scans** you can **link** an open row to an existing asset (optionally add it to the event list and set TP barcode from the scanned code).
 7. When finished, close the session. Use **Reports → Compare** to produce a formal three-way report:
 
    - **Matched** — on both scanned and inventory lists  
@@ -170,15 +187,31 @@ This is the main day-of-event workflow.
 
    | Tab | Purpose |
    |-----|---------|
-   | **Details** | Core fields, location, parent, custom fields |
+   | **Details** | Core fields, location, parent, custom fields; **Checkout** / return when kit leaves site |
    | **Files** | Manuals, photos, PDFs, links |
-   | **Maintenance** | Faults, service visits, notes |
-   | **History** | Who changed what, and when (read-only) |
+   | **Maintenance** | Faults, service visits, notes; start repairs from faults |
+   | **History** | Who changed what, and when (read-only) — includes checkout / return |
    | **Connections** / **Rack** / **Stock** | Optional modules — see [Preview features](#preview-features-optional) |
 
 4. Save changes. Important updates appear on the History tab and on the dashboard’s recent activity.
 
 **Bulk actions** on Assets or a list let you update status, location, parent, or list membership for many rows at once. Deleting assets is limited to managers and admins.
+
+### 2a. Checkout and return (hire / repair / other)
+
+On the asset **Details** tab, staff (`admin`, `inventory_manager`, `scanner`) can check an asset out and later return it. Only one **open** checkout is allowed per asset.
+
+| Purpose | Typical use | Status while out |
+|---------|-------------|------------------|
+| **Hire** | Kit leaves for a show or client | Set toward **On event** |
+| **Repair** | Sent to workshop / vendor; can link or create a **repair** | Set toward **Maintenance** |
+| **Other** | Temporary hand-off that is neither hire nor repair | Set toward **On event** |
+
+**Assignee:** pick an app user **or** a guest (name required; optional email and company).
+
+**Repair purpose:** link an open repair on the asset, or create one as part of checkout. **Return is blocked** while that linked repair is still open — complete (or close) the repair first. Completing the repair can **auto-return** the linked checkout. Checkout and return write **History** (`asset_checked_out` / `asset_returned`).
+
+External repairers cannot create hire checkouts (or manage checkouts from the asset UI).
 
 **Assets catalogue**
 
@@ -276,32 +309,54 @@ Getting types and fields right early makes import, scanning, and reports much cl
 |---------|--------|
 | ![Files desktop](images/features/files-desktop.png) | ![Files mobile](images/features/files-mobile.png) |
 
-### 7. Maintenance logging
+### 7. Maintenance, repairs, and spares (always on)
 
-On an asset’s **Maintenance** tab, record faults, service work, or notes, and attach supporting files. Scanners can add entries; managers can remove them when appropriate. This is the day-to-day place for “what’s wrong with this unit?” without burying it in free-text notes alone.
+These live under the **Maintenance** menu (and related asset tabs). They are **not** preview flags.
 
-### 8. Reports beyond Compare
+| Area | What it is |
+|------|------------|
+| **Maintenance hub** | Landing page linking repairs, procedures, and spares |
+| **Maintenance logs** (asset tab) | Faults, service notes, attachments on a single asset. Scanners can add; managers can delete |
+| **Repairs** | Work orders with steps, parts used, assignee, and complete/cancel. Start from a fault, a new fault+repair, or a spare. External repairers only see repairs **assigned to them** |
+| **Repair procedures** | Reusable step templates (managers/admins) applied when running repairs |
+| **Spares** | Catalogue of spare parts / part SKUs, groups, movements, and low-stock style tracking under Maintenance → Spares |
+
+**Spares vs Stock preview:** **Spares** is the always-on parts store for repairs and warehouse spare bins. The optional asset **Stock** tab (Profile → Developer features) is for quantity tracking on an *asset* itself (cables, consumable packs) and optional guest QR — different product surface.
+
+### 8. Departments (always on)
+
+Admins manage **Departments** under Admin. Operational data (assets, lists, scan sessions, spares, and related records) belongs to a department. Non-admin users are assigned to one or more departments; switch the active department from Profile when you have more than one. Admins can view across departments as configured. New installs backfill a default **General** department.
+
+### 9. Reports beyond Compare
 
 | Report | Use when |
 |--------|----------|
 | **Compare** | Formal stocktake outcome vs expected list |
-| **Unknown scans** | Codes that failed lookup — add notes, export, clean up; admins can clear or dedupe in bulk |
+| **Unknown scans** | Codes that failed lookup — notes, **link to existing asset**, create asset, export; admins can clear or dedupe in bulk |
 | **Connection map** | Visual map of how kit is linked (preview feature) |
+
+**Link existing asset (unknown scans):** on an open unknown-scan row, open **Link existing**, search/select the asset, then optionally:
+
+- **Add to event list** — if the unknown scan was tied to an event list, add the asset there  
+- **Set TP barcode** — copy the scanned code onto the asset when its TP barcode is empty and the code is not already used  
+
+The unknown scan is marked resolved. The same action is available via API (`POST /api/unknown-scans/{id}/link`).
 
 ---
 
 ## Preview features (optional)
 
-Some capabilities are shipped but turned on **per user** under **Profile → Developer features**. Until you enable them, related menu items and asset tabs stay hidden (and those URLs return “not found”).
+Some capabilities are shipped but turned on **per user** under **Profile → Developer features**. Until you enable them, related menu items and asset tabs stay hidden (and those URLs return “not found”). **Always-on** areas (catalogue, scan, compare, files/manuals, maintenance logs, repairs, spares, departments, checkout, email settings when flagged, SSO) do **not** need these toggles.
 
 | Feature | What it adds | Good for |
 |---------|--------------|----------|
 | **Asset connections** | Ports/interfaces on assets, link cable/signal paths, Connection types under Data, Connection map report | Documenting how racks and devices are wired |
 | **RU visualiser** | **Rack** tab: place child gear in rack-unit slots (front/rear) | Visual rack elevation for touring racks |
 | **Label generator** | Layout editor + print/PDF from Assets, lists, or Reports → Labels | Warehouse shelf labels and bag tags |
-| **Stock / consumables** | **Stock** tab: quantities, movements, min/max, charts; Kanban/QR tags for managers | Counting cables, consumables, spare packs |
+| **Stock / consumables** | **Stock** tab on an asset: quantities, movements, min/max, charts; Kanban/QR tags for managers | Counting cables/consumables *on that asset* — not the Maintenance → Spares catalogue |
+| **Email integration** | Admin → Email: outbound notifications, inbound helpdesk replies, optional **digests** | MAC onboarding and maintenance mail; see [email-setup.md](email-setup.md) |
 
-**Guest stock link:** managers can issue a token URL so someone can adjust a tracked stock item **without logging in** (rate-limited). Use only where you trust the physical QR (e.g. on a label in a controlled store).
+**Guest stock link:** managers can issue a token URL so someone can adjust a tracked **Stock** item **without logging in** (rate-limited). Use only where you trust the physical QR (e.g. on a label in a controlled store).
 
 Ask an admin before enabling preview features in production if your organisation has a staged rollout.
 
@@ -319,10 +374,12 @@ These items matter for evaluation and operations; day-to-day scanners rarely nee
 
 | Topic | Summary |
 |-------|---------|
-| **Users** | Admins create accounts and assign roles; new passwords must meet the complexity rules above |
-| **SSO** | Optional Google Workspace / Microsoft Entra sign-in for existing users; see [sso-setup.md](sso-setup.md) |
+| **Users** | Admins create accounts and assign roles (including `external_repairer`); new passwords must meet the complexity rules above |
+| **Departments** | Admin → Departments; assign users on the user form; staff pick active department in Profile |
+| **SSO** | Optional Google Workspace / Microsoft Entra sign-in for existing users; see [sso-setup.md](sso-setup.md). Accounts are not auto-created from SSO |
+| **Email** | Optional (developer feature + Admin → Email). When integration is enabled with credentials, configure **Common notifications / Digests** (warranty, test & tag, low stock); scheduler runs `email:send-digests` daily. See [email-setup.md](email-setup.md) |
 | **Storage & backup** | Choose where attachments live; run backups of data + files from Storage / ops commands |
-| **REST API** | Bearer tokens (Profile UI or password issue) with optional ability scopes for integrations (assets, lists, compare, scan). See [api.md](api.md) |
+| **REST API** | Bearer tokens (Profile UI or password issue) with optional ability scopes for integrations (assets, lists, compare, scan, unknown-scan link, repairs, spares). See [api.md](api.md) |
 | **Hosting** | PHP/Laravel app; MariaDB in production; Ubuntu + Nginx guide in [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md) |
 | **PWA** | Installable shortcut and cached shell assets; **data operations require being online** |
 | **Audit history** | Append-only for compliance/trust — History cannot be altered after the fact |
@@ -345,13 +402,13 @@ These items matter for evaluation and operations; day-to-day scanners rarely nee
 
 If you are evaluating the product or onboarding a team:
 
-1. **Admin** creates users with the right roles (and SSO if required).
+1. **Admin** creates users with the right roles (and SSO if required); set **departments** if you isolate teams.
 2. **Managers** set up **locations**, **item types**, and **field sets**.
 3. **Import** or create a sample of assets; print or confirm barcodes match identifier fields.
 4. Build one **inventory list** and one empty **event list**.
 5. On a phone, open **Scan**, run a short session, then open **Reports → Compare**.
-6. Open an asset and walk through **Files**, **Maintenance**, and **History**.
-7. Optionally enable one preview feature (e.g. labels or stock) and try it on a non-critical type.
+6. Open an asset and walk through **Files**, **Maintenance**, **Checkout**, and **History**.
+7. Optionally enable one preview feature (e.g. labels or asset Stock) and try it on a non-critical type.
 
 That path covers the core value: catalogue → scan → compare → keep records current.
 
@@ -360,9 +417,9 @@ That path covers the core value: catalogue → scan → compare → keep records
 ## What is not included yet
 
 - **Offline scanning** with later sync when the network returns  
-- Automatic **user provisioning** purely from SSO (accounts are created by an admin first)
+- Automatic **user provisioning** / JIT account creation purely from SSO (an admin must create the account first)
 
-Everything else described above is available in the current product; preview modules simply need enabling on each user’s profile.
+Everything else described above is available in the current product. Preview modules (connections, RU rack view, labels, asset Stock, email integration flag) need enabling on each user’s profile where noted.
 
 ---
 

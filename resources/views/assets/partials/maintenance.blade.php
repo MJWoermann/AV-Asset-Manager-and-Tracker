@@ -24,6 +24,7 @@
         </div>
     @endif
 
+    @unlessrole('external_repairer')
     <section class="space-y-3">
         <h3 class="font-semibold text-lg">Log entry</h3>
 
@@ -116,8 +117,19 @@
                     <input type="checkbox" name="start_repair_now" value="1" @checked(old('start_repair_now'))>
                     Start repair now
                 </label>
+                <div>
+                    <x-input-label for="assignee_user_id" value="Assignee (optional)" />
+                    <select id="assignee_user_id" name="assignee_user_id" class="mt-1 block w-full border-brand-silver dark:border-brand-charcoal dark:bg-brand-slate dark:text-white">
+                        <option value="">Unassigned / me</option>
+                        @foreach(($repairAssigneeOptions ?? collect()) as $option)
+                            <option value="{{ $option->id }}" @selected((string) old('assignee_user_id') === (string) $option->id)>
+                                {{ $option->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
                 <p class="text-xs text-brand-charcoal dark:text-brand-silver">
-                    Creates a Fault journal entry and opens a guided repair work order.
+                    Creates a Fault journal entry and opens a guided repair work order. Assignees include external repairers.
                 </p>
             </div>
 
@@ -126,6 +138,7 @@
             </div>
         </form>
     </section>
+    @endunlessrole
 
     @if($openRepairs->isNotEmpty())
         <section class="space-y-2">
