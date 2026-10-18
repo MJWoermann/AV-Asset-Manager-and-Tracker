@@ -51,7 +51,7 @@ Production upgrade (one command): `sudo bash scripts/update.sh` — see [docs/de
 
 Staff-oriented overview of use cases, roles, and day-to-day workflows: [docs/features-and-usage.md](docs/features-and-usage.md).
 
-Product roadmap (preview/developer features, deferred work, planned integrations such as Copilot Studio MCP): [docs/roadmap.md](docs/roadmap.md).
+Product roadmap (preview/developer features, deferred work, in-progress integrations such as Copilot Studio MCP): [docs/roadmap.md](docs/roadmap.md). Copilot Studio packaging: [docs/mcp-copilot-studio.md](docs/mcp-copilot-studio.md).
 
 Prepare messy vendor or legacy spreadsheets for import (field catalog and copy-paste AI prompts): [docs/import-spreadsheet-prep.md](docs/import-spreadsheet-prep.md).
 
@@ -94,6 +94,10 @@ Bearer tokens via Sanctum. Each call needs the role permission and a token abili
 
 > **For AI assistants:** Share **`docs/api.md`** as the source of truth for this app’s REST API (auth, obtain/revoke tokens, abilities, endpoints, status codes, curl). It covers the stocktake/integrations surface under `/api`.
 
+## Copilot Studio / M365 Copilot (MCP)
+
+Connect Microsoft Copilot Studio to this app over Model Context Protocol (Streamable HTTP at `/mcp/av-assets`). Setup, OAuth Dynamic discovery, sample agent instructions, and Power Apps OpenAPI fallback: [docs/mcp-copilot-studio.md](docs/mcp-copilot-studio.md). Status: [docs/roadmap.md](docs/roadmap.md).
+
 ## Single sign-on (optional)
 
 Google Workspace and Microsoft Entra (single-tenant) OAuth for existing users. See [docs/sso-setup.md](docs/sso-setup.md).
@@ -117,7 +121,7 @@ curl -X POST /api/auth/token \
 
 Connections, RU visualiser, labels, asset **Stock**/consumables, and the email-integration flag ship as opt-in **Developer features** on each user’s Profile. Always-on areas include checkout, repairs, spares, departments, files/manuals, and unknown-scan link. Optional Google / Microsoft Entra SSO: [docs/sso-setup.md](docs/sso-setup.md) (existing users only — no JIT provisioning).
 
-Full status table (preview, deferred, planned — including Copilot Studio MCP): [docs/roadmap.md](docs/roadmap.md).
+Full status table (preview, deferred, in progress, planned — including Copilot Studio MCP): [docs/roadmap.md](docs/roadmap.md). Setup packaging: [docs/mcp-copilot-studio.md](docs/mcp-copilot-studio.md).
 
 ## Licence
 
