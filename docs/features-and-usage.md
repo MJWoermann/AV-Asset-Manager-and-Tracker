@@ -416,6 +416,8 @@ That path covers the core value: catalogue → scan → compare → keep records
 
 ## What is not included yet
 
+Short list for operators. Full product status (preview / developer features, deferred work, and planned items such as Copilot Studio MCP) is on the [product roadmap](roadmap.md).
+
 - **Offline scanning** with later sync when the network returns  
 - Automatic **user provisioning** / JIT account creation purely from SSO (an admin must create the account first)
 - **Microsoft Teams** surface for the app UI (not built yet). Methods to consider when this is scheduled:
@@ -435,6 +437,7 @@ Everything else described above is available in the current product. Preview mod
 | Document | Audience |
 |----------|----------|
 | [README](../README.md) | Install and upgrade overview |
+| [Product roadmap](roadmap.md) | Preview features, deferred work, planned integrations |
 | [Organizational deployment (ADKAR)](organizational-deployment.md) | Sponsors and inventory leads — rollout, training, sustainment |
 | [Deploy (Ubuntu + Nginx)](deploy-ubuntu-nginx.md) | Server setup |
 | [REST API](api.md) | Integrators |
