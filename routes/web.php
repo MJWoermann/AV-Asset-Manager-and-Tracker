@@ -110,8 +110,6 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner,external_repair
 
 // Broad staff group — external_repairer is intentionally excluded.
 Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/profile/api-tokens', [ProfileApiTokenController::class, 'store'])
         ->name('profile.api-tokens.store');
