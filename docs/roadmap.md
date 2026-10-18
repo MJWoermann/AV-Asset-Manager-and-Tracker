@@ -47,28 +47,20 @@ Always-on areas (catalogue, scan, compare, files/manuals, maintenance logs, repa
 
 | Field | Detail |
 |-------|--------|
-| **Status** | In progress |
+| **Status** | Done (pending merge) |
 | **Why** | Let staff query and operate inventory from **Microsoft Copilot Studio** / M365 Copilot without the Blade UI |
 | **Audience** | Inventory managers, scanners, admins already in Entra (same Spatie roles as the REST API; not `external_repairer`) |
 
-**Direction**
+**Shipped in this work**
 
-- First-party **Model Context Protocol** server on the app: Streamable HTTP endpoint (`/mcp/av-assets`).
-- **Per-user OAuth** via Laravel Passport so Copilot Studio can use **OAuth 2.0 → Dynamic discovery** (PKCE + DCR). Authorize UI reuses web login (including existing Entra SSO).
-- Optional Sanctum Bearer / API-key path for service accounts and local debugging.
-- **Coarse tools** over existing services (not a 1:1 REST mirror): lookup, stocktake session/scan/compare, unknown-scan link, asset create/update, repairs, spares, checkout/return.
-- Add Sanctum **checkout / return** API parity (today web-only) so MCP and other integrators share one path.
-- Compact tool responses; same department scoping, role gates, throttles, and immutable audit history as the rest of the app.
+- Streamable HTTP MCP at `/mcp/av-assets` (`laravel/mcp` + Passport OAuth Dynamic discovery / DCR).
+- Coarse tools (lookup, stocktake, compare, unknown scans, assets, checkout/return via service, repairs, spares) plus Sanctum checkout/return REST API.
+- Setup guide and OpenAPI Power Apps fallback.
 
-**Out of scope for the first MCP release**
+**Out of scope for this release**
 
 - Offline sync, guest QR stock, print wizards, RU visualiser, SSO/storage/email *settings*, preferences UI, admin user CRUD via Copilot.
 - Overloading Socialite `AZURE_*` or Graph `MICROSOFT_GRAPH_*` as the MCP authorization server (Passport on the app is the AS; Entra stays the user IdP via login).
-
-**Dependencies (when implemented)**
-
-- Promote `laravel/mcp` into production `require`; add `laravel/passport`.
-- Implementation lands in sibling PRs; packaging/setup docs and OpenAPI are already in-repo.
 
 **Related**
 

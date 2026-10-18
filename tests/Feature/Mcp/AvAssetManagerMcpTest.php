@@ -15,6 +15,7 @@ use App\Models\ScanSession;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Passport\Passport;
 use Tests\TestCase;
 
 class AvAssetManagerMcpTest extends TestCase
@@ -49,6 +50,22 @@ class AvAssetManagerMcpTest extends TestCase
             'id' => 1,
             'method' => 'tools/list',
         ])->assertUnauthorized();
+    }
+
+    public function test_mcp_endpoint_lists_tools_when_authenticated_via_passport(): void
+    {
+        $user = $this->staffUser('scanner');
+        Passport::actingAs($user, ['mcp:use']);
+
+        $this->postJson('/mcp/av-assets', [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/list',
+        ])
+            ->assertOk()
+            ->assertJsonPath('jsonrpc', '2.0')
+            ->assertJsonPath('id', 1)
+            ->assertJsonFragment(['name' => 'whoami-tool']);
     }
 
     public function test_tool_denies_external_repairer_role(): void
