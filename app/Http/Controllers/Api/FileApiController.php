@@ -24,10 +24,7 @@ class FileApiController extends FileController
         $query = File::query()->withCount('links')->with('uploader')->latest();
 
         if ($search = trim((string) $request->string('q'))) {
-            $query->where(function ($builder) use ($search): void {
-                $builder->where('title', 'like', '%'.$search.'%')
-                    ->orWhere('original_filename', 'like', '%'.$search.'%');
-            });
+            $query->search($search);
         }
 
         return response()->json($query->paginate(min($request->integer('per_page', 25), 100)));

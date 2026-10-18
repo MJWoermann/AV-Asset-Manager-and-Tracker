@@ -462,9 +462,14 @@ class AssetConnectionFeatureTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Router', false);
-        $response->assertSee('Switch', false);
-        $response->assertDontSee('Spare', false);
+        $graphNames = collect($response->viewData('graph')['nodes'] ?? [])
+            ->map(fn (array $node): string => (string) ($node['data']['name'] ?? ''))
+            ->filter()
+            ->values()
+            ->all();
+
+        $this->assertSame(['Router', 'Switch'], $graphNames);
+        $this->assertNotContains('Spare', $graphNames);
     }
 
     public function test_connections_tab_lists_peer_assets(): void

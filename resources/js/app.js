@@ -4033,10 +4033,8 @@ Alpine.data('shelfTagPrintSetup', (assets = [], preselectedIds = [], maxBatch = 
     },
 
     get visibleAssets() {
-        const term = String(this.filter || '')
-            .trim()
-            .toLowerCase();
-        if (!term) {
+        const tokens = searchTokens(this.filter).map((token) => token.toLowerCase());
+        if (!tokens.length) {
             return this.assets;
         }
 
@@ -4045,6 +4043,7 @@ Alpine.data('shelfTagPrintSetup', (assets = [], preselectedIds = [], maxBatch = 
                 asset.name,
                 asset.tp_barcode,
                 asset.fmi_ast,
+                asset.rig_tag,
                 asset.serial_number,
                 asset.mac_address,
                 asset.item_type,
@@ -4054,7 +4053,7 @@ Alpine.data('shelfTagPrintSetup', (assets = [], preselectedIds = [], maxBatch = 
                 .join(' ')
                 .toLowerCase();
 
-            return haystack.includes(term);
+            return tokens.every((token) => haystack.includes(token));
         });
     },
 

@@ -205,13 +205,7 @@ class ConnectionBusService
                 }
 
                 if ($search !== '') {
-                    $like = '%'.$search.'%';
-                    $assetQuery->where(function (Builder $q) use ($like, $search): void {
-                        $q->where('name', 'like', $like)
-                            ->orWhere('fmi_ast', 'like', $like)
-                            ->orWhere('rig_tag', 'like', $like);
-                        ScannableIdentifierFields::orWherePartialMatch($q, $search);
-                    });
+                    $assetQuery->search($search);
                 }
             });
         }
