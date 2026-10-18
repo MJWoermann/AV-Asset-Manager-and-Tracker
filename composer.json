@@ -11,6 +11,8 @@
         "endroid/qr-code": "^6.1",
         "laravel/breeze": "^2.4",
         "laravel/framework": "^13.17",
+        "laravel/mcp": "^1.0",
+        "laravel/passport": "^13.7",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.24",
         "laravel/tinker": "^3.0",

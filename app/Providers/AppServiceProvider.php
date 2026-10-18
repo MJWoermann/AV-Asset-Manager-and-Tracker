@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Passport\Passport;
 use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 
@@ -64,6 +65,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Event::listen(SocialiteWasCalled::class, AzureExtendSocialite::class);
+
+        Passport::authorizationView(function (array $parameters) {
+            return view('mcp.authorize', $parameters);
+        });
 
         Asset::observe(AuditableObserver::class);
         AssetConnection::observe(AuditableObserver::class);
@@ -109,6 +114,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('backup', function (Request $request) {
             return Limit::perMinute(PerformanceLimits::int('throttle_backup_per_minute'))
                 ->by($this->rateLimitKey($request, 'backup'));
+        });
+
+        RateLimiter::for('mcp', function (Request $request) {
+            return Limit::perMinute(60)->by($this->rateLimitKey($request, 'mcp'));
         });
     }
 
