@@ -13,7 +13,9 @@ use App\Models\AuditLog;
 use App\Models\SparePart;
 use App\Models\SparePartMovement;
 use App\Models\User;
+use App\Support\NullableString;
 use App\Support\SparePartLuhn;
+use App\Support\UploadedFiles;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -186,7 +188,7 @@ class SparePartService
             ]);
         }
 
-        $uploads = $this->normalizeUploads($pdfs);
+        $uploads = UploadedFiles::normalize($pdfs);
         if ($uploads !== [] && $type !== SparePartMovementType::Restock) {
             throw ValidationException::withMessages([
                 'pdfs' => 'PDF attachments are only allowed on restock events.',
@@ -202,11 +204,11 @@ class SparePartService
                 'quantity_delta' => $after - $before,
                 'against_asset_id' => $input['against_asset_id'] ?? null,
                 'repair_id' => $input['repair_id'] ?? null,
-                'reason' => $this->nullableString($input['reason'] ?? null),
-                'ticket_ref' => $this->nullableString($input['ticket_ref'] ?? null),
-                'quoting_status' => $this->nullableString($input['quoting_status'] ?? null),
+                'reason' => NullableString::from($input['reason'] ?? null),
+                'ticket_ref' => NullableString::from($input['ticket_ref'] ?? null),
+                'quoting_status' => NullableString::from($input['quoting_status'] ?? null),
                 'user_id' => $user?->id,
-                'notes' => $this->nullableString($input['notes'] ?? null),
+                'notes' => NullableString::from($input['notes'] ?? null),
                 'recorded_at' => $input['recorded_at'] ?? now(),
             ]);
 
@@ -442,30 +444,5 @@ class SparePartService
         }
 
         return (int) $value;
-    }
-
-    protected function nullableString(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $trimmed = trim((string) $value);
-
-        return $trimmed === '' ? null : $trimmed;
-    }
-
-    /**
-     * @return list<UploadedFile>
-     */
-    protected function normalizeUploads(UploadedFile|array|null $pdfs): array
-    {
-        if ($pdfs === null) {
-            return [];
-        }
-
-        $list = is_array($pdfs) ? $pdfs : [$pdfs];
-
-        return array_values(array_filter($list, fn ($file): bool => $file instanceof UploadedFile));
     }
 }

@@ -177,21 +177,7 @@ class AssetExportColumns
      */
     public static function resolve(?array $selected, ?Collection $definitions = null): array
     {
-        $allowed = self::allowedKeys($definitions);
-        $columns = collect($selected ?? [])
-            ->filter(fn ($key) => is_string($key) && in_array($key, $allowed, true))
-            ->values()
-            ->all();
-
-        if ($columns === []) {
-            $columns = self::defaults();
-        }
-
-        if (! in_array('name', $columns, true)) {
-            array_unshift($columns, 'name');
-        }
-
-        return array_values(array_unique($columns));
+        return ColumnPreference::resolve($selected, self::allowedKeys($definitions), self::defaults());
     }
 
     /**

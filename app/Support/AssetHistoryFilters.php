@@ -18,8 +18,8 @@ class AssetHistoryFilters
      */
     public static function apply(Builder|Relation $query, Request $request): Builder|Relation
     {
-        $dateFrom = self::dateValue($request, 'date_from');
-        $dateTo = self::dateValue($request, 'date_to');
+        $dateFrom = RequestDates::ymd($request, 'date_from');
+        $dateTo = RequestDates::ymd($request, 'date_to');
         $action = trim($request->string('action')->toString());
         $userId = $request->string('user_id')->toString();
 
@@ -46,8 +46,8 @@ class AssetHistoryFilters
 
     public static function hasActiveFilters(Request $request): bool
     {
-        return self::dateValue($request, 'date_from') !== null
-            || self::dateValue($request, 'date_to') !== null
+        return RequestDates::ymd($request, 'date_from') !== null
+            || RequestDates::ymd($request, 'date_to') !== null
             || trim($request->string('action')->toString()) !== ''
             || trim($request->string('user_id')->toString()) !== '';
     }
@@ -107,16 +107,5 @@ class AssetHistoryFilters
     public static function actionLabel(string $action): string
     {
         return ucfirst(str_replace('_', ' ', $action));
-    }
-
-    protected static function dateValue(Request $request, string $key): ?string
-    {
-        $value = trim($request->string($key)->toString());
-
-        if ($value === '' || preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
-            return null;
-        }
-
-        return $value;
     }
 }

@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\GeneratesConnectionTypeSlug;
 use App\Http\Requests\StoreConnectionTypeRequest;
 use App\Http\Requests\UpdateConnectionTypeRequest;
 use App\Models\ConnectionType;
 use App\Support\ConnectionTypeColors;
 use App\Support\ConnectionTypeIcons;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ConnectionTypeController extends Controller
 {
+    use GeneratesConnectionTypeSlug;
+
     public function index(): View
     {
         $connectionTypes = ConnectionType::query()
@@ -95,19 +97,5 @@ class ConnectionTypeController extends Controller
         $connectionType->delete();
 
         return redirect()->route('connection-types.index')->with('status', 'Connection type deleted.');
-    }
-
-    protected function uniqueSlug(string $name): string
-    {
-        $base = Str::slug($name) ?: 'connection-type';
-        $slug = $base;
-        $i = 2;
-
-        while (ConnectionType::withTrashed()->where('slug', $slug)->exists()) {
-            $slug = $base.'-'.$i;
-            $i++;
-        }
-
-        return $slug;
     }
 }

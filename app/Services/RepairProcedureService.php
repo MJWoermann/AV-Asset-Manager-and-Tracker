@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RepairProcedure;
 use App\Models\RepairProcedureStep;
+use App\Support\NullableString;
 use Illuminate\Support\Facades\DB;
 
 class RepairProcedureService
@@ -57,9 +58,9 @@ class RepairProcedureService
     {
         return [
             'title' => (string) $data['title'],
-            'summary' => $this->nullableString($data['summary'] ?? null),
-            'safety_notes' => $this->nullableString($data['safety_notes'] ?? null),
-            'tools_required' => $this->nullableString($data['tools_required'] ?? null),
+            'summary' => NullableString::from($data['summary'] ?? null),
+            'safety_notes' => NullableString::from($data['safety_notes'] ?? null),
+            'tools_required' => NullableString::from($data['tools_required'] ?? null),
             'estimated_minutes' => isset($data['estimated_minutes']) && $data['estimated_minutes'] !== ''
                 ? (int) $data['estimated_minutes']
                 : null,
@@ -86,7 +87,7 @@ class RepairProcedureService
                 'repair_procedure_id' => $procedure->id,
                 'sort_order' => (int) ($step['sort_order'] ?? $index),
                 'title' => $title,
-                'body' => $this->nullableString($step['body'] ?? null),
+                'body' => NullableString::from($step['body'] ?? null),
                 'is_required' => (bool) ($step['is_required'] ?? true),
             ]);
         }
@@ -111,16 +112,5 @@ class RepairProcedureService
         }
 
         $procedure->recommendedSpareParts()->sync($sync);
-    }
-
-    protected function nullableString(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $trimmed = trim((string) $value);
-
-        return $trimmed === '' ? null : $trimmed;
     }
 }

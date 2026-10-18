@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Enums\LocationType;
+use App\Models\Concerns\MatchesFormerName;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str;
 
 class LocationAlias extends Model
 {
+    use MatchesFormerName;
+
     protected $fillable = [
         'former_name',
         'type',
@@ -32,9 +34,9 @@ class LocationAlias extends Model
      */
     public static function recordMerge(Location $from, Location $to): void
     {
-        static::query()
-            ->where('location_id', $from->id)
-            ->update(['location_id' => $to->id]);
+        static::repointAliases('location_id', $from->id, [
+            'location_id' => $to->id,
+        ]);
 
         $sameIdentity = $from->name === $to->name && $from->type === $to->type;
 
@@ -53,31 +55,17 @@ class LocationAlias extends Model
 
     public static function forgetMatching(string $name, LocationType|string $type): void
     {
-        $name = trim($name);
         $typeValue = $type instanceof LocationType ? $type->value : $type;
 
-        static::query()
-            ->where('type', $typeValue)
-            ->where(function ($query) use ($name): void {
-                $query->where('former_name', $name)
-                    ->orWhereRaw('LOWER(former_name) = ?', [Str::lower($name)]);
-            })
-            ->delete();
+        static::deleteMatchingFormerName(trim($name), ['type' => $typeValue]);
     }
 
     public static function resolveLocation(string $name, LocationType $type): ?Location
     {
-        $name = trim($name);
+        $resolved = static::resolveRelationByFormerName(trim($name), 'location', [
+            'type' => $type->value,
+        ]);
 
-        $alias = static::query()
-            ->with('location')
-            ->where('type', $type->value)
-            ->where(function ($query) use ($name): void {
-                $query->where('former_name', $name)
-                    ->orWhereRaw('LOWER(former_name) = ?', [Str::lower($name)]);
-            })
-            ->first();
-
-        return $alias?->location;
+        return $resolved instanceof Location ? $resolved : null;
     }
 }

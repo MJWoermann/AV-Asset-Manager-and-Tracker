@@ -4,13 +4,13 @@ namespace App\Services;
 
 use App\Models\ShelfTagLayout;
 use App\Models\SparePart;
+use App\Support\BarcodeDataUri;
 use App\Support\ShelfTagFieldKeys;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
-use Picqer\Barcode\BarcodeGeneratorPNG;
 
 class SpareTagRenderService
 {
@@ -172,18 +172,7 @@ class SpareTagRenderService
 
     protected function barcodeDataUri(string $value, string $symbology): ?string
     {
-        try {
-            $generator = new BarcodeGeneratorPNG;
-            $type = match (strtolower($symbology)) {
-                'code39' => $generator::TYPE_CODE_39,
-                default => $generator::TYPE_CODE_128,
-            };
-            $png = $generator->getBarcode($value, $type, 3, 120);
-
-            return 'data:image/png;base64,'.base64_encode($png);
-        } catch (\Throwable) {
-            return null;
-        }
+        return BarcodeDataUri::png($value, $symbology);
     }
 
     protected function qrDataUri(string $value, string $ecc): ?string

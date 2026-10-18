@@ -118,17 +118,6 @@ class SsoSettings
         return false;
     }
 
-    public static function isAvailable(): bool
-    {
-        foreach (self::PROVIDERS as $provider) {
-            if (self::isVisible($provider)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     /**
      * @return array<string, bool>
      */

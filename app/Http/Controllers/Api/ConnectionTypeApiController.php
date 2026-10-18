@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\ConnectionTypeController;
+use App\Http\Controllers\Concerns\GeneratesConnectionTypeSlug;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreConnectionTypeRequest;
 use App\Http\Requests\UpdateConnectionTypeRequest;
 use App\Models\ConnectionType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class ConnectionTypeApiController extends ConnectionTypeController
+class ConnectionTypeApiController extends Controller
 {
+    use GeneratesConnectionTypeSlug;
+
     public function index(): JsonResponse
     {
         return response()->json([
