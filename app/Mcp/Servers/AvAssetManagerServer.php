@@ -102,7 +102,7 @@ class AvAssetManagerServer extends Server
     ];
 
     /**
-     * @var array<int, class-string<Server\Resource>>
+     * @var array<int, class-string<\Laravel\Mcp\Server\Resource>>
      */
     protected array $resources = [
         GlossaryResource::class,
