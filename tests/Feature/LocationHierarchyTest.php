@@ -118,7 +118,7 @@ class LocationHierarchyTest extends TestCase
         $response = $this->actingAs($user)->get(route('locations.index'));
 
         $response->assertOk();
-        $response->assertSee('bulkLocations(', false);
+        $response->assertSee('bulkSelection(', false);
         $response->assertSee('Expand all', false);
         $response->assertSee('Collapse all', false);
         $response->assertSee('Hide racks', false);

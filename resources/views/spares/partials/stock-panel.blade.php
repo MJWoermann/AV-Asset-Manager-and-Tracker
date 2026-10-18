@@ -5,9 +5,11 @@
 
 <div
     class="space-y-6"
-    x-data="sparePartPanel(@js([
+    x-data="inventoryChartPanel(@js([
         'chart' => $chart,
         'initialAction' => $initialAction,
+        'showAnnotationLabels' => true,
+        'showLegend' => true,
     ]))"
 >
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">

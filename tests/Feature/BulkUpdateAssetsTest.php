@@ -230,7 +230,7 @@ class BulkUpdateAssetsTest extends TestCase
         $response = $this->actingAs($user)->get(route('assets.index'));
 
         $response->assertOk();
-        $response->assertSee('bulkAssets(', false);
+        $response->assertSee('bulkSelection(', false);
         $response->assertSee('Bulk edit');
         $response->assertSee('data-bulk-asset-id', false);
         $response->assertSee('toggleAll($event.target.checked)', false);
@@ -256,7 +256,7 @@ class BulkUpdateAssetsTest extends TestCase
         $response = $this->actingAs($user)->get(route('lists.show', $list));
 
         $response->assertOk();
-        $response->assertSee('bulkAssets(', false);
+        $response->assertSee('bulkSelection(', false);
         $response->assertSee('Remove from this list');
     }
 }

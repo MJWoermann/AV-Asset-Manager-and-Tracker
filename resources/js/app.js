@@ -1773,248 +1773,196 @@ Alpine.data('fieldBarcodeScanner', (fieldId, options = {}) => ({
     },
 }));
 
-Alpine.data('stockPanel', (config = {}) => ({
-    chartPayload: config.chart || {},
-    action: config.initialAction || 'count',
-    selected: null,
-    chart: null,
+/**
+ * Shared inventory movement chart + action panel (assets stock / spare parts).
+ *
+ * @param {{
+ *   chart?: object,
+ *   initialAction?: string,
+ *   openDetailId?: string|number|null,
+ *   actionHints?: Record<string, string>,
+ *   showAnnotationLabels?: boolean,
+ *   showLegend?: boolean,
+ * }} [config]
+ */
+function createInventoryChartPanel(config = {}) {
+    const actionHints = config.actionHints && typeof config.actionHints === 'object'
+        ? config.actionHints
+        : {};
+    const showAnnotationLabels = config.showAnnotationLabels !== false;
+    const showLegend = config.showLegend !== false;
 
-    get quantityHint() {
-        if (this.action === 'count') {
-            return 'Absolute on-hand quantity after counting';
-        }
-        if (this.action === 'restock') {
-            return 'Units added from a restock / Momentous PO';
-        }
-        if (this.action === 'breakage') {
-            return 'Units removed due to breakage';
-        }
-        return '';
-    },
+    return {
+        chartPayload: config.chart || {},
+        action: config.initialAction || 'count',
+        selected: null,
+        chart: null,
 
-    init() {
-        const points = this.chartPayload.points || [];
-        if (config.openDetailId) {
-            this.selected = points.find((point) => String(point.id) === String(config.openDetailId)) || null;
-        }
-        this.$nextTick(() => this.mountChart());
-    },
+        get quantityHint() {
+            return actionHints[this.action] || '';
+        },
 
-    async mountChart() {
-        const canvas = this.$refs.chart;
-        if (!canvas) {
-            return;
-        }
+        init() {
+            const points = this.chartPayload.points || [];
+            if (config.openDetailId) {
+                this.selected = points.find((point) => String(point.id) === String(config.openDetailId)) || null;
+            }
+            this.$nextTick(() => this.mountChart());
+        },
 
-        const Chart = await loadChart();
-        const points = this.chartPayload.points || [];
-        const restocks = this.chartPayload.restock_markers || [];
-        const trend = this.chartPayload.trend?.projection || [];
-        const annotations = {};
+        async mountChart() {
+            const canvas = this.$refs.chart;
+            if (!canvas) {
+                return;
+            }
 
-        if (this.chartPayload.min_line !== null && this.chartPayload.min_line !== undefined) {
-            annotations.minLine = {
+            const Chart = await loadChart();
+            const points = this.chartPayload.points || [];
+            const restocks = this.chartPayload.restock_markers || [];
+            const trend = this.chartPayload.trend?.projection || [];
+            const annotations = {};
+
+            if (this.chartPayload.min_line !== null && this.chartPayload.min_line !== undefined) {
+                annotations.minLine = {
+                    type: 'line',
+                    yMin: this.chartPayload.min_line,
+                    yMax: this.chartPayload.min_line,
+                    borderColor: '#ef4444',
+                    borderWidth: 1,
+                    borderDash: [6, 4],
+                    ...(showAnnotationLabels
+                        ? {
+                            label: {
+                                display: true,
+                                content: 'Min',
+                                position: 'start',
+                            },
+                        }
+                        : {}),
+                };
+            }
+
+            if (this.chartPayload.max_line !== null && this.chartPayload.max_line !== undefined) {
+                annotations.maxLine = {
+                    type: 'line',
+                    yMin: this.chartPayload.max_line,
+                    yMax: this.chartPayload.max_line,
+                    borderColor: '#00adb7',
+                    borderWidth: 1,
+                    borderDash: [6, 4],
+                    ...(showAnnotationLabels
+                        ? {
+                            label: {
+                                display: true,
+                                content: 'Max',
+                                position: 'start',
+                            },
+                        }
+                        : {}),
+                };
+            }
+
+            this.chart = new Chart(canvas.getContext('2d'), {
                 type: 'line',
-                yMin: this.chartPayload.min_line,
-                yMax: this.chartPayload.min_line,
-                borderColor: '#ef4444',
-                borderWidth: 1,
-                borderDash: [6, 4],
-                label: {
-                    display: true,
-                    content: 'Min',
-                    position: 'start',
+                data: {
+                    datasets: [
+                        {
+                            label: 'On hand',
+                            data: points.map((point) => ({ x: point.x, y: point.y, meta: point })),
+                            borderColor: '#111827',
+                            backgroundColor: 'transparent',
+                            stepped: true,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            tension: 0,
+                        },
+                        {
+                            label: 'Restock',
+                            data: restocks.map((point) => ({ x: point.x, y: point.y, meta: point })),
+                            borderColor: '#00adb7',
+                            backgroundColor: '#00adb7',
+                            showLine: false,
+                            pointRadius: 7,
+                            pointStyle: 'triangle',
+                        },
+                        {
+                            label: 'Trend',
+                            data: trend,
+                            borderColor: '#9ca3af',
+                            borderDash: [8, 4],
+                            pointRadius: 0,
+                            tension: 0,
+                        },
+                    ],
                 },
-            };
-        }
-
-        if (this.chartPayload.max_line !== null && this.chartPayload.max_line !== undefined) {
-            annotations.maxLine = {
-                type: 'line',
-                yMin: this.chartPayload.max_line,
-                yMax: this.chartPayload.max_line,
-                borderColor: '#00adb7',
-                borderWidth: 1,
-                borderDash: [6, 4],
-                label: {
-                    display: true,
-                    content: 'Max',
-                    position: 'start',
-                },
-            };
-        }
-
-        this.chart = new Chart(canvas.getContext('2d'), {
-            type: 'line',
-            data: {
-                datasets: [
-                    {
-                        label: 'On hand',
-                        data: points.map((point) => ({ x: point.x, y: point.y, meta: point })),
-                        borderColor: '#111827',
-                        backgroundColor: 'transparent',
-                        stepped: true,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        tension: 0,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: true },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { tooltipFormat: 'yyyy-MM-dd HH:mm' },
+                            ticks: { maxRotation: 0 },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 },
+                        },
                     },
-                    {
-                        label: 'Restock',
-                        data: restocks.map((point) => ({ x: point.x, y: point.y, meta: point })),
-                        borderColor: '#00adb7',
-                        backgroundColor: '#00adb7',
-                        showLine: false,
-                        pointRadius: 7,
-                        pointStyle: 'triangle',
-                    },
-                    {
-                        label: 'Trend',
-                        data: trend,
-                        borderColor: '#9ca3af',
-                        borderDash: [8, 4],
-                        pointRadius: 0,
-                        tension: 0,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: 'nearest', intersect: true },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: { tooltipFormat: 'yyyy-MM-dd HH:mm' },
-                        ticks: { maxRotation: 0 },
-                    },
-                    y: {
-                        beginAtZero: true,
-                        ticks: { precision: 0 },
-                    },
-                },
-                plugins: {
-                    legend: { display: true },
-                    annotation: { annotations },
-                    tooltip: {
-                        callbacks: {
-                            label(context) {
-                                const meta = context.raw?.meta;
-                                if (!meta) {
-                                    return `${context.dataset.label}: ${context.parsed.y}`;
-                                }
-                                return `${meta.type_label}: ${meta.quantity_after}`;
+                    plugins: {
+                        legend: { display: showLegend },
+                        annotation: { annotations },
+                        tooltip: {
+                            callbacks: {
+                                label(context) {
+                                    const meta = context.raw?.meta;
+                                    if (!meta) {
+                                        return `${context.dataset.label}: ${context.parsed.y}`;
+                                    }
+                                    return `${meta.type_label}: ${meta.quantity_after}`;
+                                },
                             },
                         },
                     },
+                    onClick: (_event, elements) => {
+                        if (!elements.length) {
+                            return;
+                        }
+                        const element = elements[0];
+                        const raw = this.chart.data.datasets[element.datasetIndex].data[element.index];
+                        if (raw?.meta) {
+                            this.selected = raw.meta;
+                        }
+                    },
                 },
-                onClick: (_event, elements) => {
-                    if (!elements.length) {
-                        return;
-                    }
-                    const element = elements[0];
-                    const raw = this.chart.data.datasets[element.datasetIndex].data[element.index];
-                    if (raw?.meta) {
-                        this.selected = raw.meta;
-                    }
-                },
-            },
-        });
-    },
+            });
+        },
+    };
+}
+
+const ASSET_STOCK_ACTION_HINTS = {
+    count: 'Absolute on-hand quantity after counting',
+    restock: 'Units added from a restock / Momentous PO',
+    breakage: 'Units removed due to breakage',
+};
+
+Alpine.data('inventoryChartPanel', createInventoryChartPanel);
+
+/** Asset stock tab — chart + quantity hints for count/restock/breakage. */
+Alpine.data('stockPanel', (config = {}) => createInventoryChartPanel({
+    showAnnotationLabels: true,
+    showLegend: true,
+    ...config,
+    actionHints: config.actionHints || ASSET_STOCK_ACTION_HINTS,
 }));
 
-Alpine.data('sparePartPanel', (config = {}) => ({
-    chartPayload: config.chart || {},
-    action: config.initialAction || 'count',
-    selected: null,
-    chart: null,
-
-    init() {
-        this.$nextTick(() => this.mountChart());
-    },
-
-    async mountChart() {
-        const canvas = this.$refs.chart;
-        if (!canvas) {
-            return;
-        }
-
-        const Chart = await loadChart();
-        const points = this.chartPayload.points || [];
-        const restocks = this.chartPayload.restock_markers || [];
-        const trend = this.chartPayload.trend?.projection || [];
-        const annotations = {};
-
-        if (this.chartPayload.min_line !== null && this.chartPayload.min_line !== undefined) {
-            annotations.minLine = {
-                type: 'line',
-                yMin: this.chartPayload.min_line,
-                yMax: this.chartPayload.min_line,
-                borderColor: '#ef4444',
-                borderWidth: 1,
-                borderDash: [6, 4],
-            };
-        }
-
-        if (this.chartPayload.max_line !== null && this.chartPayload.max_line !== undefined) {
-            annotations.maxLine = {
-                type: 'line',
-                yMin: this.chartPayload.max_line,
-                yMax: this.chartPayload.max_line,
-                borderColor: '#00adb7',
-                borderWidth: 1,
-                borderDash: [6, 4],
-            };
-        }
-
-        this.chart = new Chart(canvas.getContext('2d'), {
-            type: 'line',
-            data: {
-                datasets: [
-                    {
-                        label: 'On hand',
-                        data: points.map((point) => ({ x: point.x, y: point.y, meta: point })),
-                        borderColor: '#111827',
-                        stepped: true,
-                        pointRadius: 4,
-                    },
-                    {
-                        label: 'Restock',
-                        data: restocks.map((point) => ({ x: point.x, y: point.y, meta: point })),
-                        borderColor: '#00adb7',
-                        showLine: false,
-                        pointRadius: 7,
-                        pointStyle: 'triangle',
-                    },
-                    {
-                        label: 'Trend',
-                        data: trend,
-                        borderColor: '#9ca3af',
-                        borderDash: [8, 4],
-                        pointRadius: 0,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: { type: 'time', time: { tooltipFormat: 'yyyy-MM-dd HH:mm' } },
-                    y: { beginAtZero: true, ticks: { precision: 0 } },
-                },
-                plugins: { annotation: { annotations } },
-                onClick: (_event, elements) => {
-                    if (!elements.length) {
-                        return;
-                    }
-                    const element = elements[0];
-                    const raw = this.chart.data.datasets[element.datasetIndex].data[element.index];
-                    if (raw?.meta) {
-                        this.selected = raw.meta;
-                    }
-                },
-            },
-        });
-    },
+/** Spare-part stock panel — same chart; no asset-stock quantity hints by default. */
+Alpine.data('sparePartPanel', (config = {}) => createInventoryChartPanel({
+    showAnnotationLabels: true,
+    showLegend: true,
+    ...config,
+    actionHints: config.actionHints || {},
 }));
 
 Alpine.data('kanbanQr', (url) => ({
@@ -3287,279 +3235,250 @@ Alpine.data('dashboardModules', (initialModules = []) => ({
     },
 }));
 
-Alpine.data('bulkAssets', () => ({
-    selected: {},
-    panelOpen: false,
-    deleteConfirmOpen: false,
-    pendingDelete: false,
-    fields: {
-        update_status: false,
-        update_location: false,
-        clear_location: false,
-        update_parent: false,
-        clear_parent: false,
-        update_test_tag_expiry: false,
-        clear_test_tag_expiry: false,
-        update_warranty_expiry: false,
-        clear_warranty_expiry: false,
-        update_notes: false,
-        clear_notes: false,
-    },
+/**
+ * Shared bulk checkbox selection + optional delete/merge/tree collapse.
+ *
+ * @param {{
+ *   idAttribute?: string,
+ *   nameAttribute?: string|null,
+ *   fields?: Record<string, boolean>,
+ *   enableMerge?: boolean,
+ *   enableTreeCollapse?: boolean,
+ *   collapsibleAttribute?: string,
+ *   collapsibleIdAttribute?: string,
+ *   hideRacksAttribute?: string,
+ *   hideRacksIdAttribute?: string,
+ * }} [config]
+ */
+function createBulkSelection(config = {}) {
+    const idAttribute = config.idAttribute || 'data-bulk-id';
+    const nameAttribute = config.nameAttribute || null;
+    const enableMerge = Boolean(config.enableMerge);
+    const enableTreeCollapse = Boolean(config.enableTreeCollapse);
+    const collapsibleAttribute = config.collapsibleAttribute || 'data-location-collapsible';
+    const collapsibleIdAttribute = config.collapsibleIdAttribute || 'data-location-id';
+    const hideRacksAttribute = config.hideRacksAttribute || 'data-location-has-racks';
+    const hideRacksIdAttribute = config.hideRacksIdAttribute || 'data-location-id';
+    const initialFields = config.fields && typeof config.fields === 'object'
+        ? { ...config.fields }
+        : {};
 
-    get selectedIds() {
-        return Object.keys(this.selected)
-            .filter((id) => this.selected[id])
-            .map((id) => Number(id));
-    },
+    return {
+        selected: {},
+        panelOpen: false,
+        deleteConfirmOpen: false,
+        pendingDelete: false,
+        pendingMerge: false,
+        collapsed: {},
+        fields: initialFields,
+        enableMerge,
+        enableTreeCollapse,
 
-    get selectedCount() {
-        return this.selectedIds.length;
-    },
+        isOpen(id) {
+            return !this.collapsed[id];
+        },
 
-    get allPageSelected() {
-        const boxes = this.pageCheckboxes();
-        return boxes.length > 0 && boxes.every((id) => !!this.selected[id]);
-    },
+        toggle(id) {
+            if (!this.enableTreeCollapse) {
+                return;
+            }
+            this.collapsed = { ...this.collapsed, [id]: !this.collapsed[id] };
+        },
 
-    pageCheckboxes() {
-        // Use $root: $el is the event target when called from child @change handlers.
-        return [...this.$root.querySelectorAll('[data-bulk-asset-id]')].map((el) =>
-            Number(el.getAttribute('data-bulk-asset-id'))
-        );
-    },
+        expandAll() {
+            this.collapsed = {};
+        },
 
-    setSelected(id, checked) {
-        this.selected = { ...this.selected, [id]: !!checked };
-    },
+        collapseAll() {
+            if (!this.enableTreeCollapse) {
+                return;
+            }
+            const next = {};
+            this.collapsibleIds().forEach((id) => {
+                next[id] = true;
+            });
+            this.collapsed = next;
+        },
 
-    toggleAll(checked) {
-        const next = { ...this.selected };
-        this.pageCheckboxes().forEach((id) => {
-            next[id] = !!checked;
-        });
-        this.selected = next;
-    },
+        hideRacks() {
+            if (!this.enableTreeCollapse) {
+                return;
+            }
+            const next = { ...this.collapsed };
+            this.$root.querySelectorAll(`[${hideRacksAttribute}="1"]`).forEach((el) => {
+                next[Number(el.getAttribute(hideRacksIdAttribute))] = true;
+            });
+            this.collapsed = next;
+        },
 
-    clearSelection() {
-        this.selected = {};
-        this.panelOpen = false;
-        this.deleteConfirmOpen = false;
-        this.pendingDelete = false;
-    },
+        collapsibleIds() {
+            return [...this.$root.querySelectorAll(`[${collapsibleAttribute}="1"]`)].map((el) =>
+                Number(el.getAttribute(collapsibleIdAttribute))
+            );
+        },
 
-    openDeleteConfirm() {
-        if (this.selectedCount === 0) {
-            return;
-        }
-        this.pendingDelete = false;
-        this.deleteConfirmOpen = true;
-    },
+        get selectedIds() {
+            return Object.keys(this.selected)
+                .filter((id) => this.selected[id])
+                .map((id) => Number(id));
+        },
 
-    cancelDelete() {
-        this.deleteConfirmOpen = false;
-        this.pendingDelete = false;
-    },
+        get selectedCount() {
+            return this.selectedIds.length;
+        },
 
-    confirmDelete() {
-        this.pendingDelete = true;
-        this.deleteConfirmOpen = false;
-        this.$nextTick(() => {
-            const form = this.$refs.bulkForm;
-            if (!form) {
+        get allPageSelected() {
+            const boxes = this.pageCheckboxes();
+            return boxes.length > 0 && boxes.every((id) => !!this.selected[id]);
+        },
+
+        pageCheckboxes() {
+            // Use $root: $el is the event target when called from child @change handlers.
+            return [...this.$root.querySelectorAll(`[${idAttribute}]`)].map((el) =>
+                Number(el.getAttribute(idAttribute))
+            );
+        },
+
+        setSelected(id, checked) {
+            this.selected = { ...this.selected, [id]: !!checked };
+        },
+
+        toggleAll(checked) {
+            const next = { ...this.selected };
+            this.pageCheckboxes().forEach((id) => {
+                next[id] = !!checked;
+            });
+            this.selected = next;
+        },
+
+        selectDuplicateNames(names) {
+            if (!nameAttribute) {
+                return;
+            }
+            const normalized = new Set(
+                (names || []).map((name) => String(name).trim().toLowerCase())
+            );
+            const next = {};
+            [...this.$root.querySelectorAll(`[${idAttribute}]`)].forEach((el) => {
+                const name = (el.getAttribute(nameAttribute) || '').trim().toLowerCase();
+                if (normalized.has(name)) {
+                    next[Number(el.getAttribute(idAttribute))] = true;
+                }
+            });
+            this.selected = next;
+            this.panelOpen = true;
+        },
+
+        clearSelection() {
+            this.selected = {};
+            this.panelOpen = false;
+            this.deleteConfirmOpen = false;
+            this.pendingDelete = false;
+            this.pendingMerge = false;
+        },
+
+        openDeleteConfirm() {
+            if (this.selectedCount === 0) {
+                return;
+            }
+            this.pendingDelete = false;
+            this.pendingMerge = false;
+            this.deleteConfirmOpen = true;
+        },
+
+        cancelDelete() {
+            this.deleteConfirmOpen = false;
+            this.pendingDelete = false;
+        },
+
+        confirmDelete() {
+            this.pendingDelete = true;
+            this.pendingMerge = false;
+            this.deleteConfirmOpen = false;
+            this.$nextTick(() => {
+                const form = this.$refs.bulkForm;
+                if (!form) {
+                    return;
+                }
+
+                let confirmInput = form.querySelector('input[name="confirm_delete"]');
+                if (!confirmInput) {
+                    confirmInput = document.createElement('input');
+                    confirmInput.type = 'hidden';
+                    confirmInput.name = 'confirm_delete';
+                    form.appendChild(confirmInput);
+                }
+                confirmInput.value = '1';
+
+                form.requestSubmit();
+            });
+        },
+
+        submitMerge() {
+            if (!this.enableMerge || this.selectedCount < 2) {
                 return;
             }
 
-            let confirmInput = form.querySelector('input[name="confirm_delete"]');
-            if (!confirmInput) {
-                confirmInput = document.createElement('input');
-                confirmInput.type = 'hidden';
-                confirmInput.name = 'confirm_delete';
-                form.appendChild(confirmInput);
+            this.pendingMerge = true;
+            this.pendingDelete = false;
+            this.$nextTick(() => {
+                this.$refs.bulkForm?.requestSubmit();
+            });
+        },
+
+        prepareSubmit(event) {
+            if (this.pendingDelete || this.pendingMerge) {
+                return true;
             }
-            confirmInput.value = '1';
 
-            form.requestSubmit();
-        });
-    },
+            if (this.selectedCount === 0) {
+                event.preventDefault();
+                return false;
+            }
 
-    prepareSubmit(event) {
-        if (this.pendingDelete) {
             return true;
-        }
+        },
+    };
+}
 
-        if (this.selectedCount === 0) {
-            event.preventDefault();
-            return false;
-        }
+const BULK_ASSET_FIELDS = {
+    update_status: false,
+    update_location: false,
+    clear_location: false,
+    update_parent: false,
+    clear_parent: false,
+    update_test_tag_expiry: false,
+    clear_test_tag_expiry: false,
+    update_warranty_expiry: false,
+    clear_warranty_expiry: false,
+    update_notes: false,
+    clear_notes: false,
+};
 
-        return true;
-    },
+const BULK_LOCATION_FIELDS = {
+    update_parent: false,
+    clear_parent: false,
+};
+
+Alpine.data('bulkSelection', createBulkSelection);
+
+/** Assets index / list show — flat page selection + asset field toggles. */
+Alpine.data('bulkAssets', (config = {}) => createBulkSelection({
+    idAttribute: 'data-bulk-asset-id',
+    fields: BULK_ASSET_FIELDS,
+    enableMerge: false,
+    enableTreeCollapse: false,
+    ...config,
 }));
 
-Alpine.data('bulkLocations', () => ({
-    selected: {},
-    panelOpen: false,
-    deleteConfirmOpen: false,
-    pendingDelete: false,
-    pendingMerge: false,
-    collapsed: {},
-    fields: {
-        update_parent: false,
-        clear_parent: false,
-    },
-
-    isOpen(id) {
-        return !this.collapsed[id];
-    },
-
-    toggle(id) {
-        this.collapsed = { ...this.collapsed, [id]: !this.collapsed[id] };
-    },
-
-    expandAll() {
-        this.collapsed = {};
-    },
-
-    collapseAll() {
-        const next = {};
-        this.collapsibleIds().forEach((id) => {
-            next[id] = true;
-        });
-        this.collapsed = next;
-    },
-
-    hideRacks() {
-        const next = { ...this.collapsed };
-        this.$root.querySelectorAll('[data-location-has-racks="1"]').forEach((el) => {
-            next[Number(el.getAttribute('data-location-id'))] = true;
-        });
-        this.collapsed = next;
-    },
-
-    collapsibleIds() {
-        return [...this.$root.querySelectorAll('[data-location-collapsible="1"]')].map((el) =>
-            Number(el.getAttribute('data-location-id'))
-        );
-    },
-
-    get selectedIds() {
-        return Object.keys(this.selected)
-            .filter((id) => this.selected[id])
-            .map((id) => Number(id));
-    },
-
-    get selectedCount() {
-        return this.selectedIds.length;
-    },
-
-    get allPageSelected() {
-        const boxes = this.pageCheckboxes();
-        return boxes.length > 0 && boxes.every((id) => !!this.selected[id]);
-    },
-
-    pageCheckboxes() {
-        // Use $root: $el is the event target when called from child @change handlers.
-        return [...this.$root.querySelectorAll('[data-bulk-location-id]')].map((el) =>
-            Number(el.getAttribute('data-bulk-location-id'))
-        );
-    },
-
-    setSelected(id, checked) {
-        this.selected = { ...this.selected, [id]: !!checked };
-    },
-
-    toggleAll(checked) {
-        const next = { ...this.selected };
-        this.pageCheckboxes().forEach((id) => {
-            next[id] = !!checked;
-        });
-        this.selected = next;
-    },
-
-    selectDuplicateNames(names) {
-        const normalized = new Set(
-            (names || []).map((name) => String(name).trim().toLowerCase())
-        );
-        const next = {};
-        [...this.$el.querySelectorAll('[data-bulk-location-id]')].forEach((el) => {
-            const name = (el.getAttribute('data-bulk-location-name') || '').trim().toLowerCase();
-            if (normalized.has(name)) {
-                next[Number(el.getAttribute('data-bulk-location-id'))] = true;
-            }
-        });
-        this.selected = next;
-        this.panelOpen = true;
-    },
-
-    clearSelection() {
-        this.selected = {};
-        this.panelOpen = false;
-        this.deleteConfirmOpen = false;
-        this.pendingDelete = false;
-        this.pendingMerge = false;
-    },
-
-    openDeleteConfirm() {
-        if (this.selectedCount === 0) {
-            return;
-        }
-        this.pendingDelete = false;
-        this.pendingMerge = false;
-        this.deleteConfirmOpen = true;
-    },
-
-    cancelDelete() {
-        this.deleteConfirmOpen = false;
-        this.pendingDelete = false;
-    },
-
-    confirmDelete() {
-        this.pendingDelete = true;
-        this.pendingMerge = false;
-        this.deleteConfirmOpen = false;
-        this.$nextTick(() => {
-            const form = this.$refs.bulkForm;
-            if (!form) {
-                return;
-            }
-
-            let confirmInput = form.querySelector('input[name="confirm_delete"]');
-            if (!confirmInput) {
-                confirmInput = document.createElement('input');
-                confirmInput.type = 'hidden';
-                confirmInput.name = 'confirm_delete';
-                form.appendChild(confirmInput);
-            }
-            confirmInput.value = '1';
-
-            form.requestSubmit();
-        });
-    },
-
-    submitMerge() {
-        if (this.selectedCount < 2) {
-            return;
-        }
-
-        this.pendingMerge = true;
-        this.pendingDelete = false;
-        this.$nextTick(() => {
-            this.$refs.bulkForm?.requestSubmit();
-        });
-    },
-
-    prepareSubmit(event) {
-        if (this.pendingDelete || this.pendingMerge) {
-            return true;
-        }
-
-        if (this.selectedCount === 0) {
-            event.preventDefault();
-            return false;
-        }
-
-        return true;
-    },
+/** Locations tree — selection + merge duplicates + collapse/hide racks. */
+Alpine.data('bulkLocations', (config = {}) => createBulkSelection({
+    idAttribute: 'data-bulk-location-id',
+    nameAttribute: 'data-bulk-location-name',
+    fields: BULK_LOCATION_FIELDS,
+    enableMerge: true,
+    enableTreeCollapse: true,
+    ...config,
 }));
 
 Alpine.data('manufacturerCatalogue', () => ({

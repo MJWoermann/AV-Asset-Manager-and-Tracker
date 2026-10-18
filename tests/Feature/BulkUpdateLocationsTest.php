@@ -65,7 +65,7 @@ class BulkUpdateLocationsTest extends TestCase
         $response->assertOk();
         $response->assertSee('duplicate name', false);
         $response->assertSee('Select duplicates', false);
-        $response->assertSee('bulkLocations(', false);
+        $response->assertSee('bulkSelection(', false);
         $response->assertSee('Delete', false);
     }
 

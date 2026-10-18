@@ -13,7 +13,22 @@
         </div>
     </x-slot>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkAssets()">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkSelection(@js([
+        'idAttribute' => 'data-bulk-asset-id',
+        'fields' => [
+            'update_status' => false,
+            'update_location' => false,
+            'clear_location' => false,
+            'update_parent' => false,
+            'clear_parent' => false,
+            'update_test_tag_expiry' => false,
+            'clear_test_tag_expiry' => false,
+            'update_warranty_expiry' => false,
+            'clear_warranty_expiry' => false,
+            'update_notes' => false,
+            'clear_notes' => false,
+        ],
+    ]))">
         @if (session('status'))
             <div class="mb-4 text-sm text-brand">{{ session('status') }}</div>
         @endif

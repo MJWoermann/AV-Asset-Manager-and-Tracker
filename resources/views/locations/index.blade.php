@@ -7,7 +7,16 @@
             @endrole
         </div>
     </x-slot>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkLocations()">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkSelection(@js([
+        'idAttribute' => 'data-bulk-location-id',
+        'nameAttribute' => 'data-bulk-location-name',
+        'enableMerge' => true,
+        'enableTreeCollapse' => true,
+        'fields' => [
+            'update_parent' => false,
+            'clear_parent' => false,
+        ],
+    ]))">
         @if (session('status'))
             <div class="mb-4 text-sm text-brand">{{ session('status') }}</div>
         @endif
