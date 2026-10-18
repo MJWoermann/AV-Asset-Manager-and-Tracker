@@ -8,6 +8,7 @@ Statuses:
 |--------|---------|
 | **Shipped (core)** | Always on for entitled roles |
 | **Preview** | Shipped; opt-in per user under Profile → Developer features |
+| **In progress** | Agreed direction; implementation and/or packaging underway |
 | **Planned** | Agreed direction; not implemented yet |
 | **Deferred** | Explicitly out of scope until requested |
 
@@ -40,37 +41,31 @@ Always-on areas (catalogue, scan, compare, files/manuals, maintenance logs, repa
 
 ---
 
-## Planned
+## In progress
 
 ### Copilot Studio / M365 Copilot MCP
 
 | Field | Detail |
 |-------|--------|
-| **Status** | Planned |
+| **Status** | Done (pending merge) |
 | **Why** | Let staff query and operate inventory from **Microsoft Copilot Studio** / M365 Copilot without the Blade UI |
 | **Audience** | Inventory managers, scanners, admins already in Entra (same Spatie roles as the REST API; not `external_repairer`) |
 
-**Direction**
+**Shipped in this work**
 
-- First-party **Model Context Protocol** server on the app: Streamable HTTP endpoint (e.g. `/mcp/av-assets`).
-- **Per-user OAuth** via Laravel Passport so Copilot Studio can use **OAuth 2.0 → Dynamic discovery** (PKCE + DCR). Authorize UI reuses web login (including existing Entra SSO).
-- Optional Sanctum Bearer / API-key path for service accounts and local debugging.
-- **Coarse tools** over existing services (not a 1:1 REST mirror): lookup, stocktake session/scan/compare, unknown-scan link, asset create/update, repairs, spares, checkout/return.
-- Add Sanctum **checkout / return** API parity (today web-only) so MCP and other integrators share one path.
-- Compact tool responses; same department scoping, role gates, throttles, and immutable audit history as the rest of the app.
+- Streamable HTTP MCP at `/mcp/av-assets` (`laravel/mcp` + Passport OAuth Dynamic discovery / DCR).
+- Coarse tools (lookup, stocktake, compare, unknown scans, assets, checkout/return via service, repairs, spares) plus Sanctum checkout/return REST API.
+- Setup guide and OpenAPI Power Apps fallback.
 
-**Out of scope for the first MCP release**
+**Out of scope for this release**
 
 - Offline sync, guest QR stock, print wizards, RU visualiser, SSO/storage/email *settings*, preferences UI, admin user CRUD via Copilot.
 - Overloading Socialite `AZURE_*` or Graph `MICROSOFT_GRAPH_*` as the MCP authorization server (Passport on the app is the AS; Entra stays the user IdP via login).
 
-**Dependencies (when implemented)**
-
-- Promote `laravel/mcp` into production `require`; add `laravel/passport`.
-- Setup guide for Copilot Studio connection + optional OpenAPI YAML for the Power Apps connector path (`mcp-streamable-1.0`).
-
 **Related**
 
+- Setup / Copilot Studio packaging: [mcp-copilot-studio.md](mcp-copilot-studio.md)
+- OpenAPI (Power Apps custom-connector fallback): [mcp-av-assets.openapi.yaml](mcp-av-assets.openapi.yaml)
 - REST surface today: [api.md](api.md)
 - Operator overview: [features-and-usage.md](features-and-usage.md)
 
@@ -97,5 +92,5 @@ For orientation only—not a backlog. Full workflows: [features-and-usage.md](fe
 ## How to use this document
 
 - Prefer **outcome** wording (what / why / status) over implementation tickets.
-- When a Planned item ships, move it to Core or Preview and link any setup guide.
+- When an In progress or Planned item ships, move it to Core or Preview and link any setup guide.
 - Do not invent new learning/ML systems or offline sync here without an explicit product request (see project hard rules in `CLAUDE.md` / `AGENTS.md`).
