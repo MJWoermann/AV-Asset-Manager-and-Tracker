@@ -107,6 +107,7 @@ Allow-list is defined in `app/Support/ApiTokenAbilities.php`. Profile → API to
 | `audit:read` | `GET /api/assets/{asset}/history` (read-only) |
 | `admin:read` / `admin:write` | Users and departments |
 | `connections:*`, `stock:*`, `labels:*`, `rigging:*` | Feature-flagged modules (same flags as web) |
+| `checkouts:read` / `checkouts:write` | Asset checkout and return (hire / repair / other) |
 | `email:ops` | Inbound email apply/reject when `email_integration` is on |
 | `*` | Full access (default when abilities omitted on token issue) |
 
@@ -126,7 +127,7 @@ Authenticated routes require `admin`, `inventory_manager`, or `scanner`. See `ro
 | Area | Examples |
 |------|----------|
 | Auth | `POST /api/auth/token`, `DELETE /api/auth/token`, `GET /api/user` |
-| Assets | `GET/POST/PUT/DELETE /api/assets`, `POST /api/assets/bulk-update`, `GET /api/assets/{id}/history`, maintenance log sub-routes |
+| Assets | `GET/POST/PUT/DELETE /api/assets`, `POST /api/assets/bulk-update`, `GET /api/assets/{id}/history`, maintenance log sub-routes, `POST /api/assets/{id}/checkouts`, `POST /api/assets/{id}/checkouts/{checkout}/return` |
 | Lists & scan | `GET/POST/PUT/DELETE /api/lists`, `POST /api/lists/compare`, `POST /api/scan`, `POST /api/scan-sessions`, session patch/close |
 | Locations | `GET/POST/PUT/DELETE /api/locations`, `POST /api/locations/bulk-update` |
 | Catalogue | `/api/manufacturers`, nested models, `/api/item-types`, `/api/custom-field-sets` |
@@ -175,12 +176,76 @@ Ability: `reports:write`. Roles: `admin`, `inventory_manager`, or `scanner`.
 
 Returns **200** with `unknown_scan` summary (resolved). Already-resolved scans are rejected.
 
-Asset **checkout / return** is web-only (`POST /assets/{asset}/checkouts` …) — not exposed on this API.
+### Check out an asset
+
+```http
+POST /api/assets/{asset}/checkouts
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+Ability: `checkouts:write`. Roles: `admin`, `inventory_manager`, or `scanner` (same as web).
+
+```json
+{
+  "purpose": "hire",
+  "checked_out_to_user_id": 12,
+  "checked_out_to_name": null,
+  "checked_out_to_email": null,
+  "checked_out_to_company": null,
+  "location_id": null,
+  "expected_return_at": "2026-10-20T17:00:00Z",
+  "notes": "Weekend hire",
+  "repair_id": null,
+  "create_repair": false,
+  "repair_summary": null,
+  "repair_notes": null
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `purpose` | yes | `hire`, `repair`, or `other` |
+| `checked_out_to_user_id` | conditional | Existing user id; provide this **or** a guest `checked_out_to_name` |
+| `checked_out_to_name` | conditional | Guest assignee name when no user id |
+| `checked_out_to_email` | no | Guest email (must be valid when present) |
+| `checked_out_to_company` | no | Guest company |
+| `location_id` | no | Defaults to the asset’s current location |
+| `expected_return_at` | no | ISO datetime |
+| `notes` | no | Free text |
+| `repair_id` | conditional | Required for `repair` purpose unless `create_repair` is true; must belong to the asset |
+| `create_repair` | no | When true with `purpose=repair`, starts a new repair |
+| `repair_summary` / `repair_notes` | no | Used when creating a repair with checkout |
+
+Returns **201** with the checkout (includes `id`, `purpose`, assignee fields, optional `repair_id`). Asset status becomes `on_event` (hire/other) or `maintenance` (repair). An open checkout already on the asset is rejected (**422**).
+
+### Return a checkout
+
+```http
+POST /api/assets/{asset}/checkouts/{checkout}/return
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+Ability: `checkouts:write`. Roles: `admin`, `inventory_manager`, or `scanner`.
+
+```json
+{
+  "notes": "Back in rack"
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `notes` | no | Optional return notes (replaces checkout notes when provided) |
+
+Returns **200** with the returned checkout (`returned_at` set). Restores the asset status from `asset_status_before` when applicable. Return is blocked (**422**) while a linked repair is still open — complete the repair first (completing a repair auto-returns the linked checkout). `{checkout}` must belong to `{asset}` (**404** otherwise).
+
+`checkouts:read` is reserved for future list/show endpoints; mutating routes require `checkouts:write`.
 
 ## Web-only features (not on this API)
 
 - Password change, SSO/storage/email **settings** (including digest toggles), export column admin, UI preferences (columns, dashboard modules).
-- Asset checkout and return (hire / repair / other).
 - Guest stock QR (`/stock/t/{token}`) and print HTML wizards.
 - Audit log **mutation** (history is read-only via API).
 - Profile API token UI is web-only, but tokens work on all `/api/*` routes above.
