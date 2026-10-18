@@ -12,6 +12,7 @@
                     $row->fmi_ast ?? null,
                     $row->rig_tag ?? null,
                     $row->serial_number ?? null,
+                    $row->mac_address ?? null,
                 ]))),
             ])->values()->all();
         };
@@ -70,7 +71,7 @@
                     <x-scannable-search
                         id="comparison-filter-q"
                         :submit-on-scan="false"
-                        placeholder="Filter results by name, barcode, FMI, SN…"
+                        placeholder="Filter results by name, barcode, FMI, SN, MAC…"
                         class="w-full sm:max-w-md"
                         scan-aria-label="Scan barcode into comparison filter"
                         x-model="query"

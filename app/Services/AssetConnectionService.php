@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\ConnectionBus;
 use App\Models\ConnectionType;
 use App\Support\AssetExportColumns;
+use App\Support\ScannableIdentifierFields;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -668,8 +669,8 @@ class AssetConnectionService
                 $like = '%'.$search.'%';
                 $q->where('name', 'like', $like)
                     ->orWhere('fmi_ast', 'like', $like)
-                    ->orWhere('tp_barcode', 'like', $like)
                     ->orWhere('rig_tag', 'like', $like);
+                ScannableIdentifierFields::orWherePartialMatch($q, $search);
             });
         }
     }

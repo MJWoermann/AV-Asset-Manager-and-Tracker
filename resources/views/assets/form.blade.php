@@ -265,58 +265,36 @@
                     'mac_address' => 'MAC Address',
                 ] as $field => $label)
                     @php
-                        $fieldIsScannable = in_array($field, ['serial_number', 'tp_barcode', 'mac_address'], true);
+                        $fieldIsScannable = \App\Support\ScannableIdentifierFields::isScannable($field);
                     @endphp
-                    <div
-                        @if($fieldIsScannable)
-                            x-data="fieldBarcodeScanner('{{ $field }}')"
-                            class="space-y-2"
+                    @if($fieldIsScannable)
+                        @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
+                            <x-scannable-text-input
+                                :id="$field"
+                                :name="$field"
+                                :label="$label"
+                                :value="old($field, $asset->{$field})"
+                                x-model="macAddress"
+                            />
+                        @else
+                            <x-scannable-text-input
+                                :id="$field"
+                                :name="$field"
+                                :label="$label"
+                                :value="old($field, $asset->{$field})"
+                            />
                         @endif
-                    >
-                        <x-input-label :for="$field" :value="$label" />
-                        <div @class(['relative mt-1' => $fieldIsScannable])>
-                            {{-- Keep @if outside the component tag so Blade compiles it to <input> --}}
-                            @if($field === 'mac_address' && $emailIntegrationEnabled && ! $asset->exists)
-                                <x-text-input
-                                    :id="$field"
-                                    :name="$field"
-                                    @class(['block w-full', 'mt-1' => ! $fieldIsScannable, 'pe-16' => $fieldIsScannable])
-                                    :value="old($field, $asset->{$field})"
-                                    x-model="macAddress"
-                                />
-                            @else
-                                <x-text-input
-                                    :id="$field"
-                                    :name="$field"
-                                    @class(['block w-full', 'mt-1' => ! $fieldIsScannable, 'pe-16' => $fieldIsScannable])
-                                    :value="old($field, $asset->{$field})"
-                                />
-                            @endif
-                            @if($fieldIsScannable)
-                                <button
-                                    type="button"
-                                    class="absolute inset-y-0 end-0 my-px me-px flex items-center rounded-e-md px-2.5 text-xs font-medium text-brand-charcoal hover:text-brand dark:text-brand-silver dark:hover:text-brand"
-                                    @click="toggleCamera"
-                                    :aria-pressed="scanning.toString()"
-                                    :aria-label="scanning ? 'Stop camera' : 'Scan barcode into {{ $label }}'"
-                                >
-                                    <span x-text="scanning ? 'Stop' : 'Scan'"></span>
-                                </button>
-                            @endif
+                    @else
+                        <div>
+                            <x-input-label :for="$field" :value="$label" />
+                            <x-text-input
+                                :id="$field"
+                                :name="$field"
+                                class="mt-1 block w-full"
+                                :value="old($field, $asset->{$field})"
+                            />
                         </div>
-                        @if($fieldIsScannable)
-                            <div
-                                id="field-qr-{{ $field }}"
-                                class="scan-qr-reader w-full max-h-[28vh] overflow-hidden border border-brand-silver dark:border-brand-charcoal"
-                                x-show="scanning"
-                                x-cloak
-                            ></div>
-                            <p class="text-xs text-brand-charcoal dark:text-brand-silver" x-show="scanning" x-cloak>
-                                Point the camera at a barcode. This field fills automatically, then the camera stops.
-                            </p>
-                            <p class="text-sm text-red-600" x-show="error" x-text="error" x-cloak></p>
-                        @endif
-                    </div>
+                    @endif
                 @endforeach
                 <div>
                     <x-input-label for="purchase_date" value="Purchase date" />
@@ -435,6 +413,7 @@
                 @php
                     $values = $asset->customFieldValues->keyBy('custom_field_definition_id');
                     $asset->loadMissing('itemType.fieldSets.definitions');
+                    $macFieldCatalog = app(\App\Services\NotificationFieldCatalog::class);
                 @endphp
                 @foreach($asset->itemType->fieldSets as $set)
                     <fieldset class="border border-brand-silver dark:border-brand-charcoal p-3">
@@ -451,16 +430,31 @@
                                 @elseif($def->type === 'spacer')
                                     <div class="min-h-[2.5rem]" aria-hidden="true"></div>
                                 @else
-                                    <div>
-                                        <x-input-label :for="'cf_'.$def->id" :value="$def->name" />
-                                        @if($def->type === 'checkbox')
-                                            <input type="checkbox" id="cf_{{ $def->id }}" name="custom_fields[{{ $def->id }}]" value="1" class="rounded border-gray-300 text-brand"
-                                                @checked(old('custom_fields.'.$def->id, $values[$def->id]->value ?? null) == '1')>
-                                        @else
-                                            <x-text-input id="cf_{{ $def->id }}" name="custom_fields[{{ $def->id }}]" class="mt-1 block w-full"
-                                                :value="old('custom_fields.'.$def->id, $values[$def->id]->value ?? '')" />
-                                        @endif
-                                    </div>
+                                    @php
+                                        $cfId = 'cf_'.$def->id;
+                                        $cfIsMac = $def->type !== 'checkbox'
+                                            && $macFieldCatalog->looksLikeMac('custom.'.$def->slug, $def->name);
+                                    @endphp
+                                    @if($cfIsMac)
+                                        <x-scannable-text-input
+                                            :id="$cfId"
+                                            :name="'custom_fields['.$def->id.']'"
+                                            :label="$def->name"
+                                            :value="old('custom_fields.'.$def->id, $values[$def->id]->value ?? '')"
+                                            :scan-aria-label="'Scan barcode into '.$def->name"
+                                        />
+                                    @else
+                                        <div>
+                                            <x-input-label :for="$cfId" :value="$def->name" />
+                                            @if($def->type === 'checkbox')
+                                                <input type="checkbox" id="{{ $cfId }}" name="custom_fields[{{ $def->id }}]" value="1" class="rounded border-gray-300 text-brand"
+                                                    @checked(old('custom_fields.'.$def->id, $values[$def->id]->value ?? null) == '1')>
+                                            @else
+                                                <x-text-input id="{{ $cfId }}" name="custom_fields[{{ $def->id }}]" class="mt-1 block w-full"
+                                                    :value="old('custom_fields.'.$def->id, $values[$def->id]->value ?? '')" />
+                                            @endif
+                                        </div>
+                                    @endif
                                 @endif
                             @endforeach
                         </div>
@@ -476,12 +470,12 @@
                                 x-show="(@js($macField['item_type_ids'])).map(String).includes(String(itemTypeId))"
                                 x-cloak
                             >
-                                <x-input-label :for="'cf_'.$macField['id']" :value="$macField['name']" />
-                                <x-text-input
+                                <x-scannable-text-input
                                     :id="'cf_'.$macField['id']"
                                     :name="'custom_fields['.$macField['id'].']'"
-                                    class="mt-1 block w-full"
+                                    :label="$macField['name']"
                                     :value="old('custom_fields.'.$macField['id'], '')"
+                                    :scan-aria-label="'Scan barcode into '.$macField['name']"
                                     x-model="customMacValues['{{ $macField['id'] }}']"
                                 />
                             </div>

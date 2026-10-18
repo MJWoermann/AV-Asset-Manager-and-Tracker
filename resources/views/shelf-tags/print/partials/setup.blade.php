@@ -4,6 +4,8 @@
         'name' => $asset->name,
         'tp_barcode' => $asset->tp_barcode,
         'fmi_ast' => $asset->fmi_ast,
+        'serial_number' => $asset->serial_number,
+        'mac_address' => $asset->mac_address,
         'status' => $asset->status instanceof \BackedEnum ? $asset->status->value : (string) $asset->status,
         'item_type' => $asset->itemType?->name,
     ])->values()->all();
@@ -133,14 +135,15 @@
                 </p>
             @endif
 
-            <div>
-                <input
-                    type="search"
-                    x-model="filter"
+            <div @field-barcode-scanned="if ($event.detail.field === 'shelf-tag-visible-filter') filter = $event.detail.value">
+                <x-scannable-search
+                    id="shelf-tag-visible-filter"
+                    :submit-on-scan="false"
                     placeholder="Filter visible rows…"
-                    class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                    scan-aria-label="Scan barcode into visible row filter"
                     aria-label="Filter visible assets"
-                >
+                    x-model="filter"
+                />
             </div>
 
             <p class="text-sm">

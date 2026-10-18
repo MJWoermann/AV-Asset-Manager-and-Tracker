@@ -151,38 +151,34 @@
                     >
                     @break
 
-                @case('tp_barcode')
-                @case('serial_number')
-                @case('mac_address')
-                    @php
-                        $param = AssetBrowseFilters::columnParams()[$column] ?? $column;
-                        $columnLabel = \App\Support\AssetTableColumns::label($column);
-                    @endphp
-                    <x-scannable-search
-                        :id="'filter-'.$param"
-                        :name="$param"
-                        form="{{ $formId }}"
-                        :value="request($param)"
-                        placeholder="Filter…"
-                        input-class="text-xs min-w-[7rem]"
-                        :aria-label="'Filter by '.$columnLabel"
-                        :scan-aria-label="'Scan barcode into '.$columnLabel.' filter'"
-                    />
-                    @break
-
                 @default
                     @php
                         $param = AssetBrowseFilters::columnParams()[$column] ?? $column;
+                        $columnLabel = \App\Support\AssetTableColumns::label($column);
+                        $columnIsScannable = \App\Support\ScannableIdentifierFields::isScannable($column);
                     @endphp
-                    <input
-                        type="search"
-                        name="{{ $param }}"
-                        form="{{ $formId }}"
-                        value="{{ request($param) }}"
-                        placeholder="Filter…"
-                        class="{{ $inputClass }}"
-                        aria-label="Filter by {{ \App\Support\AssetTableColumns::label($column) }}"
-                    >
+                    @if($columnIsScannable)
+                        <x-scannable-search
+                            :id="'filter-'.$param"
+                            :name="$param"
+                            form="{{ $formId }}"
+                            :value="request($param)"
+                            placeholder="Filter…"
+                            input-class="text-xs min-w-[7rem]"
+                            :aria-label="'Filter by '.$columnLabel"
+                            :scan-aria-label="'Scan barcode into '.$columnLabel.' filter'"
+                        />
+                    @else
+                        <input
+                            type="search"
+                            name="{{ $param }}"
+                            form="{{ $formId }}"
+                            value="{{ request($param) }}"
+                            placeholder="Filter…"
+                            class="{{ $inputClass }}"
+                            aria-label="Filter by {{ $columnLabel }}"
+                        >
+                    @endif
             @endswitch
         </th>
     @endforeach

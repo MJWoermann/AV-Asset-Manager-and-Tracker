@@ -70,12 +70,13 @@ class AssetFormTest extends TestCase
         $response = $this->actingAs($user)->get(route('assets.create'));
 
         $response->assertOk();
-        $response->assertSee("fieldBarcodeScanner('serial_number')", false);
-        $response->assertSee("fieldBarcodeScanner('tp_barcode')", false);
-        $response->assertSee("fieldBarcodeScanner('mac_address')", false);
+        $response->assertSee("fieldBarcodeScanner('serial_number'", false);
+        $response->assertSee("fieldBarcodeScanner('tp_barcode'", false);
+        $response->assertSee("fieldBarcodeScanner('mac_address'", false);
         $response->assertSee('id="field-qr-serial_number"', false);
         $response->assertSee('id="field-qr-tp_barcode"', false);
         $response->assertSee('id="field-qr-mac_address"', false);
-        $response->assertDontSee("fieldBarcodeScanner('fmi_ast')", false);
+        $response->assertDontSee("fieldBarcodeScanner('fmi_ast'", false);
+        $response->assertDontSee("fieldBarcodeScanner('rig_tag'", false);
     }
 }
