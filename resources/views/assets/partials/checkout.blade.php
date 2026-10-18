@@ -84,7 +84,7 @@
 
             <div x-show="mode === 'user'" x-cloak>
                 <x-input-label for="checked_out_to_user_id" value="Checked out to (user)" />
-                <select id="checked_out_to_user_id" name="checked_out_to_user_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" :disabled="mode !== 'user'">
+                <select id="checked_out_to_user_id" name="checked_out_to_user_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" x-bind:disabled="mode !== 'user'">
                     <option value="">Select user…</option>
                     @foreach($checkoutAssigneeOptions as $option)
                         <option value="{{ $option->id }}" @selected((string) old('checked_out_to_user_id') === (string) $option->id)>
@@ -98,17 +98,17 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" x-show="mode === 'guest'" x-cloak>
                 <div>
                     <x-input-label for="checked_out_to_name" value="Guest name" />
-                    <x-text-input id="checked_out_to_name" name="checked_out_to_name" class="mt-1 block w-full" :value="old('checked_out_to_name')" :disabled="mode !== 'guest'" />
+                    <x-text-input id="checked_out_to_name" name="checked_out_to_name" class="mt-1 block w-full" :value="old('checked_out_to_name')" x-bind:disabled="mode !== 'guest'" />
                     <x-input-error :messages="$errors->get('checked_out_to_name')" class="mt-1" />
                 </div>
                 <div>
                     <x-input-label for="checked_out_to_email" value="Guest email" />
-                    <x-text-input id="checked_out_to_email" name="checked_out_to_email" type="email" class="mt-1 block w-full" :value="old('checked_out_to_email')" :disabled="mode !== 'guest'" />
+                    <x-text-input id="checked_out_to_email" name="checked_out_to_email" type="email" class="mt-1 block w-full" :value="old('checked_out_to_email')" x-bind:disabled="mode !== 'guest'" />
                     <x-input-error :messages="$errors->get('checked_out_to_email')" class="mt-1" />
                 </div>
                 <div>
                     <x-input-label for="checked_out_to_company" value="Company" />
-                    <x-text-input id="checked_out_to_company" name="checked_out_to_company" class="mt-1 block w-full" :value="old('checked_out_to_company')" :disabled="mode !== 'guest'" />
+                    <x-text-input id="checked_out_to_company" name="checked_out_to_company" class="mt-1 block w-full" :value="old('checked_out_to_company')" x-bind:disabled="mode !== 'guest'" />
                 </div>
             </div>
 
