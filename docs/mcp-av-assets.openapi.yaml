@@ -1,0 +1,51 @@
+# OpenAPI (Swagger 2.0) for Power Apps / Copilot Studio custom-connector fallback.
+# Import via Power Apps → Custom connectors → Import OpenAPI file.
+# Edit `host` to your APP_URL hostname (no scheme). Path must remain /mcp/av-assets.
+#
+# Primary auth in Copilot Studio: OAuth 2.0 Dynamic discovery against app Passport.
+# This file marks the Streamable MCP operation; configure connector security in Power Apps
+# to match your environment (OAuth PKCE/DCR or API key / Bearer for service accounts).
+#
+# See docs/mcp-copilot-studio.md
+
+swagger: '2.0'
+info:
+  title: AV Asset Manager MCP
+  description: >
+    Model Context Protocol (Streamable HTTP) server for AV Asset Manager —
+    stocktake, barcode lookup, repairs, spares, and checkout tools for
+    Microsoft Copilot Studio / M365 Copilot.
+  version: 1.0.0
+host: assets.example.com
+basePath: /
+schemes:
+  - https
+paths:
+  /mcp/av-assets:
+    post:
+      summary: AV Asset Manager MCP (Streamable HTTP)
+      description: >
+        JSON-RPC MCP endpoint. Copilot Studio negotiates tools over Streamable HTTP.
+        Replace host with your production APP_URL hostname before importing.
+      x-ms-agentic-protocol: mcp-streamable-1.0
+      operationId: InvokeAvAssetsMcp
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: body
+          in: body
+          required: false
+          schema:
+            type: object
+            description: MCP JSON-RPC request body (e.g. tools/list, tools/call)
+      responses:
+        '200':
+          description: Success
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden (role or scope)
+        '429':
+          description: Rate limited
