@@ -70,8 +70,11 @@ class TableSearchParityTest extends TestCase
         $response = $this->actingAs($user)->get(route('assets.index'));
 
         $response->assertOk();
-        foreach (['fmi_ast', 'tp_barcode', 'rig_tag', 'serial_number', 'ip_address', 'mac_address'] as $column) {
+        foreach (\App\Support\ScannableIdentifierFields::fields() as $column) {
             $response->assertSee("fieldBarcodeScanner('filter-{$column}'", false);
+        }
+        foreach (\App\Support\ScannableIdentifierFields::TYPED_ONLY as $column) {
+            $response->assertDontSee("fieldBarcodeScanner('filter-{$column}'", false);
         }
     }
 
