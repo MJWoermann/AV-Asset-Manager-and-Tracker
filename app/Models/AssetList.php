@@ -22,6 +22,17 @@ class AssetList extends Model
         'created_by',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (AssetList $list): void {
+            // event_list_id uses nullOnDelete so sessions can exist without a list;
+            // deleting an event list must still remove sessions that targeted it.
+            if ($list->isEvent()) {
+                ScanSession::query()->where('event_list_id', $list->id)->delete();
+            }
+        });
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(AssetListItem::class);

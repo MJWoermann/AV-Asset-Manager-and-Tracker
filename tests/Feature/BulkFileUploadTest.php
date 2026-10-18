@@ -82,9 +82,10 @@ class BulkFileUploadTest extends TestCase
     public function test_manager_can_bulk_upload_to_library(): void
     {
         $user = $this->manager();
+        // create() only reports size — empty bodies share one content_hash and dedupe.
         $files = [
-            UploadedFile::fake()->create('manual.pdf', 40, 'application/pdf'),
-            UploadedFile::fake()->create('invoice.pdf', 30, 'application/pdf'),
+            UploadedFile::fake()->createWithContent('manual.pdf', "%PDF-1.4\nmanual-".str_repeat('A', 64)),
+            UploadedFile::fake()->createWithContent('invoice.pdf', "%PDF-1.4\ninvoice-".str_repeat('B', 64)),
         ];
 
         $response = $this->actingAs($user)->post(route('files.bulk-upload'), [
@@ -118,8 +119,8 @@ class BulkFileUploadTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('files.bulk-upload'), [
             'files' => [
-                UploadedFile::fake()->create('quote-1.pdf', 25, 'application/pdf'),
-                UploadedFile::fake()->create('quote-2.pdf', 25, 'application/pdf'),
+                UploadedFile::fake()->createWithContent('quote-1.pdf', "%PDF-1.4\nquote-1-".str_repeat('C', 64)),
+                UploadedFile::fake()->createWithContent('quote-2.pdf', "%PDF-1.4\nquote-2-".str_repeat('D', 64)),
             ],
             'titles' => ['Quote 1', 'Quote 2'],
             'categories' => [FileCategory::Quote->value, FileCategory::Quote->value],
