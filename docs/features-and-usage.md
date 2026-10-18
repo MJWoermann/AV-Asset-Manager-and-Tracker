@@ -416,7 +416,7 @@ That path covers the core value: catalogue → scan → compare → keep records
 
 ## What is not included yet
 
-Short list for operators. Full product status (preview / developer features, deferred work, and planned items such as Copilot Studio MCP) is on the [product roadmap](roadmap.md).
+Short list for operators. Full product status (preview / developer features, deferred work, and in-progress items such as Copilot Studio MCP) is on the [product roadmap](roadmap.md). Copilot Studio packaging: [mcp-copilot-studio.md](mcp-copilot-studio.md).
 
 - **Offline scanning** with later sync when the network returns  
 - Automatic **user provisioning** / JIT account creation purely from SSO (an admin must create the account first)
