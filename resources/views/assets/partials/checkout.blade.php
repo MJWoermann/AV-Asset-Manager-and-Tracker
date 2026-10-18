@@ -7,9 +7,9 @@
 @endphp
 
 <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 space-y-4" x-data="{
-    purpose: '{{ old('purpose', 'hire') }}',
-    mode: '{{ old('checked_out_to_user_id') ? 'user' : 'guest' }}',
-    createRepair: {{ old('create_repair') ? 'true' : 'false' }}
+    purpose: @js(old('purpose', 'hire')),
+    mode: @js(old('checked_out_to_user_id') ? 'user' : 'guest'),
+    createRepair: @js((bool) old('create_repair'))
 }">
     <div class="flex items-center justify-between gap-2">
         <h3 class="font-semibold">Checkout</h3>
