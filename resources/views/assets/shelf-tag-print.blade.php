@@ -24,18 +24,17 @@
             @else
                 <form method="GET" action="{{ route('assets.label', $asset) }}">
                     <x-input-label for="layout" value="Layout" />
-                    <select
-                        id="layout"
+                    <x-searchable-select
                         name="layout"
-                        class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                        onchange="this.form.submit()"
-                    >
-                        @foreach($layouts as $option)
-                            <option value="{{ $option->id }}" @selected($layout && $layout->id == $option->id)>
-                                {{ $option->name }} ({{ $option->width_mm }}×{{ $option->height_mm }} mm)
-                            </option>
-                        @endforeach
-                    </select>
+                        id="layout"
+                        :options="$layouts->map(fn ($option) => [
+                            'value' => $option->id,
+                            'label' => $option->name.' ('.$option->width_mm.'×'.$option->height_mm.' mm)',
+                        ])->values()"
+                        :selected="$layout?->id"
+                        auto-submit
+                        aria-label="Select label layout"
+                    />
                 </form>
             @endif
         </div>

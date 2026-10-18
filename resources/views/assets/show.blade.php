@@ -152,35 +152,43 @@
                 <input type="hidden" name="tab" value="history">
                 <div>
                     <x-input-label for="date_from" value="From" />
-                    <x-text-input id="date_from" name="date_from" type="date" class="mt-1 block w-full" :value="request('date_from')" />
+                    <x-text-input id="date_from" name="date_from" type="date" class="mt-1 block w-full" :value="request('date_from')" onchange="this.form.requestSubmit()" />
                 </div>
                 <div>
                     <x-input-label for="date_to" value="To" />
-                    <x-text-input id="date_to" name="date_to" type="date" class="mt-1 block w-full" :value="request('date_to')" />
+                    <x-text-input id="date_to" name="date_to" type="date" class="mt-1 block w-full" :value="request('date_to')" onchange="this.form.requestSubmit()" />
                 </div>
                 <div class="min-w-[10rem]">
                     <x-input-label for="history_action" value="Action" />
-                    <select id="history_action" name="action" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">All</option>
-                        @foreach($historyActionOptions as $value => $label)
-                            <option value="{{ $value }}" @selected(request('action') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        name="action"
+                        id="history_action"
+                        :options="collect($historyActionOptions)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                        :selected="request('action')"
+                        placeholder="All"
+                        nullable
+                        auto-submit
+                        aria-label="Filter by action"
+                    />
                 </div>
                 <div class="min-w-[10rem]">
                     <x-input-label for="history_user_id" value="User" />
-                    <select id="history_user_id" name="user_id" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">All</option>
-                        @foreach($historyUserOptions as $option)
-                            <option value="{{ $option['value'] }}" @selected((string) request('user_id') === (string) $option['value'])>{{ $option['label'] }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        name="user_id"
+                        id="history_user_id"
+                        :options="$historyUserOptions"
+                        :selected="request('user_id')"
+                        placeholder="All"
+                        nullable
+                        auto-submit
+                        aria-label="Filter by user"
+                    />
                 </div>
                 <div class="flex items-end gap-2 flex-wrap">
-                    <x-primary-button>Filter</x-primary-button>
-                    @if($historyFiltersActive)
-                        <a href="{{ route('assets.show', [$asset, 'tab' => 'history']) }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Clear</a>
-                    @endif
+                    <x-clear-filters
+                        :href="route('assets.show', [$asset, 'tab' => 'history'])"
+                        :active="$historyFiltersActive"
+                    />
                 </div>
             </form>
 

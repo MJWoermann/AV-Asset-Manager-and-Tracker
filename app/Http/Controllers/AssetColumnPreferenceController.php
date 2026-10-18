@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\AssetBrowseFilters;
 use App\Support\AssetTableColumns;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,11 +17,15 @@ class AssetColumnPreferenceController extends Controller
         ]);
 
         $user = $request->user();
+        $columns = AssetTableColumns::resolve($data['columns']);
         $preferences = $user->preferences ?? [];
-        $preferences[AssetTableColumns::PREFERENCE_KEY] = AssetTableColumns::resolve($data['columns']);
+        $preferences[AssetTableColumns::PREFERENCE_KEY] = $columns;
         $user->preferences = $preferences;
         $user->save();
 
-        return back()->with('status', 'Column preferences saved.');
+        $previous = url()->previous();
+        $target = AssetBrowseFilters::urlWithoutHiddenColumnFilters($previous, $columns);
+
+        return redirect()->to($target)->with('status', 'Column preferences saved.');
     }
 }

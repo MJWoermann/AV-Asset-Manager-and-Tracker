@@ -134,6 +134,9 @@ class AssetHistoryTest extends TestCase
         $response->assertSee('TP-A');
         $response->assertSee('TP-B');
         $response->assertDontSee('Asset created');
+        $response->assertSee('searchableSelect(', false);
+        $response->assertSee('autoSubmit: true', false);
+        $response->assertSee('Clear all filters', false);
     }
 
     public function test_history_tab_filters_by_user(): void

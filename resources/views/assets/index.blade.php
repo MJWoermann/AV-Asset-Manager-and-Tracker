@@ -36,13 +36,11 @@
                 aria-label="Search assets"
                 scan-aria-label="Scan barcode into asset search"
             />
-            @foreach($preservedFilters as $param => $value)
-                <input type="hidden" name="{{ $param }}" value="{{ $value }}">
-            @endforeach
-            <button class="px-4 py-2 bg-black text-white dark:bg-brand shrink-0">Filter</button>
-            @if(\App\Support\AssetBrowseFilters::hasActiveFilters(request()))
-                <a href="{{ route('assets.index') }}" class="px-4 py-2 border text-sm inline-flex items-center shrink-0">Clear</a>
-            @endif
+            <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand shrink-0">Search</button>
+            <x-clear-filters
+                :href="route('assets.index')"
+                :active="\App\Support\AssetBrowseFilters::hasActiveFilters(request(), $selectedColumns)"
+            />
         </form>
 
         <x-bulk-asset-actions

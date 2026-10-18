@@ -12,6 +12,29 @@
     use App\Support\AssetBrowseFilters;
 
     $inputClass = 'w-full min-w-[6rem] rounded border-brand-charcoal/30 text-xs dark:bg-black dark:border-brand-charcoal dark:text-white';
+
+    $statusOptions = collect($statuses)
+        ->map(fn ($label, $value) => ['value' => (string) $value, 'label' => (string) $label])
+        ->values();
+
+    $locationOptions = collect($locations)
+        ->map(fn ($location) => ['value' => (string) $location->id, 'label' => $location->breadcrumb()])
+        ->values();
+
+    $itemTypeOptions = collect($itemTypes)
+        ->map(fn ($itemType) => ['value' => (string) $itemType->id, 'label' => $itemType->name])
+        ->values();
+
+    $manufacturerOptions = collect($manufacturers)
+        ->map(fn ($manufacturer) => ['value' => (string) $manufacturer->id, 'label' => $manufacturer->name])
+        ->values();
+
+    $modelOptions = collect($manufacturerModels)
+        ->map(fn ($manufacturerModel) => [
+            'value' => (string) $manufacturerModel->id,
+            'label' => trim(($manufacturerModel->manufacturer?->name ? $manufacturerModel->manufacturer->name.' / ' : '').$manufacturerModel->name),
+        ])
+        ->values();
 @endphp
 
 <tr class="bg-brand-silver/70 dark:bg-brand-charcoal/80">
@@ -25,88 +48,81 @@
         >
     </th>
     @foreach($selectedColumns as $column)
-        <th class="px-2 py-2 align-bottom font-normal">
+        <th class="px-2 py-2 align-bottom font-normal min-w-[7rem]">
             @switch($column)
                 @case('status')
-                    <select
+                    <x-searchable-select
                         name="status"
+                        id="filter_status"
                         form="{{ $formId }}"
-                        class="{{ $inputClass }}"
+                        :options="$statusOptions"
+                        :selected="request('status')"
+                        placeholder="All"
+                        nullable
+                        auto-submit
+                        compact
                         aria-label="Filter by status"
-                    >
-                        <option value="">All</option>
-                        @foreach($statuses as $value => $label)
-                            <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
+                    />
                     @break
 
                 @case('location')
-                    <select
+                    <x-searchable-select
                         name="location_id"
                         id="filter_location_id"
                         form="{{ $formId }}"
-                        class="{{ $inputClass }}"
+                        :options="$locationOptions"
+                        :selected="request('location_id')"
+                        placeholder="All locations"
+                        nullable
+                        auto-submit
+                        compact
                         aria-label="Filter by location"
-                    >
-                        <option value="">All locations</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}" @selected((string) request('location_id') === (string) $location->id)>
-                                {{ $location->breadcrumb() }}
-                            </option>
-                        @endforeach
-                    </select>
+                    />
                     @break
 
                 @case('item_type')
-                    <select
+                    <x-searchable-select
                         name="item_type_id"
                         id="filter_item_type_id"
                         form="{{ $formId }}"
-                        class="{{ $inputClass }}"
+                        :options="$itemTypeOptions"
+                        :selected="request('item_type_id')"
+                        placeholder="All item types"
+                        nullable
+                        auto-submit
+                        compact
                         aria-label="Filter by item type"
-                    >
-                        <option value="">All item types</option>
-                        @foreach($itemTypes as $itemType)
-                            <option value="{{ $itemType->id }}" @selected((string) request('item_type_id') === (string) $itemType->id)>
-                                {{ $itemType->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    />
                     @break
 
                 @case('manufacturer')
-                    <select
+                    <x-searchable-select
                         name="manufacturer_id"
                         id="filter_manufacturer_id"
                         form="{{ $formId }}"
-                        class="{{ $inputClass }}"
+                        :options="$manufacturerOptions"
+                        :selected="request('manufacturer_id')"
+                        placeholder="All manufacturers"
+                        nullable
+                        auto-submit
+                        compact
                         aria-label="Filter by manufacturer"
-                    >
-                        <option value="">All manufacturers</option>
-                        @foreach($manufacturers as $manufacturer)
-                            <option value="{{ $manufacturer->id }}" @selected((string) request('manufacturer_id') === (string) $manufacturer->id)>
-                                {{ $manufacturer->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    />
                     @break
 
                 @case('model')
-                    <select
+                    <x-searchable-select
                         name="manufacturer_model_id"
                         id="filter_manufacturer_model_id"
                         form="{{ $formId }}"
-                        class="{{ $inputClass }}"
+                        :options="$modelOptions"
+                        :selected="request('manufacturer_model_id')"
+                        placeholder="All models"
+                        nullable
+                        auto-submit
+                        compact
                         aria-label="Filter by model"
-                    >
-                        <option value="">All models</option>
-                        @foreach($manufacturerModels as $manufacturerModel)
-                            <option value="{{ $manufacturerModel->id }}" @selected((string) request('manufacturer_model_id') === (string) $manufacturerModel->id)>
-                                {{ $manufacturerModel->manufacturer?->name }} / {{ $manufacturerModel->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    />
                     @break
 
                 @case('quantity')
@@ -119,6 +135,7 @@
                         min="0"
                         class="{{ $inputClass }}"
                         aria-label="Filter by quantity"
+                        onchange="this.form?.requestSubmit()"
                     >
                     @break
 
@@ -130,6 +147,7 @@
                         value="{{ request('test_tag_expiry') }}"
                         class="{{ $inputClass }}"
                         aria-label="Filter by test and tag expiry"
+                        onchange="this.form?.requestSubmit()"
                     >
                     @break
 

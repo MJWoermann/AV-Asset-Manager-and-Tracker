@@ -26,6 +26,13 @@
                 </div>
             @endif
 
+            @php
+                $connectionMapFiltersActive = filled($filters['search'] ?? null)
+                    || filled($filters['location_id'] ?? null)
+                    || filled($filters['item_type_id'] ?? null)
+                    || filled($filters['connection_type_ids'] ?? null)
+                    || filled($filters['asset_id'] ?? null);
+            @endphp
             <div class="flex flex-wrap gap-2 items-end">
                 <div class="min-w-[10rem] flex-1 sm:flex-none sm:w-52">
                     <x-input-label for="connection-map-search" value="Search" class="sr-only" />
@@ -41,23 +48,38 @@
                 </div>
                 <div class="min-w-[8rem] flex-1 sm:flex-none sm:w-44">
                     <x-input-label for="location_id" value="Location" class="sr-only" />
-                    <select id="location_id" name="location_id" class="block w-full rounded border-gray-300 text-sm dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">All locations</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}" @selected((string) ($filters['location_id'] ?? '') === (string) $location->id)>{{ $location->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        name="location_id"
+                        id="location_id"
+                        :options="$locations->map(fn ($location) => ['value' => $location->id, 'label' => $location->name])->values()"
+                        :selected="$filters['location_id'] ?? null"
+                        placeholder="All locations"
+                        nullable
+                        auto-submit
+                        compact
+                        aria-label="Filter by location"
+                    />
                 </div>
                 <div class="min-w-[8rem] flex-1 sm:flex-none sm:w-44">
                     <x-input-label for="item_type_id" value="Item type" class="sr-only" />
-                    <select id="item_type_id" name="item_type_id" class="block w-full rounded border-gray-300 text-sm dark:bg-black dark:border-brand-charcoal dark:text-white">
-                        <option value="">All item types</option>
-                        @foreach($itemTypes as $itemType)
-                            <option value="{{ $itemType->id }}" @selected((string) ($filters['item_type_id'] ?? '') === (string) $itemType->id)>{{ $itemType->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        name="item_type_id"
+                        id="item_type_id"
+                        :options="$itemTypes->map(fn ($itemType) => ['value' => $itemType->id, 'label' => $itemType->name])->values()"
+                        :selected="$filters['item_type_id'] ?? null"
+                        placeholder="All item types"
+                        nullable
+                        auto-submit
+                        compact
+                        aria-label="Filter by item type"
+                    />
                 </div>
-                <x-primary-button class="text-sm">Apply</x-primary-button>
+                <x-primary-button class="text-sm">Search</x-primary-button>
+                <x-clear-filters
+                    :href="route('reports.connection-map')"
+                    :active="$connectionMapFiltersActive"
+                    class="text-sm !px-3 !py-1.5"
+                />
                 <p class="ms-auto text-xs text-brand-charcoal dark:text-brand-silver self-center">
                     {{ $graph['asset_count'] ?? count($graph['nodes']) }} assets · {{ count($graph['edges']) }} connections
                 </p>

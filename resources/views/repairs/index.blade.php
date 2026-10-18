@@ -11,14 +11,20 @@
             <p class="text-sm text-brand">{{ session('status') }}</p>
         @endif
 
+        @php
+            $repairsFiltersActive = filled($term) || (string) $status !== 'active';
+        @endphp
         <form method="get" class="flex flex-col sm:flex-row flex-wrap gap-3 border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 text-sm">
             <div class="min-w-[10rem]">
                 <x-input-label for="status" value="Status" />
-                <select id="status" name="status" class="mt-1 block w-full border-brand-silver dark:border-brand-charcoal dark:bg-brand-slate dark:text-white">
-                    @foreach($statusOptions as $value => $label)
-                        <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="status"
+                    id="status"
+                    :options="collect($statusOptions)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values()"
+                    :selected="$status"
+                    auto-submit
+                    aria-label="Filter by repair status"
+                />
             </div>
             <div class="flex-1 min-w-[12rem]">
                 <x-input-label for="repairs-search-q" value="Search" />
@@ -31,8 +37,9 @@
                     scan-aria-label="Scan barcode into repairs search"
                 />
             </div>
-            <div class="flex items-end">
-                <x-primary-button>Filter</x-primary-button>
+            <div class="flex items-end gap-2 flex-wrap">
+                <x-primary-button>Search</x-primary-button>
+                <x-clear-filters :href="route('repairs.index')" :active="$repairsFiltersActive" />
             </div>
         </form>
 

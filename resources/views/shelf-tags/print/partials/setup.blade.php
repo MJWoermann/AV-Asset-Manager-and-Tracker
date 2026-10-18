@@ -34,21 +34,18 @@
             <input type="hidden" name="shelf_tag_layout_id" value="{{ $selectedLayoutId }}">
         @endif
 
-        <div>
+        <div class="max-w-xl">
             <x-input-label for="asset_list_id_filter" value="List" />
-            <select
-                id="asset_list_id_filter"
+            <x-searchable-select
                 name="asset_list_id"
-                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                onchange="this.form.submit()"
-            >
-                <option value="">Select list…</option>
-                @foreach($lists as $list)
-                    <option value="{{ $list->id }}" @selected($selectedListId == $list->id)>
-                        {{ $list->name }} ({{ $list->type }})
-                    </option>
-                @endforeach
-            </select>
+                id="asset_list_id_filter"
+                :options="$lists->map(fn ($list) => ['value' => $list->id, 'label' => $list->name.' ('.$list->type.')'])->values()"
+                :selected="$selectedListId"
+                placeholder="Select list…"
+                nullable
+                auto-submit
+                aria-label="Filter by list"
+            />
         </div>
 
         @if($selectedListId)
@@ -62,13 +59,11 @@
                     aria-label="Search assets for shelf tags"
                     scan-aria-label="Scan barcode into shelf tag search"
                 />
-                <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand text-sm shrink-0">Filter</button>
-                @if($q !== '')
-                    <a
-                        href="{{ route('labels.index', array_filter(['asset_list_id' => $selectedListId, 'shelf_tag_layout_id' => $selectedLayoutId])) }}"
-                        class="px-4 py-2 border text-sm inline-flex items-center justify-center shrink-0"
-                    >Clear</a>
-                @endif
+                <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand text-sm shrink-0">Search</button>
+                <x-clear-filters
+                    :href="route('labels.index', array_filter(['asset_list_id' => $selectedListId, 'shelf_tag_layout_id' => $selectedLayoutId]))"
+                    :active="$q !== ''"
+                />
             </div>
         @endif
     </form>
