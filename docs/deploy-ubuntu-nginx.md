@@ -338,7 +338,7 @@ php artisan app:backup --disk=qnap --keep=7
 php artisan app:restore backups/2026-10-14_021500 --disk=qnap --force
 ```
 
-Backup archives exclude `.env` and Graph/QNAP secrets. SQL dumps include user password hashes — treat restore media as sensitive. Ensure `queue:work` and `schedule:run` (cron) are running for queued Admin → Storage actions, the nightly backup, and optional email inbound polling (`email:poll-inbound` — see [email-setup.md](email-setup.md)).
+Backup archives exclude `.env` and Graph/QNAP secrets. SQL dumps include user password hashes — treat restore media as sensitive. Ensure `queue:work --timeout=3600` (or higher) and `schedule:run` (cron) are running for queued Admin → Storage actions, the nightly backup, and optional email inbound polling (`email:poll-inbound` — see [email-setup.md](email-setup.md)). Set `DB_QUEUE_RETRY_AFTER=3900` (default in `.env.example`) so long backup/migrate jobs are not reserved twice. Soft import/export/compare caps: `php artisan app:performance-limits show` ([security-hardening.md](security-hardening.md#managing-performance-limits)).
 
 ## Security checklist
 

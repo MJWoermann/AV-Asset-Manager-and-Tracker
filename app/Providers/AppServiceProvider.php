@@ -10,9 +10,13 @@ use App\Models\AssetListItem;
 use App\Models\Location;
 use App\Models\User;
 use App\Observers\AuditableObserver;
+use App\Support\PerformanceLimits;
 use Closure;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use SocialiteProviders\Azure\AzureExtendSocialite;
@@ -67,5 +71,37 @@ class AppServiceProvider extends ServiceProvider
         if (! is_dir($excelTemp)) {
             mkdir($excelTemp, 0755, true);
         }
+
+        $this->configurePerformanceRateLimiters();
+    }
+
+    protected function configurePerformanceRateLimiters(): void
+    {
+        RateLimiter::for('import', function (Request $request) {
+            return Limit::perMinute(PerformanceLimits::int('throttle_import_per_minute'))
+                ->by($this->rateLimitKey($request, 'import'));
+        });
+
+        RateLimiter::for('export', function (Request $request) {
+            return Limit::perMinute(PerformanceLimits::int('throttle_export_per_minute'))
+                ->by($this->rateLimitKey($request, 'export'));
+        });
+
+        RateLimiter::for('compare', function (Request $request) {
+            return Limit::perMinute(PerformanceLimits::int('throttle_compare_per_minute'))
+                ->by($this->rateLimitKey($request, 'compare'));
+        });
+
+        RateLimiter::for('backup', function (Request $request) {
+            return Limit::perMinute(PerformanceLimits::int('throttle_backup_per_minute'))
+                ->by($this->rateLimitKey($request, 'backup'));
+        });
+    }
+
+    protected function rateLimitKey(Request $request, string $bucket): string
+    {
+        $userId = $request->user()?->getAuthIdentifier();
+
+        return $bucket.'|'.($userId !== null ? (string) $userId : $request->ip());
     }
 }

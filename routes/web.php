@@ -60,7 +60,6 @@ use App\Http\Controllers\SparePartMovementController;
 use App\Http\Controllers\SparePartShelfTagPrintController;
 use App\Http\Controllers\TrustedExternalDomainPreferenceController;
 use App\Http\Controllers\UnknownScanController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -111,22 +110,8 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner,external_repair
 
 // Broad staff group — external_repairer is intentionally excluded.
 Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(function () {
-    // #region agent log
-    Route::post('/__debug/agent-log', function (Request $request) {
-        $payload = $request->all();
-        $payload['sessionId'] = $payload['sessionId'] ?? '114b8c';
-        $payload['timestamp'] = $payload['timestamp'] ?? (int) round(microtime(true) * 1000);
-        $sessionId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $payload['sessionId']) ?: '114b8c';
-        file_put_contents(
-            base_path("debug-{$sessionId}.log"),
-            json_encode($payload, JSON_UNESCAPED_SLASHES)."\n",
-            FILE_APPEND | LOCK_EX
-        );
-
-        return response()->noContent();
-    })->name('debug.agent-log');
-    // #endregion
-
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/profile/api-tokens', [ProfileApiTokenController::class, 'store'])
         ->name('profile.api-tokens.store');
@@ -272,9 +257,13 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
 
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/compare', [ReportController::class, 'compareForm'])->name('reports.compare');
-    Route::post('/reports/compare', [ReportController::class, 'compare'])->name('reports.compare.run');
+    Route::post('/reports/compare', [ReportController::class, 'compare'])
+        ->middleware('throttle:compare')
+        ->name('reports.compare.run');
     Route::get('/reports/unknown-scans', [UnknownScanController::class, 'index'])->name('reports.unknown-scans');
-    Route::get('/reports/unknown-scans/export', [UnknownScanController::class, 'export'])->name('reports.unknown-scans.export');
+    Route::get('/reports/unknown-scans/export', [UnknownScanController::class, 'export'])
+        ->middleware('throttle:export')
+        ->name('reports.unknown-scans.export');
     Route::patch('/unknown-scans/{unknownScan}', [UnknownScanController::class, 'update'])->name('unknown-scans.update');
     Route::post('/unknown-scans/{unknownScan}/link', [UnknownScanController::class, 'link'])->name('unknown-scans.link');
     Route::middleware('role:admin')->group(function () {
@@ -286,11 +275,21 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
 
     Route::middleware('role:admin,inventory_manager')->group(function () {
         Route::get('/import', [ImportController::class, 'create'])->name('import.create');
-        Route::post('/import/upload', [ImportController::class, 'upload'])->name('import.upload');
-        Route::post('/import/prepare', [ImportController::class, 'prepare'])->name('import.prepare');
-        Route::post('/import/process', [ImportController::class, 'process'])->name('import.process');
-        Route::get('/export/assets', [ExportController::class, 'assets'])->name('export.assets');
-        Route::get('/export/lists/{list}', [ExportController::class, 'list'])->name('export.list');
+        Route::post('/import/upload', [ImportController::class, 'upload'])
+            ->middleware('throttle:import')
+            ->name('import.upload');
+        Route::post('/import/prepare', [ImportController::class, 'prepare'])
+            ->middleware('throttle:import')
+            ->name('import.prepare');
+        Route::post('/import/process', [ImportController::class, 'process'])
+            ->middleware('throttle:import')
+            ->name('import.process');
+        Route::get('/export/assets', [ExportController::class, 'assets'])
+            ->middleware('throttle:export')
+            ->name('export.assets');
+        Route::get('/export/lists/{list}', [ExportController::class, 'list'])
+            ->middleware('throttle:export')
+            ->name('export.list');
     });
 
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
@@ -302,8 +301,12 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
         Route::get('/sso', [SsoSettingsController::class, 'edit'])->name('sso.edit');
         Route::put('/sso', [SsoSettingsController::class, 'update'])->name('sso.update');
         Route::get('/storage', [StorageController::class, 'edit'])->name('storage.edit');
-        Route::post('/storage/migrate', [StorageController::class, 'migrate'])->name('storage.migrate');
-        Route::post('/storage/backup', [StorageController::class, 'backup'])->name('storage.backup');
+        Route::post('/storage/migrate', [StorageController::class, 'migrate'])
+            ->middleware('throttle:backup')
+            ->name('storage.migrate');
+        Route::post('/storage/backup', [StorageController::class, 'backup'])
+            ->middleware('throttle:backup')
+            ->name('storage.backup');
     });
 
     Route::middleware(['feature:email_integration', 'role:admin'])

@@ -67,7 +67,8 @@ Route::middleware(['auth:sanctum', 'role:admin,inventory_manager,scanner'])->gro
     Route::post('/lists', [AssetListApiController::class, 'store'])->middleware('abilities:lists:write');
     Route::put('/lists/{list}', [AssetListApiController::class, 'update'])->middleware('abilities:lists:write');
     Route::delete('/lists/{list}', [AssetListApiController::class, 'destroy'])->middleware('abilities:lists:write');
-    Route::post('/lists/compare', [AssetListApiController::class, 'compare'])->middleware('abilities:lists:compare');
+    Route::post('/lists/compare', [AssetListApiController::class, 'compare'])
+        ->middleware(['abilities:lists:compare', 'throttle:compare']);
     Route::post('/scan', [AssetListApiController::class, 'scan'])->middleware(['abilities:scan', 'throttle:60,1']);
 
     Route::get('/scan-sessions/active', [ScanSessionApiController::class, 'active'])->middleware('abilities:scan-sessions');
@@ -148,15 +149,18 @@ Route::middleware(['auth:sanctum', 'role:admin,inventory_manager,scanner'])->gro
 
     // Reports / exports
     Route::get('/unknown-scans', [UnknownScanApiController::class, 'index'])->middleware('abilities:reports:read');
-    Route::get('/unknown-scans/export', [UnknownScanApiController::class, 'export'])->middleware('abilities:reports:read');
+    Route::get('/unknown-scans/export', [UnknownScanApiController::class, 'export'])
+        ->middleware(['abilities:reports:read', 'throttle:export']);
     Route::patch('/unknown-scans/{unknownScan}', [UnknownScanApiController::class, 'update'])->middleware('abilities:reports:write');
     Route::post('/unknown-scans/{unknownScan}/link', [UnknownScanApiController::class, 'link'])->middleware('abilities:reports:write');
     Route::delete('/unknown-scans', [UnknownScanApiController::class, 'destroyAll'])->middleware('abilities:reports:write');
     Route::post('/unknown-scans/deduplicate', [UnknownScanApiController::class, 'deduplicate'])->middleware('abilities:reports:write');
 
     Route::middleware('role:admin,inventory_manager')->group(function () {
-        Route::get('/export/assets', [ExportApiController::class, 'assets'])->middleware('abilities:reports:read');
-        Route::get('/export/lists/{list}', [ExportApiController::class, 'list'])->middleware('abilities:reports:read');
+        Route::get('/export/assets', [ExportApiController::class, 'assets'])
+            ->middleware(['abilities:reports:read', 'throttle:export']);
+        Route::get('/export/lists/{list}', [ExportApiController::class, 'list'])
+            ->middleware(['abilities:reports:read', 'throttle:export']);
     });
 
     // Files
@@ -176,9 +180,12 @@ Route::middleware(['auth:sanctum', 'role:admin,inventory_manager,scanner'])->gro
     // Import jobs
     Route::middleware('role:admin,inventory_manager')->prefix('import')->group(function () {
         Route::get('/status', [ImportApiController::class, 'status'])->middleware('abilities:assets:write');
-        Route::post('/upload', [ImportApiController::class, 'upload'])->middleware('abilities:assets:write');
-        Route::post('/prepare', [ImportApiController::class, 'prepare'])->middleware('abilities:assets:write');
-        Route::post('/process', [ImportApiController::class, 'process'])->middleware('abilities:assets:write');
+        Route::post('/upload', [ImportApiController::class, 'upload'])
+            ->middleware(['abilities:assets:write', 'throttle:import']);
+        Route::post('/prepare', [ImportApiController::class, 'prepare'])
+            ->middleware(['abilities:assets:write', 'throttle:import']);
+        Route::post('/process', [ImportApiController::class, 'process'])
+            ->middleware(['abilities:assets:write', 'throttle:import']);
     });
 
     // Admin

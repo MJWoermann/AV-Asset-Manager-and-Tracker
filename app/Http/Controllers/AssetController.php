@@ -582,33 +582,6 @@ class AssetController extends Controller
             ])
             ->all();
 
-        // #region agent log
-        $initialManufacturerId = old('manufacturer_id', $asset->manufacturer_id);
-        $mfrKey = $initialManufacturerId !== null && $initialManufacturerId !== ''
-            ? (string) $initialManufacturerId
-            : '';
-        file_put_contents(base_path('debug-114b8c.log'), json_encode([
-            'sessionId' => '114b8c',
-            'runId' => 'pre-fix',
-            'hypothesisId' => 'H3',
-            'location' => 'AssetController.php:assetFormData',
-            'message' => 'asset form modelsByManufacturer payload',
-            'data' => [
-                'assetId' => $asset->id,
-                'assetExists' => $asset->exists,
-                'initialManufacturerId' => $mfrKey,
-                'initialModelId' => old('manufacturer_model_id', $asset->manufacturer_model_id),
-                'mapKeyCount' => count($modelsByManufacturer),
-                'mapKeysSample' => array_slice(array_keys($modelsByManufacturer), 0, 8),
-                'optionsForInitialMfr' => $mfrKey !== '' && isset($modelsByManufacturer[$mfrKey])
-                    ? count($modelsByManufacturer[$mfrKey])
-                    : null,
-                'lookupMiss' => $mfrKey !== '' && ! isset($modelsByManufacturer[$mfrKey]),
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND | LOCK_EX);
-        // #endregion
-
         return array_merge([
             'asset' => $asset,
             'itemTypes' => $itemTypes,

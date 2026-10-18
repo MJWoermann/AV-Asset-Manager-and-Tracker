@@ -16,6 +16,7 @@ use App\Models\Location;
 use App\Models\ScanSession;
 use App\Models\Setting;
 use App\Models\UnknownScan;
+use App\Support\PerformanceLimits;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -41,6 +42,7 @@ class AppBackupService
     public function backup(?string $disk = null, ?int $keep = null): array
     {
         $disk = $this->resolveBackupDisk($disk);
+        $keep ??= PerformanceLimits::int('backup_default_keep');
         $stamp = now()->format('Y-m-d_His');
         $base = 'backups/'.$stamp;
 

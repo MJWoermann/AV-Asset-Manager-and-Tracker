@@ -40,6 +40,19 @@ class ImportAssetTest extends TestCase
         return $user;
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function preparedImportRows(): array
+    {
+        $path = session('import.prepared_path');
+        $this->assertIsString($path);
+        $decoded = json_decode((string) Storage::get($path), true);
+        $this->assertIsArray($decoded);
+
+        return $decoded;
+    }
+
     public function test_upload_screen_does_not_require_item_type(): void
     {
         $response = $this->actingAs($this->manager())->get(route('import.create'));
@@ -575,7 +588,7 @@ class ImportAssetTest extends TestCase
         $prepare->assertSee('DUP-UPDATE');
         $prepare->assertSee('Create new (false match)');
 
-        $prepared = session('import.prepared');
+        $prepared = $this->preparedImportRows();
         $this->assertCount(4, $prepared);
 
         $actions = [];
@@ -759,7 +772,7 @@ class ImportAssetTest extends TestCase
             ],
         ])->assertOk();
 
-        $prepared = session('import.prepared');
+        $prepared = $this->preparedImportRows();
         $actions = [];
         foreach ($prepared as $row) {
             if ($row['existing_id'] === $existing->id) {

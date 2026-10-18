@@ -16,10 +16,12 @@ use App\Models\ItemType;
 use App\Models\ItemTypeAlias;
 use App\Models\Location;
 use App\Models\LocationAlias;
+use App\Support\PerformanceLimits;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Exceptions\NoSheetsFoundException;
@@ -176,11 +178,69 @@ class ImportService
             $reader = new AssetImport;
             Excel::import($reader, $absolutePath);
 
+            $maxRows = PerformanceLimits::int('import_max_rows');
+            if ($reader->rows->count() > $maxRows) {
+                throw ValidationException::withMessages([
+                    'file' => sprintf(
+                        'This spreadsheet has %d data rows; the import limit is %d. Split the file or raise the limit (%s).',
+                        $reader->rows->count(),
+                        $maxRows,
+                        PerformanceLimits::raiseHint('import_max_rows'),
+                    ),
+                ]);
+            }
+
             return $reader->rows;
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (Throwable $e) {
             throw ValidationException::withMessages([
                 'file' => $this->userFacingReadError($e),
             ]);
+        }
+    }
+
+    /**
+     * Persist prepared import rows outside the session/cache payload.
+     *
+     * @param  list<array<string, mixed>>  $prepared
+     */
+    public function storePreparedRows(array $prepared, ?int $userId = null): string
+    {
+        $token = Str::lower(Str::random(24));
+        $path = 'imports/prepared/'.($userId ?: 'anon').'-'.$token.'.json';
+        Storage::put($path, json_encode($prepared, JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function loadPreparedRows(string $path): array
+    {
+        if (! Storage::exists($path)) {
+            throw ValidationException::withMessages([
+                'file' => 'Import session expired. Upload again.',
+            ]);
+        }
+
+        $decoded = json_decode((string) Storage::get($path), true);
+
+        if (! is_array($decoded)) {
+            throw ValidationException::withMessages([
+                'file' => 'Import session expired. Upload again.',
+            ]);
+        }
+
+        /** @var list<array<string, mixed>> $decoded */
+        return $decoded;
+    }
+
+    public function forgetPreparedRows(?string $path): void
+    {
+        if ($path && Storage::exists($path)) {
+            Storage::delete($path);
         }
     }
 
@@ -645,19 +705,15 @@ class ImportService
         $includeUpdated = (bool) ($listOptions['include_updated'] ?? false);
         $listDestination = $listOptions['destination'] ?? 'none';
 
-        $runner = function () use (
-            $prepared,
+        $processRows = function (array $chunk) use (
             $actions,
             $dryRun,
             $defaultDuplicateAction,
-            $listOptions,
-            $listDestination,
             $includeUpdated,
-            $userId,
             &$counts,
             &$assetsForList,
         ): void {
-            foreach ($prepared as $row) {
+            foreach ($chunk as $row) {
                 $existingId = $row['existing_id'] ?? null;
 
                 if ($existingId) {
@@ -724,17 +780,29 @@ class ImportService
                 $counts['created']++;
                 $assetsForList[] = ['id' => $asset->id, 'kind' => 'created'];
             }
+        };
 
-            if ($listDestination === 'none' || $assetsForList === []) {
-                return;
+        $chunkSize = max(1, PerformanceLimits::int('import_commit_chunk'));
+
+        if ($dryRun) {
+            $processRows($prepared);
+        } else {
+            foreach (array_chunk($prepared, $chunkSize) as $chunk) {
+                DB::transaction(fn () => $processRows($chunk));
             }
+        }
 
-            if ($dryRun) {
-                $counts['added_to_list'] = count($assetsForList);
+        if ($listDestination === 'none' || $assetsForList === []) {
+            return $counts;
+        }
 
-                return;
-            }
+        if ($dryRun) {
+            $counts['added_to_list'] = count($assetsForList);
 
+            return $counts;
+        }
+
+        DB::transaction(function () use ($listOptions, $userId, $assetsForList, &$counts): void {
             $list = $this->resolveImportTargetList($listOptions, $userId);
             if (! $list) {
                 return;
@@ -747,13 +815,7 @@ class ImportService
                 array_values(array_filter(array_column($assetsForList, 'id'))),
                 $userId,
             );
-        };
-
-        if ($dryRun) {
-            $runner();
-        } else {
-            DB::transaction($runner);
-        }
+        });
 
         return $counts;
     }
@@ -1185,31 +1247,6 @@ class ImportService
         $matchedOn = [];
         $asset = null;
 
-        // #region agent log
-        $debugLogPath = base_path('debug-3c7602.log');
-        $ipInPayload = $payload['ip_address'] ?? null;
-        $ipInKeys = in_array('ip_address', self::DUPLICATE_KEYS, true);
-        $ipDbHit = null;
-        if ($ipInPayload !== null && $ipInPayload !== '') {
-            $ipDbHit = Asset::query()->where('ip_address', $ipInPayload)->value('id');
-        }
-        file_put_contents($debugLogPath, json_encode([
-            'sessionId' => '3c7602',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'A',
-            'location' => 'ImportService.php:findExistingMatch:entry',
-            'message' => 'Duplicate match entry',
-            'data' => [
-                'duplicateKeys' => self::DUPLICATE_KEYS,
-                'ipInDuplicateKeys' => $ipInKeys,
-                'ipInPayload' => $ipInPayload,
-                'payloadKeys' => array_keys($payload),
-                'ipDbHitAssetId' => $ipDbHit,
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
-
         foreach (self::DUPLICATE_KEYS as $key) {
             $value = $payload[$key] ?? null;
             if ($value === null || $value === '') {
@@ -1217,21 +1254,6 @@ class ImportService
             }
 
             $found = Asset::query()->where($key, $value)->first();
-            // #region agent log
-            file_put_contents($debugLogPath, json_encode([
-                'sessionId' => '3c7602',
-                'runId' => 'post-fix',
-                'hypothesisId' => $key === 'ip_address' ? 'A' : 'B',
-                'location' => 'ImportService.php:findExistingMatch:key',
-                'message' => 'Checked duplicate key',
-                'data' => [
-                    'key' => $key,
-                    'valuePresent' => $value !== null && $value !== '',
-                    'foundAssetId' => $found?->id,
-                ],
-                'timestamp' => (int) (microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-            // #endregion
             if ($found) {
                 if ($asset && $asset->id !== $found->id) {
                     // Prefer the first match; still record the key that hit.
@@ -1243,22 +1265,6 @@ class ImportService
                 $matchedOn[] = $key;
             }
         }
-
-        // #region agent log
-        file_put_contents($debugLogPath, json_encode([
-            'sessionId' => '3c7602',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'C',
-            'location' => 'ImportService.php:findExistingMatch:exit',
-            'message' => 'Duplicate match result',
-            'data' => [
-                'matchedAssetId' => $asset?->id,
-                'matchedOn' => $matchedOn,
-                'ipWouldMatchButSkipped' => $ipInKeys === false && $ipDbHit !== null,
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
 
         return ['asset' => $asset, 'matched_on' => $matchedOn];
     }

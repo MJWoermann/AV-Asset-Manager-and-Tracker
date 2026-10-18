@@ -27,9 +27,12 @@ class ImportApiController extends Controller
     {
         $state = ImportApiState::get((int) $request->user()->id);
 
+        $preparedPath = $state['prepared_path'] ?? null;
+
         return response()->json([
             'has_upload' => isset($state['path']) && Storage::exists((string) $state['path']),
-            'has_prepared' => isset($state['prepared']) && is_array($state['prepared']),
+            'has_prepared' => (is_string($preparedPath) && Storage::exists($preparedPath))
+                || (isset($state['prepared']) && is_array($state['prepared'])),
             'original_filename' => $state['original_filename'] ?? null,
             'columns' => $state['columns'] ?? [],
         ]);
@@ -51,16 +54,23 @@ class ImportApiController extends Controller
             throw $e;
         }
 
+        $priorState = ImportApiState::get($userId);
+        if (! empty($priorState['prepared_path']) && is_string($priorState['prepared_path'])) {
+            $this->imports->forgetPreparedRows($priorState['prepared_path']);
+        }
+
         ImportApiState::merge($userId, [
             'path' => $path,
             'columns' => $columns,
             'column_examples' => $columnExamples,
             'original_filename' => $uploaded->getClientOriginalName(),
+            'mapping' => null,
+            'prepared' => null,
+            'prepared_path' => null,
         ]);
-        ImportApiState::merge($userId, ['mapping' => null, 'prepared' => null]);
 
-        $previous = $this->imports->recalledMapping($userId);
-        $suggestedMappings = $this->imports->suggestMappings($columns, $previous);
+        $recalledMapping = $this->imports->recalledMapping($userId);
+        $suggestedMappings = $this->imports->suggestMappings($columns, $recalledMapping);
 
         return response()->json([
             'columns' => $columns,
@@ -100,9 +110,16 @@ class ImportApiController extends Controller
         $prepared = $this->imports->prepareRows($rows, $mapping);
         $this->imports->rememberMapping($mapping, $userId);
 
+        if (! empty($state['prepared_path']) && is_string($state['prepared_path'])) {
+            $this->imports->forgetPreparedRows($state['prepared_path']);
+        }
+
+        $preparedPath = $this->imports->storePreparedRows($prepared, $userId);
+
         ImportApiState::merge($userId, [
             'mapping' => $mapping,
-            'prepared' => $prepared,
+            'prepared_path' => $preparedPath,
+            'prepared' => null,
         ]);
 
         $duplicates = array_values(array_filter($prepared, fn (array $row) => $row['existing_id'] !== null));
@@ -122,7 +139,10 @@ class ImportApiController extends Controller
         $userId = (int) $request->user()->id;
         $state = ImportApiState::get($userId);
         $path = $state['path'] ?? null;
-        $prepared = $state['prepared'] ?? null;
+        $preparedPath = $state['prepared_path'] ?? null;
+        $prepared = is_string($preparedPath)
+            ? $this->imports->loadPreparedRows($preparedPath)
+            : (is_array($state['prepared'] ?? null) ? $state['prepared'] : null);
 
         if (! $path || ! is_array($prepared)) {
             return response()->json(['message' => 'Import session expired. Upload again.'], 422);
@@ -173,6 +193,9 @@ class ImportApiController extends Controller
         if (! $dryRun) {
             $this->archiveProcessedImport($path, (string) ($state['original_filename'] ?? basename($path)));
             Storage::delete($path);
+            if (is_string($preparedPath)) {
+                $this->imports->forgetPreparedRows($preparedPath);
+            }
             ImportApiState::forget($userId);
         }
 
