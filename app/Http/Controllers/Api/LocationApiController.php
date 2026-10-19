@@ -79,7 +79,7 @@ class LocationApiController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'room_code' => ['nullable', 'string', 'max:64'],
-            'type' => ['required', 'in:site,level,room,rack'],
+            'type' => ['required', Rule::enum(LocationType::class)],
             'parent_id' => [
                 'nullable',
                 Rule::exists('locations', 'id')->whereNot('type', LocationType::Rack->value),

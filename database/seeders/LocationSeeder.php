@@ -15,8 +15,12 @@ class LocationSeeder extends Seeder
             ['is_portable' => false]
         );
 
+        $building = Location::firstOrCreate(
+            ['name' => 'Building A', 'type' => LocationType::Building, 'parent_id' => $site->id]
+        );
+
         $level = Location::firstOrCreate(
-            ['name' => 'Ground Floor', 'type' => LocationType::Level, 'parent_id' => $site->id]
+            ['name' => 'Ground Floor', 'type' => LocationType::Level, 'parent_id' => $building->id]
         );
 
         $room = Location::firstOrCreate(

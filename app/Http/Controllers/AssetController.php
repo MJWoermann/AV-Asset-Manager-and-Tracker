@@ -74,7 +74,7 @@ class AssetController extends Controller
             'q' => $term ?? '',
             'availableColumns' => AssetTableColumns::definitions(),
             'selectedColumns' => $selectedColumns,
-            'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
+            'locations' => Location::with('parent.parent.parent.parent')->orderBy('name')->get(),
             'itemTypes' => ItemType::orderBy('name')->get(),
             'manufacturers' => Manufacturer::query()->orderBy('name')->get(['id', 'name']),
             'manufacturerModels' => ManufacturerModel::query()
@@ -251,7 +251,7 @@ class AssetController extends Controller
 
         $asset->load([
             'itemType.fieldSets.definitions',
-            'location.parent.parent',
+            'location.parent.parent.parent.parent',
             'children.itemType',
             'customFieldValues.definition',
             'parent',

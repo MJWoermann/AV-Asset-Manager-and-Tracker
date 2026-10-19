@@ -423,6 +423,7 @@ class ImportAssetTest extends TestCase
             'tp_barcode',
             'ip_address',
             'mac_address',
+            'location_building',
             'location_level',
             'location_room',
             'location_rack',
@@ -434,6 +435,7 @@ class ImportAssetTest extends TestCase
         $this->assertSame('tp_barcode', $suggestions['tp_barcode']);
         $this->assertSame('ip_address', $suggestions['ip_address']);
         $this->assertSame('mac_address', $suggestions['mac_address']);
+        $this->assertSame('location_building', $suggestions['location_building']);
         $this->assertSame('location_level', $suggestions['location_level']);
         $this->assertSame('location_room', $suggestions['location_room']);
         $this->assertSame('location_rack', $suggestions['location_rack']);
@@ -458,6 +460,7 @@ class ImportAssetTest extends TestCase
             'TP Barcode',
             'IP Address',
             'MAC Address',
+            'Location: Building',
             'Location: Level',
             'Location: Room',
             'Location: Rack',
@@ -469,6 +472,7 @@ class ImportAssetTest extends TestCase
         $this->assertSame('tp_barcode', $suggestions['TP Barcode']);
         $this->assertSame('ip_address', $suggestions['IP Address']);
         $this->assertSame('mac_address', $suggestions['MAC Address']);
+        $this->assertSame('location_building', $suggestions['Location: Building']);
         $this->assertSame('location_level', $suggestions['Location: Level']);
         $this->assertSame('location_room', $suggestions['Location: Room']);
         $this->assertSame('location_rack', $suggestions['Location: Rack']);
@@ -526,8 +530,8 @@ class ImportAssetTest extends TestCase
         Storage::fake('local');
         $user = $this->manager();
         $csv = UploadedFile::fake()->createWithContent('assets.csv', implode("\n", [
-            'Name,Type,Level,Room,Rack,Serial,Colour',
-            'Console One,New Console Type,Ground,Control Room,Rack A,SN-100,Red',
+            'Name,Type,Building,Level,Room,Rack,Serial,Colour',
+            'Console One,New Console Type,Building A,Ground,Control Room,Rack A,SN-100,Red',
         ]));
 
         $this->actingAs($user)->post(route('import.upload'), ['file' => $csv]);
@@ -536,6 +540,7 @@ class ImportAssetTest extends TestCase
             'mapping' => [
                 'Name' => 'name',
                 'Type' => 'item_type',
+                'Building' => 'location_building',
                 'Level' => 'location_level',
                 'Room' => 'location_room',
                 'Rack' => 'location_rack',
@@ -552,9 +557,16 @@ class ImportAssetTest extends TestCase
         $process->assertRedirect(route('assets.index'));
 
         $this->assertDatabaseHas('item_types', ['name' => 'New Console Type']);
+        $this->assertDatabaseHas('locations', ['name' => 'Building A', 'type' => LocationType::Building->value]);
         $this->assertDatabaseHas('locations', ['name' => 'Ground', 'type' => LocationType::Level->value]);
         $this->assertDatabaseHas('locations', ['name' => 'Control Room', 'type' => LocationType::Room->value]);
         $this->assertDatabaseHas('locations', ['name' => 'Rack A', 'type' => LocationType::Rack->value]);
+
+        $building = Location::query()->where('name', 'Building A')->first();
+        $level = Location::query()->where('name', 'Ground')->first();
+        $this->assertNotNull($building);
+        $this->assertNotNull($level);
+        $this->assertSame($building->id, $level->parent_id);
 
         $asset = Asset::query()->where('name', 'Console One')->first();
         $this->assertNotNull($asset);

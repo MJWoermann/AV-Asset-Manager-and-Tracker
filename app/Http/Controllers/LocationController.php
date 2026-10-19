@@ -17,10 +17,10 @@ class LocationController extends Controller
     public function index(): View
     {
         $locations = Location::tree();
-        $flatLocations = Location::query()->with('parent.parent.parent')->orderByHierarchy()->get();
+        $flatLocations = Location::query()->with('parent.parent.parent.parent')->orderByHierarchy()->get();
         $parentOptions = Location::query()
             ->canBeParent()
-            ->with('parent.parent.parent')
+            ->with('parent.parent.parent.parent')
             ->orderByHierarchy()
             ->get();
         $duplicateNames = $this->duplicateNormalizedNames($flatLocations);
@@ -138,7 +138,7 @@ class LocationController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'room_code' => ['nullable', 'string', 'max:64'],
-            'type' => ['required', 'in:site,level,room,rack'],
+            'type' => ['required', Rule::enum(LocationType::class)],
             'parent_id' => [
                 'nullable',
                 Rule::exists('locations', 'id')->whereNot('type', LocationType::Rack->value),

@@ -14,7 +14,7 @@ A short session with ChatGPT, Claude, Copilot, Gemini, or Excel Copilot can:
 
 - Rename columns to match what the import screen expects
 - Fill **Name** and **Item Type** (required) from manufacturer, model, and identifiers
-- Split combined location strings into **Location: Level**, **Location: Room**, and **Location: Rack**
+- Split combined location strings into **Location: Building**, **Location: Level**, **Location: Room**, and **Location: Rack**
 - Normalize **Status** to allowed values
 - Leave unknown identifier cells **empty** instead of inventing serial numbers or MAC addresses
 
@@ -57,7 +57,8 @@ Use these **exact header strings** in row 1 when you can. The import screen uses
 | Test & Tag Expiry | No | Electrical test & tag due date | `2026-06-01` |
 | Quantity | No | Count when relevant | `1` |
 | Notes | No | Free-form notes | `Spare capsule in case` |
-| Location: Level | No | Site or building level (not a single “Location” column) | `Building A` |
+| Location: Building | No | Building under a site (optional; nest Level under it) | `Building A` |
+| Location: Level | No | Floor / level (not a single “Location” column) | `Ground Floor` |
 | Location: Room | No | Room or store within the level | `AV Store` |
 | Location: Rack | No | Rack, shelf, or bay | `Rack 12` |
 
@@ -105,7 +106,7 @@ Columns that do not match the table above can be mapped to an existing field on 
 Plan these outside the bulk import file:
 
 - **Parent / child** rack relationships  
-- A single **Site-only** location column (use Level / Room / Rack, or set location in the app after import)  
+- A single **Site-only** location column (use Building / Level / Room / Rack, or set location in the app after import)  
 - **RU height**, **min/max stock**, **department** assignment  
 - **Spare parts** bulk load (no spare CSV import in Phase 1)
 
@@ -137,13 +138,13 @@ You are helping prepare a spreadsheet for import into an AV asset manager.
 I will paste a table (or describe columns) from a legacy/vendor export.
 
 Output a CSV with EXACTLY these header names in row 1 (use all columns; leave cells empty if unknown):
-Name, Item Type, Description, Status, Manufacturer, Model, Serial Number, Purchase Date, Warranty Expiry, Supplier, Replacement Cost, FMI AST#, TP Barcode, RIG Tag #, IP Address, MAC Address, Test & Tag Expiry, Quantity, Notes, Location: Level, Location: Room, Location: Rack
+Name, Item Type, Description, Status, Manufacturer, Model, Serial Number, Purchase Date, Warranty Expiry, Supplier, Replacement Cost, FMI AST#, TP Barcode, RIG Tag #, IP Address, MAC Address, Test & Tag Expiry, Quantity, Notes, Location: Building, Location: Level, Location: Room, Location: Rack
 
 Rules:
 - Name and Item Type are REQUIRED on every row. Follow Name rules: prefer "{Manufacturer} {Model}"; else "{Item Type} — {last 4 of serial or FMI AST# or TP Barcode}"; keep under ~80 chars; no ALL CAPS; no SKU junk in Name.
 - NEVER invent Serial Number, FMI AST#, TP Barcode, RIG Tag #, MAC Address, or IP Address. Only copy from source data; leave blank if missing.
 - Normalize Status to one of: available, in_service, on_event, maintenance, damaged, disposed, lost, reserved. If unclear, use available.
-- Split combined location strings into Location: Level, Location: Room, Location: Rack (three columns). Do not use a single "Location" column.
+- Split combined location strings into Location: Building, Location: Level, Location: Room, Location: Rack. Do not use a single "Location" column.
 - Trim whitespace; uppercase MAC addresses as AA:BB:CC:DD:EE:FF when present.
 - Do not add commentary—output only the CSV.
 
@@ -202,16 +203,17 @@ Data:
 ### Location split prompt
 
 ```text
-Split each location string into three columns: Location: Level, Location: Room, Location: Rack.
+Split each location string into columns: Location: Building, Location: Level, Location: Room, Location: Rack.
 
 Examples:
-- "Building A / AV Store / Rack 12" → Level: Building A, Room: AV Store, Rack: Rack 12
-- "Warehouse > Shelf B3" → Level: Warehouse, Room: (empty or general store), Rack: Shelf B3
-- "Site 2" only → Level: Site 2, Room and Rack empty
+- "Building A / Ground / AV Store / Rack 12" → Building: Building A, Level: Ground, Room: AV Store, Rack: Rack 12
+- "Building A / AV Store / Rack 12" → Building: Building A, Level: (empty), Room: AV Store, Rack: Rack 12
+- "Warehouse > Shelf B3" → Building: (empty), Level: Warehouse, Room: (empty or general store), Rack: Shelf B3
+- "Ground Floor only" → Building: (empty), Level: Ground Floor, Room and Rack empty
 
-Do not invent room or rack names. If the string has only one part, put it in Level.
+Do not invent room or rack names. If the string has only one part, put it in Level (or Building when it clearly names a building).
 
-Output CSV with columns: [optional row id], Location: Level, Location: Room, Location: Rack
+Output CSV with columns: [optional row id], Location: Building, Location: Level, Location: Room, Location: Rack
 
 Data:
 [PASTE LOCATION COLUMN]
@@ -224,10 +226,10 @@ Data:
 Illustrative CSV (not a downloadable template):
 
 ```csv
-Name,Item Type,Description,Status,Manufacturer,Model,Serial Number,FMI AST#,TP Barcode,Location: Level,Location: Room,Location: Rack
-Shure SM58,Microphone,Stage vocal mic,available,Shure,SM58,SN-004821,88421,TP-001234,Building A,AV Store,Rack 12
-Panasonic PT-RZ12K,Projector,12K laser,maintenance,Panasonic,PT-RZ12K,PJ-99201,,,Building A,Theatre,FOH
-XLR Cable 5m,Cable,Patch cable,available,,, ,,,Building A,AV Store,Shelf B3
+Name,Item Type,Description,Status,Manufacturer,Model,Serial Number,FMI AST#,TP Barcode,Location: Building,Location: Level,Location: Room,Location: Rack
+Shure SM58,Microphone,Stage vocal mic,available,Shure,SM58,SN-004821,88421,TP-001234,Building A,Ground Floor,AV Store,Rack 12
+Panasonic PT-RZ12K,Projector,12K laser,maintenance,Panasonic,PT-RZ12K,PJ-99201,,,Building A,Ground Floor,Theatre,FOH
+XLR Cable 5m,Cable,Patch cable,available,,, ,,,Building A,Ground Floor,AV Store,Shelf B3
 ```
 
 ---
@@ -242,7 +244,7 @@ Before upload:
 - [ ] **Item Type** names are ones you accept being **auto-created** if they do not exist yet
 - [ ] Data is on the **first sheet**; file is CSV/XLSX/XLS and under **25 MB**
 - [ ] Status values normalized (or blank → available)
-- [ ] Location split into Level / Room / Rack where you have location data
+- [ ] Location split into Building / Level / Room / Rack where you have location data
 
 ---
 

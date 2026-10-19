@@ -55,6 +55,7 @@ class ImportService
     /** @var list<string> */
     public const META_FIELDS = [
         'item_type',
+        'location_building',
         'location_level',
         'location_room',
         'location_rack',
@@ -65,6 +66,7 @@ class ImportService
         'name' => 'Name',
         'description' => 'Description',
         'item_type' => 'Item Type',
+        'location_building' => 'Location: Building',
         'location_level' => 'Location: Level',
         'location_room' => 'Location: Room',
         'location_rack' => 'Location: Rack',
@@ -175,8 +177,29 @@ class ImportService
     public function readRows(string $absolutePath): Collection
     {
         try {
+            // #region agent log
+            $__dbgReadT0 = microtime(true);
+            $__dbgLog = function (string $message, array $data = []) use ($__dbgReadT0): void {
+                $payload = [
+                    'sessionId' => 'd766ca',
+                    'runId' => 'pre-fix',
+                    'hypothesisId' => 'A',
+                    'location' => 'ImportService.php:readRows',
+                    'message' => $message,
+                    'data' => array_merge(['elapsed_ms' => (int) round((microtime(true) - $__dbgReadT0) * 1000)], $data),
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ];
+                @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
+            };
+            $__dbgLog('excel_import_start', ['path_basename' => basename($absolutePath)]);
+            // #endregion
+
             $reader = new AssetImport;
             Excel::import($reader, $absolutePath);
+
+            // #region agent log
+            $__dbgLog('excel_import_done', ['row_count' => $reader->rows->count()]);
+            // #endregion
 
             $maxRows = PerformanceLimits::int('import_max_rows');
             if ($reader->rows->count() > $maxRows) {
@@ -587,6 +610,7 @@ class ImportService
      *     custom_fields: array<string, string>,
      *     mapped_custom_fields: array<int, string>,
      *     item_type_name: string,
+     *     location_building: ?string,
      *     location_level: ?string,
      *     location_room: ?string,
      *     location_rack: ?string,
@@ -599,12 +623,35 @@ class ImportService
     {
         $prepared = [];
 
+        // #region agent log
+        $__dbgPrepT0 = microtime(true);
+        $__dbgMatchQueries = 0;
+        $__dbgMatchHits = 0;
+        $__dbgMatchMs = 0.0;
+        $__dbgProcessed = 0;
+        $__dbgSkipped = 0;
+        $__dbgLog = function (string $message, array $data = []) use ($__dbgPrepT0): void {
+            $payload = [
+                'sessionId' => 'd766ca',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'B',
+                'location' => 'ImportService.php:prepareRows',
+                'message' => $message,
+                'data' => array_merge(['elapsed_ms' => (int) round((microtime(true) - $__dbgPrepT0) * 1000)], $data),
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ];
+            @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
+        };
+        $__dbgLog('prepareRows_start', ['input_rows' => $rows->count()]);
+        // #endregion
+
         foreach ($rows as $index => $row) {
             $row = Collection::make($row);
             $payload = [];
             $customFields = [];
             $mappedCustomFields = [];
             $itemTypeName = null;
+            $building = null;
             $level = null;
             $room = null;
             $rack = null;
@@ -636,6 +683,12 @@ class ImportService
                     continue;
                 }
 
+                if ($field === 'location_building') {
+                    $building = (string) $value;
+
+                    continue;
+                }
+
                 if ($field === 'location_level') {
                     $level = (string) $value;
 
@@ -663,10 +716,44 @@ class ImportService
             }
 
             if (empty($payload['name']) || ! $itemTypeName) {
+                // #region agent log
+                $__dbgSkipped++;
+                // #endregion
+
                 continue;
             }
 
+            // #region agent log
+            $__dbgMatchT0 = microtime(true);
+            $__dbgKeysPresent = 0;
+            foreach (self::DUPLICATE_KEYS as $__dbgKey) {
+                $__dbgVal = $payload[$__dbgKey] ?? null;
+                if ($__dbgVal !== null && $__dbgVal !== '') {
+                    $__dbgKeysPresent++;
+                }
+            }
+            $__dbgMatchQueries += $__dbgKeysPresent;
+            // #endregion
+
             $match = $this->findExistingMatch($payload);
+
+            // #region agent log
+            $__dbgMatchMs += (microtime(true) - $__dbgMatchT0) * 1000;
+            if ($match['asset'] !== null) {
+                $__dbgMatchHits++;
+            }
+            $__dbgProcessed++;
+            if ($__dbgProcessed === 1 || $__dbgProcessed === 100 || $__dbgProcessed === 500 || $__dbgProcessed % 1000 === 0) {
+                $__dbgLog('prepareRows_progress', [
+                    'processed' => $__dbgProcessed,
+                    'skipped' => $__dbgSkipped,
+                    'match_queries_est' => $__dbgMatchQueries,
+                    'match_hits' => $__dbgMatchHits,
+                    'match_ms' => (int) round($__dbgMatchMs),
+                    'keys_on_this_row' => $__dbgKeysPresent,
+                ]);
+            }
+            // #endregion
 
             $prepared[] = [
                 'index' => (int) $index,
@@ -674,6 +761,7 @@ class ImportService
                 'custom_fields' => $customFields,
                 'mapped_custom_fields' => $mappedCustomFields,
                 'item_type_name' => $itemTypeName,
+                'location_building' => $building,
                 'location_level' => $level,
                 'location_room' => $room,
                 'location_rack' => $rack,
@@ -691,6 +779,17 @@ class ImportService
                 ] : null,
             ];
         }
+
+        // #region agent log
+        $__dbgLog('prepareRows_complete', [
+            'processed' => $__dbgProcessed,
+            'skipped' => $__dbgSkipped,
+            'prepared' => count($prepared),
+            'match_queries_est' => $__dbgMatchQueries,
+            'match_hits' => $__dbgMatchHits,
+            'match_ms' => (int) round($__dbgMatchMs),
+        ]);
+        // #endregion
 
         return $prepared;
     }
@@ -933,6 +1032,7 @@ class ImportService
     {
         $itemType = $this->resolveItemType($row['item_type_name']);
         $locationId = $this->resolveLocation(
+            $row['location_building'] ?? null,
             $row['location_level'] ?? null,
             $row['location_room'] ?? null,
             $row['location_rack'] ?? null,
@@ -1198,18 +1298,25 @@ class ImportService
         ]);
     }
 
-    public function resolveLocation(?string $level, ?string $room, ?string $rack): ?int
+    public function resolveLocation(?string $building, ?string $level, ?string $room, ?string $rack): ?int
     {
+        $building = $this->nullableTrim($building);
         $level = $this->nullableTrim($level);
         $room = $this->nullableTrim($room);
         $rack = $this->nullableTrim($rack);
 
-        if (! $level && ! $room && ! $rack) {
+        if (! $building && ! $level && ! $room && ! $rack) {
             return null;
         }
 
         $parentId = null;
         $resolvedId = null;
+
+        if ($building) {
+            $location = $this->firstOrCreateLocation($building, LocationType::Building, $parentId);
+            $parentId = $location->id;
+            $resolvedId = $location->id;
+        }
 
         if ($level) {
             $location = $this->firstOrCreateLocation($level, LocationType::Level, $parentId);
@@ -1246,8 +1353,9 @@ class ImportService
 
         $existing = $exactQuery->first();
 
-        // Import maps Level/Room/Rack only (no Site). Levels often live under a Site, so
-        // when no parent is known, reuse an existing name+type match anywhere in the tree.
+        // Import maps Building/Level/Room/Rack only (no Site). Buildings and levels often
+        // live under a Site, so when no parent is known, reuse an existing name+type match
+        // anywhere in the tree.
         if (! $existing && $parentId === null) {
             $existing = (clone $baseQuery)->orderBy('id')->first();
         }

@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('parent_id')->nullable()->constrained('locations')->nullOnDelete();
             $table->string('name');
-            $table->string('type', 32); // site, level, room, rack
+            $table->string('type', 32); // site, building, level, room, rack
             $table->boolean('is_portable')->default(false);
             $table->string('floorplan_path')->nullable();
             $table->string('photo_path')->nullable();

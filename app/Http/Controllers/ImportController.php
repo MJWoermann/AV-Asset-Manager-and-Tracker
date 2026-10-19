@@ -71,6 +71,23 @@ class ImportController extends Controller
 
     public function prepare(Request $request): View|RedirectResponse
     {
+        // #region agent log
+        $__dbgPrepareT0 = microtime(true);
+        $__dbgLog = function (string $hypothesisId, string $message, array $data = []) use ($__dbgPrepareT0): void {
+            $payload = [
+                'sessionId' => 'd766ca',
+                'runId' => 'pre-fix',
+                'hypothesisId' => $hypothesisId,
+                'location' => 'ImportController.php:prepare',
+                'message' => $message,
+                'data' => array_merge(['elapsed_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000)], $data),
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ];
+            @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
+        };
+        $__dbgLog('A', 'prepare_entered');
+        // #endregion
+
         $path = session('import.path');
         $columns = session('import.columns', []);
 
@@ -85,6 +102,11 @@ class ImportController extends Controller
             ])['mapping']
         );
 
+        // #region agent log
+        $__dbgLog('A', 'mapping_validated', ['mapping_count' => count($mapping)]);
+        $__dbgReadT0 = microtime(true);
+        // #endregion
+
         try {
             $rows = $this->imports->readRows(Storage::path($path));
         } catch (ValidationException $e) {
@@ -94,7 +116,23 @@ class ImportController extends Controller
             return redirect()->route('import.create')->withErrors($e->errors());
         }
 
+        // #region agent log
+        $__dbgLog('A', 'readRows_done', [
+            'read_ms' => (int) round((microtime(true) - $__dbgReadT0) * 1000),
+            'row_count' => $rows->count(),
+        ]);
+        $__dbgPrepT0 = microtime(true);
+        // #endregion
+
         $prepared = $this->imports->prepareRows($rows, $mapping);
+
+        // #region agent log
+        $__dbgLog('B', 'prepareRows_done', [
+            'prepare_ms' => (int) round((microtime(true) - $__dbgPrepT0) * 1000),
+            'prepared_count' => count($prepared),
+        ]);
+        $__dbgStoreT0 = microtime(true);
+        // #endregion
 
         $this->imports->rememberMapping($mapping, $request->user()?->id);
 
@@ -105,6 +143,13 @@ class ImportController extends Controller
 
         $preparedPath = $this->imports->storePreparedRows($prepared, $request->user()?->id);
 
+        // #region agent log
+        $__dbgLog('C', 'storePreparedRows_done', [
+            'store_ms' => (int) round((microtime(true) - $__dbgStoreT0) * 1000),
+            'prepared_path' => $preparedPath,
+        ]);
+        // #endregion
+
         session([
             'import.mapping' => $mapping,
             'import.prepared_path' => $preparedPath,
@@ -113,6 +158,14 @@ class ImportController extends Controller
 
         $duplicates = array_values(array_filter($prepared, fn (array $row) => $row['existing_id'] !== null));
         $newCount = count($prepared) - count($duplicates);
+
+        // #region agent log
+        $__dbgLog('D', 'prepare_returning_view', [
+            'duplicate_count' => count($duplicates),
+            'new_count' => $newCount,
+            'total_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000),
+        ]);
+        // #endregion
 
         return view('import.duplicates', [
             'duplicates' => $duplicates,

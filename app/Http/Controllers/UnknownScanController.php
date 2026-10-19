@@ -25,7 +25,7 @@ class UnknownScanController extends Controller
         }
 
         $scans = UnknownScan::query()
-            ->with(['user', 'location.parent.parent', 'eventList', 'inventoryList', 'resolvedAsset'])
+            ->with(['user', 'location.parent.parent.parent.parent', 'eventList', 'inventoryList', 'resolvedAsset'])
             ->when($status === 'open', fn ($query) => $query->unresolved())
             ->when($status === 'resolved', fn ($query) => $query->whereNotNull('resolved_asset_id'))
             ->when($request->filled('q'), function ($query) use ($request) {
@@ -54,7 +54,7 @@ class UnknownScanController extends Controller
         $format = $data['format'] ?? 'xlsx';
 
         $query = UnknownScan::query()
-            ->with(['user', 'location.parent.parent', 'eventList', 'inventoryList', 'resolvedAsset'])
+            ->with(['user', 'location.parent.parent.parent.parent', 'eventList', 'inventoryList', 'resolvedAsset'])
             ->when($status === 'open', fn ($query) => $query->unresolved())
             ->when($status === 'resolved', fn ($query) => $query->whereNotNull('resolved_asset_id'))
             ->when(! empty($data['q']), function ($query) use ($data) {

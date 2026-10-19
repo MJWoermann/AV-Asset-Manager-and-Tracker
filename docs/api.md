@@ -145,7 +145,7 @@ Authenticated routes require `admin`, `inventory_manager`, or `scanner`. See `ro
 ### AI agent recipes
 
 1. **Stocktake:** `POST /api/scan-sessions` → `POST /api/scan` with `scan_session_id` → `POST /api/scan-sessions/{id}/close`.
-2. **Location tree:** `POST /api/locations` with `parent_id` / `type` (site → level → room → rack).
+2. **Location tree:** `POST /api/locations` with `parent_id` / `type` (site → building → level → room → rack).
 3. **Import assets:** `POST /api/import/upload` → `POST /api/import/prepare` with `mapping` → `POST /api/import/process`.
 4. **Scoped token:** Issue with explicit `abilities` array; use `*` only for full automation accounts.
 

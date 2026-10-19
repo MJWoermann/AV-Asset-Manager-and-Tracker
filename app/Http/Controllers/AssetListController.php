@@ -91,7 +91,7 @@ class AssetListController extends Controller
             'availableColumns' => AssetTableColumns::definitions(),
             'selectedColumns' => $selectedColumns,
             'statuses' => AssetStatus::options(),
-            'locations' => Location::with('parent.parent.parent')->orderBy('name')->get(),
+            'locations' => Location::with('parent.parent.parent.parent')->orderBy('name')->get(),
             'itemTypes' => ItemType::orderBy('name')->get(),
             'manufacturers' => Manufacturer::query()->orderBy('name')->get(['id', 'name']),
             'manufacturerModels' => ManufacturerModel::query()

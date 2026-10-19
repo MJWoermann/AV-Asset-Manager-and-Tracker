@@ -36,10 +36,15 @@ class LocationHierarchyTest extends TestCase
             'name' => 'Main Warehouse',
             'type' => LocationType::Site,
         ]);
+        $building = Location::create([
+            'name' => 'Building A',
+            'type' => LocationType::Building,
+            'parent_id' => $site->id,
+        ]);
         $level = Location::create([
             'name' => 'Ground Floor',
             'type' => LocationType::Level,
-            'parent_id' => $site->id,
+            'parent_id' => $building->id,
         ]);
         $room = Location::create([
             'name' => 'Store A',
@@ -52,10 +57,12 @@ class LocationHierarchyTest extends TestCase
         $response->assertOk();
         $response->assertSeeInOrder([
             'Main Warehouse',
+            'Building A',
             'Ground Floor',
             'Store A',
         ]);
         $response->assertSee(route('assets.index', ['location_id' => $site->id]), false);
+        $response->assertSee(route('assets.index', ['location_id' => $building->id]), false);
         $response->assertSee(route('assets.index', ['location_id' => $level->id]), false);
         $response->assertSee(route('assets.index', ['location_id' => $room->id]), false);
         $response->assertDontSee('Parent:');
@@ -155,6 +162,38 @@ class LocationHierarchyTest extends TestCase
         $this->assertDatabaseHas('locations', [
             'name' => 'Scanner Site',
             'type' => LocationType::Site->value,
+        ]);
+    }
+
+    public function test_create_form_includes_building_type_and_can_store_under_site(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('inventory_manager');
+
+        $site = Location::create([
+            'name' => 'Campus',
+            'type' => LocationType::Site,
+        ]);
+
+        $create = $this->actingAs($user)->get(route('locations.create'));
+        $create->assertOk();
+        $create->assertSee('Building', false);
+        $this->assertTrue(
+            collect($create->viewData('types'))->contains(
+                fn (LocationType $type): bool => $type === LocationType::Building
+            )
+        );
+
+        $this->actingAs($user)->post(route('locations.store'), [
+            'name' => 'North Building',
+            'type' => LocationType::Building->value,
+            'parent_id' => $site->id,
+        ])->assertRedirect(route('locations.index'));
+
+        $this->assertDatabaseHas('locations', [
+            'name' => 'North Building',
+            'type' => LocationType::Building->value,
+            'parent_id' => $site->id,
         ]);
     }
 

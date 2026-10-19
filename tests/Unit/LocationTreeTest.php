@@ -17,10 +17,15 @@ class LocationTreeTest extends TestCase
             'name' => 'Main Warehouse',
             'type' => LocationType::Site,
         ]);
+        $building = Location::create([
+            'name' => 'Building A',
+            'type' => LocationType::Building,
+            'parent_id' => $site->id,
+        ]);
         $level = Location::create([
             'name' => 'Ground Floor',
             'type' => LocationType::Level,
-            'parent_id' => $site->id,
+            'parent_id' => $building->id,
         ]);
         Location::create([
             'name' => 'Portable Pool',
@@ -33,7 +38,8 @@ class LocationTreeTest extends TestCase
         $this->assertCount(2, $tree);
         $this->assertSame('Main Warehouse', $tree->first()->name);
         $this->assertCount(1, $tree->first()->children);
-        $this->assertSame($level->id, $tree->first()->children->first()->id);
+        $this->assertSame($building->id, $tree->first()->children->first()->id);
+        $this->assertSame($level->id, $tree->first()->children->first()->children->first()->id);
         $this->assertSame('Portable Pool', $tree->last()->name);
         $this->assertCount(0, $tree->last()->children);
     }
@@ -86,10 +92,15 @@ class LocationTreeTest extends TestCase
             'name' => 'Main Warehouse',
             'type' => LocationType::Site,
         ]);
+        $building = Location::create([
+            'name' => 'Building A',
+            'type' => LocationType::Building,
+            'parent_id' => $site->id,
+        ]);
         $level = Location::create([
             'name' => 'Ground Floor',
             'type' => LocationType::Level,
-            'parent_id' => $site->id,
+            'parent_id' => $building->id,
         ]);
         $room = Location::create([
             'name' => 'Store A',
@@ -105,7 +116,7 @@ class LocationTreeTest extends TestCase
         $ids = Location::selfAndDescendantIds($site->id);
         sort($ids);
 
-        $expected = [$site->id, $level->id, $room->id];
+        $expected = [$site->id, $building->id, $level->id, $room->id];
         sort($expected);
 
         $this->assertSame($expected, $ids);

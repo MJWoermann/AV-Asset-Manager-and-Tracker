@@ -198,9 +198,9 @@ class AssetConnectionService
         $connections = $this->filteredConnections($filters)
             ->with([
                 'connectionType',
-                'interfaceA.asset.location.parent.parent.parent',
+                'interfaceA.asset.location.parent.parent.parent.parent',
                 'interfaceA.asset.itemType',
-                'interfaceB.asset.location.parent.parent.parent',
+                'interfaceB.asset.location.parent.parent.parent.parent',
                 'interfaceB.asset.itemType',
             ])
             ->get();

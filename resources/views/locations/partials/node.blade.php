@@ -9,6 +9,9 @@
         \App\Enums\LocationType::Site => $alternate
             ? 'bg-[#dcdcdc] dark:bg-[#3d4043] border-l-[3px] border-l-brand-charcoal'
             : 'bg-brand-silver dark:bg-brand-slate border-l-[3px] border-l-brand-charcoal',
+        \App\Enums\LocationType::Building => $alternate
+            ? 'bg-[#ddd6cc] dark:bg-[#3f3a34] border-l-[3px] border-l-[#8a7f72]'
+            : 'bg-[#efe9e0] dark:bg-[#342f2a] border-l-[3px] border-l-[#8a7f72]',
         \App\Enums\LocationType::Level => $alternate
             ? 'bg-[#cfdce6] dark:bg-[#3a4650] border-l-[3px] border-l-brand-grey-blue'
             : 'bg-[#e4edf3] dark:bg-[#313940] border-l-[3px] border-l-brand-grey-blue',

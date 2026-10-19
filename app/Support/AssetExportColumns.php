@@ -47,6 +47,7 @@ class AssetExportColumns
             'max_stock_level' => 'Max Stock Level',
             'location' => 'Location',
             'location_site' => 'Location: Site',
+            'location_building' => 'Location: Building',
             'location_level' => 'Location: Level',
             'location_room' => 'Location: Room',
             'location_rack' => 'Location: Rack',
@@ -259,7 +260,7 @@ class AssetExportColumns
         }
 
         if (self::needsLocation($columns)) {
-            $relations[] = 'location.parent.parent.parent';
+            $relations[] = 'location.parent.parent.parent.parent';
         }
 
         if (self::needsParent($columns)) {
@@ -290,6 +291,7 @@ class AssetExportColumns
             fn (string $column): bool => in_array($column, [
                 'location',
                 'location_site',
+                'location_building',
                 'location_level',
                 'location_room',
                 'location_rack',
@@ -357,6 +359,7 @@ class AssetExportColumns
             'max_stock_level' => $asset->max_stock_level !== null ? (string) $asset->max_stock_level : '',
             'location' => $asset->location?->breadcrumb() ?? '',
             'location_site' => self::locationNameByType($asset->location, LocationType::Site),
+            'location_building' => self::locationNameByType($asset->location, LocationType::Building),
             'location_level' => self::locationNameByType($asset->location, LocationType::Level),
             'location_room' => self::locationNameByType($asset->location, LocationType::Room),
             'location_rack' => self::locationNameByType($asset->location, LocationType::Rack),

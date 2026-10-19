@@ -165,7 +165,7 @@ class ImportEntityAliasTest extends TestCase
             'location_id' => $keep->id,
         ]);
 
-        $resolvedId = app(ImportService::class)->resolveLocation(null, 'store a', null);
+        $resolvedId = app(ImportService::class)->resolveLocation(null, null, 'store a', null);
 
         $this->assertSame($live->id, $resolvedId);
     }
