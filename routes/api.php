@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Admin\DepartmentApiController;
 use App\Http\Controllers\Api\Admin\InboundEmailActionApiController;
 use App\Http\Controllers\Api\Admin\UserApiController;
 use App\Http\Controllers\Api\AssetApiController;
+use App\Http\Controllers\Api\AssetCheckoutApiController;
 use App\Http\Controllers\Api\AssetConnectionApiController;
 use App\Http\Controllers\Api\AssetConnectionBusApiController;
 use App\Http\Controllers\Api\AssetInterfaceApiController;
@@ -60,6 +61,11 @@ Route::middleware(['auth:sanctum', 'role:admin,inventory_manager,scanner'])->gro
         ->middleware('abilities:assets:write');
     Route::delete('/assets/{asset}/maintenance-logs/{maintenanceLog}', [AssetApiController::class, 'destroyMaintenanceLog'])
         ->middleware('abilities:assets:write');
+
+    Route::post('/assets/{asset}/checkouts', [AssetCheckoutApiController::class, 'store'])
+        ->middleware('abilities:checkouts:write');
+    Route::post('/assets/{asset}/checkouts/{checkout}/return', [AssetCheckoutApiController::class, 'returnCheckout'])
+        ->middleware('abilities:checkouts:write');
 
     // Lists & scan
     Route::get('/lists', [AssetListApiController::class, 'index'])->middleware('abilities:lists:read');
