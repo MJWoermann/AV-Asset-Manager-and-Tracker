@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Models\Asset;
+use App\Models\AuditLog;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AssetDuplicateService
 {
@@ -264,5 +267,301 @@ class AssetDuplicateService
     public function labelForKey(string $key): string
     {
         return self::MATCH_KEY_LABELS[$key] ?? $key;
+    }
+
+    /**
+     * Filter detected groups by matched field and/or multi-field matches.
+     *
+     * @param  list<array{matched_on: list<string>, asset_ids?: list<int>, assets?: mixed, match_values?: array<string, string>, count?: int}>  $groups
+     * @return list<array{matched_on: list<string>, asset_ids?: list<int>, assets?: mixed, match_values?: array<string, string>, count?: int}>
+     */
+    public function filterGroups(array $groups, ?string $field = null, bool $multiFieldOnly = false): array
+    {
+        $field = $field !== null && $field !== '' ? $field : null;
+
+        if ($field !== null && ! in_array($field, self::MATCH_KEYS, true)) {
+            $field = null;
+        }
+
+        return array_values(array_filter(
+            $groups,
+            function (array $group) use ($field, $multiFieldOnly): bool {
+                $matchedOn = $group['matched_on'] ?? [];
+
+                if ($field !== null && ! in_array($field, $matchedOn, true)) {
+                    return false;
+                }
+
+                if ($multiFieldOnly && count($matchedOn) < 2) {
+                    return false;
+                }
+
+                return true;
+            }
+        ));
+    }
+
+    /**
+     * Clear duplicate-detection identifier fields on selected assets.
+     *
+     * @param  list<int>  $assetIds
+     * @param  list<string>  $fields
+     * @return array{cleared_assets: int, cleared_values: int}
+     */
+    public function clearIdentifierFields(array $assetIds, array $fields, int $userId): array
+    {
+        $ids = collect($assetIds)->map(fn ($id) => (int) $id)->filter(fn (int $id) => $id > 0)->unique()->values();
+        $fields = collect($fields)
+            ->map(fn ($field) => (string) $field)
+            ->filter(fn (string $field) => in_array($field, self::MATCH_KEYS, true))
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            throw ValidationException::withMessages([
+                'asset_ids' => 'Select at least one asset to clear.',
+            ]);
+        }
+
+        if ($fields->isEmpty()) {
+            throw ValidationException::withMessages([
+                'fields' => 'Select at least one identifier field to clear.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($ids, $fields, $userId) {
+            $assets = Asset::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+            if ($assets->count() !== $ids->count()) {
+                throw ValidationException::withMessages([
+                    'asset_ids' => 'One or more selected assets are not available in your department.',
+                ]);
+            }
+
+            $departmentIds = $assets
+                ->map(fn (Asset $asset) => $asset->department_id !== null ? (int) $asset->department_id : null)
+                ->unique()
+                ->values();
+
+            if ($departmentIds->count() > 1) {
+                throw ValidationException::withMessages([
+                    'asset_ids' => 'All selected assets must belong to the same department.',
+                ]);
+            }
+
+            $clearedAssets = 0;
+            $clearedValues = 0;
+
+            foreach ($ids as $id) {
+                /** @var Asset $asset */
+                $asset = $assets->get($id);
+                $oldValues = [];
+                $newValues = [];
+
+                foreach ($fields as $field) {
+                    $current = $asset->getAttribute($field);
+                    if ($current === null || (is_string($current) && trim($current) === '')) {
+                        continue;
+                    }
+
+                    $oldValues[$field] = $current;
+                    $newValues[$field] = null;
+                    $asset->setAttribute($field, null);
+                }
+
+                if ($oldValues === []) {
+                    continue;
+                }
+
+                // Avoid a generic "updated" log; write an explicit clear audit instead.
+                Asset::withoutEvents(function () use ($asset): void {
+                    $asset->save();
+                });
+
+                AuditLog::create([
+                    'user_id' => $userId,
+                    'department_id' => $asset->department_id !== null ? (int) $asset->department_id : null,
+                    'auditable_type' => Asset::class,
+                    'auditable_id' => $asset->id,
+                    'action' => 'cleared',
+                    'old_values' => $oldValues,
+                    'new_values' => array_merge($newValues, [
+                        'source' => 'duplicate_identifier_clear',
+                        'fields' => array_keys($oldValues),
+                    ]),
+                    'created_at' => now(),
+                ]);
+
+                $clearedAssets++;
+                $clearedValues += count($oldValues);
+            }
+
+            return [
+                'cleared_assets' => $clearedAssets,
+                'cleared_values' => $clearedValues,
+            ];
+        });
+    }
+
+    /**
+     * Set one selected asset as parent and the rest as its children.
+     *
+     * @param  list<int>  $assetIds
+     * @return array{parent_id: int, linked: int, skipped: int}
+     */
+    public function linkAsParentAndChildren(array $assetIds, int $parentId, int $userId): array
+    {
+        $ids = collect($assetIds)->map(fn ($id) => (int) $id)->filter(fn (int $id) => $id > 0)->unique()->values();
+
+        if ($ids->count() < 2) {
+            throw ValidationException::withMessages([
+                'asset_ids' => 'Select at least two assets to create a parent/child relationship.',
+            ]);
+        }
+
+        if (! $ids->contains($parentId)) {
+            throw ValidationException::withMessages([
+                'parent_id' => 'The parent must be one of the selected assets.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($ids, $parentId, $userId) {
+            $assets = Asset::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+            if ($assets->count() !== $ids->count()) {
+                throw ValidationException::withMessages([
+                    'asset_ids' => 'One or more selected assets are not available in your department.',
+                ]);
+            }
+
+            $departmentIds = $assets
+                ->map(fn (Asset $asset) => $asset->department_id !== null ? (int) $asset->department_id : null)
+                ->unique()
+                ->values();
+
+            if ($departmentIds->count() > 1) {
+                throw ValidationException::withMessages([
+                    'asset_ids' => 'All selected assets must belong to the same department.',
+                ]);
+            }
+
+            /** @var Asset $parent */
+            $parent = $assets->get($parentId);
+            $childIds = $ids->filter(fn (int $id) => $id !== $parentId)->values();
+
+            foreach ($childIds as $childId) {
+                /** @var Asset $child */
+                $child = $assets->get($childId);
+
+                if ($this->wouldCreateParentCycle($parent, $child)) {
+                    throw ValidationException::withMessages([
+                        'parent_id' => 'Cannot make "'.$parent->name.'" the parent of "'.$child->name.'" — that would create a cycle.',
+                    ]);
+                }
+            }
+
+            $linked = 0;
+            $skipped = 0;
+
+            foreach ($childIds as $childId) {
+                /** @var Asset $child */
+                $child = $assets->get($childId);
+
+                if ((int) ($child->parent_id ?? 0) === $parentId) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $oldParentId = $child->parent_id !== null ? (int) $child->parent_id : null;
+                $oldLocationId = $child->location_id !== null ? (int) $child->location_id : null;
+
+                $child->parent_id = $parentId;
+                $child->location_id = $parent->location_id;
+                if ($parent->department_id !== null) {
+                    $child->department_id = $parent->department_id;
+                }
+
+                // Skip AuditableObserver; write an explicit reparented audit instead.
+                // Location inheritance matches Asset::saving / updated cascade behaviour.
+                Asset::withoutEvents(function () use ($child): void {
+                    $child->save();
+                });
+
+                $this->cascadeLocationToDescendants($child, $parent->location_id !== null ? (int) $parent->location_id : null);
+
+                AuditLog::create([
+                    'user_id' => $userId,
+                    'department_id' => $child->department_id !== null ? (int) $child->department_id : null,
+                    'auditable_type' => Asset::class,
+                    'auditable_id' => $child->id,
+                    'action' => 'reparented',
+                    'old_values' => [
+                        'parent_id' => $oldParentId,
+                        'location_id' => $oldLocationId,
+                    ],
+                    'new_values' => [
+                        'parent_id' => $parentId,
+                        'location_id' => $child->location_id !== null ? (int) $child->location_id : null,
+                        'parent_name' => $parent->name,
+                        'source' => 'duplicate_parent_child',
+                    ],
+                    'created_at' => now(),
+                ]);
+
+                $linked++;
+            }
+
+            return [
+                'parent_id' => $parentId,
+                'linked' => $linked,
+                'skipped' => $skipped,
+            ];
+        });
+    }
+
+    /**
+     * True when $child is an ancestor of $parent (or is $parent), so parenting would cycle.
+     */
+    protected function wouldCreateParentCycle(Asset $parent, Asset $child): bool
+    {
+        if ((int) $parent->id === (int) $child->id) {
+            return true;
+        }
+
+        $ancestorId = $parent->parent_id;
+        $guard = 0;
+
+        while ($ancestorId !== null && $guard < 1000) {
+            if ((int) $ancestorId === (int) $child->id) {
+                return true;
+            }
+
+            $ancestorId = Asset::query()->withoutGlobalScopes()->whereKey($ancestorId)->value('parent_id');
+            $guard++;
+        }
+
+        return false;
+    }
+
+    protected function cascadeLocationToDescendants(Asset $asset, ?int $locationId): void
+    {
+        $children = Asset::query()->where('parent_id', $asset->id)->get();
+
+        foreach ($children as $child) {
+            if ((int) ($child->location_id ?? 0) === (int) ($locationId ?? 0)
+                && (($child->location_id === null) === ($locationId === null))) {
+                $this->cascadeLocationToDescendants($child, $locationId);
+
+                continue;
+            }
+
+            Asset::withoutEvents(function () use ($child, $locationId): void {
+                $child->location_id = $locationId;
+                $child->save();
+            });
+
+            $this->cascadeLocationToDescendants($child, $locationId);
+        }
     }
 }

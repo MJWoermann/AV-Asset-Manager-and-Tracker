@@ -63,12 +63,20 @@ class BulkAssetUpdateService
      */
     protected function applyFieldUpdates(array $payload, Collection $assetIds, int $userId): array
     {
-        $assets = Asset::query()->whereIn('id', $assetIds)->get();
+        $assets = Asset::query()
+            ->with('parent:id,department_id')
+            ->whereIn('id', $assetIds)
+            ->get()
+            // Parents first so department moves keep linked children when both are selected.
+            ->sortBy(fn (Asset $asset) => $asset->parent_id === null ? 0 : 1)
+            ->values();
+
         $fields = $payload['fields'] ?? [];
+        $selectedIds = $assets->pluck('id')->map(fn ($id) => (int) $id)->all();
         $updated = 0;
 
         foreach ($assets as $asset) {
-            $changes = $this->attributeChangesFor($asset, $fields);
+            $changes = $this->attributeChangesFor($asset, $fields, $selectedIds);
 
             if ($changes !== []) {
                 $asset->update($changes);
@@ -106,13 +114,14 @@ class BulkAssetUpdateService
 
     /**
      * @param  array<string, mixed>  $fields
+     * @param  list<int>  $selectedIds
      * @return array<string, mixed>
      */
-    protected function attributeChangesFor(Asset $asset, array $fields): array
+    protected function attributeChangesFor(Asset $asset, array $fields, array $selectedIds = []): array
     {
         $changes = [];
 
-        foreach (['status', 'location_id', 'parent_id', 'test_tag_expiry', 'warranty_expiry', 'notes'] as $attribute) {
+        foreach (['status', 'location_id', 'parent_id', 'department_id', 'test_tag_expiry', 'warranty_expiry', 'notes'] as $attribute) {
             if (! array_key_exists($attribute, $fields)) {
                 continue;
             }
@@ -125,6 +134,47 @@ class BulkAssetUpdateService
 
             $changes[$attribute] = $value;
         }
+
+        if (array_key_exists('department_id', $changes)) {
+            $changes = $this->departmentChangesFor($asset, $changes, $selectedIds);
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Detach from a parent that is not moving with this asset when the department changes.
+     *
+     * @param  array<string, mixed>  $changes
+     * @param  list<int>  $selectedIds
+     * @return array<string, mixed>
+     */
+    protected function departmentChangesFor(Asset $asset, array $changes, array $selectedIds): array
+    {
+        $newDepartmentId = (int) $changes['department_id'];
+
+        if ($asset->parent_id === null) {
+            return $changes;
+        }
+
+        // Explicit clear/reparent in the same request wins.
+        if (array_key_exists('parent_id', $changes)) {
+            return $changes;
+        }
+
+        $parentId = (int) $asset->parent_id;
+
+        if (in_array($parentId, $selectedIds, true)) {
+            return $changes;
+        }
+
+        $parentDepartmentId = $asset->parent?->department_id;
+
+        if ($parentDepartmentId !== null && (int) $parentDepartmentId === $newDepartmentId) {
+            return $changes;
+        }
+
+        $changes['parent_id'] = null;
 
         return $changes;
     }

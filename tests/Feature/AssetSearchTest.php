@@ -9,6 +9,7 @@ use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\Manufacturer;
 use App\Models\User;
+use App\Support\AssetSearch;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -62,6 +63,77 @@ class AssetSearchTest extends TestCase
         $response->assertOk();
         $response->assertSee('Partial Barcode Asset');
         $response->assertSee('<mark class="bg-brand/30 text-inherit rounded-sm px-0.5">ZX9</mark>', false);
+    }
+
+    public function test_search_matches_asset_id_number(): void
+    {
+        $user = $this->scanner();
+        $itemType = $this->itemType();
+
+        $asset = Asset::create([
+            'name' => 'ID Lookup Asset',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+        ]);
+
+        Asset::create([
+            'name' => 'Unrelated Asset',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+        ]);
+
+        $found = Asset::query()->search((string) $asset->id)->pluck('name')->all();
+        $this->assertContains('ID Lookup Asset', $found);
+
+        $foundByHash = Asset::query()->search('#'.$asset->id)->pluck('name')->all();
+        $this->assertContains('ID Lookup Asset', $foundByHash);
+
+        $this->actingAs($user)
+            ->getJson(route('assets.search', ['q' => '#'.$asset->id]))
+            ->assertOk()
+            ->assertJsonFragment(['id' => $asset->id])
+            ->assertJsonFragment(['name' => 'ID Lookup Asset']);
+    }
+
+    public function test_parent_search_endpoint_limits_to_top_level_and_excludes_self(): void
+    {
+        $user = $this->scanner();
+        $itemType = $this->itemType();
+
+        $parent = Asset::create([
+            'name' => 'Top Level Parent',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'tp_barcode' => 'TOP-PARENT-1',
+        ]);
+        $child = Asset::create([
+            'name' => 'Nested Child',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'parent_id' => $parent->id,
+            'tp_barcode' => 'NESTED-CHILD-1',
+        ]);
+        $other = Asset::create([
+            'name' => 'Another Top',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'tp_barcode' => 'TOP-OTHER-2',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->getJson(route('assets.search', [
+                'q' => 'TOP',
+                'parents_only' => 1,
+                'exclude_id' => $other->id,
+            ]));
+
+        $response->assertOk();
+        $ids = collect($response->json('data'))->pluck('id')->all();
+
+        $this->assertContains($parent->id, $ids);
+        $this->assertNotContains($child->id, $ids);
+        $this->assertNotContains($other->id, $ids);
+        $response->assertJsonFragment(['label' => AssetSearch::optionLabel($parent->fresh())]);
     }
 
     public function test_exact_identifier_match_ranks_above_partial_name_match(): void

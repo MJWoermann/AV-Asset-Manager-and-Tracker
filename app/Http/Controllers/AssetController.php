@@ -13,6 +13,7 @@ use App\Models\AssetList;
 use App\Models\AssetRuPlacement;
 use App\Models\ConnectionType;
 use App\Models\CustomFieldDefinition;
+use App\Models\Department;
 use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\Manufacturer;
@@ -34,6 +35,7 @@ use App\Services\StockMovementService;
 use App\Support\AssetBrowseFilters;
 use App\Support\AssetHistoryFilters;
 use App\Support\AssetMaintenanceFilters;
+use App\Support\AssetSearch;
 use App\Support\AssetTableColumns;
 use App\Support\EmailIntegrationSettings;
 use App\Support\PageSize;
@@ -41,6 +43,7 @@ use App\Support\StockTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -82,8 +85,11 @@ class AssetController extends Controller
                 ->with('manufacturer:id,name')
                 ->orderBy('name')
                 ->get(['id', 'name', 'manufacturer_id']),
-            'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
+            'parents' => collect(),
             'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
+            'departments' => $request->user()?->hasRole('admin')
+                ? Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name'])
+                : collect(),
         ]);
     }
 
@@ -91,32 +97,28 @@ class AssetController extends Controller
     {
         $term = trim($request->string('q')->toString());
         $searchTerm = $term !== '' ? $term : null;
+        $excludeId = $request->filled('exclude_id') ? $request->integer('exclude_id') : null;
 
         $assets = Asset::query()
             ->with(['itemType:id,name'])
+            ->when($request->boolean('parents_only'), fn ($query) => $query->whereNull('parent_id'))
+            ->when($excludeId !== null, fn ($query) => $query->where('id', '!=', $excludeId))
             ->search($searchTerm)
             ->orderBySearchRelevance($searchTerm)
             ->limit(20)
-            ->get(['id', 'name', 'tp_barcode', 'fmi_ast', 'serial_number', 'item_type_id']);
+            ->get(['id', 'name', 'tp_barcode', 'fmi_ast', 'rig_tag', 'serial_number', 'item_type_id']);
 
         return response()->json([
             'data' => $assets->map(static function (Asset $asset): array {
-                $parts = array_filter([
-                    $asset->tp_barcode,
-                    $asset->fmi_ast,
-                    $asset->serial_number,
-                ]);
-
                 return [
                     'id' => $asset->id,
                     'name' => $asset->name,
                     'tp_barcode' => $asset->tp_barcode,
                     'fmi_ast' => $asset->fmi_ast,
+                    'rig_tag' => $asset->rig_tag,
                     'serial_number' => $asset->serial_number,
                     'item_type' => $asset->itemType?->name,
-                    'label' => $parts === []
-                        ? $asset->name
-                        : $asset->name.' ('.implode(' · ', $parts).')',
+                    'label' => AssetSearch::optionLabel($asset),
                 ];
             })->values(),
         ]);
@@ -562,6 +564,37 @@ class AssetController extends Controller
     }
 
     /**
+     * Seed only the currently selected parent for the async parent picker.
+     *
+     * @return Collection<int, array{value: int, label: string}>
+     */
+    protected function selectedParentOptions(mixed $selectedParentId, ?int $excludeId = null): Collection
+    {
+        if ($selectedParentId === null || $selectedParentId === '') {
+            return collect();
+        }
+
+        $parentId = (int) $selectedParentId;
+
+        if ($parentId < 1 || ($excludeId !== null && $parentId === $excludeId)) {
+            return collect();
+        }
+
+        $parent = Asset::query()
+            ->whereKey($parentId)
+            ->first(['id', 'name', 'tp_barcode', 'fmi_ast', 'rig_tag', 'serial_number']);
+
+        if ($parent === null) {
+            return collect();
+        }
+
+        return collect([[
+            'value' => $parent->id,
+            'label' => AssetSearch::optionLabel($parent),
+        ]]);
+    }
+
+    /**
      * @param  array<string, mixed>  $extra
      * @return array<string, mixed>
      */
@@ -604,11 +637,10 @@ class AssetController extends Controller
             'locations' => Location::orderBy('name')->get(),
             'manufacturers' => $manufacturers,
             'modelsByManufacturer' => $modelsByManufacturer,
-            'parents' => Asset::query()
-                ->whereNull('parent_id')
-                ->when($asset->exists, fn ($q) => $q->where('id', '!=', $asset->id))
-                ->orderBy('name')
-                ->get(),
+            'parents' => $this->selectedParentOptions(
+                old('parent_id', $asset->parent_id),
+                $asset->exists ? (int) $asset->id : null,
+            ),
             'statuses' => AssetStatus::options(),
             'ruVisualiserEnabled' => auth()->user()?->hasDeveloperFeature('ru_visualiser') ?? false,
             'itemTypesSupportRu' => $itemTypes

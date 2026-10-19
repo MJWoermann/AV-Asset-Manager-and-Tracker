@@ -77,31 +77,8 @@ class ImportController extends Controller
         set_time_limit(0);
         ini_set('memory_limit', '512M');
 
-        // #region agent log
-        $__dbgPrepareT0 = microtime(true);
-        $__dbgLog = function (string $hypothesisId, string $message, array $data = []) use ($__dbgPrepareT0): void {
-            $payload = [
-                'sessionId' => 'd766ca',
-                'runId' => 'dup-check-3',
-                'hypothesisId' => $hypothesisId,
-                'location' => 'ImportController.php:prepare',
-                'message' => $message,
-                'data' => array_merge([
-                    'elapsed_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000),
-                    'memory_mb' => (int) round(memory_get_usage(true) / 1048576),
-                    'peak_memory_mb' => (int) round(memory_get_peak_usage(true) / 1048576),
-                    'memory_limit' => ini_get('memory_limit'),
-                ], $data),
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ];
-            @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
-        };
-        $__dbgLog('P', 'prepare_entered');
-        // #endregion
-
         try {
             $path = session('import.path');
-            $columns = session('import.columns', []);
 
             if (! $path || ! Storage::exists($path)) {
                 return redirect()->route('import.create')->withErrors(['file' => 'Import session expired. Upload again.']);
@@ -114,10 +91,6 @@ class ImportController extends Controller
                 ])['mapping']
             );
 
-            // #region agent log
-            $__dbgLog('P', 'mapping_validated', ['mapping_count' => count($mapping)]);
-            // #endregion
-
             try {
                 $rows = $this->imports->readRows(Storage::path($path));
             } catch (ValidationException $e) {
@@ -127,16 +100,8 @@ class ImportController extends Controller
                 return redirect()->route('import.create')->withErrors($e->errors());
             }
 
-            // #region agent log
-            $__dbgLog('P', 'readRows_done', ['row_count' => $rows->count()]);
-            // #endregion
-
             $prepared = $this->imports->prepareRows($rows, $mapping);
             unset($rows);
-
-            // #region agent log
-            $__dbgLog('P', 'prepareRows_done', ['prepared_count' => count($prepared)]);
-            // #endregion
 
             $this->imports->rememberMapping($mapping, $request->user()?->id);
 
@@ -146,13 +111,6 @@ class ImportController extends Controller
             }
 
             $preparedPath = $this->imports->storePreparedRows($prepared, $request->user()?->id);
-
-            // #region agent log
-            $__dbgLog('P', 'store_done', [
-                'prepared_path' => $preparedPath,
-                'store_bytes' => Storage::exists($preparedPath) ? (int) Storage::size($preparedPath) : 0,
-            ]);
-            // #endregion
 
             session([
                 'import.mapping' => $mapping,
@@ -177,15 +135,6 @@ class ImportController extends Controller
             $duplicatesHiddenCount = max(0, $duplicateCount - count($duplicatesPreview));
             unset($prepared);
 
-            // #region agent log
-            $__dbgLog('P', 'prepare_returning_view', [
-                'duplicate_count' => $duplicateCount,
-                'duplicates_preview' => count($duplicatesPreview),
-                'duplicates_hidden' => $duplicatesHiddenCount,
-                'new_count' => $newCount,
-            ]);
-            // #endregion
-
             return view('import.duplicates', [
                 'duplicates' => $duplicatesPreview,
                 'duplicateCount' => $duplicateCount,
@@ -198,15 +147,6 @@ class ImportController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (Throwable $e) {
-            // #region agent log
-            $__dbgLog('P', 'prepare_exception', [
-                'exception' => $e::class,
-                'error' => Str::limit($e->getMessage(), 240),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-            // #endregion
-
             report($e);
 
             return redirect()->route('import.create')->withErrors([

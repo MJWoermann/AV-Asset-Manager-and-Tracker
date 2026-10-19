@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Asset;
 use App\Models\ItemType;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -46,6 +47,44 @@ class AssetFormTest extends TestCase
         $response->assertSee('name="parent_id"', false);
         $response->assertSee('name="manufacturer_id"', false);
         $response->assertSee('+ Add new manufacturer…', false);
+        $response->assertSee('searchUrl:', false);
+        $response->assertSee('parents_only', false);
+        $response->assertSee('Search by name, ID#, barcode…', false);
+    }
+
+    public function test_edit_form_seeds_only_selected_parent_option(): void
+    {
+        $user = $this->manager();
+        $itemType = ItemType::create([
+            'name' => 'LX Fixture',
+            'slug' => 'lx-fixture',
+        ]);
+
+        $parent = Asset::factory()->create([
+            'name' => 'Selected Parent Rack',
+            'item_type_id' => $itemType->id,
+            'tp_barcode' => 'PARENT-TP-1',
+        ]);
+        $other = Asset::factory()->create([
+            'name' => 'Other Parent Should Not Embed',
+            'item_type_id' => $itemType->id,
+            'tp_barcode' => 'OTHER-TP-9',
+        ]);
+        $child = Asset::factory()->create([
+            'name' => 'Child Asset',
+            'item_type_id' => $itemType->id,
+            'parent_id' => $parent->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('assets.edit', $child));
+
+        $response->assertOk();
+        $response->assertSee('Selected Parent Rack', false);
+        $response->assertSee('PARENT-TP-1', false);
+        $response->assertSee('#'.$parent->id, false);
+        $response->assertDontSee('Other Parent Should Not Embed', false);
+        $response->assertDontSee('OTHER-TP-9', false);
+        $response->assertSee('exclude_id', false);
     }
 
     public function test_create_form_marks_required_fields(): void

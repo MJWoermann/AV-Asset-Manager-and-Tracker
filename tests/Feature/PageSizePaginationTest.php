@@ -75,6 +75,9 @@ class PageSizePaginationTest extends TestCase
         $response->assertSee('value="200"', false);
         $response->assertSee('value="500"', false);
         $response->assertSee('value="all"', false);
+        // Inline onchange must use window.URL — bare URL is document.URL (string) in that scope.
+        $response->assertSee('new window.URL(window.location.href)', false);
+        $response->assertDontSee('new URL(window.location.href)', false);
 
         $response->assertViewHas('assets', function (LengthAwarePaginator $assets): bool {
             return $assets->perPage() === 50

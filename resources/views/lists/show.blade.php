@@ -36,6 +36,7 @@
             'clear_location' => false,
             'update_parent' => false,
             'clear_parent' => false,
+            'update_department' => false,
             'update_test_tag_expiry' => false,
             'clear_test_tag_expiry' => false,
             'update_warranty_expiry' => false,
@@ -81,6 +82,7 @@
             :locations="$locations"
             :parents="$parents"
             :lists="$lists"
+            :departments="$departments"
             :current-list="$list"
         />
 

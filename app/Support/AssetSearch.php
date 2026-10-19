@@ -58,6 +58,7 @@ class AssetSearch
     public static function fieldLabels(): array
     {
         return [
+            'id' => 'ID#',
             'name' => 'Name',
             'description' => 'Description',
             'manufacturer' => 'Manufacturer',
@@ -92,7 +93,7 @@ class AssetSearch
     /**
      * OR a single token's like-pattern across asset searchable fields (for nested queries).
      */
-    public static function orWhereTokenMatches(Builder $group, string $like): void
+    public static function orWhereTokenMatches(Builder $group, string $like, string $token = ''): void
     {
         foreach (self::COLUMNS as $column) {
             $group->orWhereLike($column, $like);
@@ -109,6 +110,47 @@ class AssetSearch
             'customFieldValues',
             fn (Builder $cf) => $cf->whereLike('value', $like)
         );
+
+        self::orWhereIdMatches($group, $token);
+    }
+
+    /**
+     * Match primary key when the token is digits or #digits (exact or partial).
+     */
+    public static function orWhereIdMatches(Builder $group, string $token): void
+    {
+        $idToken = str_starts_with($token, '#') ? substr($token, 1) : $token;
+
+        if ($idToken === '' || ! ctype_digit($idToken)) {
+            return;
+        }
+
+        $group->orWhere('id', (int) $idToken);
+
+        $idLike = '%'.self::escapeLike($idToken).'%';
+        $cast = $group->getConnection()->getDriverName() === 'sqlite'
+            ? 'CAST(id AS TEXT)'
+            : 'CAST(id AS CHAR)';
+
+        $group->orWhereRaw($cast.' LIKE ?', [$idLike]);
+    }
+
+    /**
+     * Compact label for parent / asset pickers (name + ID + identifiers).
+     */
+    public static function optionLabel(Asset $asset): string
+    {
+        $parts = array_values(array_filter([
+            '#'.$asset->id,
+            $asset->tp_barcode,
+            $asset->fmi_ast,
+            $asset->rig_tag,
+            $asset->serial_number,
+        ], static fn ($part) => $part !== null && $part !== ''));
+
+        return $parts === []
+            ? (string) $asset->name
+            : $asset->name.' ('.implode(' · ', $parts).')';
     }
 
     public static function constrain(Builder $query, ?string $term): Builder
@@ -116,7 +158,7 @@ class AssetSearch
         return TextSearch::constrain(
             $query,
             $term,
-            fn (Builder $group, string $like) => self::orWhereTokenMatches($group, $like)
+            fn (Builder $group, string $like, string $token) => self::orWhereTokenMatches($group, $like, $token)
         );
     }
 
@@ -131,6 +173,7 @@ class AssetSearch
         $lower = mb_strtolower($trimmed);
         $prefix = self::escapeLike($trimmed).'%';
         $contains = '%'.self::escapeLike($trimmed).'%';
+        $idTerm = str_starts_with($trimmed, '#') ? substr($trimmed, 1) : $trimmed;
 
         $otherColumns = array_values(array_diff(self::COLUMNS, [...self::IDENTIFIERS, 'name']));
 
@@ -139,6 +182,12 @@ class AssetSearch
         $prefixIdentifier = [];
         $containsIdentifier = [];
         $bindings = [];
+        $exactIdClause = null;
+
+        if ($idTerm !== '' && ctype_digit($idTerm)) {
+            $exactIdClause = 'id = ?';
+            $bindings[] = (int) $idTerm;
+        }
 
         foreach (self::IDENTIFIERS as $column) {
             $exactIdentifier[] = "LOWER({$column}) = ?";
@@ -164,8 +213,12 @@ class AssetSearch
             $bindings[] = $contains;
         }
 
+        $exactWhen = $exactIdClause !== null
+            ? $exactIdClause.' OR '.implode(' OR ', $exactIdentifier)
+            : implode(' OR ', $exactIdentifier);
+
         $sql = 'CASE'
-            .' WHEN '.implode(' OR ', $exactIdentifier).' THEN 0'
+            .' WHEN '.$exactWhen.' THEN 0'
             .' WHEN LOWER(name) = ? THEN 1'
             .' WHEN '.implode(' OR ', $exactOther).' THEN 2'
             .' WHEN '.implode(' OR ', $prefixIdentifier).' THEN 3'
@@ -220,6 +273,21 @@ class AssetSearch
 
         $full = trim((string) $term);
         $best = null;
+        $idTerm = str_starts_with($full, '#') ? substr($full, 1) : $full;
+
+        if ($idTerm !== '' && ctype_digit($idTerm)) {
+            $idValue = (string) $asset->id;
+            $score = self::scoreValue($idValue, $idTerm, [$idTerm]);
+
+            if ($score !== null) {
+                $best = [
+                    'field' => 'id',
+                    'label' => self::fieldLabels()['id'],
+                    'value' => '#'.$asset->id,
+                    'score' => $score,
+                ];
+            }
+        }
 
         foreach (self::COLUMNS as $column) {
             $value = (string) ($asset->{$column} ?? '');

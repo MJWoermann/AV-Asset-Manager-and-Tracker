@@ -9,6 +9,7 @@ use App\Models\Asset;
 use App\Models\AssetCheckout;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
+use App\Models\Department;
 use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\User;
@@ -45,6 +46,14 @@ class BulkUpdateAssetsTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('scanner');
+
+        return $user;
+    }
+
+    protected function admin(): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole('admin');
 
         return $user;
     }
@@ -390,5 +399,108 @@ class BulkUpdateAssetsTest extends TestCase
         $response->assertOk();
         $response->assertSee('bulkSelection(', false);
         $response->assertSee('Remove from this list');
+    }
+
+    public function test_admin_can_bulk_update_department_and_cascades_to_children(): void
+    {
+        $user = $this->admin();
+        $target = Department::factory()->create([
+            'name' => 'Lighting',
+            'slug' => 'lighting',
+            'is_active' => true,
+        ]);
+
+        $parent = $this->makeAsset(['name' => 'Rack']);
+        $child = $this->makeAsset(['name' => 'Amp', 'parent_id' => $parent->id]);
+        $originalDepartmentId = (int) $parent->department_id;
+
+        $response = $this->actingAs($user)->post(route('assets.bulk-update'), [
+            'action' => 'update',
+            'asset_ids' => [$parent->id],
+            'update_department' => '1',
+            'department_id' => $target->id,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status');
+
+        $this->assertSame($target->id, (int) $parent->fresh()->department_id);
+        $this->assertSame($target->id, (int) $child->fresh()->department_id);
+        $this->assertSame($parent->id, (int) $child->fresh()->parent_id);
+        $this->assertNotSame($originalDepartmentId, $target->id);
+    }
+
+    public function test_admin_bulk_department_update_detaches_child_when_parent_not_selected(): void
+    {
+        $user = $this->admin();
+        $target = Department::factory()->create([
+            'name' => 'Audio',
+            'slug' => 'audio',
+            'is_active' => true,
+        ]);
+
+        $parent = $this->makeAsset(['name' => 'Parent rack']);
+        $child = $this->makeAsset(['name' => 'Child amp', 'parent_id' => $parent->id]);
+
+        $response = $this->actingAs($user)->post(route('assets.bulk-update'), [
+            'action' => 'update',
+            'asset_ids' => [$child->id],
+            'update_department' => '1',
+            'department_id' => $target->id,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('status');
+
+        $this->assertSame($target->id, (int) $child->fresh()->department_id);
+        $this->assertNull($child->fresh()->parent_id);
+        $this->assertNotSame($target->id, (int) $parent->fresh()->department_id);
+    }
+
+    public function test_non_admin_cannot_bulk_update_department(): void
+    {
+        $user = $this->manager();
+        $target = Department::factory()->create([
+            'name' => 'Video',
+            'slug' => 'video',
+            'is_active' => true,
+        ]);
+        $asset = $this->makeAsset();
+        $originalDepartmentId = (int) $asset->department_id;
+
+        $response = $this->actingAs($user)->from(route('assets.index'))->post(route('assets.bulk-update'), [
+            'action' => 'update',
+            'asset_ids' => [$asset->id],
+            'update_department' => '1',
+            'department_id' => $target->id,
+        ]);
+
+        $response->assertRedirect(route('assets.index'));
+        $response->assertSessionHasErrors('update_department');
+        $this->assertSame($originalDepartmentId, (int) $asset->fresh()->department_id);
+    }
+
+    public function test_admin_sees_department_bulk_control_on_assets_index(): void
+    {
+        $user = $this->admin();
+        $this->makeAsset();
+
+        $response = $this->actingAs($user)->get(route('assets.index'));
+
+        $response->assertOk();
+        $response->assertSee('Update department');
+        $response->assertSee('name="update_department"', false);
+    }
+
+    public function test_manager_does_not_see_department_bulk_control(): void
+    {
+        $user = $this->manager();
+        $this->makeAsset();
+
+        $response = $this->actingAs($user)->get(route('assets.index'));
+
+        $response->assertOk();
+        $response->assertDontSee('Update department');
+        $response->assertDontSee('name="update_department"', false);
     }
 }

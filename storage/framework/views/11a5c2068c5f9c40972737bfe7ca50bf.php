@@ -50,6 +50,7 @@
             'clear_location' => false,
             'update_parent' => false,
             'clear_parent' => false,
+            'update_department' => false,
             'update_test_tag_expiry' => false,
             'clear_test_tag_expiry' => false,
             'update_warranty_expiry' => false,
@@ -119,14 +120,14 @@
 
         <?php if (isset($component)) { $__componentOriginal9ffcf2017585465c912ad277f9f14b73 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal9ffcf2017585465c912ad277f9f14b73 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.bulk-asset-actions','data' => ['statuses' => $statuses,'locations' => $locations,'parents' => $parents,'lists' => $lists]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.bulk-asset-actions','data' => ['statuses' => $statuses,'locations' => $locations,'parents' => $parents,'lists' => $lists,'departments' => $departments]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('bulk-asset-actions'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['statuses' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($statuses),'locations' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($locations),'parents' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($parents),'lists' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($lists)]); ?>
+<?php $component->withAttributes(['statuses' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($statuses),'locations' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($locations),'parents' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($parents),'lists' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($lists),'departments' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($departments)]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal9ffcf2017585465c912ad277f9f14b73)): ?>

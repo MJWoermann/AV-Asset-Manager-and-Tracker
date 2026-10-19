@@ -6,6 +6,7 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'locations',
     'parents',
     'lists',
+    'departments' => null,
     'currentList' => null,
     'canDelete' => false,
 ]));
@@ -28,6 +29,7 @@ foreach (array_filter(([
     'locations',
     'parents',
     'lists',
+    'departments' => null,
     'currentList' => null,
     'canDelete' => false,
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
@@ -44,6 +46,8 @@ unset($__defined_vars, $__key, $__value); ?>
 
 <?php
     $canDelete = $canDelete || auth()->user()?->hasAnyRole(['admin', 'inventory_manager']);
+    $canChangeDepartment = auth()->user()?->hasRole('admin') ?? false;
+    $departments = collect($departments ?? []);
 ?>
 
 <div
@@ -166,14 +170,18 @@ unset($__defined_vars, $__key, $__value); ?>
                 </label>
                 <?php if (isset($component)) { $__componentOriginal93f56a9791a1857c74a51e0e80d6e731 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal93f56a9791a1857c74a51e0e80d6e731 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.searchable-select','data' => ['name' => 'parent_id','id' => 'bulk_parent_id','options' => $parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->name]),'nullable' => true,'placeholder' => 'Select parent']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.searchable-select','data' => ['name' => 'parent_id','id' => 'bulk_parent_id','options' => collect($parents ?? [])->map(fn ($parent) => is_array($parent)
+                        ? $parent
+                        : ['value' => $parent->id, 'label' => \App\Support\AssetSearch::optionLabel($parent)]),'searchUrl' => route('assets.search'),'searchParams' => ['parents_only' => 1],'nullable' => true,'placeholder' => 'Search by name, ID#, barcode…']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('searchable-select'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['name' => 'parent_id','id' => 'bulk_parent_id','options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->name])),'nullable' => true,'placeholder' => 'Select parent']); ?>
+<?php $component->withAttributes(['name' => 'parent_id','id' => 'bulk_parent_id','options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(collect($parents ?? [])->map(fn ($parent) => is_array($parent)
+                        ? $parent
+                        : ['value' => $parent->id, 'label' => \App\Support\AssetSearch::optionLabel($parent)])),'search-url' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(route('assets.search')),'search-params' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(['parents_only' => 1]),'nullable' => true,'placeholder' => 'Search by name, ID#, barcode…']); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal93f56a9791a1857c74a51e0e80d6e731)): ?>
@@ -185,6 +193,29 @@ unset($__defined_vars, $__key, $__value); ?>
 <?php unset($__componentOriginal93f56a9791a1857c74a51e0e80d6e731); ?>
 <?php endif; ?>
             </fieldset>
+
+            <?php if($canChangeDepartment && $departments->isNotEmpty()): ?>
+                <fieldset class="space-y-2 border border-brand-silver dark:border-brand-charcoal p-3">
+                    <legend class="px-1 font-medium">Department</legend>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="update_department" value="1" x-model="fields.update_department">
+                        <span>Update department</span>
+                    </label>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Child assets follow the parent. Moving a child alone clears its parent link.
+                    </p>
+                    <select
+                        name="department_id"
+                        class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                        :disabled="!fields.update_department"
+                    >
+                        <option value="">Select department</option>
+                        <?php $__currentLoopData = $departments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $department): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($department->id); ?>"><?php echo e($department->name); ?></option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </select>
+                </fieldset>
+            <?php endif; ?>
 
             <fieldset class="space-y-2 border border-brand-silver dark:border-brand-charcoal p-3">
                 <legend class="px-1 font-medium">Test &amp; Tag expiry</legend>

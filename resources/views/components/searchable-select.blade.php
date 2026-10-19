@@ -11,6 +11,8 @@
     'form' => null,
     'autoSubmit' => false,
     'compact' => false,
+    'searchUrl' => null,
+    'searchParams' => [],
 ])
 
 @php
@@ -56,6 +58,8 @@
         createOption: @js($create),
         autoSubmit: @js((bool) $autoSubmit),
         compact: @js((bool) $compact),
+        searchUrl: @js($searchUrl),
+        searchParams: @js($searchParams ?: new \stdClass),
     })"
     @keydown="onKeydown($event)"
     @click.outside="closeList()"
@@ -111,8 +115,11 @@
             >
         </div>
         <ul class="max-h-60 overflow-y-auto py-1 text-sm">
-            <template x-if="filtered.length === 0">
-                <li class="px-3 py-2 text-brand-charcoal dark:text-brand-silver">No matches</li>
+            <template x-if="remoteLoading">
+                <li class="px-3 py-2 text-brand-charcoal dark:text-brand-silver">Searching…</li>
+            </template>
+            <template x-if="! remoteLoading && filtered.length === 0">
+                <li class="px-3 py-2 text-brand-charcoal dark:text-brand-silver" x-text="emptyMessage"></li>
             </template>
             <template x-for="(option, index) in filtered" :key="option.value === '' ? '__empty__' : option.value">
                 <li>

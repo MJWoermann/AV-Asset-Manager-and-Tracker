@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ClearDuplicateIdentifierFieldsRequest;
+use App\Http\Requests\LinkDuplicateParentChildrenRequest;
 use App\Http\Requests\MergeAssetsRequest;
 use App\Http\Requests\PreviewAssetMergeRequest;
 use App\Models\Asset;
@@ -13,15 +15,31 @@ use Illuminate\View\View;
 
 class AssetDuplicateController extends Controller
 {
-    public function index(AssetDuplicateService $duplicates): View
+    public function index(Request $request, AssetDuplicateService $duplicates): View
     {
-        $groups = $duplicates->findGroups();
+        $fieldFilter = $request->string('field')->toString();
+        if ($fieldFilter !== '' && ! in_array($fieldFilter, AssetDuplicateService::MATCH_KEYS, true)) {
+            $fieldFilter = '';
+        }
+
+        $multiFieldOnly = $request->boolean('multi');
+
+        $allGroups = $duplicates->findGroups();
+        $groups = $duplicates->filterGroups(
+            $allGroups,
+            $fieldFilter !== '' ? $fieldFilter : null,
+            $multiFieldOnly,
+        );
 
         return view('assets.duplicates.index', [
             'groups' => $groups,
             'groupCount' => count($groups),
             'assetCount' => collect($groups)->sum('count'),
+            'totalGroupCount' => count($allGroups),
             'matchKeyLabels' => AssetDuplicateService::MATCH_KEY_LABELS,
+            'fieldFilter' => $fieldFilter,
+            'multiFieldOnly' => $multiFieldOnly,
+            'filtersActive' => $fieldFilter !== '' || $multiFieldOnly,
         ]);
     }
 
@@ -75,6 +93,8 @@ class AssetDuplicateController extends Controller
             $valueMatrix[$key]['_all_blank'] = $nonBlank->count() === 0;
         }
 
+        $quantityTotal = $assets->sum(fn (Asset $asset): int => max(1, (int) ($asset->quantity ?? 1)));
+
         return view('assets.duplicates.merge', [
             'assets' => $assets,
             'rows' => $rows,
@@ -83,6 +103,7 @@ class AssetDuplicateController extends Controller
             'defaultCustomFields' => $defaults['custom_fields'],
             'emptySource' => AssetMergeService::EMPTY_SOURCE,
             'maxAssets' => AssetMergeService::MAX_ASSETS,
+            'quantityTotal' => $quantityTotal,
         ]);
     }
 
@@ -96,6 +117,7 @@ class AssetDuplicateController extends Controller
             $payload['fields'],
             $payload['custom_fields'],
             (int) $request->user()->id,
+            $payload['set_quantity_to_total'],
         );
 
         $deleted = $result['deleted'];
@@ -106,6 +128,63 @@ class AssetDuplicateController extends Controller
                 'status',
                 'Merged '.$deleted.' duplicate '.($deleted === 1 ? 'asset' : 'assets').' into #'.$result['survivor']->id.'.'
             );
+    }
+
+    public function clearFields(ClearDuplicateIdentifierFieldsRequest $request, AssetDuplicateService $duplicates): RedirectResponse
+    {
+        $payload = $request->clearPayload();
+
+        $result = $duplicates->clearIdentifierFields(
+            $payload['asset_ids'],
+            $payload['fields'],
+            (int) $request->user()->id,
+        );
+
+        $assetCount = $result['cleared_assets'];
+        $valueCount = $result['cleared_values'];
+
+        if ($assetCount === 0) {
+            return redirect()
+                ->route('assets.duplicates.index')
+                ->with('status', 'No identifier values needed clearing on the selected assets.');
+        }
+
+        return redirect()
+            ->route('assets.duplicates.index')
+            ->with(
+                'status',
+                'Cleared '.$valueCount.' identifier '.($valueCount === 1 ? 'value' : 'values')
+                .' on '.$assetCount.' '.($assetCount === 1 ? 'asset' : 'assets').'.'
+            );
+    }
+
+    public function linkParentChildren(LinkDuplicateParentChildrenRequest $request, AssetDuplicateService $duplicates): RedirectResponse
+    {
+        $payload = $request->linkPayload();
+
+        $result = $duplicates->linkAsParentAndChildren(
+            $payload['asset_ids'],
+            $payload['parent_id'],
+            (int) $request->user()->id,
+        );
+
+        $linked = $result['linked'];
+        $skipped = $result['skipped'];
+
+        if ($linked === 0 && $skipped > 0) {
+            return redirect()
+                ->route('assets.duplicates.index')
+                ->with('status', 'Selected assets were already linked under that parent.');
+        }
+
+        $message = 'Linked '.$linked.' '.($linked === 1 ? 'asset' : 'assets').' as children of #'.$result['parent_id'].'.';
+        if ($skipped > 0) {
+            $message .= ' '.$skipped.' already had that parent.';
+        }
+
+        return redirect()
+            ->route('assets.duplicates.index')
+            ->with('status', $message);
     }
 
     /**

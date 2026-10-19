@@ -32,6 +32,7 @@ class BulkUpdateAssetsRequest extends FormRequest
             'clear_location',
             'update_parent',
             'clear_parent',
+            'update_department',
             'update_test_tag_expiry',
             'clear_test_tag_expiry',
             'update_warranty_expiry',
@@ -103,6 +104,14 @@ class BulkUpdateAssetsRequest extends FormRequest
                 'exists:assets,id',
             ],
 
+            'update_department' => ['sometimes', 'boolean'],
+            'department_id' => [
+                Rule::requiredIf(fn () => $this->boolean('update_department')),
+                'nullable',
+                'integer',
+                Rule::exists('departments', 'id')->where('is_active', true),
+            ],
+
             'update_test_tag_expiry' => ['sometimes', 'boolean'],
             'clear_test_tag_expiry' => ['sometimes', 'boolean'],
             'test_tag_expiry' => [
@@ -162,6 +171,7 @@ class BulkUpdateAssetsRequest extends FormRequest
                 'clear_location',
                 'update_parent',
                 'clear_parent',
+                'update_department',
                 'update_test_tag_expiry',
                 'clear_test_tag_expiry',
                 'update_warranty_expiry',
@@ -174,6 +184,10 @@ class BulkUpdateAssetsRequest extends FormRequest
 
             if (! $hasFieldUpdate && ! $hasListAction) {
                 $validator->errors()->add('action', 'Select at least one field or list action to apply.');
+            }
+
+            if ($this->boolean('update_department') && ! $this->user()?->hasRole('admin')) {
+                $validator->errors()->add('update_department', 'Only administrators can change department.');
             }
 
             if ($this->boolean('remove_from_list') && blank($this->input('current_list_id'))) {
@@ -233,6 +247,10 @@ class BulkUpdateAssetsRequest extends FormRequest
             $fields['parent_id'] = null;
         } elseif ($this->boolean('update_parent')) {
             $fields['parent_id'] = $this->validated('parent_id');
+        }
+
+        if ($this->boolean('update_department')) {
+            $fields['department_id'] = (int) $this->validated('department_id');
         }
 
         if ($this->boolean('clear_test_tag_expiry')) {

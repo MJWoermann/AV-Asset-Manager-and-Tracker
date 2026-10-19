@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AssetStatus;
-use App\Models\Asset;
+use App\Http\Requests\BulkUpdateAssetListsRequest;
 use App\Models\AssetList;
+use App\Models\Department;
 use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\Manufacturer;
 use App\Models\ManufacturerModel;
+use App\Services\BulkAssetListUpdateService;
 use App\Support\AssetBrowseFilters;
 use App\Support\AssetTableColumns;
 use App\Support\PageSize;
@@ -18,11 +20,37 @@ use Illuminate\View\View;
 
 class AssetListController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $lists = AssetList::withCount('items')->orderBy('type')->orderBy('name')->get();
 
-        return view('lists.index', compact('lists'));
+        return view('lists.index', [
+            'lists' => $lists,
+            'departments' => $request->user()?->hasRole('admin')
+                ? Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name'])
+                : collect(),
+        ]);
+    }
+
+    public function bulkUpdate(BulkUpdateAssetListsRequest $request, BulkAssetListUpdateService $bulkUpdate): RedirectResponse
+    {
+        $result = $bulkUpdate->handle($request->bulkPayload());
+
+        return redirect()->route('lists.index')->with('status', $this->bulkStatusMessage($result));
+    }
+
+    /**
+     * @param  array{updated: int}  $result
+     */
+    protected function bulkStatusMessage(array $result): string
+    {
+        $updated = (int) ($result['updated'] ?? 0);
+
+        if ($updated === 0) {
+            return 'No changes applied.';
+        }
+
+        return $updated.' list'.($updated === 1 ? '' : 's').' updated.';
     }
 
     public function create(): View
@@ -100,8 +128,11 @@ class AssetListController extends Controller
                 ->with('manufacturer:id,name')
                 ->orderBy('name')
                 ->get(['id', 'name', 'manufacturer_id']),
-            'parents' => Asset::whereNull('parent_id')->orderBy('name')->get(),
+            'parents' => collect(),
             'lists' => AssetList::orderBy('type')->orderBy('name')->get(),
+            'departments' => $request->user()?->hasRole('admin')
+                ? Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name'])
+                : collect(),
         ]);
     }
 

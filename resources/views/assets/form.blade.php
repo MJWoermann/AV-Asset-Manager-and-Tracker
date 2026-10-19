@@ -108,8 +108,14 @@
                     <x-searchable-select
                         name="parent_id"
                         id="parent_id"
-                        :options="$parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->name])"
+                        :options="$parents"
                         :selected="old('parent_id', $asset->parent_id)"
+                        :search-url="route('assets.search')"
+                        :search-params="array_filter([
+                            'parents_only' => 1,
+                            'exclude_id' => $asset->exists ? $asset->id : null,
+                        ])"
+                        placeholder="Search by name, ID#, barcode…"
                         nullable
                     />
                     <x-input-error :messages="$errors->get('parent_id')" class="mt-1" />

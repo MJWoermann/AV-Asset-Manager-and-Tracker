@@ -141,6 +141,10 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
             ->name('assets.duplicates.merge');
         Route::post('/assets/duplicates/merge', [AssetDuplicateController::class, 'merge'])
             ->name('assets.duplicates.merge.store');
+        Route::post('/assets/duplicates/clear', [AssetDuplicateController::class, 'clearFields'])
+            ->name('assets.duplicates.clear');
+        Route::post('/assets/duplicates/parent-child', [AssetDuplicateController::class, 'linkParentChildren'])
+            ->name('assets.duplicates.parent-child');
         Route::post('/assets/duplicates/start', [AssetDuplicateController::class, 'startFromSelection'])
             ->name('assets.duplicates.start');
     });
@@ -257,6 +261,9 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     });
 
     Route::get('/lists', [AssetListController::class, 'index'])->name('lists.index');
+    Route::post('/lists/bulk-update', [AssetListController::class, 'bulkUpdate'])
+        ->middleware('role:admin')
+        ->name('lists.bulk-update');
     Route::get('/lists/{list}', [AssetListController::class, 'show'])->name('lists.show');
 
     Route::get('/scan', [ScanController::class, 'index'])->name('scan.index');

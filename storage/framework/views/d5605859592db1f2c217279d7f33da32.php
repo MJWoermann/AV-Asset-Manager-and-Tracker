@@ -14,6 +14,8 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'form' => null,
     'autoSubmit' => false,
     'compact' => false,
+    'searchUrl' => null,
+    'searchParams' => [],
 ]));
 
 foreach ($attributes->all() as $__key => $__value) {
@@ -42,6 +44,8 @@ foreach (array_filter(([
     'form' => null,
     'autoSubmit' => false,
     'compact' => false,
+    'searchUrl' => null,
+    'searchParams' => [],
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
     $$__key = $$__key ?? $__value;
 }
@@ -98,6 +102,8 @@ unset($__defined_vars, $__key, $__value); ?>
         createOption: <?php echo \Illuminate\Support\Js::from($create)->toHtml() ?>,
         autoSubmit: <?php echo \Illuminate\Support\Js::from((bool) $autoSubmit)->toHtml() ?>,
         compact: <?php echo \Illuminate\Support\Js::from((bool) $compact)->toHtml() ?>,
+        searchUrl: <?php echo \Illuminate\Support\Js::from($searchUrl)->toHtml() ?>,
+        searchParams: <?php echo \Illuminate\Support\Js::from($searchParams ?: new \stdClass)->toHtml() ?>,
     })"
     @keydown="onKeydown($event)"
     @click.outside="closeList()"
@@ -153,8 +159,11 @@ unset($__defined_vars, $__key, $__value); ?>
             >
         </div>
         <ul class="max-h-60 overflow-y-auto py-1 text-sm">
-            <template x-if="filtered.length === 0">
-                <li class="px-3 py-2 text-brand-charcoal dark:text-brand-silver">No matches</li>
+            <template x-if="remoteLoading">
+                <li class="px-3 py-2 text-brand-charcoal dark:text-brand-silver">Searching…</li>
+            </template>
+            <template x-if="! remoteLoading && filtered.length === 0">
+                <li class="px-3 py-2 text-brand-charcoal dark:text-brand-silver" x-text="emptyMessage"></li>
             </template>
             <template x-for="(option, index) in filtered" :key="option.value === '' ? '__empty__' : option.value">
                 <li>

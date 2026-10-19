@@ -618,6 +618,12 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     disabled: Boolean(config.disabled),
     autoSubmit: Boolean(config.autoSubmit),
     compact: Boolean(config.compact),
+    searchUrl: config.searchUrl || null,
+    searchParams: config.searchParams && typeof config.searchParams === 'object'
+        ? config.searchParams
+        : {},
+    remoteLoading: false,
+    selectedOption: null,
     createOption: config.createOption
         ? {
               value: String(config.createOption.value),
@@ -630,6 +636,8 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     fieldName: '',
     panelStyle: {},
     _reposition: null,
+    _searchTimer: null,
+    _searchSeq: 0,
 
     init() {
         this.rootEl = this.$el;
@@ -640,26 +648,56 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
                 this.updatePanelPosition();
             }
         };
+
+        if (this.value) {
+            const seeded = this.options.find((o) => o.value === this.value);
+            if (seeded) {
+                this.selectedOption = { value: seeded.value, label: seeded.label };
+            }
+        }
+
+        if (this.searchUrl) {
+            this.$watch('query', (q) => {
+                if (!this.open) {
+                    return;
+                }
+                clearTimeout(this._searchTimer);
+                this._searchTimer = setTimeout(() => this.fetchRemote(q), 200);
+            });
+        }
+    },
+
+    get emptyMessage() {
+        if (this.searchUrl && !this.query.trim()) {
+            return 'Type to search…';
+        }
+
+        return 'No matches';
     },
 
     get selectedLabel() {
         if (this.createOption && this.value === this.createOption.value) {
             return this.createOption.label;
         }
+        if (this.selectedOption && this.selectedOption.value === this.value) {
+            return this.selectedOption.label;
+        }
         const opt = this.options.find((o) => o.value === this.value);
         return opt ? opt.label : this.placeholder;
     },
 
     get filtered() {
-        const q = this.query.trim();
         let list = this.options;
 
-        if (q) {
-            list = this.options
-                .map((option) => ({ option, score: matchScore(option.label, q) }))
-                .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
-                .sort((a, b) => a.score - b.score || a.option.label.localeCompare(b.option.label))
-                .map((entry) => entry.option);
+        if (!this.searchUrl) {
+            const q = this.query.trim();
+            if (q) {
+                list = this.options
+                    .map((option) => ({ option, score: matchScore(option.label, q) }))
+                    .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
+                    .sort((a, b) => a.score - b.score || a.option.label.localeCompare(b.option.label))
+                    .map((entry) => entry.option);
+            }
         }
 
         if (this.createOption) {
@@ -671,6 +709,55 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
 
     highlightedLabel(label) {
         return highlightSearchTerm(label, this.query);
+    },
+
+    async fetchRemote(q = '') {
+        if (!this.searchUrl) {
+            return;
+        }
+
+        const seq = ++this._searchSeq;
+        this.remoteLoading = true;
+
+        try {
+            const url = new URL(this.searchUrl, window.location.origin);
+            url.searchParams.set('q', String(q ?? '').trim());
+            Object.entries(this.searchParams || {}).forEach(([key, value]) => {
+                if (value === null || value === undefined || value === '') {
+                    return;
+                }
+                url.searchParams.set(key, String(value));
+            });
+
+            const response = await fetch(url.toString(), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+
+            if (seq !== this._searchSeq) {
+                return;
+            }
+
+            if (!response.ok) {
+                this.options = [];
+                return;
+            }
+
+            const payload = await response.json();
+            this.options = (payload.data || []).map((row) => ({
+                value: String(row.id ?? row.value ?? ''),
+                label: String(row.label ?? row.name ?? ''),
+            })).filter((option) => option.value !== '');
+        } catch (error) {
+            if (seq === this._searchSeq) {
+                this.options = [];
+            }
+        } finally {
+            if (seq === this._searchSeq) {
+                this.remoteLoading = false;
+                this.$nextTick(() => this.updatePanelPosition());
+            }
+        }
     },
 
     updatePanelPosition() {
@@ -723,12 +810,17 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             this.updatePanelPosition();
             this.$refs.search?.focus();
         });
+        if (this.searchUrl) {
+            this.fetchRemote(this.query);
+        }
     },
 
     closeList() {
         this.open = false;
         this.query = '';
         this.highlight = -1;
+        this.remoteLoading = false;
+        clearTimeout(this._searchTimer);
         this.unbindPanelListeners();
     },
 
@@ -768,6 +860,7 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
 
     select(option) {
         this.value = option.value;
+        this.selectedOption = { value: option.value, label: option.label };
         this.closeList();
         this.emitChanged();
     },
@@ -781,6 +874,14 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
 
     setValue(next, { emit = false } = {}) {
         this.value = next === null || next === undefined ? '' : String(next);
+        if (this.value === '') {
+            this.selectedOption = null;
+        } else {
+            const opt = this.options.find((o) => o.value === this.value);
+            if (opt) {
+                this.selectedOption = { value: opt.value, label: opt.label };
+            }
+        }
         if (emit) {
             this.emitChanged();
         }
@@ -798,6 +899,7 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             return;
         }
         this.value = '';
+        this.selectedOption = null;
         this.closeList();
         this.emitChanged();
     },
@@ -840,6 +942,7 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     },
 
     destroy() {
+        clearTimeout(this._searchTimer);
         this.unbindPanelListeners();
     },
 }));
@@ -3149,6 +3252,7 @@ const BULK_ASSET_FIELDS = {
     clear_location: false,
     update_parent: false,
     clear_parent: false,
+    update_department: false,
     update_test_tag_expiry: false,
     clear_test_tag_expiry: false,
     update_warranty_expiry: false,

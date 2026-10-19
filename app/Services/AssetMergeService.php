@@ -8,6 +8,7 @@ use App\Models\AssetCustomFieldValue;
 use App\Models\AssetInterface;
 use App\Models\AssetListItem;
 use App\Models\AssetMaintenanceLog;
+use App\Models\AssetMergeAlias;
 use App\Models\AssetRuPlacement;
 use App\Models\AssetStockToken;
 use App\Models\AuditLog;
@@ -109,6 +110,10 @@ class AssetMergeService
     /**
      * Merge with explicit per-field source asset ids (or EMPTY_SOURCE to clear).
      *
+     * When $setQuantityToTotal is true, survivor quantity becomes the sum of each
+     * selected asset's quantity (treating blank/zero as 1), overriding the quantity
+     * field selector.
+     *
      * @param  list<int>  $assetIds
      * @param  array<string, int|string|null>  $fieldSources  field => asset id | EMPTY_SOURCE
      * @param  array<int, int|string|null>  $customFieldSources  definition id => asset id | EMPTY_SOURCE
@@ -120,8 +125,9 @@ class AssetMergeService
         array $fieldSources,
         array $customFieldSources,
         int $userId,
+        bool $setQuantityToTotal = false,
     ): array {
-        return DB::transaction(function () use ($assetIds, $survivorId, $fieldSources, $customFieldSources, $userId) {
+        return DB::transaction(function () use ($assetIds, $survivorId, $fieldSources, $customFieldSources, $userId, $setQuantityToTotal) {
             $ids = collect($assetIds)->map(fn ($id) => (int) $id)->unique()->values();
 
             $this->assertMergeSelection($ids, $survivorId);
@@ -153,8 +159,22 @@ class AssetMergeService
 
             $this->resolveSurvivorParent($survivor, $duplicates, $duplicateIds);
 
+            if ($setQuantityToTotal) {
+                // Field selector for quantity is ignored when totaling.
+                unset($fieldSources['quantity']);
+            }
+
             $appliedFields = $this->applyFieldSources($survivor, $assets, $fieldSources);
             $appliedCustom = $this->applyCustomFieldSources($survivor, $assets, $customFieldSources);
+
+            if ($setQuantityToTotal) {
+                $totalQuantity = $this->sumAssetQuantities($assets);
+                if ((int) ($survivor->quantity ?? 0) !== $totalQuantity) {
+                    $survivor->quantity = $totalQuantity;
+                    $appliedFields[] = 'quantity';
+                }
+                $fieldSources['quantity'] = 'total_merged';
+            }
 
             if ($appliedFields !== [] || $survivor->isDirty()) {
                 $survivor->save();
@@ -171,6 +191,7 @@ class AssetMergeService
             $after = $this->snapshotAsset($survivor->fresh(['customFieldValues']));
 
             foreach ($duplicates as $duplicate) {
+                AssetMergeAlias::recordAbsorbedAsset($duplicate, $survivor);
                 $this->logMergedAsset(
                     $survivor,
                     $duplicate,
@@ -245,6 +266,7 @@ class AssetMergeService
             $deleted = 0;
 
             foreach ($duplicates as $duplicate) {
+                AssetMergeAlias::recordAbsorbedAsset($duplicate, $survivor);
                 $this->logMergedAssetSimple($survivor, $duplicate, $userId);
                 $duplicate->delete();
                 $deleted++;
@@ -982,5 +1004,15 @@ class AssetMergeService
         }
 
         return (string) $a === (string) $b;
+    }
+
+    /**
+     * Sum quantities across assets; treat blank/zero as 1 so unit assets count.
+     *
+     * @param  Collection<int, Asset>  $assets
+     */
+    public function sumAssetQuantities(Collection $assets): int
+    {
+        return (int) $assets->sum(fn (Asset $asset): int => max(1, (int) ($asset->quantity ?? 1)));
     }
 }

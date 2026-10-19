@@ -3,12 +3,15 @@
     'locations',
     'parents',
     'lists',
+    'departments' => null,
     'currentList' => null,
     'canDelete' => false,
 ])
 
 @php
     $canDelete = $canDelete || auth()->user()?->hasAnyRole(['admin', 'inventory_manager']);
+    $canChangeDepartment = auth()->user()?->hasRole('admin') ?? false;
+    $departments = collect($departments ?? []);
 @endphp
 
 <div
@@ -119,11 +122,38 @@
                 <x-searchable-select
                     name="parent_id"
                     id="bulk_parent_id"
-                    :options="$parents->map(fn ($parent) => ['value' => $parent->id, 'label' => $parent->name])"
+                    :options="collect($parents ?? [])->map(fn ($parent) => is_array($parent)
+                        ? $parent
+                        : ['value' => $parent->id, 'label' => \App\Support\AssetSearch::optionLabel($parent)])"
+                    :search-url="route('assets.search')"
+                    :search-params="['parents_only' => 1]"
                     nullable
-                    placeholder="Select parent"
+                    placeholder="Search by name, ID#, barcode…"
                 />
             </fieldset>
+
+            @if($canChangeDepartment && $departments->isNotEmpty())
+                <fieldset class="space-y-2 border border-brand-silver dark:border-brand-charcoal p-3">
+                    <legend class="px-1 font-medium">Department</legend>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="update_department" value="1" x-model="fields.update_department">
+                        <span>Update department</span>
+                    </label>
+                    <p class="text-xs text-brand-charcoal dark:text-brand-silver">
+                        Child assets follow the parent. Moving a child alone clears its parent link.
+                    </p>
+                    <select
+                        name="department_id"
+                        class="w-full rounded border-brand-charcoal/30 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                        :disabled="!fields.update_department"
+                    >
+                        <option value="">Select department</option>
+                        @foreach($departments as $department)
+                            <option value="{{ $department->id }}">{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </fieldset>
+            @endif
 
             <fieldset class="space-y-2 border border-brand-silver dark:border-brand-charcoal p-3">
                 <legend class="px-1 font-medium">Test &amp; Tag expiry</legend>

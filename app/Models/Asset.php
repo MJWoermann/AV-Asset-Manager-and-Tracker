@@ -109,6 +109,12 @@ class Asset extends Model
                     $child->update(['location_id' => $asset->location_id]);
                 });
             }
+
+            if ($asset->wasChanged('department_id')) {
+                $asset->children()->each(function (Asset $child) use ($asset) {
+                    $child->update(['department_id' => $asset->department_id]);
+                });
+            }
         });
 
         static::deleting(function (Asset $asset): void {

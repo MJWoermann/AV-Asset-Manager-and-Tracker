@@ -10,6 +10,7 @@ use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
+use App\Models\AssetMergeAlias;
 use App\Models\CustomFieldDefinition;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
@@ -1539,6 +1540,8 @@ class ImportService
             self::DUPLICATE_KEYS,
         )));
 
+        $duplicateService = app(AssetDuplicateService::class);
+
         foreach ($valuesByKey as $key => $valueSet) {
             $values = array_keys($valueSet);
             if ($values === []) {
@@ -1564,26 +1567,123 @@ class ImportService
                     $lookupKey = (string) $lookup;
                     // Match query()->where()->first() behaviour: keep the earliest id.
                     if (! isset($map[$lookupKey])) {
-                        $map[$lookupKey] = [
-                            'id' => (int) $asset->id,
-                            'name' => $asset->name,
-                            'serial_number' => $asset->serial_number ?? null,
-                            'fmi_ast' => $asset->fmi_ast ?? null,
-                            'mac_address' => $asset->mac_address ?? null,
-                            'rig_tag' => $asset->rig_tag ?? null,
-                            'tp_barcode' => $asset->tp_barcode ?? null,
-                            'ip_address' => $asset->ip_address ?? null,
-                        ];
+                        $map[$lookupKey] = $this->assetMatchSummaryFromRow($asset);
                     }
                 }
 
                 unset($found);
+
+                $this->mergeAliasMatchesIntoIndex($map, $key, $valueChunk, $duplicateService, $columns);
             }
 
             $indexes[$key] = $map;
         }
 
         return $indexes;
+    }
+
+    /**
+     * Map absorbed (merged) identifier values onto their survivor asset summaries.
+     *
+     * @param  array<string, array<string, mixed>>  $map
+     * @param  list<string>  $valueChunk
+     * @param  list<string>  $columns
+     */
+    protected function mergeAliasMatchesIntoIndex(
+        array &$map,
+        string $key,
+        array $valueChunk,
+        AssetDuplicateService $duplicateService,
+        array $columns,
+    ): void {
+        $normalizedByRaw = [];
+        $normalizedValues = [];
+
+        foreach ($valueChunk as $raw) {
+            $normalized = $duplicateService->normalise($key, $raw);
+            if ($normalized === null) {
+                continue;
+            }
+
+            $normalizedByRaw[(string) $raw] = $normalized;
+            $normalizedValues[$normalized] = true;
+        }
+
+        if ($normalizedByRaw === []) {
+            return;
+        }
+
+        $aliases = AssetMergeAlias::query()
+            ->where('field', $key)
+            ->where(function ($query) use ($valueChunk, $normalizedValues): void {
+                $query->whereIn('value', $valueChunk);
+                if ($normalizedValues !== []) {
+                    $query->orWhereIn('value_normalized', array_keys($normalizedValues));
+                }
+            })
+            ->get(['survivor_asset_id', 'value', 'value_normalized']);
+
+        if ($aliases->isEmpty()) {
+            return;
+        }
+
+        $survivorIds = $aliases->pluck('survivor_asset_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $survivors = Asset::query()
+            ->select($columns)
+            ->whereIn('id', $survivorIds)
+            ->orderBy('id')
+            ->toBase()
+            ->get()
+            ->keyBy('id');
+
+        /** @var array<string, array<string, mixed>> $aliasSummaryByNorm */
+        $aliasSummaryByNorm = [];
+        /** @var array<string, array<string, mixed>> $aliasSummaryByValue */
+        $aliasSummaryByValue = [];
+
+        foreach ($aliases as $alias) {
+            $survivor = $survivors->get($alias->survivor_asset_id);
+            if ($survivor === null) {
+                continue;
+            }
+
+            $summary = $this->assetMatchSummaryFromRow($survivor);
+            $aliasSummaryByValue[(string) $alias->value] = $summary;
+            $aliasSummaryByNorm[(string) $alias->value_normalized] = $summary;
+        }
+
+        foreach ($valueChunk as $raw) {
+            $lookupKey = (string) $raw;
+            if (isset($map[$lookupKey])) {
+                continue;
+            }
+
+            $summary = $aliasSummaryByValue[$lookupKey]
+                ?? $aliasSummaryByNorm[$normalizedByRaw[$lookupKey] ?? '']
+                ?? null;
+
+            if ($summary !== null) {
+                $map[$lookupKey] = $summary;
+            }
+        }
+    }
+
+    /**
+     * @param  object{id: mixed, name: mixed, serial_number?: mixed, fmi_ast?: mixed, mac_address?: mixed, rig_tag?: mixed, tp_barcode?: mixed, ip_address?: mixed}  $asset
+     * @return array{id: int, name: mixed, serial_number: mixed, fmi_ast: mixed, mac_address: mixed, rig_tag: mixed, tp_barcode: mixed, ip_address: mixed}
+     */
+    protected function assetMatchSummaryFromRow(object $asset): array
+    {
+        return [
+            'id' => (int) $asset->id,
+            'name' => $asset->name,
+            'serial_number' => $asset->serial_number ?? null,
+            'fmi_ast' => $asset->fmi_ast ?? null,
+            'mac_address' => $asset->mac_address ?? null,
+            'rig_tag' => $asset->rig_tag ?? null,
+            'tp_barcode' => $asset->tp_barcode ?? null,
+            'ip_address' => $asset->ip_address ?? null,
+        ];
     }
 
     /**
@@ -1600,6 +1700,8 @@ class ImportService
         $matchedOn = [];
         $summary = null;
 
+        $columns = array_values(array_unique(array_merge(['id', 'name'], self::DUPLICATE_KEYS)));
+
         foreach (self::DUPLICATE_KEYS as $key) {
             $value = $payload[$key] ?? null;
             if ($value === null || $value === '') {
@@ -1610,20 +1712,19 @@ class ImportService
                 $found = $indexes[$key][(string) $value] ?? null;
             } else {
                 $asset = Asset::query()
-                    ->select(array_values(array_unique(array_merge(['id', 'name'], self::DUPLICATE_KEYS))))
+                    ->select($columns)
                     ->where($key, $value)
                     ->orderBy('id')
                     ->first();
-                $found = $asset ? [
-                    'id' => (int) $asset->id,
-                    'name' => $asset->name,
-                    'serial_number' => $asset->serial_number,
-                    'fmi_ast' => $asset->fmi_ast,
-                    'mac_address' => $asset->mac_address,
-                    'rig_tag' => $asset->rig_tag,
-                    'tp_barcode' => $asset->tp_barcode,
-                    'ip_address' => $asset->ip_address,
-                ] : null;
+                $found = $asset ? $this->assetMatchSummaryFromRow($asset) : null;
+
+                if ($found === null) {
+                    $survivorId = AssetMergeAlias::resolveSurvivorId($key, $value);
+                    if ($survivorId !== null) {
+                        $aliased = Asset::query()->select($columns)->find($survivorId);
+                        $found = $aliased ? $this->assetMatchSummaryFromRow($aliased) : null;
+                    }
+                }
             }
 
             if ($found) {

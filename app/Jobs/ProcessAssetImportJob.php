@@ -45,27 +45,9 @@ class ProcessAssetImportJob
         ini_set('memory_limit', '512M');
         ignore_user_abort(true);
 
-        // #region agent log
-        $t0 = microtime(true);
-        $log = function (string $message, array $data = []) use ($t0): void {
-            @file_put_contents(base_path('debug-d766ca.log'), json_encode([
-                'sessionId' => 'd766ca',
-                'runId' => 'commit-bg',
-                'hypothesisId' => 'COMMIT',
-                'location' => 'ProcessAssetImportJob.php:handle',
-                'message' => $message,
-                'data' => array_merge([
-                    'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
-                ], $data),
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ])."\n", FILE_APPEND);
-        };
-        $log('commit_bg_start', ['prepared_path' => $this->preparedPath]);
-        // #endregion
-
         try {
             $prepared = $imports->loadPreparedRows($this->preparedPath);
-            $counts = $imports->commit(
+            $imports->commit(
                 $prepared,
                 $this->actions,
                 false,
@@ -74,7 +56,6 @@ class ProcessAssetImportJob
                 $this->userId,
             );
 
-            $archived = false;
             if (Storage::exists($this->uploadPath)) {
                 try {
                     $attachments->storeFromAbsolutePath(
@@ -86,7 +67,6 @@ class ProcessAssetImportJob
                             'note' => 'Archived from a successful asset import.',
                         ],
                     );
-                    $archived = true;
                 } catch (Throwable $e) {
                     report($e);
                 }
@@ -94,23 +74,7 @@ class ProcessAssetImportJob
             }
 
             $imports->forgetPreparedRows($this->preparedPath);
-
-            // #region agent log
-            $log('commit_bg_done', [
-                'created' => $counts['created'],
-                'updated' => $counts['updated'],
-                'replaced' => $counts['replaced'],
-                'skipped' => $counts['skipped'],
-                'archived' => $archived,
-            ]);
-            // #endregion
         } catch (Throwable $e) {
-            // #region agent log
-            $log('commit_bg_failed', [
-                'exception' => $e::class,
-                'error' => mb_substr($e->getMessage(), 0, 240),
-            ]);
-            // #endregion
             report($e);
         }
     }

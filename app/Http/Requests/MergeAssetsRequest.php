@@ -31,6 +31,10 @@ class MergeAssetsRequest extends FormRequest
             $merged['confirm_merge'] = $this->boolean('confirm_merge');
         }
 
+        if ($this->has('set_quantity_to_total')) {
+            $merged['set_quantity_to_total'] = $this->boolean('set_quantity_to_total');
+        }
+
         $this->merge($merged);
     }
 
@@ -42,6 +46,7 @@ class MergeAssetsRequest extends FormRequest
             'asset_ids.*' => ['integer', 'distinct', 'exists:assets,id'],
             'survivor_id' => ['required', 'integer', 'exists:assets,id'],
             'confirm_merge' => ['accepted'],
+            'set_quantity_to_total' => ['sometimes', 'boolean'],
             'fields' => ['nullable', 'array'],
             'fields.*' => ['nullable', 'string'],
             'custom_fields' => ['nullable', 'array'],
@@ -121,7 +126,8 @@ class MergeAssetsRequest extends FormRequest
      *     asset_ids: list<int>,
      *     survivor_id: int,
      *     fields: array<string, string>,
-     *     custom_fields: array<int, string>
+     *     custom_fields: array<int, string>,
+     *     set_quantity_to_total: bool
      * }
      */
     public function mergePayload(): array
@@ -152,6 +158,7 @@ class MergeAssetsRequest extends FormRequest
             'survivor_id' => (int) $this->validated('survivor_id'),
             'fields' => $fields,
             'custom_fields' => $custom,
+            'set_quantity_to_total' => $this->boolean('set_quantity_to_total'),
         ];
     }
 }

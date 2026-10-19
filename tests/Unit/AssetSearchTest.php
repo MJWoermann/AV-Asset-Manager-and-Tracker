@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Models\Asset;
 use App\Support\AssetSearch;
 use Tests\TestCase;
 
@@ -38,5 +39,22 @@ class AssetSearchTest extends TestCase
     {
         $this->assertTrue(AssetSearch::matchesText('Yamaha Mixer Desk', 'Yamaha Mixer'));
         $this->assertFalse(AssetSearch::matchesText('Yamaha Mixer Desk', 'Yamaha Camera'));
+    }
+
+    public function test_option_label_includes_id_and_identifiers(): void
+    {
+        $asset = new Asset([
+            'name' => 'Rack A',
+            'tp_barcode' => 'TP-1',
+            'fmi_ast' => 'FMI-9',
+            'rig_tag' => null,
+            'serial_number' => 'SN-3',
+        ]);
+        $asset->id = 42;
+
+        $this->assertSame(
+            'Rack A (#42 · TP-1 · FMI-9 · SN-3)',
+            AssetSearch::optionLabel($asset)
+        );
     }
 }

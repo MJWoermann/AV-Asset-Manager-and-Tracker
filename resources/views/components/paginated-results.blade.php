@@ -29,10 +29,11 @@
 
         <label class="inline-flex items-center gap-2 text-sm text-brand-charcoal dark:text-brand-silver">
             <span>Per page</span>
+            {{-- Inline handlers resolve bare URL to document.URL (string); use window.URL. --}}
             <select
                 class="rounded border-brand-charcoal/40 bg-white text-sm dark:bg-black dark:border-brand-charcoal dark:text-white"
                 aria-label="Results per page"
-                onchange="(() => { const url = new URL(window.location.href); url.searchParams.set('{{ PageSize::PARAM }}', this.value); url.searchParams.delete('page'); window.location.assign(url.toString()); })()"
+                onchange="{{-- #region agent log --}}fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1576a3'},body:JSON.stringify({sessionId:'1576a3',runId:'post-fix',hypothesisId:'D',location:'paginated-results.blade.php',message:'navigate',data:{value:this.value,href:location.href},timestamp:Date.now()})}).catch(function(){});{{-- #endregion --}}var u=new window.URL(window.location.href);u.searchParams.set('{{ PageSize::PARAM }}',this.value);u.searchParams.delete('page');window.location.assign(u.toString());"
             >
                 @foreach (PageSize::OPTIONS as $size)
                     <option value="{{ $size }}" @selected($selected === $size)>{{ $size }}</option>

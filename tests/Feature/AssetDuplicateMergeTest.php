@@ -3,15 +3,19 @@
 namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
+use App\Enums\LocationType;
 use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
+use App\Models\AssetMergeAlias;
 use App\Models\CustomFieldDefinition;
 use App\Models\CustomFieldSet;
 use App\Models\ItemType;
+use App\Models\Location;
 use App\Models\User;
 use App\Services\AssetMergeService;
+use App\Services\ImportService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -104,6 +108,81 @@ class AssetDuplicateMergeTest extends TestCase
             'confirm_merge' => '1',
             'fields' => $this->defaultFieldSources([$a, $b], $a->id),
         ])->assertForbidden();
+        $this->actingAs($user)->post(route('assets.duplicates.clear'), [
+            'asset_ids' => [$a->id],
+            'fields' => ['tp_barcode'],
+            'confirm_clear' => '1',
+        ])->assertForbidden();
+        $this->actingAs($user)->post(route('assets.duplicates.parent-child'), [
+            'asset_ids' => [$a->id, $b->id],
+            'parent_id' => $a->id,
+            'confirm_parent_child' => '1',
+        ])->assertForbidden();
+    }
+
+    public function test_clear_identifier_fields_from_selected_assets_shrinks_duplicate_group(): void
+    {
+        $user = $this->manager();
+        $keep = $this->makeAsset(['name' => 'Keep SN', 'serial_number' => 'SN-SHARED']);
+        $clearA = $this->makeAsset(['name' => 'Clear A', 'serial_number' => 'SN-SHARED']);
+        $clearB = $this->makeAsset(['name' => 'Clear B', 'serial_number' => 'SN-SHARED']);
+
+        $this->actingAs($user)->get(route('assets.duplicates.index'))
+            ->assertOk()
+            ->assertSee('1 group')
+            ->assertSee('Clear fields');
+
+        $response = $this->actingAs($user)->post(route('assets.duplicates.clear'), [
+            'asset_ids' => [$clearA->id, $clearB->id],
+            'fields' => ['serial_number'],
+            'confirm_clear' => '1',
+        ]);
+
+        $response->assertRedirect(route('assets.duplicates.index'));
+        $response->assertSessionHas('status');
+
+        $this->assertNull($clearA->fresh()->serial_number);
+        $this->assertNull($clearB->fresh()->serial_number);
+        $this->assertSame('SN-SHARED', $keep->fresh()->serial_number);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_id' => $clearA->id,
+            'action' => 'cleared',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_id' => $clearB->id,
+            'action' => 'cleared',
+        ]);
+
+        $this->actingAs($user)->get(route('assets.duplicates.index'))
+            ->assertOk()
+            ->assertSee('0 groups')
+            ->assertSee('No duplicates found');
+    }
+
+    public function test_clear_requires_confirmation_and_valid_identifier_fields(): void
+    {
+        $user = $this->manager();
+        $a = $this->makeAsset(['serial_number' => 'SN-1']);
+        $b = $this->makeAsset(['serial_number' => 'SN-1']);
+
+        $response = $this->actingAs($user)->from(route('assets.duplicates.index'))->post(route('assets.duplicates.clear'), [
+            'asset_ids' => [$a->id],
+            'fields' => ['serial_number'],
+        ]);
+        $response->assertRedirect(route('assets.duplicates.index'));
+        $response->assertSessionHasErrors('confirm_clear');
+        $this->assertSame('SN-1', $a->fresh()->serial_number);
+
+        $response = $this->actingAs($user)->from(route('assets.duplicates.index'))->post(route('assets.duplicates.clear'), [
+            'asset_ids' => [$a->id, $b->id],
+            'fields' => ['name'],
+            'confirm_clear' => '1',
+        ]);
+        $response->assertRedirect(route('assets.duplicates.index'));
+        $response->assertSessionHasErrors('fields.0');
+        $this->assertSame('SN-1', $a->fresh()->serial_number);
+        $this->assertSame('Test Asset', $a->fresh()->name);
     }
 
     public function test_merge_form_renders_side_by_side_fields(): void
@@ -121,6 +200,7 @@ class AssetDuplicateMergeTest extends TestCase
         $response->assertSee('Conflict');
         $response->assertSee('SN-A');
         $response->assertSee('SN-B');
+        $response->assertSee('Set quantity to total of merged assets');
         $response->assertSee('Merge permanently');
     }
 
@@ -283,5 +363,217 @@ class AssetDuplicateMergeTest extends TestCase
             ->assertOk()
             ->assertSee('Duplicates')
             ->assertSee(route('assets.duplicates.index'), false);
+    }
+
+    public function test_parent_child_links_selected_assets_and_inherits_location(): void
+    {
+        $user = $this->manager();
+        $location = Location::create([
+            'name' => 'Warehouse A',
+            'type' => LocationType::Building,
+        ]);
+
+        $parent = $this->makeAsset([
+            'name' => 'Rack',
+            'tp_barcode' => 'TP-PC',
+            'location_id' => $location->id,
+        ]);
+        $child = $this->makeAsset([
+            'name' => 'Fixture',
+            'tp_barcode' => 'TP-PC',
+            'location_id' => null,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('assets.duplicates.parent-child'), [
+            'asset_ids' => [$parent->id, $child->id],
+            'parent_id' => $parent->id,
+            'confirm_parent_child' => '1',
+        ]);
+
+        $response->assertRedirect(route('assets.duplicates.index'));
+        $response->assertSessionHas('status');
+
+        $child->refresh();
+        $this->assertSame($parent->id, (int) $child->parent_id);
+        $this->assertSame($location->id, (int) $child->location_id);
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_id' => $child->id,
+            'action' => 'reparented',
+        ]);
+    }
+
+    public function test_merge_can_set_survivor_quantity_to_total_of_merged_assets(): void
+    {
+        $user = $this->manager();
+        $survivor = $this->makeAsset([
+            'name' => 'Keep Qty',
+            'tp_barcode' => 'TP-QTY',
+            'quantity' => 2,
+        ]);
+        $duplicate = $this->makeAsset([
+            'name' => 'Drop Qty',
+            'tp_barcode' => 'TP-QTY',
+            'quantity' => 3,
+        ]);
+
+        $fields = $this->defaultFieldSources([$survivor, $duplicate], $survivor->id);
+
+        $response = $this->actingAs($user)->post(route('assets.duplicates.merge.store'), [
+            'asset_ids' => [$survivor->id, $duplicate->id],
+            'survivor_id' => $survivor->id,
+            'confirm_merge' => '1',
+            'set_quantity_to_total' => '1',
+            'fields' => $fields,
+        ]);
+
+        $response->assertRedirect(route('assets.show', $survivor));
+        $this->assertDatabaseMissing('assets', ['id' => $duplicate->id]);
+        $this->assertSame(5, (int) $survivor->fresh()->quantity);
+    }
+
+    public function test_duplicate_index_filters_by_field_and_multi_field(): void
+    {
+        $user = $this->manager();
+
+        // Group matched only on barcode.
+        $this->makeAsset(['name' => 'Bar A', 'tp_barcode' => 'TP-ONLY']);
+        $this->makeAsset(['name' => 'Bar B', 'tp_barcode' => 'TP-ONLY']);
+
+        // Group matched on barcode + serial.
+        $this->makeAsset([
+            'name' => 'Multi A',
+            'tp_barcode' => 'TP-MULTI',
+            'serial_number' => 'SN-MULTI',
+        ]);
+        $this->makeAsset([
+            'name' => 'Multi B',
+            'tp_barcode' => 'TP-MULTI',
+            'serial_number' => 'SN-MULTI',
+        ]);
+
+        $this->actingAs($user)->get(route('assets.duplicates.index', ['field' => 'serial_number']))
+            ->assertOk()
+            ->assertSee('Multi A')
+            ->assertDontSee('Bar A');
+
+        $this->actingAs($user)->get(route('assets.duplicates.index', ['multi' => '1']))
+            ->assertOk()
+            ->assertSee('Multi A')
+            ->assertDontSee('Bar A');
+
+        $this->actingAs($user)->get(route('assets.duplicates.index', [
+            'field' => 'tp_barcode',
+            'multi' => '1',
+        ]))
+            ->assertOk()
+            ->assertSee('Multi A')
+            ->assertDontSee('Bar A');
+    }
+
+    public function test_merge_records_aliases_and_reimport_matches_survivor(): void
+    {
+        $user = $this->manager();
+        $survivor = $this->makeAsset([
+            'name' => 'Survivor',
+            'tp_barcode' => 'TP-SURVIVE',
+            'serial_number' => 'SN-KEEP',
+        ]);
+        $duplicate = $this->makeAsset([
+            'name' => 'Absorbed',
+            'tp_barcode' => 'TP-ABSORB',
+            'serial_number' => 'SN-ABSORB',
+            'mac_address' => 'AA:BB:CC:DD:EE:11',
+        ]);
+
+        $fields = $this->defaultFieldSources([$survivor, $duplicate], $survivor->id);
+        // Keep survivor barcode/serial; do not take absorbed identifiers onto survivor.
+        $fields['tp_barcode'] = (string) $survivor->id;
+        $fields['serial_number'] = (string) $survivor->id;
+        $fields['mac_address'] = (string) $survivor->id;
+        $fields['name'] = (string) $survivor->id;
+
+        $this->actingAs($user)->post(route('assets.duplicates.merge.store'), [
+            'asset_ids' => [$survivor->id, $duplicate->id],
+            'survivor_id' => $survivor->id,
+            'confirm_merge' => '1',
+            'fields' => $fields,
+        ])->assertRedirect(route('assets.show', $survivor));
+
+        $this->assertDatabaseMissing('assets', ['id' => $duplicate->id]);
+        $this->assertDatabaseHas('asset_merge_aliases', [
+            'survivor_asset_id' => $survivor->id,
+            'merged_asset_id' => $duplicate->id,
+            'field' => 'tp_barcode',
+            'value' => 'TP-ABSORB',
+        ]);
+        $this->assertDatabaseHas('asset_merge_aliases', [
+            'survivor_asset_id' => $survivor->id,
+            'field' => 'serial_number',
+            'value' => 'SN-ABSORB',
+        ]);
+        $this->assertDatabaseHas('asset_merge_aliases', [
+            'survivor_asset_id' => $survivor->id,
+            'field' => 'mac_address',
+            'value' => 'AA:BB:CC:DD:EE:11',
+        ]);
+
+        $rows = app(ImportService::class)->prepareRows(collect([
+            collect([
+                'name' => 'Reuploaded Absorbed',
+                'type' => 'LX Fixture',
+                'barcode' => 'TP-ABSORB',
+            ]),
+            collect([
+                'name' => 'Reuploaded Serial',
+                'type' => 'LX Fixture',
+                'serial' => 'SN-ABSORB',
+            ]),
+        ]), [
+            'name' => 'name',
+            'type' => 'item_type',
+            'barcode' => 'tp_barcode',
+            'serial' => 'serial_number',
+        ]);
+
+        $this->assertSame($survivor->id, $rows[0]['existing_id']);
+        $this->assertContains('tp_barcode', $rows[0]['matched_on']);
+        $this->assertSame($survivor->id, $rows[1]['existing_id']);
+        $this->assertContains('serial_number', $rows[1]['matched_on']);
+
+        // Absorbed identifier must not create a fresh duplicate group against a new asset.
+        $this->assertSame(1, Asset::query()->where('tp_barcode', 'TP-SURVIVE')->count());
+        $this->assertSame(0, Asset::query()->where('tp_barcode', 'TP-ABSORB')->count());
+        $this->assertSame(
+            $survivor->id,
+            AssetMergeAlias::resolveSurvivorId('tp_barcode', 'TP-ABSORB'),
+        );
+    }
+
+    public function test_deleting_survivor_removes_merge_aliases(): void
+    {
+        $user = $this->manager();
+        $survivor = $this->makeAsset(['name' => 'Keep', 'tp_barcode' => 'TP-DEL-S']);
+        $duplicate = $this->makeAsset(['name' => 'Drop', 'tp_barcode' => 'TP-DEL-D']);
+
+        $fields = $this->defaultFieldSources([$survivor, $duplicate], $survivor->id);
+        $this->actingAs($user)->post(route('assets.duplicates.merge.store'), [
+            'asset_ids' => [$survivor->id, $duplicate->id],
+            'survivor_id' => $survivor->id,
+            'confirm_merge' => '1',
+            'fields' => $fields,
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('asset_merge_aliases', [
+            'survivor_asset_id' => $survivor->id,
+            'field' => 'tp_barcode',
+            'value' => 'TP-DEL-D',
+        ]);
+
+        $survivor->delete();
+
+        $this->assertDatabaseMissing('asset_merge_aliases', [
+            'survivor_asset_id' => $survivor->id,
+        ]);
+        $this->assertNull(AssetMergeAlias::resolveSurvivorId('tp_barcode', 'TP-DEL-D'));
     }
 }
