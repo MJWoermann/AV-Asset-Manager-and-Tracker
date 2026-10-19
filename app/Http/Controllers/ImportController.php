@@ -72,15 +72,16 @@ class ImportController extends Controller
 
     public function prepare(Request $request): View|RedirectResponse
     {
-        // Large spreadsheets can exceed the default 30s limit during prepare/store/view.
+        // Large spreadsheets exceed default 30s / 128M PHP limits (Excel alone ~100M+).
         set_time_limit(0);
+        ini_set('memory_limit', '512M');
 
         // #region agent log
         $__dbgPrepareT0 = microtime(true);
         $__dbgLog = function (string $hypothesisId, string $message, array $data = []) use ($__dbgPrepareT0): void {
             $payload = [
                 'sessionId' => 'd766ca',
-                'runId' => 'dup-check-2',
+                'runId' => 'dup-check-3',
                 'hypothesisId' => $hypothesisId,
                 'location' => 'ImportController.php:prepare',
                 'message' => $message,
@@ -88,6 +89,7 @@ class ImportController extends Controller
                     'elapsed_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000),
                     'memory_mb' => (int) round(memory_get_usage(true) / 1048576),
                     'peak_memory_mb' => (int) round(memory_get_peak_usage(true) / 1048576),
+                    'memory_limit' => ini_get('memory_limit'),
                 ], $data),
                 'timestamp' => (int) round(microtime(true) * 1000),
             ];
@@ -214,6 +216,9 @@ class ImportController extends Controller
 
     public function process(Request $request): RedirectResponse
     {
+        set_time_limit(0);
+        ini_set('memory_limit', '512M');
+
         $path = session('import.path');
         $preparedPath = session('import.prepared_path');
         $prepared = is_string($preparedPath)

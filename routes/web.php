@@ -18,6 +18,7 @@ use App\Http\Controllers\AssetColumnPreferenceController;
 use App\Http\Controllers\AssetConnectionBusController;
 use App\Http\Controllers\AssetConnectionController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AssetDuplicateController;
 use App\Http\Controllers\AssetInterfaceController;
 use App\Http\Controllers\AssetListController;
 use App\Http\Controllers\AssetMaintenanceLogController;
@@ -132,6 +133,18 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::get('/assets/search', [AssetController::class, 'search'])->name('assets.search');
     Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
     Route::post('/assets/bulk-update', [AssetController::class, 'bulkUpdate'])->name('assets.bulk-update');
+
+    Route::middleware('role:admin,inventory_manager')->group(function () {
+        Route::get('/assets/duplicates', [AssetDuplicateController::class, 'index'])
+            ->name('assets.duplicates.index');
+        Route::get('/assets/duplicates/merge', [AssetDuplicateController::class, 'mergeForm'])
+            ->name('assets.duplicates.merge');
+        Route::post('/assets/duplicates/merge', [AssetDuplicateController::class, 'merge'])
+            ->name('assets.duplicates.merge.store');
+        Route::post('/assets/duplicates/start', [AssetDuplicateController::class, 'startFromSelection'])
+            ->name('assets.duplicates.start');
+    });
+
     Route::get('/assets/{asset}/edit', [AssetController::class, 'edit'])->name('assets.edit');
     Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])

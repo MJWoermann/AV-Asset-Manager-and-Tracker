@@ -773,8 +773,24 @@ class ImportService
             ];
         }
 
+        // Release spreadsheet row collections before loading DB match indexes (Excel alone ~100MB+).
+        $rows->splice(0);
+
         // #region agent log
         $__dbgIdxT0 = microtime(true);
+        @file_put_contents(base_path('debug-d766ca.log'), json_encode([
+            'sessionId' => 'd766ca',
+            'runId' => 'dup-check-3',
+            'hypothesisId' => 'P',
+            'location' => 'ImportService.php:prepareRows',
+            'message' => 'drafts_ready_rows_cleared',
+            'data' => [
+                'draft_count' => count($drafts),
+                'memory_mb' => (int) round(memory_get_usage(true) / 1048576),
+                'peak_memory_mb' => (int) round(memory_get_peak_usage(true) / 1048576),
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
         // #endregion
 
         $indexes = $this->buildExistingMatchIndexes($drafts);
@@ -782,7 +798,7 @@ class ImportService
         // #region agent log
         @file_put_contents(base_path('debug-d766ca.log'), json_encode([
             'sessionId' => 'd766ca',
-            'runId' => 'dup-check-2',
+            'runId' => 'dup-check-3',
             'hypothesisId' => 'P',
             'location' => 'ImportService.php:prepareRows',
             'message' => 'indexes_built',
@@ -812,18 +828,9 @@ class ImportService
                 'location_level' => $draft['location_level'],
                 'location_room' => $draft['location_room'],
                 'location_rack' => $draft['location_rack'],
-                'existing_id' => $match['asset']?->id,
+                'existing_id' => $match['existing_id'],
                 'matched_on' => $match['matched_on'],
-                'existing_summary' => $match['asset'] ? [
-                    'id' => $match['asset']->id,
-                    'name' => $match['asset']->name,
-                    'serial_number' => $match['asset']->serial_number,
-                    'fmi_ast' => $match['asset']->fmi_ast,
-                    'mac_address' => $match['asset']->mac_address,
-                    'rig_tag' => $match['asset']->rig_tag,
-                    'tp_barcode' => $match['asset']->tp_barcode,
-                    'ip_address' => $match['asset']->ip_address,
-                ] : null,
+                'existing_summary' => $match['existing_summary'],
             ];
         }
 
@@ -860,9 +867,10 @@ class ImportService
         array $listOptions = [],
         ?int $userId = null,
     ): array {
-        // Large imports exceed default 30s PHP limits (per-row create + audit log).
+        // Large imports exceed default 30s / 128M PHP limits (per-row create + audit log).
         if (! $dryRun) {
             set_time_limit(0);
+            ini_set('memory_limit', '512M');
         }
 
         $counts = [
@@ -1773,10 +1781,10 @@ class ImportService
     }
 
     /**
-     * Prefetch existing assets for all duplicate keys in one query per key.
+     * Prefetch lean existing-asset summaries for all duplicate keys (chunked whereIn).
      *
      * @param  list<array{payload: array<string, mixed>}>  $drafts
-     * @return array<string, array<string, Asset>> key => (string)value => Asset
+     * @return array<string, array<string, array{id: int, name: mixed, serial_number: mixed, fmi_ast: mixed, mac_address: mixed, rig_tag: mixed, tp_barcode: mixed, ip_address: mixed}>>
      */
     protected function buildExistingMatchIndexes(array $drafts): array
     {
@@ -1795,7 +1803,7 @@ class ImportService
             }
         }
 
-        /** @var array<string, array<string, Asset>> $indexes */
+        /** @var array<string, array<string, array<string, mixed>>> $indexes */
         $indexes = [];
         $columns = array_values(array_unique(array_merge(
             ['id', 'name'],
@@ -1815,10 +1823,11 @@ class ImportService
                     ->select($columns)
                     ->whereIn($key, $valueChunk)
                     ->orderBy('id')
+                    ->toBase()
                     ->get();
 
                 foreach ($found as $asset) {
-                    $lookup = $asset->getAttribute($key);
+                    $lookup = $asset->{$key} ?? null;
                     if ($lookup === null || $lookup === '') {
                         continue;
                     }
@@ -1826,9 +1835,20 @@ class ImportService
                     $lookupKey = (string) $lookup;
                     // Match query()->where()->first() behaviour: keep the earliest id.
                     if (! isset($map[$lookupKey])) {
-                        $map[$lookupKey] = $asset;
+                        $map[$lookupKey] = [
+                            'id' => (int) $asset->id,
+                            'name' => $asset->name,
+                            'serial_number' => $asset->serial_number ?? null,
+                            'fmi_ast' => $asset->fmi_ast ?? null,
+                            'mac_address' => $asset->mac_address ?? null,
+                            'rig_tag' => $asset->rig_tag ?? null,
+                            'tp_barcode' => $asset->tp_barcode ?? null,
+                            'ip_address' => $asset->ip_address ?? null,
+                        ];
                     }
                 }
+
+                unset($found);
             }
 
             $indexes[$key] = $map;
@@ -1839,13 +1859,17 @@ class ImportService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @param  array<string, array<string, Asset>>|null  $indexes
-     * @return array{asset: ?Asset, matched_on: list<string>}
+     * @param  array<string, array<string, array<string, mixed>>>|null  $indexes
+     * @return array{
+     *     existing_id: ?int,
+     *     matched_on: list<string>,
+     *     existing_summary: ?array<string, mixed>
+     * }
      */
     protected function findExistingMatch(array $payload, ?array $indexes = null): array
     {
         $matchedOn = [];
-        $asset = null;
+        $summary = null;
 
         foreach (self::DUPLICATE_KEYS as $key) {
             $value = $payload[$key] ?? null;
@@ -1856,22 +1880,40 @@ class ImportService
             if ($indexes !== null) {
                 $found = $indexes[$key][(string) $value] ?? null;
             } else {
-                $found = Asset::query()->where($key, $value)->orderBy('id')->first();
+                $asset = Asset::query()
+                    ->select(array_values(array_unique(array_merge(['id', 'name'], self::DUPLICATE_KEYS))))
+                    ->where($key, $value)
+                    ->orderBy('id')
+                    ->first();
+                $found = $asset ? [
+                    'id' => (int) $asset->id,
+                    'name' => $asset->name,
+                    'serial_number' => $asset->serial_number,
+                    'fmi_ast' => $asset->fmi_ast,
+                    'mac_address' => $asset->mac_address,
+                    'rig_tag' => $asset->rig_tag,
+                    'tp_barcode' => $asset->tp_barcode,
+                    'ip_address' => $asset->ip_address,
+                ] : null;
             }
 
             if ($found) {
-                if ($asset && $asset->id !== $found->id) {
+                if ($summary && (int) $summary['id'] !== (int) $found['id']) {
                     // Prefer the first match; still record the key that hit.
                     $matchedOn[] = $key;
 
                     continue;
                 }
-                $asset = $found;
+                $summary = $found;
                 $matchedOn[] = $key;
             }
         }
 
-        return ['asset' => $asset, 'matched_on' => $matchedOn];
+        return [
+            'existing_id' => $summary['id'] ?? null,
+            'matched_on' => $matchedOn,
+            'existing_summary' => $summary,
+        ];
     }
 
     /**
