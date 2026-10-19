@@ -15,9 +15,16 @@
                 <p>
                     Prepared <span class="font-semibold">{{ $totalCount }}</span> rows:
                     <span class="font-semibold">{{ $newCount }}</span> new,
-                    <span class="font-semibold">{{ count($duplicates) }}</span> matched existing assets
+                    <span class="font-semibold">{{ $duplicateCount ?? count($duplicates) }}</span> matched existing assets
                     (Serial Number, FMI AST#, MAC Address, Rig Tag #, or TP Barcode).
                 </p>
+                @if(($duplicatesHiddenCount ?? 0) > 0)
+                    <p class="text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-2 rounded">
+                        Showing the first {{ count($duplicates) }} of {{ $duplicateCount }} matches for review.
+                        The bulk action below still applies to <span class="font-semibold">all</span> matched rows
+                        (including the {{ $duplicatesHiddenCount }} not listed).
+                    </p>
+                @endif
                 <p class="text-gray-600 dark:text-brand-silver">
                     <span class="font-medium text-brand-black dark:text-white">Update</span> merges mapped fields into the existing asset.
                     <span class="font-medium text-brand-black dark:text-white">Replace</span> clears core fields then applies the import.
@@ -26,7 +33,7 @@
                 </p>
             </div>
 
-            @if(count($duplicates))
+            @if(($duplicateCount ?? count($duplicates)) > 0)
                 <div class="bg-white dark:bg-brand-slate border p-4 space-y-3">
                     <div class="flex flex-wrap items-end gap-3">
                         <div>

@@ -71,6 +71,9 @@ class ImportController extends Controller
 
     public function prepare(Request $request): View|RedirectResponse
     {
+        // Large spreadsheets can exceed the default 30s limit during prepare/store/view.
+        set_time_limit(0);
+
         // #region agent log
         $__dbgPrepareT0 = microtime(true);
         $__dbgLog = function (string $hypothesisId, string $message, array $data = []) use ($__dbgPrepareT0): void {
@@ -80,7 +83,11 @@ class ImportController extends Controller
                 'hypothesisId' => $hypothesisId,
                 'location' => 'ImportController.php:prepare',
                 'message' => $message,
-                'data' => array_merge(['elapsed_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000)], $data),
+                'data' => array_merge([
+                    'elapsed_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000),
+                    'memory_mb' => (int) round(memory_get_usage(true) / 1048576),
+                    'peak_memory_mb' => (int) round(memory_get_peak_usage(true) / 1048576),
+                ], $data),
                 'timestamp' => (int) round(microtime(true) * 1000),
             ];
             $line = json_encode($payload)."\n";
@@ -142,12 +149,14 @@ class ImportController extends Controller
         // #endregion
 
         $prepared = $this->imports->prepareRows($rows, $mapping);
+        unset($rows);
 
         // #region agent log
         $__dbgLog('B', 'prepareRows_done', [
             'prepare_ms' => (int) round((microtime(true) - $__dbgPrepT0) * 1000),
             'prepared_count' => count($prepared),
         ]);
+        $__dbgLog('C', 'store_starting');
         $__dbgStoreT0 = microtime(true);
         // #endregion
 
@@ -161,9 +170,11 @@ class ImportController extends Controller
         $preparedPath = $this->imports->storePreparedRows($prepared, $request->user()?->id);
 
         // #region agent log
+        $__dbgStoreBytes = Storage::exists($preparedPath) ? (int) Storage::size($preparedPath) : 0;
         $__dbgLog('C', 'storePreparedRows_done', [
             'store_ms' => (int) round((microtime(true) - $__dbgStoreT0) * 1000),
             'prepared_path' => $preparedPath,
+            'store_bytes' => $__dbgStoreBytes,
         ]);
         // #endregion
 
@@ -174,20 +185,28 @@ class ImportController extends Controller
         session()->forget('import.prepared');
 
         $duplicates = array_values(array_filter($prepared, fn (array $row) => $row['existing_id'] !== null));
-        $newCount = count($prepared) - count($duplicates);
+        $duplicateCount = count($duplicates);
+        $newCount = count($prepared) - $duplicateCount;
+        $duplicatesPreview = array_slice($duplicates, 0, ImportService::DUPLICATES_PREVIEW_LIMIT);
+        $duplicatesHiddenCount = max(0, $duplicateCount - count($duplicatesPreview));
+        unset($duplicates, $prepared);
 
         // #region agent log
         $__dbgLog('D', 'prepare_returning_view', [
-            'duplicate_count' => count($duplicates),
+            'duplicate_count' => $duplicateCount,
+            'duplicates_preview' => count($duplicatesPreview),
+            'duplicates_hidden' => $duplicatesHiddenCount,
             'new_count' => $newCount,
             'total_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000),
         ]);
         // #endregion
 
         return view('import.duplicates', [
-            'duplicates' => $duplicates,
+            'duplicates' => $duplicatesPreview,
+            'duplicateCount' => $duplicateCount,
+            'duplicatesHiddenCount' => $duplicatesHiddenCount,
             'newCount' => $newCount,
-            'totalCount' => count($prepared),
+            'totalCount' => $newCount + $duplicateCount,
             'fieldLabels' => ImportService::ASSET_FIELDS,
             'lists' => AssetList::query()->orderBy('type')->orderBy('name')->get(['id', 'name', 'type']),
         ]);

@@ -72,6 +72,9 @@ class ImportService
         'test_tag_expiry',
     ];
 
+    /** Max duplicate rows rendered on the resolve screen (bulk action still applies to all). */
+    public const DUPLICATES_PREVIEW_LIMIT = 100;
+
     /** @var list<string> */
     public const META_FIELDS = [
         'item_type',
@@ -277,7 +280,35 @@ class ImportService
     {
         $token = Str::lower(Str::random(24));
         $path = 'imports/prepared/'.($userId ?: 'anon').'-'.$token.'.json';
-        Storage::put($path, json_encode($prepared, JSON_THROW_ON_ERROR));
+
+        // Stream row-by-row JSON to avoid doubling peak memory with one giant encode.
+        $absolute = Storage::path($path);
+        $directory = dirname($absolute);
+        if (! is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+
+        $handle = fopen($absolute, 'wb');
+        if ($handle === false) {
+            throw ValidationException::withMessages([
+                'file' => 'Unable to store prepared import rows. Check storage permissions.',
+            ]);
+        }
+
+        try {
+            fwrite($handle, '[');
+            $first = true;
+            foreach ($prepared as $row) {
+                if (! $first) {
+                    fwrite($handle, ',');
+                }
+                $first = false;
+                fwrite($handle, json_encode($row, JSON_THROW_ON_ERROR));
+            }
+            fwrite($handle, ']');
+        } finally {
+            fclose($handle);
+        }
 
         return $path;
     }
