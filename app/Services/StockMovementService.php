@@ -139,7 +139,7 @@ class StockMovementService
                 $this->attachments->storeUpload($upload, [
                     'title' => $title,
                     'category' => FileCategory::Invoice->value,
-                    'note' => 'Momentous PO export',
+                    'note' => 'PO export',
                 ], $movement);
             }
 

@@ -103,11 +103,14 @@
             <div>
                 <x-input-label value="Departments" />
                 <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">
-                    Non-admins only see operational data in assigned departments. Admins can browse without membership.
+                    Non-admins only see operational data in assigned departments. For admins, this matches Profile → Departments to show (clear all = every department).
                 </p>
                 <div class="mt-2 space-y-2 max-h-48 overflow-y-auto border border-brand-silver dark:border-brand-charcoal p-3">
                     @php
-                        $selectedDepartmentIds = collect(old('department_ids', $user->departments?->pluck('id')->all() ?? []))->map(fn ($id) => (int) $id);
+                        $defaultDepartmentIds = $user->exists && $user->hasRole('admin')
+                            ? $user->visibleDepartmentIdsPreference()
+                            : ($user->departments?->pluck('id')->all() ?? []);
+                        $selectedDepartmentIds = collect(old('department_ids', $defaultDepartmentIds))->map(fn ($id) => (int) $id);
                     @endphp
                     @forelse($departments as $department)
                         <label class="flex items-center gap-2 text-sm">

@@ -16,6 +16,35 @@
                     <a href="http://<?php echo e($asset->ip_address); ?>" target="_blank" rel="noopener" class="px-3 py-2 bg-brand text-white text-sm">Open IP</a>
                 <?php endif; ?>
                 <?php if (! ($isExternalRepairer ?? false)): ?>
+                    <?php
+                        $openableCustomUrls = collect();
+                        $customValuesByDefinition = $asset->customFieldValues->keyBy('custom_field_definition_id');
+                        foreach ($asset->itemType?->fieldSets ?? [] as $urlFieldSet) {
+                            foreach ($urlFieldSet->definitions as $urlDef) {
+                                if ($urlDef->type !== 'url') {
+                                    continue;
+                                }
+                                $href = \App\Models\CustomFieldDefinition::openableHttpUrl(
+                                    $customValuesByDefinition[$urlDef->id]->value ?? null
+                                );
+                                if ($href !== null) {
+                                    $openableCustomUrls->push([
+                                        'url' => $href,
+                                        'name' => $urlDef->name,
+                                    ]);
+                                }
+                            }
+                        }
+                    ?>
+                    <?php $__currentLoopData = $openableCustomUrls; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $openableCustomUrl): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <a
+                            href="<?php echo e($openableCustomUrl['url']); ?>"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="<?php echo e($openableCustomUrl['name']); ?>"
+                            class="px-3 py-2 bg-brand text-white text-sm"
+                        >Open URL</a>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     <a href="<?php echo e(route('assets.edit', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
                     <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
                         <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
@@ -557,9 +586,25 @@
                                 <?php elseif($def->type === 'spacer'): ?>
                                     <div class="min-h-[1.5rem]" aria-hidden="true"></div>
                                 <?php else: ?>
+                                    <?php
+                                        $customValue = $customValues[$def->id]->value ?? null;
+                                        $openableUrl = $def->type === 'url'
+                                            ? \App\Models\CustomFieldDefinition::openableHttpUrl($customValue)
+                                            : null;
+                                    ?>
                                     <div class="flex justify-between gap-4 border-b border-brand-silver/50 dark:border-brand-charcoal pb-1">
                                         <span><?php echo e($def->name); ?></span>
-                                        <span class="font-mono"><?php echo e($customValues[$def->id]->value ?? '—'); ?></span>
+                                        <span class="font-mono text-right inline-flex flex-col items-end gap-1 sm:flex-row sm:items-center">
+                                            <span><?php echo e($customValue ?: '—'); ?></span>
+                                            <?php if($openableUrl): ?>
+                                                <a
+                                                    href="<?php echo e($openableUrl); ?>"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="inline-flex items-center px-2 py-0.5 text-xs bg-brand text-white no-underline font-sans"
+                                                >Open URL</a>
+                                            <?php endif; ?>
+                                        </span>
                                     </div>
                                 <?php endif; ?>
                             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

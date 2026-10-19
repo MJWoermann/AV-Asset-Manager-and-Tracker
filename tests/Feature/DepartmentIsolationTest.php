@@ -211,6 +211,44 @@ class DepartmentIsolationTest extends TestCase
         $this->assertSame(['name', 'status'], $admin->preferences[AssetTableColumns::PREFERENCE_KEY]);
         $this->assertTrue($admin->preferences['features']['email_integration']);
         $this->assertSame([$dept->id], $admin->preferences[DepartmentVisibility::PREFERENCE_KEY]);
+        $this->assertTrue($admin->departments->contains('id', $dept->id));
+    }
+
+    public function test_admin_department_visibility_stays_in_sync_with_manage_users(): void
+    {
+        $deptA = $this->makeDepartment('Alpha');
+        $deptB = $this->makeDepartment('Bravo');
+        $admin = $this->adminUser();
+        $actor = $this->adminUser();
+
+        $this->actingAs($admin)
+            ->patch(route('preferences.department-visibility'), [
+                'visible_department_ids' => [$deptA->id],
+            ])
+            ->assertRedirect();
+
+        $admin->refresh();
+        $this->assertSame([$deptA->id], $admin->preferences[DepartmentVisibility::PREFERENCE_KEY]);
+        $this->assertEqualsCanonicalizing([$deptA->id], $admin->departments->pluck('id')->map(fn ($id) => (int) $id)->all());
+
+        $this->actingAs($actor)
+            ->put(route('admin.users.update', $admin), [
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'role' => 'admin',
+                'theme' => 'light',
+                'department_ids' => [$deptB->id],
+            ])
+            ->assertRedirect(route('admin.users.index'));
+
+        $admin->refresh();
+        $this->assertSame([$deptB->id], $admin->preferences[DepartmentVisibility::PREFERENCE_KEY]);
+        $this->assertEqualsCanonicalizing([$deptB->id], $admin->departments->pluck('id')->map(fn ($id) => (int) $id)->all());
+
+        $this->actingAs($actor)
+            ->get(route('admin.users.edit', $admin))
+            ->assertOk()
+            ->assertSee('value="'.$deptB->id.'"', false);
     }
 
     public function test_scan_does_not_match_barcode_from_other_department(): void

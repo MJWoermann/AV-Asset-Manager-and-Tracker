@@ -41,6 +41,24 @@ class User extends Authenticatable
     }
 
     /**
+     * Sync department membership. For admins, also keep preferences.visible_department_ids
+     * in lockstep (empty = unrestricted / show all).
+     *
+     * @param  list<int|string>|null  $departmentIds
+     */
+    public function syncDepartmentsWithVisibility(?array $departmentIds): void
+    {
+        $ids = DepartmentVisibility::normalizeIds($departmentIds);
+
+        $this->departments()->sync($ids);
+
+        if ($this->hasRole('admin')) {
+            $this->preferences = DepartmentVisibility::mergePreference($this->preferences, $ids);
+            $this->save();
+        }
+    }
+
+    /**
      * Whether the user has opted into a developer feature via preferences.features.{feature}.
      */
     public function hasFeature(string $feature): bool

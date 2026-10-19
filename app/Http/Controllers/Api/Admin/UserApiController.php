@@ -46,7 +46,7 @@ class UserApiController extends Controller
             'email_verified_at' => now(),
         ]);
         $user->syncRoles([$data['role']]);
-        $user->departments()->sync($data['department_ids'] ?? []);
+        $user->syncDepartmentsWithVisibility($data['department_ids'] ?? []);
 
         return response()->json($user->load(['roles', 'departments']), 201);
     }
@@ -70,7 +70,7 @@ class UserApiController extends Controller
             ...(filled($data['password'] ?? null) ? ['password' => Hash::make($data['password'])] : []),
         ]);
         $user->syncRoles([$data['role']]);
-        $user->departments()->sync($data['department_ids'] ?? []);
+        $user->syncDepartmentsWithVisibility($data['department_ids'] ?? []);
 
         return response()->json($user->fresh(['roles', 'departments']));
     }

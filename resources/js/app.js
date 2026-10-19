@@ -1579,8 +1579,26 @@ function createInventoryChartPanel(config = {}) {
                 return;
             }
 
+            // Chart.js responsive + maintainAspectRatio:false needs a height-bounded parent.
+            // Use inline height so the bound works even if Tailwind purge missed a utility class.
+            let parentEl = canvas.parentElement;
+            if (parentEl) {
+                const parentStyle = getComputedStyle(parentEl);
+                const explicitPx = Number.parseFloat(parentStyle.height);
+                const alreadyBounded = parentEl.dataset.chartHeightBound === '1'
+                    || (Number.isFinite(explicitPx) && explicitPx > 0 && explicitPx <= 400);
+                if (!alreadyBounded) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'relative w-full overflow-hidden';
+                    wrap.style.height = '240px';
+                    wrap.dataset.chartHeightBound = '1';
+                    parentEl.insertBefore(wrap, canvas);
+                    wrap.appendChild(canvas);
+                    parentEl = wrap;
+                }
+            }
+
             // #region agent log
-            const parentEl = canvas.parentElement;
             const parentStyle = parentEl ? getComputedStyle(parentEl) : null;
             const dbgLog = (hypothesisId, message, data = {}) => {
                 fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
@@ -1588,7 +1606,7 @@ function createInventoryChartPanel(config = {}) {
                     headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '8d5950' },
                     body: JSON.stringify({
                         sessionId: '8d5950',
-                        runId: 'pre-fix',
+                        runId: 'post-fix',
                         hypothesisId,
                         location: 'app.js:mountChart',
                         message,
@@ -1608,6 +1626,7 @@ function createInventoryChartPanel(config = {}) {
                 parentComputedHeight: parentStyle?.height,
                 parentComputedMinHeight: parentStyle?.minHeight,
                 parentComputedMaxHeight: parentStyle?.maxHeight,
+                heightBound: parentEl?.dataset?.chartHeightBound === '1',
                 maintainAspectRatio: false,
                 responsive: true,
                 pointCount: (this.chartPayload.points || []).length,
@@ -1698,16 +1717,19 @@ function createInventoryChartPanel(config = {}) {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    layout: {
+                        padding: { top: 8, right: 12, bottom: 12, left: 8 },
+                    },
                     interaction: { mode: 'nearest', intersect: true },
                     scales: {
                         x: {
                             type: 'time',
                             time: { tooltipFormat: 'yyyy-MM-dd HH:mm' },
-                            ticks: { maxRotation: 0 },
+                            ticks: { maxRotation: 0, padding: 6 },
                         },
                         y: {
                             beginAtZero: true,
-                            ticks: { precision: 0 },
+                            ticks: { precision: 0, padding: 6 },
                         },
                     },
                     plugins: {
@@ -1785,7 +1807,7 @@ function createInventoryChartPanel(config = {}) {
 
 const ASSET_STOCK_ACTION_HINTS = {
     count: 'Absolute on-hand quantity after counting',
-    restock: 'Units added from a restock / Momentous PO',
+    restock: 'Units added from a restock / PO',
     breakage: 'Units removed due to breakage',
 };
 

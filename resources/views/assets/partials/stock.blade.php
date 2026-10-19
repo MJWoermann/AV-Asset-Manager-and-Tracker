@@ -16,7 +16,7 @@
         'showLegend' => true,
         'actionHints' => [
             'count' => 'Absolute on-hand quantity after counting',
-            'restock' => 'Units added from a restock / Momentous PO',
+            'restock' => 'Units added from a restock / PO',
             'breakage' => 'Units removed due to breakage',
         ],
     ]))"
@@ -67,8 +67,11 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2 border border-brand-silver dark:border-brand-charcoal p-3 bg-white dark:bg-brand-slate">
-            <canvas x-ref="chart" height="220"></canvas>
-            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-2">Click a point for movement details.</p>
+            {{-- Inline height: Chart.js responsive + maintainAspectRatio:false grows unboundedly without a bounded parent --}}
+            <div class="relative w-full overflow-hidden" style="height: 240px;">
+                <canvas x-ref="chart"></canvas>
+            </div>
+            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-3 pt-1">Click a point for movement details.</p>
         </div>
 
         <div class="border border-brand-silver dark:border-brand-charcoal p-3 bg-white dark:bg-brand-slate text-sm space-y-2 min-h-[12rem]">
@@ -87,7 +90,7 @@
                     </p>
                     <p x-show="selected.notes"><span class="text-brand-charcoal dark:text-brand-silver">Notes:</span> <span x-text="selected.notes"></span></p>
                     <div x-show="selected.external_po_number || selected.external_po_url" class="space-y-1">
-                        <p class="font-medium">Momentous PO</p>
+                        <p class="font-medium">PO</p>
                         <template x-if="selected.external_po_url">
                             <a :href="selected.external_po_url" target="_blank" rel="noopener" class="text-brand" x-text="selected.external_po_number || 'Open PO'"></a>
                         </template>
@@ -148,11 +151,11 @@
 
             <div x-show="action === 'restock'" x-cloak class="space-y-3">
                 <div>
-                    <x-input-label for="external_po_number" value="Momentous PO number" />
+                    <x-input-label for="external_po_number" value="PO number" />
                     <x-text-input id="external_po_number" name="external_po_number" class="mt-1 block w-full" :value="old('external_po_number')" />
                 </div>
                 <div>
-                    <x-input-label for="external_po_url" value="Momentous PO URL" />
+                    <x-input-label for="external_po_url" value="PO URL" />
                     <x-text-input id="external_po_url" name="external_po_url" type="url" class="mt-1 block w-full" :value="old('external_po_url')" />
                 </div>
                 <div>

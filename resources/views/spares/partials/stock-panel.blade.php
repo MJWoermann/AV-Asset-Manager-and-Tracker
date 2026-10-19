@@ -33,8 +33,11 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2 border border-brand-silver dark:border-brand-charcoal p-3 bg-white dark:bg-brand-slate">
-            <canvas x-ref="chart" height="220"></canvas>
-            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-2">Click a point for movement details.</p>
+            {{-- Inline height: Chart.js responsive + maintainAspectRatio:false grows unboundedly without a bounded parent --}}
+            <div class="relative w-full overflow-hidden" style="height: 240px;">
+                <canvas x-ref="chart"></canvas>
+            </div>
+            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-3 pt-1">Click a point for movement details.</p>
         </div>
         <div class="border border-brand-silver dark:border-brand-charcoal p-3 text-sm space-y-2 min-h-[12rem]">
             <h3 class="font-semibold">Movement detail</h3>

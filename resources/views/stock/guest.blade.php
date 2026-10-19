@@ -48,11 +48,11 @@
 
             <div x-show="action === 'restock'" x-cloak class="space-y-3">
                 <div>
-                    <x-input-label for="external_po_number" value="Momentous PO number (optional)" />
+                    <x-input-label for="external_po_number" value="PO number (optional)" />
                     <x-text-input id="external_po_number" name="external_po_number" class="mt-1 block w-full" :value="old('external_po_number')" />
                 </div>
                 <div>
-                    <x-input-label for="external_po_url" value="Momentous PO URL (optional)" />
+                    <x-input-label for="external_po_url" value="PO URL (optional)" />
                     <x-text-input id="external_po_url" name="external_po_url" type="url" class="mt-1 block w-full" :value="old('external_po_url')" />
                 </div>
                 <p class="text-xs text-brand-charcoal">PDF attachments can be added when signed in.</p>
