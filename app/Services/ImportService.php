@@ -81,6 +81,31 @@ class ImportService
         'location_rack',
     ];
 
+    /**
+     * Max lengths for string columns written during import (matches schema / Asset form rules).
+     *
+     * @var array<string, int>
+     */
+    public const ASSET_STRING_MAX_LENGTHS = [
+        'name' => 255,
+        'status' => 32,
+        'serial_number' => 255,
+        'supplier' => 255,
+        'fmi_ast' => 255,
+        'tp_barcode' => 255,
+        'rig_tag' => 255,
+        'ip_address' => 45,
+        'mac_address' => 32,
+        'manufacturer' => 255,
+        'model' => 255,
+    ];
+
+    /** MySQL TEXT / custom-field value ceiling used when sanitising long import cells. */
+    public const ASSET_TEXT_MAX_LENGTH = 65535;
+
+    /** Item types, locations, and related free-text names. */
+    public const META_NAME_MAX_LENGTH = 255;
+
     /** @var array<string, string> */
     public const ASSET_FIELDS = [
         'name' => 'Name',
@@ -680,7 +705,7 @@ class ImportService
                 }
 
                 if ($field === self::CREATE_NEW_FIELD) {
-                    $customFields[(string) $column] = (string) $value;
+                    $customFields[(string) $column] = $this->limitImportString((string) $value, self::ASSET_TEXT_MAX_LENGTH);
 
                     continue;
                 }
@@ -688,38 +713,38 @@ class ImportService
                 if ($this->isCustomFieldMapping($field)) {
                     $definitionId = $this->customFieldDefinitionIdFromMapping($field);
                     if ($definitionId !== null) {
-                        $mappedCustomFields[$definitionId] = (string) $value;
+                        $mappedCustomFields[$definitionId] = $this->limitImportString((string) $value, self::ASSET_TEXT_MAX_LENGTH);
                     }
 
                     continue;
                 }
 
                 if ($field === 'item_type') {
-                    $itemTypeName = (string) $value;
+                    $itemTypeName = $this->limitImportString((string) $value, self::META_NAME_MAX_LENGTH);
 
                     continue;
                 }
 
                 if ($field === 'location_building') {
-                    $building = (string) $value;
+                    $building = $this->limitImportString((string) $value, self::META_NAME_MAX_LENGTH);
 
                     continue;
                 }
 
                 if ($field === 'location_level') {
-                    $level = (string) $value;
+                    $level = $this->limitImportString((string) $value, self::META_NAME_MAX_LENGTH);
 
                     continue;
                 }
 
                 if ($field === 'location_room') {
-                    $room = (string) $value;
+                    $room = $this->limitImportString((string) $value, self::META_NAME_MAX_LENGTH);
 
                     continue;
                 }
 
                 if ($field === 'location_rack') {
-                    $rack = (string) $value;
+                    $rack = $this->limitImportString((string) $value, self::META_NAME_MAX_LENGTH);
 
                     continue;
                 }
@@ -755,6 +780,10 @@ class ImportService
                         }
                     }
                     // #endregion
+                }
+
+                if (is_string($value)) {
+                    $value = $this->sanitizeAssetFieldString($field, $value);
                 }
 
                 $payload[$field] = $value;
@@ -1196,12 +1225,13 @@ class ImportService
      */
     protected function applyRow(?Asset $existing, array $row, bool $replace): Asset
     {
-        $itemType = $this->resolveItemType($row['item_type_name']);
+        $itemTypeName = $this->limitImportString((string) ($row['item_type_name'] ?? ''), self::META_NAME_MAX_LENGTH);
+        $itemType = $this->resolveItemType($itemTypeName);
         $locationId = $this->resolveLocation(
-            $row['location_building'] ?? null,
-            $row['location_level'] ?? null,
-            $row['location_room'] ?? null,
-            $row['location_rack'] ?? null,
+            $this->nullableLimit($row['location_building'] ?? null, self::META_NAME_MAX_LENGTH),
+            $this->nullableLimit($row['location_level'] ?? null, self::META_NAME_MAX_LENGTH),
+            $this->nullableLimit($row['location_room'] ?? null, self::META_NAME_MAX_LENGTH),
+            $this->nullableLimit($row['location_rack'] ?? null, self::META_NAME_MAX_LENGTH),
         );
 
         $payload = $row['payload'];
@@ -1209,6 +1239,7 @@ class ImportService
         $__dbgStatusInRow = array_key_exists('status', $payload);
         $__dbgMfrInRow = array_key_exists('manufacturer', $payload);
         $__dbgModelInRow = array_key_exists('model', $payload);
+        $__dbgNameLenBefore = is_string($payload['name'] ?? null) ? mb_strlen($payload['name']) : null;
         $__dbgBefore = $existing ? [
             'name' => $existing->name,
             'status' => $existing->status?->value ?? $existing->status,
@@ -1224,6 +1255,9 @@ class ImportService
             'quantity' => $existing->quantity,
         ] : null;
         // #endregion
+
+        $payload = $this->sanitizeAssetPayloadStrings($payload);
+
         foreach (self::DATE_FIELDS as $dateField) {
             if (array_key_exists($dateField, $payload)) {
                 $payload[$dateField] = $this->normalizeImportDate($payload[$dateField], $dateField);
@@ -1276,6 +1310,40 @@ class ImportService
             ];
             @file_put_contents(base_path('debug-ee61fc.log'), json_encode($__dbgApplyLog)."\n", FILE_APPEND);
         }
+        // #endregion
+
+        // #region agent log
+        $__dbgLen = static function (mixed $v): ?int {
+            return is_string($v) ? mb_strlen($v) : null;
+        };
+        $__dbgOverLimit = [];
+        foreach (self::ASSET_STRING_MAX_LENGTHS as $__dbgField => $__dbgMax) {
+            $__dbgVal = $payload[$__dbgField] ?? null;
+            if (is_string($__dbgVal) && mb_strlen($__dbgVal) > $__dbgMax) {
+                $__dbgOverLimit[$__dbgField] = mb_strlen($__dbgVal);
+            }
+        }
+        @file_put_contents(base_path('debug-704ea9.log'), json_encode([
+            'sessionId' => '704ea9',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'H1',
+            'location' => 'ImportService.php:applyRow:before_persist',
+            'message' => 'payload_string_lengths_after_sanitize',
+            'data' => [
+                'existing_id' => $existing?->id,
+                'replace' => $replace,
+                'will_create' => $existing === null,
+                'name_len_before_sanitize' => $__dbgNameLenBefore,
+                'name_len' => $__dbgLen($payload['name'] ?? null),
+                'description_len' => $__dbgLen($payload['description'] ?? null),
+                'notes_len' => $__dbgLen($payload['notes'] ?? null),
+                'supplier_len' => $__dbgLen($payload['supplier'] ?? null),
+                'name_preview' => is_string($payload['name'] ?? null) ? mb_substr($payload['name'], 0, 80) : null,
+                'fields_over_column_limit' => $__dbgOverLimit,
+                'name_was_truncated' => ($__dbgNameLenBefore ?? 0) > 255,
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
         // #endregion
 
         if ($existing && $replace) {
@@ -1845,6 +1913,66 @@ class ImportService
         }
 
         return ['asset' => $asset, 'matched_on' => $matchedOn];
+    }
+
+    /**
+     * Clamp a string to a maximum character length (UTF-8 safe, no ellipsis).
+     */
+    protected function limitImportString(string $value, int $maxLength): string
+    {
+        if ($maxLength < 1) {
+            return '';
+        }
+
+        if (mb_strlen($value) <= $maxLength) {
+            return $value;
+        }
+
+        return mb_substr($value, 0, $maxLength);
+    }
+
+    protected function nullableLimit(mixed $value, int $maxLength): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $trimmed = trim((string) $value);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        return $this->limitImportString($trimmed, $maxLength);
+    }
+
+    protected function sanitizeAssetFieldString(string $field, string $value): string
+    {
+        if (isset(self::ASSET_STRING_MAX_LENGTHS[$field])) {
+            return $this->limitImportString($value, self::ASSET_STRING_MAX_LENGTHS[$field]);
+        }
+
+        if (in_array($field, ['description', 'notes'], true)) {
+            return $this->limitImportString($value, self::ASSET_TEXT_MAX_LENGTH);
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function sanitizeAssetPayloadStrings(array $payload): array
+    {
+        foreach ($payload as $field => $value) {
+            if (! is_string($value) || ! is_string($field)) {
+                continue;
+            }
+
+            $payload[$field] = $this->sanitizeAssetFieldString($field, $value);
+        }
+
+        return $payload;
     }
 
     /**

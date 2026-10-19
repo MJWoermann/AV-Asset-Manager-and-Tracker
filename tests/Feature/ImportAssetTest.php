@@ -852,6 +852,48 @@ class ImportAssetTest extends TestCase
         $this->assertSame('2026-06-01', $created->test_tag_expiry?->toDateString());
     }
 
+    public function test_import_truncates_oversized_string_fields_to_column_limits(): void
+    {
+        ItemType::create(['name' => 'Servers & Appliances', 'slug' => 'servers-appliances']);
+
+        $longName = str_repeat('N', 300);
+        $longMac = str_repeat('A', 40);
+        $longIp = str_repeat('1', 50);
+
+        $service = app(ImportService::class);
+        $rows = $service->prepareRows(collect([
+            collect([
+                'name' => $longName,
+                'type' => 'Servers & Appliances',
+                'mac' => $longMac,
+                'ip' => $longIp,
+                'fmi' => 'FFE-002601',
+            ]),
+        ]), [
+            'name' => 'name',
+            'type' => 'item_type',
+            'mac' => 'mac_address',
+            'ip' => 'ip_address',
+            'fmi' => 'fmi_ast',
+        ]);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(255, mb_strlen($rows[0]['payload']['name']));
+        $this->assertSame(str_repeat('N', 255), $rows[0]['payload']['name']);
+        $this->assertSame(32, mb_strlen($rows[0]['payload']['mac_address']));
+        $this->assertSame(45, mb_strlen($rows[0]['payload']['ip_address']));
+
+        $counts = $service->commit($rows, [], false, 'update');
+        $this->assertSame(1, $counts['created']);
+
+        $created = Asset::query()->where('fmi_ast', 'FFE-002601')->first();
+        $this->assertNotNull($created);
+        $this->assertSame(255, mb_strlen((string) $created->name));
+        $this->assertSame(str_repeat('N', 255), $created->name);
+        $this->assertSame(32, mb_strlen((string) $created->mac_address));
+        $this->assertSame(45, mb_strlen((string) $created->ip_address));
+    }
+
     public function test_import_can_create_new_list_and_add_created_assets(): void
     {
         Storage::fake('local');
