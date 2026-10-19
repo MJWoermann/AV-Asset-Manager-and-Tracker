@@ -816,6 +816,42 @@ class ImportAssetTest extends TestCase
         $this->assertContains('ip_address', $rows[0]['matched_on']);
     }
 
+    public function test_service_normalizes_day_first_spreadsheet_dates(): void
+    {
+        ItemType::create(['name' => 'Audio Equipment', 'slug' => 'audio-equipment']);
+
+        $service = app(ImportService::class);
+        $rows = $service->prepareRows(collect([
+            collect([
+                'name' => 'Dated Mic',
+                'type' => 'Audio Equipment',
+                'purchased' => '14/08/2021 0:00',
+                'warranty' => '14/08/2024',
+                'test_tag' => '01/06/2026 00:00:00',
+            ]),
+        ]), [
+            'name' => 'name',
+            'type' => 'item_type',
+            'purchased' => 'purchase_date',
+            'warranty' => 'warranty_expiry',
+            'test_tag' => 'test_tag_expiry',
+        ]);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('2021-08-14', $rows[0]['payload']['purchase_date']);
+        $this->assertSame('2024-08-14', $rows[0]['payload']['warranty_expiry']);
+        $this->assertSame('2026-06-01', $rows[0]['payload']['test_tag_expiry']);
+
+        $asset = $service->commit($rows, [], false, 'update')['created'] ?? null;
+        $this->assertSame(1, $asset);
+
+        $created = Asset::query()->where('name', 'Dated Mic')->first();
+        $this->assertNotNull($created);
+        $this->assertSame('2021-08-14', $created->purchase_date?->toDateString());
+        $this->assertSame('2024-08-14', $created->warranty_expiry?->toDateString());
+        $this->assertSame('2026-06-01', $created->test_tag_expiry?->toDateString());
+    }
+
     public function test_import_can_create_new_list_and_add_created_assets(): void
     {
         Storage::fake('local');

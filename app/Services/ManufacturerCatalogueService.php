@@ -13,11 +13,22 @@ use InvalidArgumentException;
 
 class ManufacturerCatalogueService
 {
+    /** @var array<string, Manufacturer> */
+    protected array $manufacturerCache = [];
+
+    /** @var array<string, ManufacturerModel> */
+    protected array $modelCache = [];
+
     public function resolveManufacturer(?string $name): ?Manufacturer
     {
         $name = $this->nullableTrim($name);
         if ($name === null) {
             return null;
+        }
+
+        $cacheKey = Str::lower($name);
+        if (isset($this->manufacturerCache[$cacheKey])) {
+            return $this->manufacturerCache[$cacheKey];
         }
 
         $existing = Manufacturer::query()
@@ -28,15 +39,15 @@ class ManufacturerCatalogueService
             ->first();
 
         if ($existing) {
-            return $existing;
+            return $this->manufacturerCache[$cacheKey] = $existing;
         }
 
         $aliased = ManufacturerAlias::resolveManufacturer($name);
         if ($aliased) {
-            return $aliased;
+            return $this->manufacturerCache[$cacheKey] = $aliased;
         }
 
-        return Manufacturer::create(['name' => $name]);
+        return $this->manufacturerCache[$cacheKey] = Manufacturer::create(['name' => $name]);
     }
 
     public function resolveModel(?Manufacturer $manufacturer, ?string $name): ?ManufacturerModel
@@ -44,6 +55,11 @@ class ManufacturerCatalogueService
         $name = $this->nullableTrim($name);
         if ($name === null || $manufacturer === null) {
             return null;
+        }
+
+        $cacheKey = $manufacturer->id.'|'.Str::lower($name);
+        if (isset($this->modelCache[$cacheKey])) {
+            return $this->modelCache[$cacheKey];
         }
 
         $existing = ManufacturerModel::query()
@@ -55,15 +71,15 @@ class ManufacturerCatalogueService
             ->first();
 
         if ($existing) {
-            return $existing;
+            return $this->modelCache[$cacheKey] = $existing;
         }
 
         $aliased = ManufacturerModelAlias::resolveModel($manufacturer, $name);
         if ($aliased) {
-            return $aliased;
+            return $this->modelCache[$cacheKey] = $aliased;
         }
 
-        return ManufacturerModel::create([
+        return $this->modelCache[$cacheKey] = ManufacturerModel::create([
             'manufacturer_id' => $manufacturer->id,
             'name' => $name,
         ]);

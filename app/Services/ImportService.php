@@ -17,6 +17,7 @@ use App\Models\ItemTypeAlias;
 use App\Models\Location;
 use App\Models\LocationAlias;
 use App\Support\PerformanceLimits;
+use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -31,6 +32,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\HeadingRowImport;
 use PhpOffice\PhpSpreadsheet\Exception as SpreadsheetException;
 use PhpOffice\PhpSpreadsheet\Reader\Exception as SpreadsheetReaderException;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use Throwable;
 
 class ImportService
@@ -42,6 +44,17 @@ class ImportService
     /** @var Collection<int, CustomFieldDefinition>|null */
     protected ?Collection $importableCustomFieldDefinitionsCache = null;
 
+    /** @var array<string, ItemType> */
+    protected array $itemTypeResolutionCache = [];
+
+    /** @var array<string, Location> */
+    protected array $locationResolutionCache = [];
+
+    /** @var array<string, int|null> */
+    protected array $locationPathResolutionCache = [];
+
+    protected ?ManufacturerCatalogueService $manufacturerCatalogue = null;
+
     /** @var list<string> */
     public const DUPLICATE_KEYS = [
         'serial_number',
@@ -50,6 +63,13 @@ class ImportService
         'rig_tag',
         'tp_barcode',
         'ip_address',
+    ];
+
+    /** @var list<string> */
+    public const DATE_FIELDS = [
+        'purchase_date',
+        'warranty_expiry',
+        'test_tag_expiry',
     ];
 
     /** @var list<string> */
@@ -709,6 +729,34 @@ class ImportService
                     $value = AssetStatus::tryFrom($slug)?->value ?? AssetStatus::Available->value;
                 }
 
+                if (in_array($field, self::DATE_FIELDS, true)) {
+                    // #region agent log
+                    $__dbgRawDate = $value;
+                    // #endregion
+                    $value = $this->normalizeImportDate($value, $field);
+                    // #region agent log
+                    if ($__dbgRawDate !== $value) {
+                        static $__dbgDateLogs = 0;
+                        if ($__dbgDateLogs < 5) {
+                            $__dbgDateLogs++;
+                            @file_put_contents(base_path('debug-d766ca.log'), json_encode([
+                                'sessionId' => 'd766ca',
+                                'runId' => 'post-fix',
+                                'hypothesisId' => 'DATE',
+                                'location' => 'ImportService.php:prepareRows',
+                                'message' => 'date_normalized',
+                                'data' => [
+                                    'field' => $field,
+                                    'raw' => is_scalar($__dbgRawDate) ? (string) $__dbgRawDate : get_debug_type($__dbgRawDate),
+                                    'normalized' => $value,
+                                ],
+                                'timestamp' => (int) round(microtime(true) * 1000),
+                            ])."\n", FILE_APPEND);
+                        }
+                    }
+                    // #endregion
+                }
+
                 $payload[$field] = $value;
             }
 
@@ -827,6 +875,11 @@ class ImportService
         array $listOptions = [],
         ?int $userId = null,
     ): array {
+        // Large imports exceed default 30s PHP limits (per-row create + audit log).
+        if (! $dryRun) {
+            set_time_limit(0);
+        }
+
         $counts = [
             'created' => 0,
             'updated' => 0,
@@ -840,6 +893,35 @@ class ImportService
         $includeUpdated = (bool) ($listOptions['include_updated'] ?? false);
         $listDestination = $listOptions['destination'] ?? 'none';
 
+        // #region agent log
+        $__dbgCommitT0 = microtime(true);
+        $__dbgRowsSeen = 0;
+        $__dbgLogCommit = function (string $message, array $data = []) use ($__dbgCommitT0, &$counts): void {
+            $payload = [
+                'sessionId' => 'd766ca',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'COMMIT',
+                'location' => 'ImportService.php:commit',
+                'message' => $message,
+                'data' => array_merge([
+                    'elapsed_ms' => (int) round((microtime(true) - $__dbgCommitT0) * 1000),
+                    'created' => $counts['created'],
+                    'updated' => $counts['updated'],
+                    'replaced' => $counts['replaced'],
+                    'skipped' => $counts['skipped'],
+                ], $data),
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ];
+            @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
+        };
+        $__dbgLogCommit('commit_start', [
+            'prepared_count' => count($prepared),
+            'dry_run' => $dryRun,
+            'default_action' => $defaultDuplicateAction,
+            'time_limit' => (int) ini_get('max_execution_time'),
+        ]);
+        // #endregion
+
         $processRows = function (array $chunk) use (
             $actions,
             $dryRun,
@@ -847,6 +929,8 @@ class ImportService
             $includeUpdated,
             &$counts,
             &$assetsForList,
+            &$__dbgRowsSeen,
+            $__dbgLogCommit,
         ): void {
             foreach ($chunk as $row) {
                 $existingId = $row['existing_id'] ?? null;
@@ -860,6 +944,13 @@ class ImportService
                     if ($action === 'skip') {
                         $counts['skipped']++;
 
+                        // #region agent log
+                        $__dbgRowsSeen++;
+                        if ($__dbgRowsSeen === 1 || $__dbgRowsSeen % 250 === 0) {
+                            $__dbgLogCommit('commit_progress', ['rows_seen' => $__dbgRowsSeen]);
+                        }
+                        // #endregion
+
                         continue;
                     }
 
@@ -869,12 +960,23 @@ class ImportService
                             $counts['created']++;
                             $assetsForList[] = ['id' => null, 'kind' => 'created'];
 
+                            // #region agent log
+                            $__dbgRowsSeen++;
+                            // #endregion
+
                             continue;
                         }
 
                         $asset = $this->applyRow(null, $row, false);
                         $counts['created']++;
                         $assetsForList[] = ['id' => $asset->id, 'kind' => 'created'];
+
+                        // #region agent log
+                        $__dbgRowsSeen++;
+                        if ($__dbgRowsSeen === 1 || $__dbgRowsSeen % 250 === 0) {
+                            $__dbgLogCommit('commit_progress', ['rows_seen' => $__dbgRowsSeen]);
+                        }
+                        // #endregion
 
                         continue;
                     }
@@ -885,12 +987,20 @@ class ImportService
                             $assetsForList[] = ['id' => (int) $existingId, 'kind' => 'updated'];
                         }
 
+                        // #region agent log
+                        $__dbgRowsSeen++;
+                        // #endregion
+
                         continue;
                     }
 
                     $asset = Asset::query()->find($existingId);
                     if (! $asset) {
                         $counts['skipped']++;
+
+                        // #region agent log
+                        $__dbgRowsSeen++;
+                        // #endregion
 
                         continue;
                     }
@@ -925,6 +1035,13 @@ class ImportService
                         $assetsForList[] = ['id' => $asset->id, 'kind' => 'updated'];
                     }
 
+                    // #region agent log
+                    $__dbgRowsSeen++;
+                    if ($__dbgRowsSeen === 1 || $__dbgRowsSeen % 250 === 0) {
+                        $__dbgLogCommit('commit_progress', ['rows_seen' => $__dbgRowsSeen]);
+                    }
+                    // #endregion
+
                     continue;
                 }
 
@@ -932,12 +1049,23 @@ class ImportService
                     $counts['created']++;
                     $assetsForList[] = ['id' => null, 'kind' => 'created'];
 
+                    // #region agent log
+                    $__dbgRowsSeen++;
+                    // #endregion
+
                     continue;
                 }
 
                 $asset = $this->applyRow(null, $row, false);
                 $counts['created']++;
                 $assetsForList[] = ['id' => $asset->id, 'kind' => 'created'];
+
+                // #region agent log
+                $__dbgRowsSeen++;
+                if ($__dbgRowsSeen === 1 || $__dbgRowsSeen % 250 === 0) {
+                    $__dbgLogCommit('commit_progress', ['rows_seen' => $__dbgRowsSeen]);
+                }
+                // #endregion
             }
         };
 
@@ -950,6 +1078,15 @@ class ImportService
                 DB::transaction(fn () => $processRows($chunk));
             }
         }
+
+        // #region agent log
+        $__dbgLogCommit('commit_complete', [
+            'rows_seen' => $__dbgRowsSeen,
+            'item_type_cache' => count($this->itemTypeResolutionCache),
+            'location_cache' => count($this->locationResolutionCache),
+            'location_path_cache' => count($this->locationPathResolutionCache),
+        ]);
+        // #endregion
 
         if ($listDestination === 'none' || $assetsForList === []) {
             return $counts;
@@ -1087,6 +1224,12 @@ class ImportService
             'quantity' => $existing->quantity,
         ] : null;
         // #endregion
+        foreach (self::DATE_FIELDS as $dateField) {
+            if (array_key_exists($dateField, $payload)) {
+                $payload[$dateField] = $this->normalizeImportDate($payload[$dateField], $dateField);
+            }
+        }
+
         $payload['item_type_id'] = $itemType->id;
         if ($locationId !== null) {
             $payload['location_id'] = $locationId;
@@ -1094,7 +1237,8 @@ class ImportService
         $payload['status'] = $payload['status'] ?? AssetStatus::Available->value;
 
         if (array_key_exists('manufacturer', $payload) || array_key_exists('model', $payload)) {
-            $catalogueIds = app(ManufacturerCatalogueService::class)->resolveFromNames(
+            $this->manufacturerCatalogue ??= app(ManufacturerCatalogueService::class);
+            $catalogueIds = $this->manufacturerCatalogue->resolveFromNames(
                 array_key_exists('manufacturer', $payload) ? (string) ($payload['manufacturer'] ?? '') : null,
                 array_key_exists('model', $payload) ? (string) ($payload['model'] ?? '') : null,
             );
@@ -1396,6 +1540,12 @@ class ImportService
     public function resolveItemType(string $name): ItemType
     {
         $name = trim($name);
+        $cacheKey = Str::lower($name);
+
+        if (isset($this->itemTypeResolutionCache[$cacheKey])) {
+            return $this->itemTypeResolutionCache[$cacheKey];
+        }
+
         $slug = Str::slug($name);
 
         $existing = ItemType::query()
@@ -1407,15 +1557,15 @@ class ImportService
             ->first();
 
         if ($existing) {
-            return $existing;
+            return $this->itemTypeResolutionCache[$cacheKey] = $existing;
         }
 
         $aliased = ItemTypeAlias::resolveItemType($name);
         if ($aliased) {
-            return $aliased;
+            return $this->itemTypeResolutionCache[$cacheKey] = $aliased;
         }
 
-        return ItemType::create([
+        return $this->itemTypeResolutionCache[$cacheKey] = ItemType::create([
             'name' => $name,
             'slug' => $slug !== '' ? $slug : Str::slug($name.'-'.Str::random(4)),
         ]);
@@ -1430,6 +1580,17 @@ class ImportService
 
         if (! $building && ! $level && ! $room && ! $rack) {
             return null;
+        }
+
+        $pathKey = implode("\0", [
+            $building ?? '',
+            $level ?? '',
+            $room ?? '',
+            $rack ?? '',
+        ]);
+
+        if (array_key_exists($pathKey, $this->locationPathResolutionCache)) {
+            return $this->locationPathResolutionCache[$pathKey];
         }
 
         $parentId = null;
@@ -1458,11 +1619,17 @@ class ImportService
             $resolvedId = $location->id;
         }
 
-        return $resolvedId;
+        return $this->locationPathResolutionCache[$pathKey] = $resolvedId;
     }
 
     protected function firstOrCreateLocation(string $name, LocationType $type, ?int $parentId): Location
     {
+        $cacheKey = $type->value.'|'.$name.'|'.($parentId ?? 'null');
+
+        if (isset($this->locationResolutionCache[$cacheKey])) {
+            return $this->locationResolutionCache[$cacheKey];
+        }
+
         $baseQuery = Location::query()
             ->where('name', $name)
             ->where('type', $type->value);
@@ -1484,20 +1651,101 @@ class ImportService
         }
 
         if ($existing) {
-            return $existing;
+            return $this->locationResolutionCache[$cacheKey] = $existing;
         }
 
         $aliased = LocationAlias::resolveLocation($name, $type);
         if ($aliased) {
-            return $aliased;
+            return $this->locationResolutionCache[$cacheKey] = $aliased;
         }
 
-        return Location::create([
+        return $this->locationResolutionCache[$cacheKey] = Location::create([
             'name' => $name,
             'type' => $type,
             'parent_id' => $parentId,
             'is_portable' => false,
         ]);
+    }
+
+    /**
+     * Normalise spreadsheet date cells to Y-m-d for Eloquent date casts.
+     * Accepts day-first strings (common in AU/NZ exports), ISO dates, Excel serials, and DateTime.
+     */
+    protected function normalizeImportDate(mixed $value, string $field = 'date'): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::parse($value)->toDateString();
+        }
+
+        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value) && ! preg_match('/[^\d.]/', trim($value)))) {
+            $numeric = (float) $value;
+            // Excel serials are typically 1..~60000 (1900–2064); reject tiny integers that are not dates.
+            if ($numeric >= 1 && $numeric < 100000) {
+                try {
+                    return Carbon::instance(ExcelDate::excelToDateTimeObject($numeric))->toDateString();
+                } catch (Throwable) {
+                    // Fall through to string parsing.
+                }
+            }
+        }
+
+        $string = trim((string) $value);
+        if ($string === '') {
+            return null;
+        }
+
+        $formats = [
+            'Y-m-d',
+            'Y-m-d H:i:s',
+            'Y-m-d H:i',
+            'Y/m/d',
+            'Y/m/d H:i:s',
+            'Y/m/d H:i',
+            'd/m/Y',
+            'd/m/Y H:i:s',
+            'd/m/Y H:i',
+            'd/m/Y G:i',
+            'd/m/Y G:i:s',
+            'd-m-Y',
+            'd-m-Y H:i:s',
+            'd-m-Y H:i',
+            'd.m.Y',
+            'd.m.Y H:i:s',
+            'd.m.Y H:i',
+            'm/d/Y',
+            'm/d/Y H:i:s',
+            'm/d/Y H:i',
+            'm/d/Y G:i',
+            'j/n/Y',
+            'j/n/Y G:i',
+        ];
+
+        foreach ($formats as $format) {
+            try {
+                $parsed = Carbon::createFromFormat('!'.$format, $string);
+                if ($parsed instanceof Carbon) {
+                    return $parsed->toDateString();
+                }
+            } catch (Throwable) {
+                // Try the next format.
+            }
+        }
+
+        try {
+            return Carbon::parse($string)->toDateString();
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'file' => sprintf(
+                    'Could not read %s value "%s". Use YYYY-MM-DD or DD/MM/YYYY.',
+                    self::ASSET_FIELDS[$field] ?? $field,
+                    Str::limit($string, 40),
+                ),
+            ]);
+        }
     }
 
     /**
