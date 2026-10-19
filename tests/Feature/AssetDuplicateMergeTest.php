@@ -470,6 +470,75 @@ class AssetDuplicateMergeTest extends TestCase
             ->assertDontSee('Bar A');
     }
 
+    public function test_default_duplicate_search_excludes_parent_child_identifier_matches(): void
+    {
+        $user = $this->manager();
+
+        $parent = $this->makeAsset([
+            'name' => 'Rack Parent',
+            'serial_number' => 'SN-RELATED',
+        ]);
+        $this->makeAsset([
+            'name' => 'Child Fixture',
+            'serial_number' => 'SN-RELATED',
+            'parent_id' => $parent->id,
+        ]);
+
+        $this->makeAsset([
+            'name' => 'Loose Alpha',
+            'tp_barcode' => 'TP-LOOSE',
+        ]);
+        $this->makeAsset([
+            'name' => 'Loose Beta',
+            'tp_barcode' => 'TP-LOOSE',
+        ]);
+
+        // Siblings under the same parent still count as duplicates by default.
+        $kit = $this->makeAsset(['name' => 'Kit Parent']);
+        $this->makeAsset([
+            'name' => 'Sibling One',
+            'fmi_ast' => 'FMI-SIB',
+            'parent_id' => $kit->id,
+        ]);
+        $this->makeAsset([
+            'name' => 'Sibling Two',
+            'fmi_ast' => 'FMI-SIB',
+            'parent_id' => $kit->id,
+        ]);
+
+        $default = $this->actingAs($user)->get(route('assets.duplicates.index'));
+        $default->assertOk();
+        $default->assertSee('excluding parent/child matches');
+        $default->assertSee('Search including parent/child');
+        $default->assertSee('2 groups');
+        $default->assertSee('Loose Alpha');
+        $default->assertSee('Loose Beta');
+        $default->assertSee('Sibling One');
+        $default->assertSee('Sibling Two');
+        $default->assertDontSee('Rack Parent');
+        $default->assertDontSee('Child Fixture');
+
+        $included = $this->actingAs($user)->get(route('assets.duplicates.index', [
+            'include_related' => '1',
+        ]));
+        $included->assertOk();
+        $included->assertSee('including parent/child matches');
+        $included->assertSee('Hide parent/child matches');
+        $included->assertSee('3 groups');
+        $included->assertSee('Rack Parent');
+        $included->assertSee('Child Fixture');
+        $included->assertSee('Loose Alpha');
+
+        // Field filter still works in include mode.
+        $this->actingAs($user)->get(route('assets.duplicates.index', [
+            'include_related' => '1',
+            'field' => 'serial_number',
+        ]))
+            ->assertOk()
+            ->assertSee('Rack Parent')
+            ->assertDontSee('Loose Alpha');
+    }
+
     public function test_merge_records_aliases_and_reimport_matches_survivor(): void
     {
         $user = $this->manager();

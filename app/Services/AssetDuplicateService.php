@@ -44,6 +44,10 @@ class AssetDuplicateService
      * Find groups of assets that share at least one normalised identifier.
      * Matching is transitive within a department-scoped asset query (union-find).
      *
+     * By default, pairs already linked as ancestor↔descendant (parent/child chain)
+     * are not unioned, so intentional rack/kit hierarchies do not appear as merge candidates.
+     * Pass $includeRelated = true to include those pairs.
+     *
      * @return list<array{
      *     asset_ids: list<int>,
      *     assets: Collection<int, Asset>,
@@ -52,7 +56,7 @@ class AssetDuplicateService
      *     count: int
      * }>
      */
-    public function findGroups(?int $limit = 100): array
+    public function findGroups(?int $limit = 100, bool $includeRelated = false): array
     {
         $columns = array_values(array_unique(array_merge(
             ['id', 'name', 'department_id', 'item_type_id', 'status', 'parent_id'],
@@ -74,7 +78,13 @@ class AssetDuplicateService
             return [];
         }
 
-        /** @var array<int, int> $parent */
+        /** @var array<int, int|null> $assetParentById parent_id map for hierarchy checks (lazy-filled) */
+        $assetParentById = [];
+        foreach ($assets as $asset) {
+            $assetParentById[(int) $asset->id] = $asset->parent_id !== null ? (int) $asset->parent_id : null;
+        }
+
+        /** @var array<int, int> $parent union-find parent */
         $parent = [];
         foreach ($assets as $asset) {
             $parent[(int) $asset->id] = (int) $asset->id;
@@ -114,7 +124,7 @@ class AssetDuplicateService
             }
         }
 
-        /** @var array<int, array<string, true>> $matchKeysByRootCandidate */
+        /** @var array<int, array<string, true>> $edgeKeys */
         $edgeKeys = [];
 
         foreach ($buckets as $key => $valueMap) {
@@ -124,12 +134,24 @@ class AssetDuplicateService
                     continue;
                 }
 
-                $first = $uniqueIds[0];
-                foreach (array_slice($uniqueIds, 1) as $other) {
-                    $union($first, $other);
+                $linkedInBucket = [];
+
+                for ($i = 0, $count = count($uniqueIds); $i < $count; $i++) {
+                    for ($j = $i + 1; $j < $count; $j++) {
+                        $left = $uniqueIds[$i];
+                        $right = $uniqueIds[$j];
+
+                        if (! $includeRelated && $this->areAncestorDescendant($left, $right, $assetParentById)) {
+                            continue;
+                        }
+
+                        $union($left, $right);
+                        $linkedInBucket[$left] = true;
+                        $linkedInBucket[$right] = true;
+                    }
                 }
 
-                foreach ($uniqueIds as $id) {
+                foreach (array_keys($linkedInBucket) as $id) {
                     $edgeKeys[$id][$key] = true;
                 }
             }
@@ -521,6 +543,55 @@ class AssetDuplicateService
     }
 
     /**
+     * True when $a and $b sit on the same parent→child chain (ancestor↔descendant).
+     * Siblings under the same parent are not considered related for this check.
+     *
+     * @param  array<int, int|null>  $parentById
+     */
+    protected function areAncestorDescendant(int $a, int $b, array &$parentById): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+
+        return $this->isAncestorOf($a, $b, $parentById)
+            || $this->isAncestorOf($b, $a, $parentById);
+    }
+
+    /**
+     * @param  array<int, int|null>  $parentById
+     */
+    protected function isAncestorOf(int $ancestorId, int $descendantId, array &$parentById): bool
+    {
+        $current = $this->resolveParentId($descendantId, $parentById);
+        $guard = 0;
+
+        while ($current !== null && $guard < 1000) {
+            if ($current === $ancestorId) {
+                return true;
+            }
+
+            $current = $this->resolveParentId($current, $parentById);
+            $guard++;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<int, int|null>  $parentById
+     */
+    protected function resolveParentId(int $assetId, array &$parentById): ?int
+    {
+        if (! array_key_exists($assetId, $parentById)) {
+            $parentId = Asset::query()->withoutGlobalScopes()->whereKey($assetId)->value('parent_id');
+            $parentById[$assetId] = $parentId !== null ? (int) $parentId : null;
+        }
+
+        return $parentById[$assetId];
+    }
+
+    /**
      * True when $child is an ancestor of $parent (or is $parent), so parenting would cycle.
      */
     protected function wouldCreateParentCycle(Asset $parent, Asset $child): bool
@@ -529,19 +600,13 @@ class AssetDuplicateService
             return true;
         }
 
-        $ancestorId = $parent->parent_id;
-        $guard = 0;
+        /** @var array<int, int|null> $parentById */
+        $parentById = [
+            (int) $parent->id => $parent->parent_id !== null ? (int) $parent->parent_id : null,
+            (int) $child->id => $child->parent_id !== null ? (int) $child->parent_id : null,
+        ];
 
-        while ($ancestorId !== null && $guard < 1000) {
-            if ((int) $ancestorId === (int) $child->id) {
-                return true;
-            }
-
-            $ancestorId = Asset::query()->withoutGlobalScopes()->whereKey($ancestorId)->value('parent_id');
-            $guard++;
-        }
-
-        return false;
+        return $this->isAncestorOf((int) $child->id, (int) $parent->id, $parentById);
     }
 
     protected function cascadeLocationToDescendants(Asset $asset, ?int $locationId): void

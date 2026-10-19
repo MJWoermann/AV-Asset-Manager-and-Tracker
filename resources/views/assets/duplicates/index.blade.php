@@ -39,7 +39,35 @@
             Select assets to merge (2–{{ \App\Services\AssetMergeService::MAX_ASSETS }}), clear shared identifiers, or link as parent/child.
         </p>
 
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-3">
+            <p class="text-sm">
+                @if ($includeRelated)
+                    <span class="font-medium">Mode:</span> including parent/child matches
+                    <span class="text-brand-charcoal dark:text-brand-silver">(assets already linked in a hierarchy may appear)</span>
+                @else
+                    <span class="font-medium">Mode:</span> excluding parent/child matches
+                    <span class="text-brand-charcoal dark:text-brand-silver">(default — ancestor/descendant pairs that share identifiers are hidden)</span>
+                @endif
+            </p>
+            <div class="flex flex-wrap gap-2 sm:justify-end">
+                @if ($includeRelated)
+                    <a
+                        href="{{ $excludeRelatedUrl }}"
+                        class="px-3 py-2 border border-brand-charcoal dark:border-brand-silver text-sm inline-flex items-center justify-center"
+                    >Hide parent/child matches</a>
+                @else
+                    <a
+                        href="{{ $includeRelatedUrl }}"
+                        class="px-3 py-2 border border-brand-charcoal dark:border-brand-silver text-sm inline-flex items-center justify-center"
+                    >Search including parent/child</a>
+                @endif
+            </div>
+        </div>
+
         <form method="GET" action="{{ route('assets.duplicates.index') }}" class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-3">
+            @if ($includeRelated)
+                <input type="hidden" name="include_related" value="1">
+            @endif
             <div class="min-w-[12rem]">
                 <x-input-label for="duplicate_field_filter" value="Matched field" />
                 <select
@@ -66,7 +94,7 @@
                 <span>2+ fields only</span>
             </label>
             <x-clear-filters
-                :href="route('assets.duplicates.index')"
+                :href="$clearFiltersUrl"
                 :active="$filtersActive"
             />
         </form>

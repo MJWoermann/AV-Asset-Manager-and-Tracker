@@ -23,13 +23,19 @@ class AssetDuplicateController extends Controller
         }
 
         $multiFieldOnly = $request->boolean('multi');
+        $includeRelated = $request->boolean('include_related');
 
-        $allGroups = $duplicates->findGroups();
+        $allGroups = $duplicates->findGroups(includeRelated: $includeRelated);
         $groups = $duplicates->filterGroups(
             $allGroups,
             $fieldFilter !== '' ? $fieldFilter : null,
             $multiFieldOnly,
         );
+
+        $queryBase = array_filter([
+            'field' => $fieldFilter !== '' ? $fieldFilter : null,
+            'multi' => $multiFieldOnly ? '1' : null,
+        ]);
 
         return view('assets.duplicates.index', [
             'groups' => $groups,
@@ -39,7 +45,12 @@ class AssetDuplicateController extends Controller
             'matchKeyLabels' => AssetDuplicateService::MATCH_KEY_LABELS,
             'fieldFilter' => $fieldFilter,
             'multiFieldOnly' => $multiFieldOnly,
+            'includeRelated' => $includeRelated,
             'filtersActive' => $fieldFilter !== '' || $multiFieldOnly,
+            'filterQuery' => $queryBase,
+            'includeRelatedUrl' => route('assets.duplicates.index', array_merge($queryBase, ['include_related' => '1'])),
+            'excludeRelatedUrl' => route('assets.duplicates.index', $queryBase),
+            'clearFiltersUrl' => route('assets.duplicates.index', $includeRelated ? ['include_related' => '1'] : []),
         ]);
     }
 
