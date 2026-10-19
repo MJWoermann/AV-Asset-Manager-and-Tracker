@@ -225,29 +225,8 @@ class ImportService
     public function readRows(string $absolutePath): Collection
     {
         try {
-            // #region agent log
-            $__dbgReadT0 = microtime(true);
-            $__dbgLog = function (string $message, array $data = []) use ($__dbgReadT0): void {
-                $payload = [
-                    'sessionId' => 'd766ca',
-                    'runId' => 'post-fix',
-                    'hypothesisId' => 'A',
-                    'location' => 'ImportService.php:readRows',
-                    'message' => $message,
-                    'data' => array_merge(['elapsed_ms' => (int) round((microtime(true) - $__dbgReadT0) * 1000)], $data),
-                    'timestamp' => (int) round(microtime(true) * 1000),
-                ];
-                @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
-            };
-            $__dbgLog('excel_import_start', ['path_basename' => basename($absolutePath)]);
-            // #endregion
-
             $reader = new AssetImport;
             Excel::import($reader, $absolutePath);
-
-            // #region agent log
-            $__dbgLog('excel_import_done', ['row_count' => $reader->rows->count()]);
-            // #endregion
 
             $maxRows = PerformanceLimits::int('import_max_rows');
             if ($reader->rows->count() > $maxRows) {
@@ -699,25 +678,6 @@ class ImportService
     {
         $drafts = [];
 
-        // #region agent log
-        $__dbgPrepT0 = microtime(true);
-        $__dbgMatchHits = 0;
-        $__dbgSkipped = 0;
-        $__dbgLog = function (string $message, array $data = []) use ($__dbgPrepT0): void {
-            $payload = [
-                'sessionId' => 'd766ca',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'B',
-                'location' => 'ImportService.php:prepareRows',
-                'message' => $message,
-                'data' => array_merge(['elapsed_ms' => (int) round((microtime(true) - $__dbgPrepT0) * 1000)], $data),
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ];
-            @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
-        };
-        $__dbgLog('prepareRows_start', ['input_rows' => $rows->count()]);
-        // #endregion
-
         foreach ($rows as $index => $row) {
             $row = Collection::make($row);
             $payload = [];
@@ -786,31 +746,7 @@ class ImportService
                 }
 
                 if (in_array($field, self::DATE_FIELDS, true)) {
-                    // #region agent log
-                    $__dbgRawDate = $value;
-                    // #endregion
                     $value = $this->normalizeImportDate($value, $field);
-                    // #region agent log
-                    if ($__dbgRawDate !== $value) {
-                        static $__dbgDateLogs = 0;
-                        if ($__dbgDateLogs < 5) {
-                            $__dbgDateLogs++;
-                            @file_put_contents(base_path('debug-d766ca.log'), json_encode([
-                                'sessionId' => 'd766ca',
-                                'runId' => 'post-fix',
-                                'hypothesisId' => 'DATE',
-                                'location' => 'ImportService.php:prepareRows',
-                                'message' => 'date_normalized',
-                                'data' => [
-                                    'field' => $field,
-                                    'raw' => is_scalar($__dbgRawDate) ? (string) $__dbgRawDate : get_debug_type($__dbgRawDate),
-                                    'normalized' => $value,
-                                ],
-                                'timestamp' => (int) round(microtime(true) * 1000),
-                            ])."\n", FILE_APPEND);
-                        }
-                    }
-                    // #endregion
                 }
 
                 if (is_string($value)) {
@@ -821,10 +757,6 @@ class ImportService
             }
 
             if (empty($payload['name']) || ! $itemTypeName) {
-                // #region agent log
-                $__dbgSkipped++;
-                // #endregion
-
                 continue;
             }
 
@@ -842,32 +774,33 @@ class ImportService
         }
 
         // #region agent log
-        $__dbgMatchT0 = microtime(true);
+        $__dbgIdxT0 = microtime(true);
         // #endregion
 
         $indexes = $this->buildExistingMatchIndexes($drafts);
 
         // #region agent log
-        $__dbgMatchMs = (int) round((microtime(true) - $__dbgMatchT0) * 1000);
-        $__dbgLog('prepareRows_indexes_built', [
-            'draft_count' => count($drafts),
-            'skipped' => $__dbgSkipped,
-            'index_keys' => array_keys($indexes),
-            'index_sizes' => array_map(fn (array $map) => count($map), $indexes),
-            'match_ms' => $__dbgMatchMs,
-        ]);
+        @file_put_contents(base_path('debug-d766ca.log'), json_encode([
+            'sessionId' => 'd766ca',
+            'runId' => 'dup-check-2',
+            'hypothesisId' => 'P',
+            'location' => 'ImportService.php:prepareRows',
+            'message' => 'indexes_built',
+            'data' => [
+                'draft_count' => count($drafts),
+                'index_ms' => (int) round((microtime(true) - $__dbgIdxT0) * 1000),
+                'index_sizes' => array_map(fn (array $map) => count($map), $indexes),
+                'memory_mb' => (int) round(memory_get_usage(true) / 1048576),
+                'peak_memory_mb' => (int) round(memory_get_peak_usage(true) / 1048576),
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
         // #endregion
 
         $prepared = [];
 
         foreach ($drafts as $draft) {
             $match = $this->findExistingMatch($draft['payload'], $indexes);
-
-            // #region agent log
-            if ($match['asset'] !== null) {
-                $__dbgMatchHits++;
-            }
-            // #endregion
 
             $prepared[] = [
                 'index' => $draft['index'],
@@ -894,15 +827,7 @@ class ImportService
             ];
         }
 
-        // #region agent log
-        $__dbgLog('prepareRows_complete', [
-            'processed' => count($prepared),
-            'skipped' => $__dbgSkipped,
-            'prepared' => count($prepared),
-            'match_hits' => $__dbgMatchHits,
-            'match_ms' => $__dbgMatchMs,
-        ]);
-        // #endregion
+        unset($drafts, $indexes);
 
         return $prepared;
     }
@@ -1883,23 +1808,26 @@ class ImportService
                 continue;
             }
 
-            $found = Asset::query()
-                ->select($columns)
-                ->whereIn($key, $values)
-                ->orderBy('id')
-                ->get();
-
             $map = [];
-            foreach ($found as $asset) {
-                $lookup = $asset->getAttribute($key);
-                if ($lookup === null || $lookup === '') {
-                    continue;
-                }
+            // Chunk whereIn to avoid oversized packets / long queries on large re-imports.
+            foreach (array_chunk($values, 500) as $valueChunk) {
+                $found = Asset::query()
+                    ->select($columns)
+                    ->whereIn($key, $valueChunk)
+                    ->orderBy('id')
+                    ->get();
 
-                $lookupKey = (string) $lookup;
-                // Match query()->where()->first() behaviour: keep the earliest id.
-                if (! isset($map[$lookupKey])) {
-                    $map[$lookupKey] = $asset;
+                foreach ($found as $asset) {
+                    $lookup = $asset->getAttribute($key);
+                    if ($lookup === null || $lookup === '') {
+                        continue;
+                    }
+
+                    $lookupKey = (string) $lookup;
+                    // Match query()->where()->first() behaviour: keep the earliest id.
+                    if (! isset($map[$lookupKey])) {
+                        $map[$lookupKey] = $asset;
+                    }
                 }
             }
 

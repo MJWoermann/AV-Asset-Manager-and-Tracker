@@ -11,6 +11,7 @@ use App\Models\Manufacturer;
 use App\Models\ManufacturerModel;
 use App\Support\AssetBrowseFilters;
 use App\Support\AssetTableColumns;
+use App\Support\PageSize;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -75,14 +76,15 @@ class AssetListController extends Controller
 
         AssetBrowseFilters::applyToListItemQuery($items, $request, $selectedColumns);
 
-        $items = $items
-            ->join('assets', 'assets.id', '=', 'asset_list_items.asset_id')
-            ->orderByRaw('COALESCE(assets.parent_id, assets.id)')
-            ->orderBy('assets.parent_id')
-            ->orderBy('assets.name')
-            ->select('asset_list_items.*')
-            ->paginate(50)
-            ->withQueryString();
+        $items = PageSize::paginate(
+            $items
+                ->join('assets', 'assets.id', '=', 'asset_list_items.asset_id')
+                ->orderByRaw('COALESCE(assets.parent_id, assets.id)')
+                ->orderBy('assets.parent_id')
+                ->orderBy('assets.name')
+                ->select('asset_list_items.*'),
+            $request,
+        );
 
         return view('lists.show', [
             'list' => $list,

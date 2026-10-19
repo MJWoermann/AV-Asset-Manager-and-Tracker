@@ -57,6 +57,9 @@
         @endif
 
         <form id="asset-filters" method="GET" class="mb-4 flex flex-col sm:flex-row gap-2 sm:items-start">
+            @if (request()->filled(\App\Support\PageSize::PARAM))
+                <input type="hidden" name="{{ \App\Support\PageSize::PARAM }}" value="{{ request(\App\Support\PageSize::PARAM) }}">
+            @endif
             <x-scannable-search
                 id="list-search-q"
                 name="q"
@@ -148,6 +151,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="mt-4">{{ $items->links() }}</div>
+        <x-paginated-results :paginator="$items" />
     </div>
 </x-app-layout>

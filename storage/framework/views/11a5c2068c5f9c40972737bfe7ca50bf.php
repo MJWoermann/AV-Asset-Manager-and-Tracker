@@ -70,6 +70,9 @@
         <?php endif; ?>
 
         <form id="asset-filters" method="GET" class="mb-4 flex flex-col sm:flex-row gap-2 sm:items-start">
+            <?php if(request()->filled(\App\Support\PageSize::PARAM)): ?>
+                <input type="hidden" name="<?php echo e(\App\Support\PageSize::PARAM); ?>" value="<?php echo e(request(\App\Support\PageSize::PARAM)); ?>">
+            <?php endif; ?>
             <?php if (isset($component)) { $__componentOriginal6ba2bee0210b38146ba04d5bb3b73030 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal6ba2bee0210b38146ba04d5bb3b73030 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.scannable-search','data' => ['id' => 'asset-search-q','name' => 'q','value' => $q,'placeholder' => 'Search name, location, FMI, barcode, SN…','class' => 'flex-1','ariaLabel' => 'Search assets','scanAriaLabel' => 'Scan barcode into asset search']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -216,7 +219,26 @@
                 </tbody>
             </table>
         </div>
-        <div class="mt-4"><?php echo e($assets->links()); ?></div>
+        <?php if (isset($component)) { $__componentOriginal6e24cf2ff912fed75ae4f2edca067c58 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal6e24cf2ff912fed75ae4f2edca067c58 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.paginated-results','data' => ['paginator' => $assets]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('paginated-results'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['paginator' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($assets)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal6e24cf2ff912fed75ae4f2edca067c58)): ?>
+<?php $attributes = $__attributesOriginal6e24cf2ff912fed75ae4f2edca067c58; ?>
+<?php unset($__attributesOriginal6e24cf2ff912fed75ae4f2edca067c58); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal6e24cf2ff912fed75ae4f2edca067c58)): ?>
+<?php $component = $__componentOriginal6e24cf2ff912fed75ae4f2edca067c58; ?>
+<?php unset($__componentOriginal6e24cf2ff912fed75ae4f2edca067c58); ?>
+<?php endif; ?>
     </div>
  <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>

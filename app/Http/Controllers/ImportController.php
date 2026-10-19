@@ -10,6 +10,7 @@ use App\Services\ImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -79,7 +80,7 @@ class ImportController extends Controller
         $__dbgLog = function (string $hypothesisId, string $message, array $data = []) use ($__dbgPrepareT0): void {
             $payload = [
                 'sessionId' => 'd766ca',
-                'runId' => 'post-fix',
+                'runId' => 'dup-check-2',
                 'hypothesisId' => $hypothesisId,
                 'location' => 'ImportController.php:prepare',
                 'message' => $message,
@@ -90,126 +91,125 @@ class ImportController extends Controller
                 ], $data),
                 'timestamp' => (int) round(microtime(true) * 1000),
             ];
-            $line = json_encode($payload)."\n";
-            @file_put_contents(base_path('debug-d766ca.log'), $line, FILE_APPEND);
-            @file_put_contents(storage_path('logs/debug-d766ca.log'), $line, FILE_APPEND);
-            try {
-                $ch = curl_init('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812');
-                if ($ch !== false) {
-                    curl_setopt_array($ch, [
-                        CURLOPT_POST => true,
-                        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Debug-Session-Id: d766ca'],
-                        CURLOPT_POSTFIELDS => json_encode($payload),
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_TIMEOUT_MS => 100,
-                    ]);
-                    curl_exec($ch);
-                    curl_close($ch);
-                }
-            } catch (\Throwable) {
-            }
+            @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
         };
-        $__dbgLog('A', 'prepare_entered');
-        // #endregion
-
-        $path = session('import.path');
-        $columns = session('import.columns', []);
-
-        if (! $path || ! Storage::exists($path)) {
-            return redirect()->route('import.create')->withErrors(['file' => 'Import session expired. Upload again.']);
-        }
-
-        $mapping = $this->imports->validateMapping(
-            $request->validate([
-                'mapping' => ['required', 'array'],
-                'mapping.*' => ['nullable', 'string'],
-            ])['mapping']
-        );
-
-        // #region agent log
-        $__dbgLog('A', 'mapping_validated', ['mapping_count' => count($mapping)]);
-        $__dbgReadT0 = microtime(true);
+        $__dbgLog('P', 'prepare_entered');
         // #endregion
 
         try {
-            $rows = $this->imports->readRows(Storage::path($path));
+            $path = session('import.path');
+            $columns = session('import.columns', []);
+
+            if (! $path || ! Storage::exists($path)) {
+                return redirect()->route('import.create')->withErrors(['file' => 'Import session expired. Upload again.']);
+            }
+
+            $mapping = $this->imports->validateMapping(
+                $request->validate([
+                    'mapping' => ['required', 'array'],
+                    'mapping.*' => ['nullable', 'string'],
+                ])['mapping']
+            );
+
+            // #region agent log
+            $__dbgLog('P', 'mapping_validated', ['mapping_count' => count($mapping)]);
+            // #endregion
+
+            try {
+                $rows = $this->imports->readRows(Storage::path($path));
+            } catch (ValidationException $e) {
+                Storage::delete($path);
+                session()->forget(['import.path', 'import.columns', 'import.original_filename', 'import.mapping', 'import.prepared', 'import.prepared_path']);
+
+                return redirect()->route('import.create')->withErrors($e->errors());
+            }
+
+            // #region agent log
+            $__dbgLog('P', 'readRows_done', ['row_count' => $rows->count()]);
+            // #endregion
+
+            $prepared = $this->imports->prepareRows($rows, $mapping);
+            unset($rows);
+
+            // #region agent log
+            $__dbgLog('P', 'prepareRows_done', ['prepared_count' => count($prepared)]);
+            // #endregion
+
+            $this->imports->rememberMapping($mapping, $request->user()?->id);
+
+            $previousPrepared = session('import.prepared_path');
+            if (is_string($previousPrepared)) {
+                $this->imports->forgetPreparedRows($previousPrepared);
+            }
+
+            $preparedPath = $this->imports->storePreparedRows($prepared, $request->user()?->id);
+
+            // #region agent log
+            $__dbgLog('P', 'store_done', [
+                'prepared_path' => $preparedPath,
+                'store_bytes' => Storage::exists($preparedPath) ? (int) Storage::size($preparedPath) : 0,
+            ]);
+            // #endregion
+
+            session([
+                'import.mapping' => $mapping,
+                'import.prepared_path' => $preparedPath,
+            ]);
+            session()->forget('import.prepared');
+
+            // Count matches without cloning the full prepared list into a second large array.
+            $duplicateCount = 0;
+            $duplicatesPreview = [];
+            $previewLimit = ImportService::DUPLICATES_PREVIEW_LIMIT;
+            foreach ($prepared as $row) {
+                if (($row['existing_id'] ?? null) === null) {
+                    continue;
+                }
+                $duplicateCount++;
+                if (count($duplicatesPreview) < $previewLimit) {
+                    $duplicatesPreview[] = $row;
+                }
+            }
+            $newCount = count($prepared) - $duplicateCount;
+            $duplicatesHiddenCount = max(0, $duplicateCount - count($duplicatesPreview));
+            unset($prepared);
+
+            // #region agent log
+            $__dbgLog('P', 'prepare_returning_view', [
+                'duplicate_count' => $duplicateCount,
+                'duplicates_preview' => count($duplicatesPreview),
+                'duplicates_hidden' => $duplicatesHiddenCount,
+                'new_count' => $newCount,
+            ]);
+            // #endregion
+
+            return view('import.duplicates', [
+                'duplicates' => $duplicatesPreview,
+                'duplicateCount' => $duplicateCount,
+                'duplicatesHiddenCount' => $duplicatesHiddenCount,
+                'newCount' => $newCount,
+                'totalCount' => $newCount + $duplicateCount,
+                'fieldLabels' => ImportService::ASSET_FIELDS,
+                'lists' => AssetList::query()->orderBy('type')->orderBy('name')->get(['id', 'name', 'type']),
+            ]);
         } catch (ValidationException $e) {
-            Storage::delete($path);
-            session()->forget(['import.path', 'import.columns', 'import.original_filename', 'import.mapping', 'import.prepared', 'import.prepared_path']);
+            throw $e;
+        } catch (Throwable $e) {
+            // #region agent log
+            $__dbgLog('P', 'prepare_exception', [
+                'exception' => $e::class,
+                'error' => Str::limit($e->getMessage(), 240),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            // #endregion
 
-            return redirect()->route('import.create')->withErrors($e->errors());
+            report($e);
+
+            return redirect()->route('import.create')->withErrors([
+                'file' => 'Import prepare failed: '.Str::limit($e->getMessage(), 160),
+            ]);
         }
-
-        // #region agent log
-        $__dbgLog('A', 'readRows_done', [
-            'read_ms' => (int) round((microtime(true) - $__dbgReadT0) * 1000),
-            'row_count' => $rows->count(),
-        ]);
-        $__dbgPrepT0 = microtime(true);
-        // #endregion
-
-        $prepared = $this->imports->prepareRows($rows, $mapping);
-        unset($rows);
-
-        // #region agent log
-        $__dbgLog('B', 'prepareRows_done', [
-            'prepare_ms' => (int) round((microtime(true) - $__dbgPrepT0) * 1000),
-            'prepared_count' => count($prepared),
-        ]);
-        $__dbgLog('C', 'store_starting');
-        $__dbgStoreT0 = microtime(true);
-        // #endregion
-
-        $this->imports->rememberMapping($mapping, $request->user()?->id);
-
-        $previousPrepared = session('import.prepared_path');
-        if (is_string($previousPrepared)) {
-            $this->imports->forgetPreparedRows($previousPrepared);
-        }
-
-        $preparedPath = $this->imports->storePreparedRows($prepared, $request->user()?->id);
-
-        // #region agent log
-        $__dbgStoreBytes = Storage::exists($preparedPath) ? (int) Storage::size($preparedPath) : 0;
-        $__dbgLog('C', 'storePreparedRows_done', [
-            'store_ms' => (int) round((microtime(true) - $__dbgStoreT0) * 1000),
-            'prepared_path' => $preparedPath,
-            'store_bytes' => $__dbgStoreBytes,
-        ]);
-        // #endregion
-
-        session([
-            'import.mapping' => $mapping,
-            'import.prepared_path' => $preparedPath,
-        ]);
-        session()->forget('import.prepared');
-
-        $duplicates = array_values(array_filter($prepared, fn (array $row) => $row['existing_id'] !== null));
-        $duplicateCount = count($duplicates);
-        $newCount = count($prepared) - $duplicateCount;
-        $duplicatesPreview = array_slice($duplicates, 0, ImportService::DUPLICATES_PREVIEW_LIMIT);
-        $duplicatesHiddenCount = max(0, $duplicateCount - count($duplicatesPreview));
-        unset($duplicates, $prepared);
-
-        // #region agent log
-        $__dbgLog('D', 'prepare_returning_view', [
-            'duplicate_count' => $duplicateCount,
-            'duplicates_preview' => count($duplicatesPreview),
-            'duplicates_hidden' => $duplicatesHiddenCount,
-            'new_count' => $newCount,
-            'total_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000),
-        ]);
-        // #endregion
-
-        return view('import.duplicates', [
-            'duplicates' => $duplicatesPreview,
-            'duplicateCount' => $duplicateCount,
-            'duplicatesHiddenCount' => $duplicatesHiddenCount,
-            'newCount' => $newCount,
-            'totalCount' => $newCount + $duplicateCount,
-            'fieldLabels' => ImportService::ASSET_FIELDS,
-            'lists' => AssetList::query()->orderBy('type')->orderBy('name')->get(['id', 'name', 'type']),
-        ]);
     }
 
     public function process(Request $request): RedirectResponse

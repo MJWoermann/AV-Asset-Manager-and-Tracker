@@ -36,6 +36,7 @@ use App\Support\AssetHistoryFilters;
 use App\Support\AssetMaintenanceFilters;
 use App\Support\AssetTableColumns;
 use App\Support\EmailIntegrationSettings;
+use App\Support\PageSize;
 use App\Support\StockTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -63,10 +64,10 @@ class AssetController extends Controller
 
         AssetBrowseFilters::applyToAssetQuery($assets, $request, selectedColumns: $selectedColumns);
 
-        $assets = $assets
-            ->orderBySearchRelevance($term)
-            ->paginate(50)
-            ->withQueryString();
+        $assets = PageSize::paginate(
+            $assets->orderBySearchRelevance($term),
+            $request,
+        );
 
         return view('assets.index', [
             'assets' => $assets,
