@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AssetStatus;
 use App\Models\Concerns\BelongsToDepartment;
+use App\Support\ScannableIdentifierFields;
 use App\Support\TextSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -83,27 +84,123 @@ class UnknownScan extends Model
     /**
      * Resolve this unknown scan against an existing asset.
      *
-     * Optionally sets tp_barcode from the scanned code when empty and unique,
-     * and adds the asset to the related event list without duplicating.
+     * Optionally writes the scanned code onto a chosen identifier field (overwriting),
+     * applies the scan location when present (non-child assets only), and adds the
+     * asset to the related event list without duplicating.
      */
-    public function linkToExisting(Asset $asset, bool $addToEventList = false, bool $setIdentifier = false, ?int $userId = null): void
-    {
+    public function linkToExisting(
+        Asset $asset,
+        bool $addToEventList = false,
+        bool $setIdentifier = false,
+        ?int $userId = null,
+        ?string $identifierField = null,
+    ): void {
+        $resolvedField = $identifierField;
+
+        if ($resolvedField === null && $setIdentifier) {
+            $resolvedField = 'tp_barcode';
+        }
+
+        // #region agent log
+        $debugLogPath = base_path('debug-307f2d.log');
+        file_put_contents($debugLogPath, json_encode([
+            'sessionId' => '307f2d',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'B',
+            'location' => 'UnknownScan.php:linkToExisting:entry',
+            'message' => 'linkToExisting called',
+            'data' => [
+                'unknownScanId' => $this->id,
+                'assetId' => $asset->id,
+                'scannedCode' => $this->scanned_code,
+                'addToEventList' => $addToEventList,
+                'setIdentifier' => $setIdentifier,
+                'identifierField' => $resolvedField,
+                'scanLocationId' => $this->location_id,
+                'assetLocationId' => $asset->location_id,
+                'assetParentId' => $asset->parent_id,
+                'assetTpBarcode' => $asset->tp_barcode,
+                'assetSerial' => $asset->serial_number,
+                'assetFmiAst' => $asset->fmi_ast,
+                'assetRigTag' => $asset->rig_tag,
+                'assetMac' => $asset->mac_address,
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
+        // #endregion
+
         if ($this->isResolved()) {
             throw ValidationException::withMessages([
                 'asset_id' => 'This unknown scan is already resolved.',
             ]);
         }
 
-        if ($setIdentifier && blank($asset->tp_barcode)) {
+        $attributes = [];
+
+        if ($resolvedField !== null) {
+            if (! ScannableIdentifierFields::isLinkTarget($resolvedField)) {
+                throw ValidationException::withMessages([
+                    'identifier_field' => 'Invalid identifier field.',
+                ]);
+            }
+
             $code = $this->scanned_code;
             $collision = Asset::query()
-                ->where('tp_barcode', $code)
+                ->where($resolvedField, $code)
                 ->where('id', '!=', $asset->id)
                 ->exists();
 
-            if (! $collision) {
-                $asset->update(['tp_barcode' => $code]);
+            // #region agent log
+            file_put_contents($debugLogPath, json_encode([
+                'sessionId' => '307f2d',
+                'runId' => 'post-fix',
+                'hypothesisId' => 'C',
+                'location' => 'UnknownScan.php:linkToExisting:identifier_branch',
+                'message' => 'identifier field write evaluated',
+                'data' => [
+                    'field' => $resolvedField,
+                    'existingValue' => $asset->{$resolvedField},
+                    'collision' => $collision,
+                    'overwrite' => filled($asset->{$resolvedField}),
+                ],
+                'timestamp' => (int) (microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
+            // #endregion
+
+            if ($collision) {
+                throw ValidationException::withMessages([
+                    'identifier_field' => 'Another asset already uses this '.ScannableIdentifierFields::label($resolvedField).'.',
+                ]);
             }
+
+            $attributes[$resolvedField] = $code;
+        }
+
+        $willApplyLocation = (bool) $this->location_id && ! $asset->parent_id;
+
+        if ($willApplyLocation) {
+            $attributes['location_id'] = $this->location_id;
+        }
+
+        // #region agent log
+        file_put_contents($debugLogPath, json_encode([
+            'sessionId' => '307f2d',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'F',
+            'location' => 'UnknownScan.php:linkToExisting:location_branch',
+            'message' => 'location update evaluated',
+            'data' => [
+                'scanLocationId' => $this->location_id,
+                'assetParentId' => $asset->parent_id,
+                'willApplyLocation' => $willApplyLocation,
+                'attributesKeys' => array_keys($attributes),
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
+        // #endregion
+
+        if ($attributes !== []) {
+            $asset->update($attributes);
         }
 
         $this->markResolved($asset);

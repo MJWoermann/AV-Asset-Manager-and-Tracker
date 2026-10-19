@@ -90,6 +90,7 @@ class AssetController extends Controller
             'departments' => $request->user()?->hasRole('admin')
                 ? Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name'])
                 : collect(),
+            'departmentColours' => $request->user()?->departmentColoursForBrowse() ?? [],
         ]);
     }
 
@@ -106,7 +107,7 @@ class AssetController extends Controller
             ->search($searchTerm)
             ->orderBySearchRelevance($searchTerm)
             ->limit(20)
-            ->get(['id', 'name', 'tp_barcode', 'fmi_ast', 'rig_tag', 'serial_number', 'item_type_id']);
+            ->get(['id', 'name', 'tp_barcode', 'fmi_ast', 'rig_tag', 'serial_number', 'mac_address', 'item_type_id']);
 
         return response()->json([
             'data' => $assets->map(static function (Asset $asset): array {
@@ -117,6 +118,7 @@ class AssetController extends Controller
                     'fmi_ast' => $asset->fmi_ast,
                     'rig_tag' => $asset->rig_tag,
                     'serial_number' => $asset->serial_number,
+                    'mac_address' => $asset->mac_address,
                     'item_type' => $asset->itemType?->name,
                     'label' => AssetSearch::optionLabel($asset),
                 ];

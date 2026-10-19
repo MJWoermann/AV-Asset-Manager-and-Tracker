@@ -53,71 +53,8 @@ unset($__defined_vars, $__key, $__value); ?>
 <div
     x-cloak
     x-show="selectedCount > 0"
-    x-ref="bulkPanel"
     class="sticky top-0 z-20 mb-4 max-h-screen overflow-y-auto border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-3 shadow-sm"
     style="max-height: 100vh"
-    x-init="
-        const logBulkPanel = (reason, hypothesisId) => {
-            // #region agent log
-            const panel = $refs.bulkPanel;
-            const applyBtn = panel && [...panel.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Apply bulk update');
-            const form = $refs.bulkForm;
-            if (!panel) return;
-            const pr = panel.getBoundingClientRect();
-            const ar = applyBtn?.getBoundingClientRect();
-            const cs = getComputedStyle(panel);
-            const payload = {
-                sessionId: '3fe58c',
-                runId: 'post-fix',
-                hypothesisId,
-                location: 'bulk-asset-actions.blade.php:panel-measure',
-                message: reason,
-                data: {
-                    panelOpen,
-                    selectedCount,
-                    viewportH: window.innerHeight,
-                    docScrollH: document.documentElement.scrollHeight,
-                    windowScrollY: window.scrollY,
-                    panelHeight: Math.round(pr.height),
-                    panelTop: Math.round(pr.top),
-                    panelBottom: Math.round(pr.bottom),
-                    panelOverflowY: cs.overflowY,
-                    panelMaxHeight: cs.maxHeight,
-                    panelPosition: cs.position,
-                    formHeight: form ? Math.round(form.getBoundingClientRect().height) : null,
-                    applyTop: ar ? Math.round(ar.top) : null,
-                    applyBottom: ar ? Math.round(ar.bottom) : null,
-                    applyInViewport: ar ? (ar.top >= 0 && ar.bottom <= window.innerHeight) : null,
-                    applyBelowFold: ar ? ar.bottom > window.innerHeight : null,
-                    panelTallerThanViewport: pr.height > window.innerHeight,
-                },
-                timestamp: Date.now(),
-            };
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3fe58c'},body:JSON.stringify(payload)}).catch(()=>{});
-            // #endregion
-        };
-        $watch('panelOpen', (open) => {
-            if (!open) return;
-            $nextTick(() => {
-                logBulkPanel('panel-opened', 'A');
-                logBulkPanel('panel-opened-overflow-check', 'C');
-            });
-        });
-        let lastScrollLog = 0;
-        let lastApplyBelow = null;
-        const onScroll = () => {
-            if (!panelOpen || selectedCount < 1) return;
-            const applyBtn = $refs.bulkPanel && [...$refs.bulkPanel.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Apply bulk update');
-            const ar = applyBtn?.getBoundingClientRect();
-            const below = ar ? ar.bottom > window.innerHeight : null;
-            const now = Date.now();
-            if (below === lastApplyBelow && now - lastScrollLog < 800) return;
-            lastApplyBelow = below;
-            lastScrollLog = now;
-            logBulkPanel('scroll-while-panel-open', 'B');
-        };
-        window.addEventListener('scroll', onScroll, { passive: true });
-    "
 >
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <p class="text-sm">

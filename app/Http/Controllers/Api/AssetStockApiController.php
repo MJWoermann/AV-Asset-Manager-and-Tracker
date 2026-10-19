@@ -35,6 +35,7 @@ class AssetStockApiController extends Controller
                 'notes' => $data['notes'] ?? null,
                 'external_po_number' => $data['external_po_number'] ?? null,
                 'external_po_url' => $data['external_po_url'] ?? null,
+                'recorded_at' => $data['recorded_at'] ?? null,
                 'source' => StockMovementSource::Web,
             ],
             $request->user(),

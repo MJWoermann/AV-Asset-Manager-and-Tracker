@@ -484,6 +484,57 @@
                         </div>
                         @break
 
+                    @case('items_users_by_department')
+                        @role('admin')
+                            <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                                <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
+                                    <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Items &amp; users by department</h3>
+                                </div>
+                                @if (($itemsUsersByDepartment ?? []) === [])
+                                    <p class="px-4 py-6 text-sm text-center text-brand-charcoal dark:text-brand-silver">No departments yet.</p>
+                                @else
+                                    <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                                        <table class="min-w-full text-sm">
+                                            <thead class="bg-brand-silver dark:bg-brand-charcoal text-left sticky top-0">
+                                                <tr>
+                                                    <th class="px-3 py-2 w-8"></th>
+                                                    <th class="px-3 py-2">Department</th>
+                                                    <th class="px-3 py-2 text-right">Items</th>
+                                                    <th class="px-3 py-2 text-right">Users</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($itemsUsersByDepartment as $row)
+                                                    <tr class="border-t border-brand-silver dark:border-brand-charcoal">
+                                                        <td class="px-3 py-2">
+                                                            @if ($row['color'])
+                                                                <span
+                                                                    class="inline-block h-3.5 w-3.5 rounded border border-brand-charcoal/30 dark:border-brand-silver/40"
+                                                                    style="background-color: {{ $row['color'] }}"
+                                                                    title="{{ $row['color'] }}"
+                                                                ></span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-3 py-2">
+                                                            <a href="{{ $row['url'] }}" class="hover:text-brand @if(! $row['is_active']) text-brand-charcoal dark:text-brand-silver @endif">
+                                                                {{ $row['name'] }}
+                                                                @unless($row['is_active'])
+                                                                    <span class="text-xs">(inactive)</span>
+                                                                @endunless
+                                                            </a>
+                                                        </td>
+                                                        <td class="px-3 py-2 text-right font-mono tabular-nums">{{ $row['item_count'] }}</td>
+                                                        <td class="px-3 py-2 text-right font-mono tabular-nums">{{ $row['user_count'] }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            </div>
+                        @endrole
+                        @break
+
                     @case('assets_by_type')
                         <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
                             <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">

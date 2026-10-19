@@ -316,6 +316,8 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [AdminHubController::class, 'index'])->name('index');
         Route::resource('users', UserController::class)->except(['show']);
+        Route::patch('/departments/row-colours', [DepartmentController::class, 'updateRowColours'])
+            ->name('departments.row-colours');
         Route::resource('departments', DepartmentController::class)->except(['show']);
         Route::get('/export-columns', [ExportColumnController::class, 'edit'])->name('export-columns.edit');
         Route::put('/export-columns', [ExportColumnController::class, 'update'])->name('export-columns.update');

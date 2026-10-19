@@ -53,6 +53,7 @@ class StoreStockMovementRequest extends FormRequest
             ],
             'external_po_number' => ['nullable', 'string', 'max:255'],
             'external_po_url' => ['nullable', 'url', 'max:2048'],
+            'recorded_at' => ['nullable', 'date', 'before_or_equal:today'],
             'pdfs' => ['nullable', 'array', 'max:5'],
             'pdfs.*' => [
                 'file',

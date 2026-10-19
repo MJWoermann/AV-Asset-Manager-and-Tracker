@@ -149,6 +149,21 @@
                 <x-input-error :messages="$errors->get('quantity')" class="mt-1" />
             </div>
 
+            <div>
+                <x-input-label for="stock_recorded_at" value="Date" />
+                <x-text-input
+                    id="stock_recorded_at"
+                    name="recorded_at"
+                    type="date"
+                    class="mt-1 block w-full"
+                    :value="old('recorded_at', now()->format('Y-m-d'))"
+                    :max="now()->format('Y-m-d')"
+                    required
+                />
+                <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-1">Use a past date when entering historical stock movements.</p>
+                <x-input-error :messages="$errors->get('recorded_at')" class="mt-1" />
+            </div>
+
             <div x-show="action === 'restock'" x-cloak class="space-y-3">
                 <div>
                     <x-input-label for="external_po_number" value="PO number" />

@@ -41,6 +41,16 @@ final class ScannableIdentifierFields
         return self::FIELDS;
     }
 
+    /**
+     * Identifier columns that may receive a scanned code when linking an unknown scan.
+     *
+     * @return list<string>
+     */
+    public static function linkTargets(): array
+    {
+        return [...self::FIELDS, ...self::TYPED_ONLY];
+    }
+
     public static function isScannable(string $field): bool
     {
         return in_array($field, self::FIELDS, true);
@@ -49,6 +59,11 @@ final class ScannableIdentifierFields
     public static function isTypedOnly(string $field): bool
     {
         return in_array($field, self::TYPED_ONLY, true);
+    }
+
+    public static function isLinkTarget(string $field): bool
+    {
+        return in_array($field, self::linkTargets(), true);
     }
 
     /**

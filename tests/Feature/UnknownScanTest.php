@@ -322,7 +322,11 @@ class UnknownScanTest extends TestCase
             ->assertOk()
             ->assertSee('Add asset')
             ->assertSee('Link existing')
-            ->assertSee('Link to existing asset');
+            ->assertSee('Link to existing asset')
+            ->assertSee('Write scanned code to')
+            ->assertSee('TP Barcode')
+            ->assertSee('Serial Number')
+            ->assertSee('FMI AST#');
     }
 
     public function test_linking_unknown_scan_to_existing_asset_marks_it_resolved(): void
@@ -420,7 +424,29 @@ class UnknownScanTest extends TestCase
         $this->assertSame('NEW-BARCODE-9', $asset->fresh()->tp_barcode);
     }
 
-    public function test_linking_skips_tp_barcode_when_another_asset_already_uses_code(): void
+    public function test_linking_can_write_chosen_identifier_field_and_overwrite(): void
+    {
+        $user = $this->scanner();
+        $asset = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'serial_number' => 'OLD-SERIAL',
+        ]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'NEW-SERIAL-9',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)->post(route('unknown-scans.link', $unknown), [
+            'asset_id' => $asset->id,
+            'identifier_field' => 'serial_number',
+        ])->assertRedirect();
+
+        $this->assertSame('NEW-SERIAL-9', $asset->fresh()->serial_number);
+        $this->assertTrue($unknown->fresh()->isResolved());
+    }
+
+    public function test_linking_rejects_identifier_when_another_asset_already_uses_code(): void
     {
         $user = $this->scanner();
         Asset::factory()->create([
@@ -437,13 +463,82 @@ class UnknownScanTest extends TestCase
             'quantity' => 1,
         ]);
 
+        $this->actingAs($user)
+            ->from(route('reports.unknown-scans'))
+            ->post(route('unknown-scans.link', $unknown), [
+                'asset_id' => $asset->id,
+                'identifier_field' => 'tp_barcode',
+            ])
+            ->assertRedirect(route('reports.unknown-scans'))
+            ->assertSessionHasErrors('identifier_field');
+
+        $this->assertFalse($unknown->fresh()->isResolved());
+        $this->assertNull($asset->fresh()->tp_barcode);
+    }
+
+    public function test_linking_applies_scan_location_to_asset_without_parent(): void
+    {
+        $user = $this->scanner();
+        $scanLocation = Location::create([
+            'name' => 'Scan Bay',
+            'type' => LocationType::Room,
+        ]);
+        $oldLocation = Location::create([
+            'name' => 'Old Shelf',
+            'type' => LocationType::Room,
+        ]);
+        $asset = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'location_id' => $oldLocation->id,
+            'parent_id' => null,
+        ]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'LOC-LINK-1',
+            'user_id' => $user->id,
+            'location_id' => $scanLocation->id,
+            'quantity' => 1,
+        ]);
+
         $this->actingAs($user)->post(route('unknown-scans.link', $unknown), [
             'asset_id' => $asset->id,
-            'set_identifier' => true,
         ])->assertRedirect();
 
+        $this->assertSame($scanLocation->id, $asset->fresh()->location_id);
+    }
+
+    public function test_linking_does_not_override_child_asset_location(): void
+    {
+        $user = $this->scanner();
+        $scanLocation = Location::create([
+            'name' => 'Scan Bay 2',
+            'type' => LocationType::Room,
+        ]);
+        $parentLocation = Location::create([
+            'name' => 'Parent Bay',
+            'type' => LocationType::Room,
+        ]);
+        $parent = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'location_id' => $parentLocation->id,
+        ]);
+        $child = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'parent_id' => $parent->id,
+            'location_id' => $parentLocation->id,
+        ]);
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'LOC-CHILD-1',
+            'user_id' => $user->id,
+            'location_id' => $scanLocation->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user)->post(route('unknown-scans.link', $unknown), [
+            'asset_id' => $child->id,
+        ])->assertRedirect();
+
+        $this->assertSame($parentLocation->id, $child->fresh()->location_id);
         $this->assertTrue($unknown->fresh()->isResolved());
-        $this->assertNull($asset->fresh()->tp_barcode);
     }
 
     public function test_cannot_link_already_resolved_unknown_scan(): void

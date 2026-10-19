@@ -87,10 +87,10 @@ class UnknownScanApiController extends Controller
         $asset = Asset::query()->findOrFail($request->integer('asset_id'));
 
         $unknownScan->linkToExisting(
-            $asset,
-            $request->boolean('add_to_event_list'),
-            $request->boolean('set_identifier'),
-            $request->user()?->id,
+            asset: $asset,
+            addToEventList: $request->boolean('add_to_event_list'),
+            userId: $request->user()?->id,
+            identifierField: $request->resolvedIdentifierField(),
         );
 
         return response()->json([

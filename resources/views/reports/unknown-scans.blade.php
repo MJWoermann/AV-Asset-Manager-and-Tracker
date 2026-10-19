@@ -11,24 +11,33 @@
             scanId: null,
             scannedCode: '',
             hasEventList: false,
+            hasLocation: false,
+            identifierField: '',
             query: '',
             results: [],
             selectedId: null,
             selectedLabel: '',
+            selectedAsset: null,
             searching: false,
             searchTimer: null,
             linkAction() {
                 return this.linkUrlTemplate.replace('__ID__', String(this.scanId ?? ''));
             },
-            openLink(id, code, hasEventList) {
+            openLink(id, code, hasEventList, hasLocation) {
                 this.scanId = id;
                 this.scannedCode = code;
                 this.hasEventList = Boolean(hasEventList);
+                this.hasLocation = Boolean(hasLocation);
+                this.identifierField = '';
                 this.query = '';
                 this.results = [];
                 this.selectedId = null;
                 this.selectedLabel = '';
+                this.selectedAsset = null;
                 this.searching = false;
+                // #region agent log
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'307f2d'},body:JSON.stringify({sessionId:'307f2d',runId:'post-fix',hypothesisId:'A',location:'unknown-scans.blade.php:openLink',message:'Link modal opened',data:{scanId:id,scannedCode:code,hasEventList:Boolean(hasEventList),hasLocation:Boolean(hasLocation),uiOffersFieldSelect:true},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
                 this.$dispatch('open-modal', 'link-unknown-scan');
                 this.$nextTick(() => this.$refs.linkSearch?.focus());
             },
@@ -57,8 +66,16 @@
             pick(asset) {
                 this.selectedId = asset.id;
                 this.selectedLabel = asset.label || asset.name;
+                this.selectedAsset = asset;
                 this.query = asset.label || asset.name;
                 this.results = [];
+            },
+            selectedFieldCurrentValue() {
+                if (!this.identifierField || !this.selectedAsset) {
+                    return null;
+                }
+                const value = this.selectedAsset[this.identifierField];
+                return value == null || value === '' ? null : String(value);
             },
         }"
     >
@@ -178,7 +195,7 @@
                                         <button
                                             type="button"
                                             class="text-brand underline text-xs"
-                                            @click="openLink({{ $scan->id }}, @js($scan->scanned_code), {{ $scan->event_list_id ? 'true' : 'false' }})"
+                                            @click="openLink({{ $scan->id }}, @js($scan->scanned_code), {{ $scan->event_list_id ? 'true' : 'false' }}, {{ $scan->location_id ? 'true' : 'false' }})"
                                         >Link existing</button>
                                     </div>
                                 @endunless
@@ -199,7 +216,7 @@
             {{ $scans->links() }}
         </div>
 
-        <x-modal name="link-unknown-scan" :show="$errors->has('asset_id')" focusable maxWidth="md">
+        <x-modal name="link-unknown-scan" :show="$errors->has('asset_id') || $errors->has('identifier_field')" focusable maxWidth="md">
             <form method="POST" :action="linkAction()" class="p-6 space-y-4" @submit="if (!selectedId) { $event.preventDefault(); }">
                 @csrf
 
@@ -259,10 +276,36 @@
                     <span>Add asset to the event list from this scan (skip if already on the list)</span>
                 </label>
 
-                <label class="flex items-start gap-2 text-sm">
-                    <input type="checkbox" name="set_identifier" value="1" class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand dark:border-brand-charcoal dark:bg-black">
-                    <span>Set TP barcode to scanned code when the asset has none (skipped if another asset already uses it)</span>
-                </label>
+                <div>
+                    <x-input-label for="link-identifier-field" value="Write scanned code to" />
+                    <select
+                        id="link-identifier-field"
+                        name="identifier_field"
+                        x-model="identifierField"
+                        class="mt-1 block w-full border-brand-silver dark:border-brand-charcoal dark:bg-black dark:text-white focus:border-brand focus:ring-brand rounded-md shadow-sm text-sm"
+                    >
+                        <option value="">Don’t update an identifier</option>
+                        @foreach(\App\Support\ScannableIdentifierFields::linkTargets() as $field)
+                            <option value="{{ $field }}">{{ \App\Support\ScannableIdentifierFields::label($field) }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">
+                        Replaces the chosen field on the linked asset. Skipped if another asset already uses this code.
+                    </p>
+                    <p
+                        class="mt-1 text-xs text-amber-700 dark:text-amber-300"
+                        x-show="identifierField && selectedFieldCurrentValue()"
+                        x-cloak
+                    >
+                        Current value will be overwritten:
+                        <span class="font-medium" x-text="selectedFieldCurrentValue()"></span>
+                    </p>
+                    <x-input-error :messages="$errors->get('identifier_field')" class="mt-2" />
+                </div>
+
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="hasLocation" x-cloak>
+                    This scan has a location — the linked asset’s location will be updated (child assets keep their parent’s location).
+                </p>
 
                 <div class="flex justify-end gap-2 pt-2">
                     <x-secondary-button type="button" x-on:click="$dispatch('close')">

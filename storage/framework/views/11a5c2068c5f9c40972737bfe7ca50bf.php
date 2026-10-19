@@ -177,8 +177,14 @@
                             if ($bulkLabelParts !== []) {
                                 $bulkAssetLabel .= ' ('.implode(' · ', $bulkLabelParts).')';
                             }
+                            $rowColour = ($departmentColours ?? [])[$asset->department_id] ?? null;
                         ?>
-                        <tr class="border-t border-brand-silver dark:border-brand-charcoal">
+                        <tr
+                            class="border-t border-brand-silver dark:border-brand-charcoal"
+                            <?php if($rowColour): ?>
+                                style="background-color: color-mix(in srgb, <?php echo e($rowColour); ?> 14%, transparent)"
+                            <?php endif; ?>
+                        >
                             <td class="px-3 py-2">
                                 <input
                                     type="checkbox"

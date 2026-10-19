@@ -16,9 +16,36 @@
             Departments isolate operational records (assets, lists, scans, files, spares). Locations and catalogue data stay shared.
         </p>
 
+        <form
+            method="POST"
+            action="{{ route('admin.departments.row-colours') }}"
+            class="mb-6 flex flex-wrap items-center justify-between gap-3 border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4"
+        >
+            @csrf
+            @method('PATCH')
+            <label class="inline-flex items-start gap-2 text-sm max-w-2xl">
+                <input type="hidden" name="enabled" value="0">
+                <input
+                    type="checkbox"
+                    name="enabled"
+                    value="1"
+                    class="mt-0.5 rounded text-brand"
+                    @checked(old('enabled', $rowColoursEnabled))
+                >
+                <span>
+                    Colour asset rows by department when a user can see 2+ departments
+                    <span class="block text-xs text-brand-charcoal dark:text-brand-silver mt-1">
+                        Applies soft background tint on Assets and list browse tables. Dashboard department colours always use the colour field below.
+                    </span>
+                </span>
+            </label>
+            <x-primary-button>Save</x-primary-button>
+        </form>
+
         <table class="min-w-full text-sm bg-white dark:bg-brand-slate border">
             <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                 <tr>
+                    <th class="px-3 py-2">Colour</th>
                     <th class="px-3 py-2">Name</th>
                     <th class="px-3 py-2">Status</th>
                     <th class="px-3 py-2">Members</th>
@@ -28,6 +55,18 @@
             <tbody>
                 @foreach($departments as $department)
                     <tr class="border-t border-brand-silver dark:border-brand-charcoal">
+                        <td class="px-3 py-2">
+                            @if($department->color)
+                                <span
+                                    class="inline-block h-5 w-5 rounded border border-brand-charcoal/30 dark:border-brand-silver/40"
+                                    style="background-color: {{ $department->color }}"
+                                    title="{{ $department->color }}"
+                                    aria-label="{{ $department->color }}"
+                                ></span>
+                            @else
+                                <span class="text-brand-charcoal dark:text-brand-silver">—</span>
+                            @endif
+                        </td>
                         <td class="px-3 py-2">{{ $department->name }}</td>
                         <td class="px-3 py-2">{{ $department->is_active ? 'Active' : 'Inactive' }}</td>
                         <td class="px-3 py-2">{{ $department->users_count }}</td>

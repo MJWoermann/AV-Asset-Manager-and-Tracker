@@ -26,9 +26,54 @@
             Departments isolate operational records (assets, lists, scans, files, spares). Locations and catalogue data stay shared.
         </p>
 
+        <form
+            method="POST"
+            action="<?php echo e(route('admin.departments.row-colours')); ?>"
+            class="mb-6 flex flex-wrap items-center justify-between gap-3 border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4"
+        >
+            <?php echo csrf_field(); ?>
+            <?php echo method_field('PATCH'); ?>
+            <label class="inline-flex items-start gap-2 text-sm max-w-2xl">
+                <input type="hidden" name="enabled" value="0">
+                <input
+                    type="checkbox"
+                    name="enabled"
+                    value="1"
+                    class="mt-0.5 rounded text-brand"
+                    <?php if(old('enabled', $rowColoursEnabled)): echo 'checked'; endif; ?>
+                >
+                <span>
+                    Colour asset rows by department when a user can see 2+ departments
+                    <span class="block text-xs text-brand-charcoal dark:text-brand-silver mt-1">
+                        Applies soft background tint on Assets and list browse tables. Dashboard department colours always use the colour field below.
+                    </span>
+                </span>
+            </label>
+            <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('primary-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>Save <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginald411d1792bd6cc877d687758b753742c)): ?>
+<?php $attributes = $__attributesOriginald411d1792bd6cc877d687758b753742c; ?>
+<?php unset($__attributesOriginald411d1792bd6cc877d687758b753742c); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginald411d1792bd6cc877d687758b753742c)): ?>
+<?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
+<?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
+<?php endif; ?>
+        </form>
+
         <table class="min-w-full text-sm bg-white dark:bg-brand-slate border">
             <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
                 <tr>
+                    <th class="px-3 py-2">Colour</th>
                     <th class="px-3 py-2">Name</th>
                     <th class="px-3 py-2">Status</th>
                     <th class="px-3 py-2">Members</th>
@@ -38,6 +83,18 @@
             <tbody>
                 <?php $__currentLoopData = $departments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $department): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <tr class="border-t border-brand-silver dark:border-brand-charcoal">
+                        <td class="px-3 py-2">
+                            <?php if($department->color): ?>
+                                <span
+                                    class="inline-block h-5 w-5 rounded border border-brand-charcoal/30 dark:border-brand-silver/40"
+                                    style="background-color: <?php echo e($department->color); ?>"
+                                    title="<?php echo e($department->color); ?>"
+                                    aria-label="<?php echo e($department->color); ?>"
+                                ></span>
+                            <?php else: ?>
+                                <span class="text-brand-charcoal dark:text-brand-silver">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="px-3 py-2"><?php echo e($department->name); ?></td>
                         <td class="px-3 py-2"><?php echo e($department->is_active ? 'Active' : 'Inactive'); ?></td>
                         <td class="px-3 py-2"><?php echo e($department->users_count); ?></td>

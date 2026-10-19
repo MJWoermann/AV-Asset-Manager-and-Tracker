@@ -321,6 +321,50 @@ class StockConsumablesFeatureTest extends TestCase
         $this->assertSame(10, (int) $asset->fresh()->quantity);
     }
 
+    public function test_stock_movement_can_use_historical_recorded_at(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->stockAsset(quantity: 6);
+        $recordedAt = now()->subDays(14)->toDateString();
+
+        $this->actingAs($user)
+            ->post(route('assets.stock-movements.store', $asset), [
+                'type' => 'restock',
+                'quantity' => 3,
+                'recorded_at' => $recordedAt,
+            ])
+            ->assertRedirect(route('assets.show', [$asset, 'tab' => 'stock', 'action' => 'restock']));
+
+        $this->assertSame(9, (int) $asset->fresh()->quantity);
+
+        $movement = StockMovement::query()
+            ->where('asset_id', $asset->id)
+            ->where('type', StockMovementType::Restock)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($movement);
+        $this->assertSame($recordedAt, $movement->recorded_at?->toDateString());
+    }
+
+    public function test_stock_movement_rejects_future_recorded_at(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->stockAsset(quantity: 6);
+
+        $this->actingAs($user)
+            ->from(route('assets.show', [$asset, 'tab' => 'stock']))
+            ->post(route('assets.stock-movements.store', $asset), [
+                'type' => 'count',
+                'quantity' => 6,
+                'recorded_at' => now()->addDay()->toDateString(),
+            ])
+            ->assertRedirect(route('assets.show', [$asset, 'tab' => 'stock']))
+            ->assertSessionHasErrors('recorded_at');
+
+        $this->assertSame(6, (int) $asset->fresh()->quantity);
+    }
+
     public function test_kanban_token_rotate_and_revoke(): void
     {
         $user = $this->manager();

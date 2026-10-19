@@ -13,6 +13,7 @@ use App\Models\Asset;
 use App\Models\AssetInterface;
 use App\Models\AssetList;
 use App\Models\AuditLog;
+use App\Models\Department;
 use App\Models\InboundEmailAction;
 use App\Models\Repair;
 use App\Models\RigEvent;
@@ -28,6 +29,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class DashboardStatsService
 {
@@ -141,6 +143,9 @@ class DashboardStatsService
                 : [],
             'riggingUpcoming' => in_array(DashboardModules::RIGGING_UPCOMING, $enabled, true)
                 ? $this->riggingUpcoming()
+                : [],
+            'itemsUsersByDepartment' => in_array(DashboardModules::ITEMS_USERS_BY_DEPARTMENT, $enabled, true)
+                ? $this->itemsUsersByDepartment($user)
                 : [],
         ];
     }
@@ -761,6 +766,49 @@ class DashboardStatsService
                 'url' => route('rigging.events.index'),
             ],
         ];
+    }
+
+    /**
+     * Org-wide department item/user counts for admins (ignores visibility filter).
+     *
+     * @return list<array{id: int, name: string, color: string|null, is_active: bool, item_count: int, user_count: int, url: string}>
+     */
+    public function itemsUsersByDepartment(?User $user): array
+    {
+        if ($user === null || ! $user->hasRole('admin')) {
+            return [];
+        }
+
+        $itemCounts = Asset::withoutDepartmentScope()
+            ->selectRaw('department_id, count(*) as aggregate')
+            ->groupBy('department_id')
+            ->pluck('aggregate', 'department_id');
+
+        $userCounts = DB::table('department_user')
+            ->selectRaw('department_id, count(*) as aggregate')
+            ->groupBy('department_id')
+            ->pluck('aggregate', 'department_id');
+
+        return Department::query()
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get(['id', 'name', 'color', 'is_active'])
+            ->map(function (Department $department) use ($itemCounts, $userCounts): array {
+                $color = $department->color !== null && $department->color !== ''
+                    ? strtolower((string) $department->color)
+                    : null;
+
+                return [
+                    'id' => (int) $department->id,
+                    'name' => (string) $department->name,
+                    'color' => $color,
+                    'is_active' => (bool) $department->is_active,
+                    'item_count' => (int) ($itemCounts[$department->id] ?? 0),
+                    'user_count' => (int) ($userCounts[$department->id] ?? 0),
+                    'url' => route('admin.departments.edit', $department),
+                ];
+            })
+            ->all();
     }
 
     /**

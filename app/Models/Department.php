@@ -18,6 +18,7 @@ class Department extends Model
         'name',
         'slug',
         'is_active',
+        'color',
     ];
 
     protected function casts(): array

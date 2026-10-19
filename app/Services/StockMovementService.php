@@ -11,6 +11,10 @@ use App\Models\StockMovement;
 use App\Models\User;
 use App\Support\NullableString;
 use App\Support\UploadedFiles;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use DateTimeImmutable;
+use DateTimeInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -60,7 +64,7 @@ class StockMovementService
      *     external_po_number?: string|null,
      *     external_po_url?: string|null,
      *     source?: StockMovementSource|string|null,
-     *     recorded_at?: \DateTimeInterface|string|null,
+     *     recorded_at?: DateTimeInterface|string|null,
      * }  $input
      * @param  list<UploadedFile>|UploadedFile|null  $pdfs
      */
@@ -114,7 +118,9 @@ class StockMovementService
             ]);
         }
 
-        return DB::transaction(function () use ($asset, $type, $source, $before, $after, $input, $user, $uploads): StockMovement {
+        $recordedAt = $this->resolveRecordedAt($input['recorded_at'] ?? null);
+
+        return DB::transaction(function () use ($asset, $type, $source, $before, $after, $input, $user, $uploads, $recordedAt): StockMovement {
             $movement = StockMovement::query()->create([
                 'asset_id' => $asset->id,
                 'type' => $type,
@@ -126,7 +132,7 @@ class StockMovementService
                 'external_po_url' => NullableString::from($input['external_po_url'] ?? null),
                 'notes' => NullableString::from($input['notes'] ?? null),
                 'source' => $source,
-                'recorded_at' => $input['recorded_at'] ?? now(),
+                'recorded_at' => $recordedAt,
             ]);
 
             $asset->update(['quantity' => $after]);
@@ -179,6 +185,34 @@ class StockMovementService
             StockMovementType::Breakage => $before - $this->requirePositiveInt($input['quantity'] ?? $input['quantity_delta'] ?? null, 'quantity'),
             StockMovementType::Adjustment => $before + $this->requireInt($input['quantity_delta'] ?? null, 'quantity_delta'),
         };
+    }
+
+    /**
+     * HTML date inputs arrive as Y-m-d (midnight). Keep today's wall-clock time so same-day
+     * entries sort after earlier movements; past dates keep the current clock on that day.
+     */
+    protected function resolveRecordedAt(mixed $value): CarbonInterface
+    {
+        if ($value === null || $value === '') {
+            return now();
+        }
+
+        if ($value instanceof CarbonInterface) {
+            return $value;
+        }
+
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance(DateTimeImmutable::createFromInterface($value));
+        }
+
+        $raw = (string) $value;
+        $parsed = Carbon::parse($raw);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) === 1) {
+            return $parsed->setTimeFrom(now());
+        }
+
+        return $parsed;
     }
 
     protected function requireNonNegativeInt(mixed $value, string $field): int

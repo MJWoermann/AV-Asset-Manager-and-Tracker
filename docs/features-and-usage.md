@@ -116,6 +116,8 @@ On **Assets** and when browsing a **list**, use **Columns** to show or hide fiel
 
 **Dashboard**
 
+Use **Customize modules** to enable, disable, and reorder widgets (saved per user). Most modules respect your department visibility. Admins can also show **Items & users by department** — org-wide counts that ignore the visibility filter.
+
 | Desktop | Mobile |
 |---------|--------|
 | ![Dashboard desktop](images/features/dashboard-desktop.png) | ![Dashboard mobile](images/features/dashboard-mobile.png) |
@@ -326,6 +328,10 @@ These live under the **Maintenance** menu (and related asset tabs). They are **n
 ### 8. Departments (always on)
 
 Admins manage **Departments** under Admin. Operational data (assets, lists, item types, scan sessions, spares, and related records) belongs to a department. Non-admin users are assigned to one or more departments; switch the active department from Profile when you have more than one. Admins can view across departments as configured, and can bulk-move assets, lists, and item types between departments. New installs backfill a default **General** department.
+
+Each department can have an optional **colour** (same palette as connection types). On Admin → Departments, admins can enable **Colour asset rows by department when a user can see 2+ departments** — when on, Assets and list browse tables apply a soft row tint from the asset’s department colour for multi-department users (and unrestricted admins when two or more active departments exist). External repairers never get row tinting. Colours without a selected hex leave those rows unpainted.
+
+Admins also get a dashboard module **Items & users by department** (enabled by default for new admins): org-wide item and member counts per department with colour swatches, independent of the admin’s visibility filter and of the browse-row toggle.
 
 ### 9. Reports beyond Compare
 

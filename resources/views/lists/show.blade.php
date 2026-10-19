@@ -115,8 +115,16 @@
                                     $bulkAssetLabel .= ' ('.implode(' · ', $bulkLabelParts).')';
                                 }
                             }
+                            $rowColour = $item->asset
+                                ? (($departmentColours ?? [])[$item->asset->department_id] ?? null)
+                                : null;
                         @endphp
-                        <tr class="border-t border-brand-silver dark:border-brand-charcoal">
+                        <tr
+                            class="border-t border-brand-silver dark:border-brand-charcoal"
+                            @if($rowColour)
+                                style="background-color: color-mix(in srgb, {{ $rowColour }} 14%, transparent)"
+                            @endif
+                        >
                             <td class="px-3 py-2 {{ $indent ? 'pl-8' : '' }}">
                                 @if($item->asset)
                                     <input

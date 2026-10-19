@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\AssetTableColumns;
 use App\Support\CameraBatteryOptimisation;
 use App\Support\DashboardModules;
+use App\Support\DepartmentRowColourSettings;
 use App\Support\DepartmentVisibility;
 use App\Support\DeveloperFeatures;
 use App\Support\ScanNoise;
@@ -138,6 +139,57 @@ class User extends Authenticatable
             ->where('assignee_user_id', $this->id)
             ->active()
             ->exists();
+    }
+
+    /**
+     * Count of departments that gate asset/list row colour tinting.
+     * External repairers are treated as 0 (no tint).
+     */
+    public function visibleDepartmentCountForRowColours(): int
+    {
+        if ($this->isExternalRepairer()) {
+            return 0;
+        }
+
+        if ($this->hasRole('admin')) {
+            $visible = $this->visibleDepartmentIdsPreference();
+
+            if ($visible !== []) {
+                return count($visible);
+            }
+
+            return (int) Department::query()->where('is_active', true)->count();
+        }
+
+        return (int) $this->departments()->where('departments.is_active', true)->count();
+    }
+
+    /**
+     * Whether browse tables should tint rows by department colour.
+     */
+    public function shouldShowDepartmentRowColours(): bool
+    {
+        return DepartmentRowColourSettings::enabled()
+            && $this->visibleDepartmentCountForRowColours() >= 2;
+    }
+
+    /**
+     * Compact map of department id → colour hex for browse row tinting.
+     *
+     * @return array<int, string>
+     */
+    public function departmentColoursForBrowse(): array
+    {
+        if (! $this->shouldShowDepartmentRowColours()) {
+            return [];
+        }
+
+        return Department::query()
+            ->whereNotNull('color')
+            ->where('color', '!=', '')
+            ->pluck('color', 'id')
+            ->mapWithKeys(fn ($color, $id): array => [(int) $id => strtolower((string) $color)])
+            ->all();
     }
 
     /**

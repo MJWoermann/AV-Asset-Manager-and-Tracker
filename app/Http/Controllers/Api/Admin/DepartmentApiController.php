@@ -31,6 +31,7 @@ class DepartmentApiController extends Controller
             'name' => $data['name'],
             'slug' => Str::slug($data['name']),
             'is_active' => $data['is_active'] ?? true,
+            'color' => $data['color'] ?? null,
         ]);
 
         return response()->json($department, 201);
@@ -44,6 +45,7 @@ class DepartmentApiController extends Controller
             'name' => $data['name'],
             'slug' => $department->isGeneral() ? $department->slug : Str::slug($data['name']),
             'is_active' => $data['is_active'] ?? $department->is_active,
+            'color' => array_key_exists('color', $data) ? $data['color'] : $department->color,
         ]);
 
         return response()->json($department->fresh());

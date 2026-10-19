@@ -133,6 +133,7 @@ class AssetListController extends Controller
             'departments' => $request->user()?->hasRole('admin')
                 ? Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name'])
                 : collect(),
+            'departmentColours' => $request->user()?->departmentColoursForBrowse() ?? [],
         ]);
     }
 

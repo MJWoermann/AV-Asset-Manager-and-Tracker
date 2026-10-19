@@ -38,6 +38,8 @@ class DashboardModules
 
     public const ASSETS_BY_TYPE = 'assets_by_type';
 
+    public const ITEMS_USERS_BY_DEPARTMENT = 'items_users_by_department';
+
     public const INBOUND_EMAILS = 'inbound_emails';
 
     public const LATEST_CHANGES = 'latest_changes';
@@ -63,6 +65,7 @@ class DashboardModules
             self::ASSETS_BY_STATUS => 'Assets by status',
             self::ASSETS_BY_LOCATION => 'Assets by location',
             self::ASSETS_BY_TYPE => 'Assets by type',
+            self::ITEMS_USERS_BY_DEPARTMENT => 'Items & users by department',
             self::DATA_QUALITY => 'Catalogue completeness',
             self::LIST_ACTIVITY => 'Lists snapshot',
             self::CONNECTION_COVERAGE => 'Connection coverage',
@@ -93,6 +96,7 @@ class DashboardModules
             self::ASSETS_BY_STATUS,
             self::ASSETS_BY_LOCATION,
             self::ASSETS_BY_TYPE,
+            self::ITEMS_USERS_BY_DEPARTMENT,
             self::DATA_QUALITY,
             self::LIST_ACTIVITY,
             self::CONNECTION_COVERAGE,
@@ -120,6 +124,7 @@ class DashboardModules
             self::CONSUMABLES_STATS,
             self::ASSETS_BY_STATUS,
             self::ASSETS_BY_LOCATION,
+            self::ITEMS_USERS_BY_DEPARTMENT,
             self::LATEST_CHANGES,
         ];
     }
@@ -148,6 +153,13 @@ class DashboardModules
     public static function availableFor(?User $user): array
     {
         $keys = self::keys();
+
+        if ($user === null || ! $user->hasRole('admin')) {
+            $keys = array_values(array_filter(
+                $keys,
+                fn (string $key): bool => $key !== self::ITEMS_USERS_BY_DEPARTMENT
+            ));
+        }
 
         if ($user === null
             || ! $user->hasFeature('email_integration')

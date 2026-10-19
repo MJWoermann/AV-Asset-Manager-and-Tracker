@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ConnectionTypeColors;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -28,13 +29,23 @@ class UpdateDepartmentRequest extends FormRequest
                 Rule::unique('departments', 'name')->ignore($department),
             ],
             'is_active' => ['sometimes', 'boolean'],
+            'color' => ['sometimes', 'nullable', 'string', Rule::in(ConnectionTypeColors::keys())],
         ];
     }
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $merge = [
             'is_active' => $this->boolean('is_active'),
-        ]);
+        ];
+
+        if ($this->exists('color')) {
+            $color = $this->input('color');
+            $merge['color'] = ($color === null || $color === '')
+                ? null
+                : strtolower((string) $color);
+        }
+
+        $this->merge($merge);
     }
 }
