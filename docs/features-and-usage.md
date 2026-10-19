@@ -43,7 +43,7 @@ The app can be **installed on a phone or tablet** like a Progressive Web App (PW
 | **Checkout** | Formal hire / repair / other hand-off of an asset to a user or guest; open checkout blocks a second one until return |
 | **Repair** | Tracked work order (steps, parts, assignee) linked to an asset or spare; can pair with a repair-purpose checkout |
 | **Spare** | Stocked spare part or consumable part SKU (Maintenance → Spares) — distinct from the optional asset **Stock** preview tab |
-| **Department** | Isolation boundary for assets, lists, and related records; users belong to one or more departments |
+| **Department** | Isolation boundary for assets, lists, item types, and related records; users belong to one or more departments |
 | **History** | Read-only log of important changes to an asset (cannot be edited or deleted) |
 
 ---
@@ -325,7 +325,7 @@ These live under the **Maintenance** menu (and related asset tabs). They are **n
 
 ### 8. Departments (always on)
 
-Admins manage **Departments** under Admin. Operational data (assets, lists, scan sessions, spares, and related records) belongs to a department. Non-admin users are assigned to one or more departments; switch the active department from Profile when you have more than one. Admins can view across departments as configured. New installs backfill a default **General** department.
+Admins manage **Departments** under Admin. Operational data (assets, lists, item types, scan sessions, spares, and related records) belongs to a department. Non-admin users are assigned to one or more departments; switch the active department from Profile when you have more than one. Admins can view across departments as configured, and can bulk-move assets, lists, and item types between departments. New installs backfill a default **General** department.
 
 ### 9. Reports beyond Compare
 
@@ -416,10 +416,11 @@ That path covers the core value: catalogue → scan → compare → keep records
 
 ## What is not included yet
 
-Short list for operators. Full product status (preview / developer features, deferred work, and planned items such as Copilot Studio MCP) is on the [product roadmap](roadmap.md).
+Short list for operators. Full product status (preview / developer features, deferred work, and planned items such as Copilot Studio MCP and local network scan) is on the [product roadmap](roadmap.md).
 
 - **Offline scanning** with later sync when the network returns  
 - Automatic **user provisioning** / JIT account creation purely from SSO (an admin must create the account first)
+- **Local network scan** to reconcile asset IP/MAC from the LAN, ensure a Network interface, and join an IP-scope Network bus (planned — see roadmap)
 - **Microsoft Teams** surface for the app UI (not built yet). Methods to consider when this is scheduled:
   - **Website / custom Teams tab** — pin `APP_URL` (or deep links) as a personal or channel tab; needs framing headers (`frame-ancestors` / no blanket deny of Teams hosts), cookie/`SameSite` behaviour, and a URL staff clients can reach (public, VPN, or split DNS). Best for browse / lists / reports / maintenance.
   - **Teams SSO on top of existing Entra** — reuse the Microsoft Entra app registration and [SSO setup](sso-setup.md) (existing users + domain allow-list only); exchange a Teams token for an app session so staff are not re-prompted.

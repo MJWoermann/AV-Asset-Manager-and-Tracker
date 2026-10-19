@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToDepartment;
 use App\Services\FileAttachmentService;
 use Database\Factories\ItemTypeFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,9 +14,10 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 class ItemType extends Model
 {
     /** @use HasFactory<ItemTypeFactory> */
-    use HasFactory;
+    use BelongsToDepartment, HasFactory;
 
     protected $fillable = [
+        'department_id',
         'name',
         'slug',
         'description',

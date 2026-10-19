@@ -76,6 +76,45 @@ Always-on areas (catalogue, scan, compare, files/manuals, maintenance logs, repa
 
 ---
 
+### Local network scan (IP / MAC reconcile)
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Planned |
+| **Why** | Keep asset IP and MAC in sync with what is live on the LAN, and place matched gear on the right Network interface and IP-scope bus without hand entry |
+| **Audience** | Admins and inventory managers (not scanners or external repairers for apply) |
+
+**Direction**
+
+- On-demand scan from the **app host** against admin-configured LAN CIDR(s) the host can reach (ARP / neighbor after a controlled ping sweep—or equivalent). No browser-side Wi‑Fi scan and no cloud agent.
+- For each discovered IP↔MAC pair, match department-scoped assets and **review then apply**:
+  1. **MAC known** → update `assets.ip_address` when missing or stale.
+  2. **IP known, MAC empty** → fill `assets.mac_address` (canonical uppercase `AA:BB:CC:DD:EE:FF`).
+  3. **Ensure a Network interface** → if the asset has none (Network connection type or conventional `LAN` / `Network` name), create a template on its **manufacturer model** (fallback: item type) and apply via existing interface sync.
+  4. **Join an IP-scope Network bus** → derive network address scope from the IP (prefer the matching configured scan CIDR); find or create a Network device bus for that scope; join the interface so peers on the same subnet share one bus.
+- Prefer Eloquent asset updates so History / audit stays intact. Do not overwrite a non-empty MAC with a different value, or move an interface already on another bus, without an explicit review choice.
+- Depends on **Asset Connections** (Preview today). When built: enable buses on the Network connection type and give buses a durable **network address scope** (e.g. CIDR), not name-only matching.
+
+**Out of scope for the first network-scan release**
+
+- Continuous / scheduled background scanning; DHCP lease import; SNMP / NetBox / switch CAM APIs.
+- Client PWA ARP; offline or remote sites with no L2/L3 path to the app host.
+- Storing IP/MAC on interfaces; auto-creating point-to-point cable connections; auto-joining Dante/DMX buses from this scan.
+- Resolving barcode scan by IP; silent MAC overwrite or silent bus moves.
+
+**Dependencies (when implemented)**
+
+- Host OS ARP/neighbor visibility (and same broadcast domain / routing as the scanned subnets).
+- Asset Connections available; Network type with device buses; optional bus CIDR/scope field.
+- Admin CIDR config, review UI, role gates, tests, and an operator/security note (LAN reconnaissance; trusted admins only).
+
+**Related**
+
+- Preview: Asset connections (this file) and [features-and-usage.md](features-and-usage.md)
+- Corporate LAN context: [security-hardening.md](security-hardening.md)
+
+---
+
 ## Core product (already shipped)
 
 For orientation only—not a backlog. Full workflows: [features-and-usage.md](features-and-usage.md).

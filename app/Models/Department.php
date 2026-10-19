@@ -60,11 +60,17 @@ class Department extends Model
     {
         return Asset::withoutDepartmentScope()->where('department_id', $this->id)->exists()
             || AssetList::withoutDepartmentScope()->where('department_id', $this->id)->exists()
+            || ItemType::withoutDepartmentScope()->where('department_id', $this->id)->exists()
             || SparePart::withoutDepartmentScope()->where('department_id', $this->id)->exists()
             || SpareGroup::withoutDepartmentScope()->where('department_id', $this->id)->exists()
             || File::withoutDepartmentScope()->where('department_id', $this->id)->exists()
             || ScanSession::withoutDepartmentScope()->where('department_id', $this->id)->exists()
             || UnknownScan::withoutDepartmentScope()->where('department_id', $this->id)->exists()
             || RigEvent::withoutDepartmentScope()->where('department_id', $this->id)->exists();
+    }
+
+    public function itemTypes(): HasMany
+    {
+        return $this->hasMany(ItemType::class);
     }
 }

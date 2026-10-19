@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 trait ManagesCustomFieldSets
 {
     /** @var list<string> */
-    public const FIELD_TYPES = ['text', 'number', 'checkbox', 'select', 'spacer', 'divider'];
+    public const FIELD_TYPES = ['text', 'number', 'checkbox', 'select', 'url', 'spacer', 'divider'];
 
     /** @return array<string, mixed> */
     protected function validated(Request $request, ?CustomFieldSet $fieldSet = null): array

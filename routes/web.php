@@ -250,6 +250,9 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
         Route::put('/manufacturers/{manufacturer}/models/{manufacturer_model}', [ManufacturerModelController::class, 'update'])->name('manufacturers.models.update');
         Route::delete('/manufacturers/{manufacturer}/models/{manufacturer_model}', [ManufacturerModelController::class, 'destroy'])->name('manufacturers.models.destroy');
 
+        Route::post('/item-types/bulk-update', [ItemTypeController::class, 'bulkUpdate'])
+            ->middleware('role:admin')
+            ->name('item-types.bulk-update');
         Route::resource('item-types', ItemTypeController::class)->except(['show']);
         Route::resource('custom-field-sets', CustomFieldSetController::class)->except(['show']);
 

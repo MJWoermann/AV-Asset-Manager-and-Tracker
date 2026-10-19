@@ -25,6 +25,7 @@
         'number' => 'Number',
         'checkbox' => 'Checkbox',
         'select' => 'Select',
+        'url' => 'URL',
         'spacer' => 'Spacer',
         'divider' => 'Divider',
     ];

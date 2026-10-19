@@ -1579,6 +1579,43 @@ function createInventoryChartPanel(config = {}) {
                 return;
             }
 
+            // #region agent log
+            const parentEl = canvas.parentElement;
+            const parentStyle = parentEl ? getComputedStyle(parentEl) : null;
+            const dbgLog = (hypothesisId, message, data = {}) => {
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '8d5950' },
+                    body: JSON.stringify({
+                        sessionId: '8d5950',
+                        runId: 'pre-fix',
+                        hypothesisId,
+                        location: 'app.js:mountChart',
+                        message,
+                        data,
+                        timestamp: Date.now(),
+                    }),
+                }).catch(() => {});
+            };
+            dbgLog('A', 'pre-mount container metrics', {
+                canvasAttrHeight: canvas.getAttribute('height'),
+                canvasClientH: canvas.clientHeight,
+                canvasOffsetH: canvas.offsetHeight,
+                parentTag: parentEl?.tagName,
+                parentClass: parentEl?.className,
+                parentClientH: parentEl?.clientHeight,
+                parentOffsetH: parentEl?.offsetHeight,
+                parentComputedHeight: parentStyle?.height,
+                parentComputedMinHeight: parentStyle?.minHeight,
+                parentComputedMaxHeight: parentStyle?.maxHeight,
+                maintainAspectRatio: false,
+                responsive: true,
+                pointCount: (this.chartPayload.points || []).length,
+                restockCount: (this.chartPayload.restock_markers || []).length,
+                trendCount: (this.chartPayload.trend?.projection || []).length,
+            });
+            // #endregion
+
             const Chart = await loadChart();
             const points = this.chartPayload.points || [];
             const restocks = this.chartPayload.restock_markers || [];
@@ -1700,6 +1737,48 @@ function createInventoryChartPanel(config = {}) {
                     },
                 },
             });
+
+            // #region agent log
+            dbgLog('B', 'post-mount canvas metrics', {
+                canvasClientH: canvas.clientHeight,
+                canvasOffsetH: canvas.offsetHeight,
+                canvasStyleH: canvas.style.height,
+                parentClientH: parentEl?.clientHeight,
+                parentOffsetH: parentEl?.offsetHeight,
+            });
+            let resizeSample = 0;
+            const maxSamples = 12;
+            const growthObserver = new ResizeObserver((entries) => {
+                resizeSample += 1;
+                if (resizeSample > maxSamples) {
+                    growthObserver.disconnect();
+                    return;
+                }
+                const entry = entries[0];
+                const h = entry?.contentRect?.height ?? canvas.clientHeight;
+                dbgLog('A', 'canvas resize sample', {
+                    sample: resizeSample,
+                    canvasContentH: h,
+                    canvasClientH: canvas.clientHeight,
+                    canvasOffsetH: canvas.offsetHeight,
+                    parentClientH: parentEl?.clientHeight,
+                    parentOffsetH: parentEl?.offsetHeight,
+                    growing: resizeSample > 1 && h > (this._dbgPrevH || 0),
+                    prevH: this._dbgPrevH || null,
+                });
+                this._dbgPrevH = h;
+                if (resizeSample >= maxSamples) {
+                    dbgLog('A', 'resize sample cap reached', {
+                        finalCanvasH: canvas.clientHeight,
+                        finalParentH: parentEl?.clientHeight,
+                        samples: resizeSample,
+                    });
+                    growthObserver.disconnect();
+                }
+            });
+            growthObserver.observe(canvas);
+            this._dbgGrowthObserver = growthObserver;
+            // #endregion
         },
     };
 }

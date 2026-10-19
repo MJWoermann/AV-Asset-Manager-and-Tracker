@@ -289,7 +289,7 @@ class DepartmentIsolationTest extends TestCase
         $response->assertJsonPath('unknown', true);
     }
 
-    public function test_shared_location_and_item_type_usable_across_departments(): void
+    public function test_shared_location_usable_across_departments(): void
     {
         $deptA = $this->makeDepartment('Alpha');
         $deptB = $this->makeDepartment('Bravo');
@@ -300,12 +300,22 @@ class DepartmentIsolationTest extends TestCase
             'type' => LocationType::Room,
             'is_portable' => false,
         ]);
+        $typeA = ItemType::withoutDepartmentScope()->create([
+            'department_id' => $deptA->id,
+            'name' => 'Alpha Fixture',
+            'slug' => 'alpha-fixture',
+        ]);
+        $typeB = ItemType::withoutDepartmentScope()->create([
+            'department_id' => $deptB->id,
+            'name' => 'Bravo Fixture',
+            'slug' => 'bravo-fixture',
+        ]);
 
         $this->actingAs($userA);
         session([DepartmentVisibility::SESSION_KEY => $deptA->id]);
         $this->post(route('assets.store'), [
             'name' => 'Asset A',
-            'item_type_id' => $this->itemType->id,
+            'item_type_id' => $typeA->id,
             'location_id' => $location->id,
             'status' => AssetStatus::Available->value,
             'quantity' => 1,
@@ -315,7 +325,7 @@ class DepartmentIsolationTest extends TestCase
         session([DepartmentVisibility::SESSION_KEY => $deptB->id]);
         $this->post(route('assets.store'), [
             'name' => 'Asset B',
-            'item_type_id' => $this->itemType->id,
+            'item_type_id' => $typeB->id,
             'location_id' => $location->id,
             'status' => AssetStatus::Available->value,
             'quantity' => 1,
@@ -324,6 +334,58 @@ class DepartmentIsolationTest extends TestCase
         $this->assertSame(2, Asset::withoutDepartmentScope()->where('location_id', $location->id)->count());
         $this->assertDatabaseHas('assets', ['name' => 'Asset A', 'department_id' => $deptA->id]);
         $this->assertDatabaseHas('assets', ['name' => 'Asset B', 'department_id' => $deptB->id]);
+    }
+
+    public function test_non_admin_cannot_see_or_edit_other_department_item_type(): void
+    {
+        $deptA = $this->makeDepartment('Alpha');
+        $deptB = $this->makeDepartment('Bravo');
+        $user = User::factory()->create();
+        $user->assignRole('inventory_manager');
+        $user->departments()->sync([$deptA->id]);
+
+        ItemType::withoutDepartmentScope()->create([
+            'department_id' => $deptA->id,
+            'name' => 'Visible Type',
+            'slug' => 'visible-type',
+        ]);
+        $typeB = ItemType::withoutDepartmentScope()->create([
+            'department_id' => $deptB->id,
+            'name' => 'Hidden Type',
+            'slug' => 'hidden-type',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('item-types.index'))
+            ->assertOk()
+            ->assertSee('Visible Type')
+            ->assertDontSee('Hidden Type');
+
+        $this->actingAs($user)
+            ->get(route('item-types.edit', $typeB))
+            ->assertNotFound();
+    }
+
+    public function test_create_item_type_stamps_active_department_id(): void
+    {
+        $deptA = $this->makeDepartment('Alpha');
+        $deptB = $this->makeDepartment('Bravo');
+        $user = User::factory()->create();
+        $user->assignRole('inventory_manager');
+        $user->departments()->sync([$deptA->id, $deptB->id]);
+
+        $this->actingAs($user);
+        session([DepartmentVisibility::SESSION_KEY => $deptB->id]);
+
+        $response = $this->post(route('item-types.store'), [
+            'name' => 'Stamped Type',
+            'description' => null,
+        ]);
+
+        $response->assertRedirect(route('item-types.index'));
+        $type = ItemType::withoutDepartmentScope()->where('name', 'Stamped Type')->first();
+        $this->assertNotNull($type);
+        $this->assertSame($deptB->id, (int) $type->department_id);
     }
 
     public function test_member_can_switch_active_department(): void

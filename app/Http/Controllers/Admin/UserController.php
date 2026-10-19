@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\User;
+use App\Support\AgentDebugLog;
+use App\Support\DepartmentVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -60,6 +62,18 @@ class UserController extends Controller
     {
         $user->load('departments');
 
+        // #region agent log
+        $pivotIds = $user->departments->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        $prefIds = DepartmentVisibility::normalizeIds(($user->preferences ?? [])[DepartmentVisibility::PREFERENCE_KEY] ?? null);
+        AgentDebugLog::write('C', 'UserController.php:edit', 'Manage users form load sources', [
+            'userId' => $user->id,
+            'isAdmin' => $user->hasRole('admin'),
+            'formShowsPivotIds' => $pivotIds,
+            'preferenceIds' => $prefIds,
+            'formWouldMismatchPref' => $user->hasRole('admin') && $pivotIds !== $prefIds,
+        ]);
+        // #endregion
+
         return view('admin.users.form', [
             'user' => $user,
             'roles' => Role::orderBy('name')->get(),
@@ -79,6 +93,10 @@ class UserController extends Controller
             'department_ids.*' => ['integer', Rule::exists('departments', 'id')],
         ]);
 
+        // #region agent log
+        $prefBefore = DepartmentVisibility::normalizeIds(($user->preferences ?? [])[DepartmentVisibility::PREFERENCE_KEY] ?? null);
+        $wasAdmin = $user->hasRole('admin');
+        // #endregion
         $user->update([
             'name' => $data['name'],
             'email' => $data['email'],
@@ -87,6 +105,23 @@ class UserController extends Controller
         ]);
         $user->syncRoles([$data['role']]);
         $user->departments()->sync($data['department_ids'] ?? []);
+
+        // #region agent log
+        $user->refresh();
+        $pivotAfter = $user->departments()->pluck('departments.id')->map(fn ($id) => (int) $id)->values()->all();
+        $prefAfter = DepartmentVisibility::normalizeIds(($user->preferences ?? [])[DepartmentVisibility::PREFERENCE_KEY] ?? null);
+        $submitted = DepartmentVisibility::normalizeIds($data['department_ids'] ?? []);
+        AgentDebugLog::write('B', 'UserController.php:update', 'Manage users departments saved', [
+            'userId' => $user->id,
+            'wasAdmin' => $wasAdmin,
+            'isAdminAfter' => $user->hasRole('admin'),
+            'submittedDepartmentIds' => $submitted,
+            'pivotAfter' => $pivotAfter,
+            'prefBefore' => $prefBefore,
+            'prefAfter' => $prefAfter,
+            'prefUnchangedWhenAdmin' => $wasAdmin && $prefBefore === $prefAfter && $submitted !== $prefAfter,
+        ]);
+        // #endregion
 
         return redirect()->route('admin.users.index')->with('status', 'User updated.');
     }

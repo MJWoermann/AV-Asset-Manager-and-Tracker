@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\BulkUpdateItemTypesRequest;
 use App\Http\Requests\DeleteItemTypeRequest;
 use App\Models\Asset;
 use App\Models\ConnectionType;
 use App\Models\CustomFieldSet;
+use App\Models\Department;
 use App\Models\ItemType;
 use App\Models\ItemTypeAlias;
 use App\Services\AssetInterfaceService;
+use App\Services\BulkItemTypeUpdateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,11 +20,37 @@ use Illuminate\View\View;
 
 class ItemTypeController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $itemTypes = ItemType::with('fieldSets')->withCount('assets')->orderBy('name')->get();
 
-        return view('item-types.index', compact('itemTypes'));
+        return view('item-types.index', [
+            'itemTypes' => $itemTypes,
+            'departments' => $request->user()?->hasRole('admin')
+                ? Department::query()->where('is_active', true)->orderBy('name')->get(['id', 'name'])
+                : collect(),
+        ]);
+    }
+
+    public function bulkUpdate(BulkUpdateItemTypesRequest $request, BulkItemTypeUpdateService $bulkUpdate): RedirectResponse
+    {
+        $result = $bulkUpdate->handle($request->bulkPayload());
+
+        return redirect()->route('item-types.index')->with('status', $this->bulkStatusMessage($result));
+    }
+
+    /**
+     * @param  array{updated: int}  $result
+     */
+    protected function bulkStatusMessage(array $result): string
+    {
+        $updated = (int) ($result['updated'] ?? 0);
+
+        if ($updated === 0) {
+            return 'No changes applied.';
+        }
+
+        return $updated.' item type'.($updated === 1 ? '' : 's').' updated.';
     }
 
     public function create(): View

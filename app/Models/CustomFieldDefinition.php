@@ -34,6 +34,37 @@ class CustomFieldDefinition extends Model
         return in_array($this->type, self::LAYOUT_TYPES, true);
     }
 
+    /**
+     * Return a safe http(s) URL for opening in a new tab, or null when invalid.
+     */
+    public static function openableHttpUrl(?string $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (! preg_match('#^[a-z][a-z0-9+.-]*:#i', $value)) {
+            $value = 'https://'.$value;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL) === false) {
+            return null;
+        }
+
+        $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        $host = parse_url($value, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+
+        return $value;
+    }
+
     public function fieldSet(): BelongsTo
     {
         return $this->belongsTo(CustomFieldSet::class, 'custom_field_set_id');

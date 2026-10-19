@@ -371,6 +371,10 @@
                                             @if($def->type === 'checkbox')
                                                 <input type="checkbox" id="{{ $cfId }}" name="custom_fields[{{ $def->id }}]" value="1" class="rounded border-gray-300 text-brand"
                                                     @checked(old('custom_fields.'.$def->id, $values[$def->id]->value ?? null) == '1')>
+                                            @elseif($def->type === 'url')
+                                                <x-text-input id="{{ $cfId }}" name="custom_fields[{{ $def->id }}]" type="url" class="mt-1 block w-full"
+                                                    :value="old('custom_fields.'.$def->id, $values[$def->id]->value ?? '')"
+                                                    placeholder="https://" />
                                             @else
                                                 <x-text-input id="{{ $cfId }}" name="custom_fields[{{ $def->id }}]" class="mt-1 block w-full"
                                                     :value="old('custom_fields.'.$def->id, $values[$def->id]->value ?? '')" />

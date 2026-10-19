@@ -29,7 +29,7 @@ return new class extends Migration
             $table->foreignId('custom_field_set_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('slug');
-            $table->string('type', 32)->default('text'); // text, number, checkbox, select
+            $table->string('type', 32)->default('text'); // text, number, checkbox, select, url, spacer, divider
             $table->json('options')->nullable();
             $table->boolean('is_required')->default(false);
             $table->unsignedInteger('sort_order')->default(0);
