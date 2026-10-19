@@ -73,12 +73,19 @@ unset($__defined_vars, $__key, $__value); ?>
             <?php endif; ?>
             <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="clearSelection()">Clear</button>
             <?php if($canDelete): ?>
-                <button
-                    type="button"
-                    class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver"
+                <form
+                    method="POST"
+                    action="<?php echo e(route('assets.duplicates.start')); ?>"
+                    class="inline"
                     x-show="selectedCount >= 2"
-                    @click="openMergeConfirm()"
-                >Merge selected</button>
+                    x-ref="mergeStartForm"
+                >
+                    <?php echo csrf_field(); ?>
+                    <template x-for="id in selectedIds" :key="'merge-start-'+id">
+                        <input type="hidden" name="asset_ids[]" :value="id">
+                    </template>
+                    <button type="submit" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver">Merge selected</button>
+                </form>
                 <button type="button" class="px-3 py-2 text-sm bg-red-700 text-white" @click="openDeleteConfirm()">Delete selected</button>
             <?php endif; ?>
         </div>
@@ -289,39 +296,5 @@ unset($__defined_vars, $__key, $__value); ?>
         </div>
     </div>
 
-    <div
-        x-cloak
-        x-show="mergeConfirmOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6"
-        role="dialog"
-        aria-modal="true"
-    >
-        <div class="fixed inset-0 bg-black/50" @click="cancelMerge()"></div>
-        <div class="relative w-full max-w-lg max-h-[calc(100vh-3rem)] overflow-y-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-6 space-y-4 shadow-xl">
-            <h3 class="text-lg font-semibold">Merge selected assets</h3>
-            <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                The kept asset keeps its values; blank fields are filled from merged assets. Lists, history, repairs, and related records move to the kept asset. Other selected assets are permanently deleted.
-            </p>
-            <fieldset class="space-y-2 text-sm">
-                <legend class="font-medium text-brand-black dark:text-white">Keep this asset</legend>
-                <template x-for="option in selectedMergeOptions()" :key="'merge-'+option.id">
-                    <label class="flex items-start gap-2 border border-brand-silver dark:border-brand-charcoal p-2 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="merge_keep_preview"
-                            class="mt-1"
-                            :value="option.id"
-                            x-model.number="keepAssetId"
-                        >
-                        <span x-text="option.label"></span>
-                    </label>
-                </template>
-            </fieldset>
-            <div class="flex justify-end gap-2">
-                <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="cancelMerge()">Cancel</button>
-                <button type="button" class="px-3 py-2 text-sm bg-brand text-white" @click="confirmMerge()">Merge permanently</button>
-            </div>
-        </div>
-    </div>
 <?php endif; ?>
 <?php /**PATH C:\Users\MatthewWoermann\Software Projects\AV-Asset-Manager-and-Tracker\resources\views/components/bulk-asset-actions.blade.php ENDPATH**/ ?>

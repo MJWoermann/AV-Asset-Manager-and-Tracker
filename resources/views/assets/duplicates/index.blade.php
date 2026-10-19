@@ -25,9 +25,9 @@
         </p>
 
         <div class="text-sm">
-            <span class="font-semibold">{{ $groupCount }}</span> group{{ $groupCount === 1 ? '' : 's' }}
+            <span class="font-semibold">{{ $groupCount }} {{ $groupCount === 1 ? 'group' : 'groups' }}</span>
             ·
-            <span class="font-semibold">{{ $assetCount }}</span> asset{{ $assetCount === 1 ? '' : 's' }} involved
+            <span class="font-semibold">{{ $assetCount }} {{ $assetCount === 1 ? 'asset' : 'assets' }} involved</span>
         </div>
 
         @forelse ($groups as $groupIndex => $group)

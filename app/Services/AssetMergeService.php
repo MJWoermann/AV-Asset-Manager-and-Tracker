@@ -39,6 +39,7 @@ class AssetMergeService
         'name',
         'status',
         'item_type_id',
+        'quantity',
     ];
 
     /**
@@ -329,7 +330,10 @@ class AssetMergeService
                 }
             }
 
-            $fields[$field] = $chosen ?? self::EMPTY_SOURCE;
+            $fields[$field] = $chosen
+                ?? (in_array($field, self::REQUIRED_FIELDS, true) && $survivor
+                    ? (string) $survivorId
+                    : self::EMPTY_SOURCE);
         }
 
         $custom = [];
@@ -530,8 +534,13 @@ class AssetMergeService
                     ]);
                 }
 
-                if (! $this->isBlank($survivor->getAttribute($field))) {
-                    $survivor->setAttribute($field, $field === 'ru_rear_enabled' ? false : null);
+                $clearValue = match ($field) {
+                    'ru_rear_enabled' => false,
+                    default => null,
+                };
+
+                if (! $this->valuesEqual($survivor->getAttribute($field), $clearValue)) {
+                    $survivor->setAttribute($field, $clearValue);
                     $applied[] = $field;
                 }
 

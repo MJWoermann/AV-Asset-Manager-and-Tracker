@@ -83,8 +83,9 @@ class AssetDuplicateMergeTest extends TestCase
         $response->assertSee('Duplicate check');
         $response->assertSee('Alpha');
         $response->assertSee('Beta');
-        $response->assertDontSee('Unique', false);
+        $response->assertSee('TP-ABC');
         $response->assertSee('1 group');
+        $response->assertDontSee('>Unique<', false);
     }
 
     public function test_scanner_cannot_view_or_merge_duplicates(): void

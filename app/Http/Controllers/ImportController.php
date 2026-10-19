@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\FileCategory;
 use App\Http\Requests\ImportUploadRequest;
+use App\Jobs\ProcessAssetImportJob;
 use App\Models\AssetList;
 use App\Services\FileAttachmentService;
 use App\Services\ImportService;
@@ -256,19 +257,61 @@ class ImportController extends Controller
 
         $dryRun = $request->boolean('dry_run');
         $listDestination = $data['list_destination'] ?? 'none';
+        $listOptions = [
+            'destination' => $listDestination,
+            'asset_list_id' => isset($data['asset_list_id']) ? (int) $data['asset_list_id'] : null,
+            'new_list_name' => $data['new_list_name'] ?? null,
+            'new_list_type' => $data['new_list_type'] ?? null,
+            'include_updated' => $request->boolean('include_updated_in_list'),
+        ];
+        $actions = $data['actions'] ?? [];
+        $bulkAction = $data['bulk_action'] ?? 'update';
+        $userId = $request->user()?->id;
+        $rowCount = count($prepared);
+
+        // Large commits take minutes (audit log per row) and trip nginx 504s; finish after response.
+        if (
+            ! $dryRun
+            && is_string($preparedPath)
+            && $rowCount >= ImportService::BACKGROUND_COMMIT_THRESHOLD
+        ) {
+            $originalFilename = (string) (session('import.original_filename') ?: basename($path));
+
+            ProcessAssetImportJob::dispatchAfterResponse(
+                $path,
+                $preparedPath,
+                $originalFilename,
+                $actions,
+                $bulkAction,
+                $listOptions,
+                $userId,
+            );
+
+            session()->forget([
+                'import.path',
+                'import.columns',
+                'import.original_filename',
+                'import.mapping',
+                'import.prepared',
+                'import.prepared_path',
+            ]);
+
+            return redirect()->route('assets.index')->with(
+                'status',
+                sprintf(
+                    'Import of %d rows is finishing in the background (usually 1–3 minutes). Refresh the assets list shortly.',
+                    $rowCount,
+                ),
+            );
+        }
+
         $counts = $this->imports->commit(
             $prepared,
-            $data['actions'] ?? [],
+            $actions,
             $dryRun,
-            $data['bulk_action'] ?? 'update',
-            [
-                'destination' => $listDestination,
-                'asset_list_id' => isset($data['asset_list_id']) ? (int) $data['asset_list_id'] : null,
-                'new_list_name' => $data['new_list_name'] ?? null,
-                'new_list_type' => $data['new_list_type'] ?? null,
-                'include_updated' => $request->boolean('include_updated_in_list'),
-            ],
-            $request->user()?->id,
+            $bulkAction,
+            $listOptions,
+            $userId,
         );
 
         $archivedToLibrary = false;

@@ -33,6 +33,7 @@
 <?php unset($__componentOriginale38ded69f40ce1c2c90acaee9ee96445); ?>
 <?php endif; ?>
                 <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                    <a href="<?php echo e(route('assets.duplicates.index')); ?>" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Duplicates</a>
                     <a href="<?php echo e(route('import.create')); ?>" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Import</a>
                     <a href="<?php echo e(route('export.assets', ['format' => 'xlsx'])); ?>" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Export</a>
                 <?php endif; ?>

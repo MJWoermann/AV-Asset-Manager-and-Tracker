@@ -75,6 +75,9 @@ class ImportService
     /** Max duplicate rows rendered on the resolve screen (bulk action still applies to all). */
     public const DUPLICATES_PREVIEW_LIMIT = 100;
 
+    /** Row counts at/above this finish via dispatchAfterResponse to avoid gateway timeouts. */
+    public const BACKGROUND_COMMIT_THRESHOLD = 200;
+
     /** @var list<string> */
     public const META_FIELDS = [
         'item_type',
@@ -776,43 +779,7 @@ class ImportService
         // Release spreadsheet row collections before loading DB match indexes (Excel alone ~100MB+).
         $rows->splice(0);
 
-        // #region agent log
-        $__dbgIdxT0 = microtime(true);
-        @file_put_contents(base_path('debug-d766ca.log'), json_encode([
-            'sessionId' => 'd766ca',
-            'runId' => 'dup-check-3',
-            'hypothesisId' => 'P',
-            'location' => 'ImportService.php:prepareRows',
-            'message' => 'drafts_ready_rows_cleared',
-            'data' => [
-                'draft_count' => count($drafts),
-                'memory_mb' => (int) round(memory_get_usage(true) / 1048576),
-                'peak_memory_mb' => (int) round(memory_get_peak_usage(true) / 1048576),
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ])."\n", FILE_APPEND);
-        // #endregion
-
         $indexes = $this->buildExistingMatchIndexes($drafts);
-
-        // #region agent log
-        @file_put_contents(base_path('debug-d766ca.log'), json_encode([
-            'sessionId' => 'd766ca',
-            'runId' => 'dup-check-3',
-            'hypothesisId' => 'P',
-            'location' => 'ImportService.php:prepareRows',
-            'message' => 'indexes_built',
-            'data' => [
-                'draft_count' => count($drafts),
-                'index_ms' => (int) round((microtime(true) - $__dbgIdxT0) * 1000),
-                'index_sizes' => array_map(fn (array $map) => count($map), $indexes),
-                'memory_mb' => (int) round(memory_get_usage(true) / 1048576),
-                'peak_memory_mb' => (int) round(memory_get_peak_usage(true) / 1048576),
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ])."\n", FILE_APPEND);
-        // #endregion
-
         $prepared = [];
 
         foreach ($drafts as $draft) {
@@ -886,35 +853,6 @@ class ImportService
         $includeUpdated = (bool) ($listOptions['include_updated'] ?? false);
         $listDestination = $listOptions['destination'] ?? 'none';
 
-        // #region agent log
-        $__dbgCommitT0 = microtime(true);
-        $__dbgRowsSeen = 0;
-        $__dbgLogCommit = function (string $message, array $data = []) use ($__dbgCommitT0, &$counts): void {
-            $payload = [
-                'sessionId' => 'd766ca',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'COMMIT',
-                'location' => 'ImportService.php:commit',
-                'message' => $message,
-                'data' => array_merge([
-                    'elapsed_ms' => (int) round((microtime(true) - $__dbgCommitT0) * 1000),
-                    'created' => $counts['created'],
-                    'updated' => $counts['updated'],
-                    'replaced' => $counts['replaced'],
-                    'skipped' => $counts['skipped'],
-                ], $data),
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ];
-            @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
-        };
-        $__dbgLogCommit('commit_start', [
-            'prepared_count' => count($prepared),
-            'dry_run' => $dryRun,
-            'default_action' => $defaultDuplicateAction,
-            'time_limit' => (int) ini_get('max_execution_time'),
-        ]);
-        // #endregion
-
         $processRows = function (array $chunk) use (
             $actions,
             $dryRun,
@@ -922,8 +860,6 @@ class ImportService
             $includeUpdated,
             &$counts,
             &$assetsForList,
-            &$__dbgRowsSeen,
-            $__dbgLogCommit,
         ): void {
             foreach ($chunk as $row) {
                 $existingId = $row['existing_id'] ?? null;
@@ -937,13 +873,6 @@ class ImportService
                     if ($action === 'skip') {
                         $counts['skipped']++;
 
-                        // #region agent log
-                        $__dbgRowsSeen++;
-                        if ($__dbgRowsSeen === 1 || $__dbgRowsSeen % 250 === 0) {
-                            $__dbgLogCommit('commit_progress', ['rows_seen' => $__dbgRowsSeen]);
-                        }
-                        // #endregion
-
                         continue;
                     }
 
@@ -953,23 +882,12 @@ class ImportService
                             $counts['created']++;
                             $assetsForList[] = ['id' => null, 'kind' => 'created'];
 
-                            // #region agent log
-                            $__dbgRowsSeen++;
-                            // #endregion
-
                             continue;
                         }
 
                         $asset = $this->applyRow(null, $row, false);
                         $counts['created']++;
                         $assetsForList[] = ['id' => $asset->id, 'kind' => 'created'];
-
-                        // #region agent log
-                        $__dbgRowsSeen++;
-                        if ($__dbgRowsSeen === 1 || $__dbgRowsSeen % 250 === 0) {
-                            $__dbgLogCommit('commit_progress', ['rows_seen' => $__dbgRowsSeen]);
-                        }
-                        // #endregion
 
                         continue;
                     }
@@ -980,10 +898,6 @@ class ImportService
                             $assetsForList[] = ['id' => (int) $existingId, 'kind' => 'updated'];
                         }
 
-                        // #region agent log
-                        $__dbgRowsSeen++;
-                        // #endregion
-
                         continue;
                     }
 
@@ -991,49 +905,14 @@ class ImportService
                     if (! $asset) {
                         $counts['skipped']++;
 
-                        // #region agent log
-                        $__dbgRowsSeen++;
-                        // #endregion
-
                         continue;
                     }
-
-                    // #region agent log
-                    $__dbgCommitPayload = [
-                        'sessionId' => 'ee61fc',
-                        'runId' => 'pre-fix',
-                        'hypothesisId' => 'H1',
-                        'location' => 'ImportService.php:commit',
-                        'message' => 'duplicate_action_resolved',
-                        'data' => [
-                            'row_index' => $row['index'] ?? null,
-                            'existing_id' => (int) $existingId,
-                            'action' => $action,
-                            'replace_flag' => $action === 'replace',
-                            'payload_keys' => array_keys($row['payload'] ?? []),
-                            'payload_empty_keys' => array_values(array_filter(array_keys($row['payload'] ?? []), function ($k) use ($row) {
-                                $v = $row['payload'][$k] ?? null;
-
-                                return $v === null || $v === '';
-                            })),
-                        ],
-                        'timestamp' => (int) round(microtime(true) * 1000),
-                    ];
-                    @file_put_contents(base_path('debug-ee61fc.log'), json_encode($__dbgCommitPayload)."\n", FILE_APPEND);
-                    // #endregion
 
                     $asset = $this->applyRow($asset, $row, $action === 'replace');
                     $counts[$action === 'replace' ? 'replaced' : 'updated']++;
                     if ($includeUpdated) {
                         $assetsForList[] = ['id' => $asset->id, 'kind' => 'updated'];
                     }
-
-                    // #region agent log
-                    $__dbgRowsSeen++;
-                    if ($__dbgRowsSeen === 1 || $__dbgRowsSeen % 250 === 0) {
-                        $__dbgLogCommit('commit_progress', ['rows_seen' => $__dbgRowsSeen]);
-                    }
-                    // #endregion
 
                     continue;
                 }
@@ -1042,23 +921,12 @@ class ImportService
                     $counts['created']++;
                     $assetsForList[] = ['id' => null, 'kind' => 'created'];
 
-                    // #region agent log
-                    $__dbgRowsSeen++;
-                    // #endregion
-
                     continue;
                 }
 
                 $asset = $this->applyRow(null, $row, false);
                 $counts['created']++;
                 $assetsForList[] = ['id' => $asset->id, 'kind' => 'created'];
-
-                // #region agent log
-                $__dbgRowsSeen++;
-                if ($__dbgRowsSeen === 1 || $__dbgRowsSeen % 250 === 0) {
-                    $__dbgLogCommit('commit_progress', ['rows_seen' => $__dbgRowsSeen]);
-                }
-                // #endregion
             }
         };
 
@@ -1071,15 +939,6 @@ class ImportService
                 DB::transaction(fn () => $processRows($chunk));
             }
         }
-
-        // #region agent log
-        $__dbgLogCommit('commit_complete', [
-            'rows_seen' => $__dbgRowsSeen,
-            'item_type_cache' => count($this->itemTypeResolutionCache),
-            'location_cache' => count($this->locationResolutionCache),
-            'location_path_cache' => count($this->locationPathResolutionCache),
-        ]);
-        // #endregion
 
         if ($listDestination === 'none' || $assetsForList === []) {
             return $counts;
@@ -1199,27 +1058,6 @@ class ImportService
         );
 
         $payload = $row['payload'];
-        // #region agent log
-        $__dbgStatusInRow = array_key_exists('status', $payload);
-        $__dbgMfrInRow = array_key_exists('manufacturer', $payload);
-        $__dbgModelInRow = array_key_exists('model', $payload);
-        $__dbgNameLenBefore = is_string($payload['name'] ?? null) ? mb_strlen($payload['name']) : null;
-        $__dbgBefore = $existing ? [
-            'name' => $existing->name,
-            'status' => $existing->status?->value ?? $existing->status,
-            'notes' => $existing->notes,
-            'description' => $existing->description,
-            'serial_number' => $existing->serial_number,
-            'fmi_ast' => $existing->fmi_ast,
-            'tp_barcode' => $existing->tp_barcode,
-            'manufacturer_id' => $existing->manufacturer_id,
-            'manufacturer_model_id' => $existing->manufacturer_model_id,
-            'location_id' => $existing->location_id,
-            'supplier' => $existing->supplier,
-            'quantity' => $existing->quantity,
-        ] : null;
-        // #endregion
-
         $payload = $this->sanitizeAssetPayloadStrings($payload);
 
         foreach (self::DATE_FIELDS as $dateField) {
@@ -1245,71 +1083,6 @@ class ImportService
             $payload['manufacturer_model_id'] = $catalogueIds['manufacturer_model_id'];
         }
 
-        // #region agent log
-        if ($existing) {
-            $__dbgNullPayloadKeys = [];
-            foreach ($payload as $__dbgK => $__dbgV) {
-                if ($__dbgV === null || $__dbgV === '') {
-                    $__dbgNullPayloadKeys[] = $__dbgK;
-                }
-            }
-            $__dbgApplyLog = [
-                'sessionId' => 'ee61fc',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'H2-H5',
-                'location' => 'ImportService.php:applyRow',
-                'message' => 'applyRow_before_persist',
-                'data' => [
-                    'existing_id' => $existing->id,
-                    'replace' => $replace,
-                    'status_in_row_payload' => $__dbgStatusInRow,
-                    'status_being_written' => $payload['status'] ?? null,
-                    'mfr_in_row' => $__dbgMfrInRow,
-                    'model_in_row' => $__dbgModelInRow,
-                    'payload_keys' => array_keys($payload),
-                    'null_or_empty_payload_keys' => $__dbgNullPayloadKeys,
-                    'before' => $__dbgBefore,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ];
-            @file_put_contents(base_path('debug-ee61fc.log'), json_encode($__dbgApplyLog)."\n", FILE_APPEND);
-        }
-        // #endregion
-
-        // #region agent log
-        $__dbgLen = static function (mixed $v): ?int {
-            return is_string($v) ? mb_strlen($v) : null;
-        };
-        $__dbgOverLimit = [];
-        foreach (self::ASSET_STRING_MAX_LENGTHS as $__dbgField => $__dbgMax) {
-            $__dbgVal = $payload[$__dbgField] ?? null;
-            if (is_string($__dbgVal) && mb_strlen($__dbgVal) > $__dbgMax) {
-                $__dbgOverLimit[$__dbgField] = mb_strlen($__dbgVal);
-            }
-        }
-        @file_put_contents(base_path('debug-704ea9.log'), json_encode([
-            'sessionId' => '704ea9',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'H1',
-            'location' => 'ImportService.php:applyRow:before_persist',
-            'message' => 'payload_string_lengths_after_sanitize',
-            'data' => [
-                'existing_id' => $existing?->id,
-                'replace' => $replace,
-                'will_create' => $existing === null,
-                'name_len_before_sanitize' => $__dbgNameLenBefore,
-                'name_len' => $__dbgLen($payload['name'] ?? null),
-                'description_len' => $__dbgLen($payload['description'] ?? null),
-                'notes_len' => $__dbgLen($payload['notes'] ?? null),
-                'supplier_len' => $__dbgLen($payload['supplier'] ?? null),
-                'name_preview' => is_string($payload['name'] ?? null) ? mb_substr($payload['name'], 0, 80) : null,
-                'fields_over_column_limit' => $__dbgOverLimit,
-                'name_was_truncated' => ($__dbgNameLenBefore ?? 0) > 255,
-            ],
-            'timestamp' => (int) round(microtime(true) * 1000),
-        ])."\n", FILE_APPEND);
-        // #endregion
-
         if ($existing && $replace) {
             $existing = $this->replaceAsset($existing, $payload);
         } elseif ($existing) {
@@ -1317,50 +1090,6 @@ class ImportService
         } else {
             $existing = Asset::create($payload);
         }
-
-        // #region agent log
-        if ($__dbgBefore !== null) {
-            $existing->refresh();
-            $__dbgAfter = [
-                'name' => $existing->name,
-                'status' => $existing->status?->value ?? $existing->status,
-                'notes' => $existing->notes,
-                'description' => $existing->description,
-                'serial_number' => $existing->serial_number,
-                'fmi_ast' => $existing->fmi_ast,
-                'tp_barcode' => $existing->tp_barcode,
-                'manufacturer_id' => $existing->manufacturer_id,
-                'manufacturer_model_id' => $existing->manufacturer_model_id,
-                'location_id' => $existing->location_id,
-                'supplier' => $existing->supplier,
-                'quantity' => $existing->quantity,
-            ];
-            $__dbgCleared = [];
-            foreach ($__dbgBefore as $__dbgField => $__dbgOld) {
-                $__dbgNew = $__dbgAfter[$__dbgField] ?? null;
-                $__dbgHadValue = $__dbgOld !== null && $__dbgOld !== '';
-                $__dbgNowEmpty = $__dbgNew === null || $__dbgNew === '';
-                if ($__dbgHadValue && $__dbgNowEmpty) {
-                    $__dbgCleared[] = $__dbgField;
-                }
-            }
-            $__dbgAfterLog = [
-                'sessionId' => 'ee61fc',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'H2-H5',
-                'location' => 'ImportService.php:applyRow',
-                'message' => 'applyRow_after_persist',
-                'data' => [
-                    'existing_id' => $existing->id,
-                    'replace' => $replace,
-                    'cleared_fields' => $__dbgCleared,
-                    'after' => $__dbgAfter,
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ];
-            @file_put_contents(base_path('debug-ee61fc.log'), json_encode($__dbgAfterLog)."\n", FILE_APPEND);
-        }
-        // #endregion
 
         $this->syncImportedCustomFields($existing, $itemType, $row['custom_fields'] ?? [], $replace);
         $this->syncMappedCustomFields($existing, $itemType, $row['mapped_custom_fields'] ?? [], $replace);
