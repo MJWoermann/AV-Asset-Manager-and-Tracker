@@ -182,7 +182,7 @@ class ImportService
             $__dbgLog = function (string $message, array $data = []) use ($__dbgReadT0): void {
                 $payload = [
                     'sessionId' => 'd766ca',
-                    'runId' => 'pre-fix',
+                    'runId' => 'post-fix',
                     'hypothesisId' => 'A',
                     'location' => 'ImportService.php:readRows',
                     'message' => $message,
@@ -621,19 +621,16 @@ class ImportService
      */
     public function prepareRows(Collection $rows, array $mapping): array
     {
-        $prepared = [];
+        $drafts = [];
 
         // #region agent log
         $__dbgPrepT0 = microtime(true);
-        $__dbgMatchQueries = 0;
         $__dbgMatchHits = 0;
-        $__dbgMatchMs = 0.0;
-        $__dbgProcessed = 0;
         $__dbgSkipped = 0;
         $__dbgLog = function (string $message, array $data = []) use ($__dbgPrepT0): void {
             $payload = [
                 'sessionId' => 'd766ca',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
                 'hypothesisId' => 'B',
                 'location' => 'ImportService.php:prepareRows',
                 'message' => $message,
@@ -723,39 +720,7 @@ class ImportService
                 continue;
             }
 
-            // #region agent log
-            $__dbgMatchT0 = microtime(true);
-            $__dbgKeysPresent = 0;
-            foreach (self::DUPLICATE_KEYS as $__dbgKey) {
-                $__dbgVal = $payload[$__dbgKey] ?? null;
-                if ($__dbgVal !== null && $__dbgVal !== '') {
-                    $__dbgKeysPresent++;
-                }
-            }
-            $__dbgMatchQueries += $__dbgKeysPresent;
-            // #endregion
-
-            $match = $this->findExistingMatch($payload);
-
-            // #region agent log
-            $__dbgMatchMs += (microtime(true) - $__dbgMatchT0) * 1000;
-            if ($match['asset'] !== null) {
-                $__dbgMatchHits++;
-            }
-            $__dbgProcessed++;
-            if ($__dbgProcessed === 1 || $__dbgProcessed === 100 || $__dbgProcessed === 500 || $__dbgProcessed % 1000 === 0) {
-                $__dbgLog('prepareRows_progress', [
-                    'processed' => $__dbgProcessed,
-                    'skipped' => $__dbgSkipped,
-                    'match_queries_est' => $__dbgMatchQueries,
-                    'match_hits' => $__dbgMatchHits,
-                    'match_ms' => (int) round($__dbgMatchMs),
-                    'keys_on_this_row' => $__dbgKeysPresent,
-                ]);
-            }
-            // #endregion
-
-            $prepared[] = [
+            $drafts[] = [
                 'index' => (int) $index,
                 'payload' => $payload,
                 'custom_fields' => $customFields,
@@ -765,6 +730,47 @@ class ImportService
                 'location_level' => $level,
                 'location_room' => $room,
                 'location_rack' => $rack,
+            ];
+        }
+
+        // #region agent log
+        $__dbgMatchT0 = microtime(true);
+        // #endregion
+
+        $indexes = $this->buildExistingMatchIndexes($drafts);
+
+        // #region agent log
+        $__dbgMatchMs = (int) round((microtime(true) - $__dbgMatchT0) * 1000);
+        $__dbgLog('prepareRows_indexes_built', [
+            'draft_count' => count($drafts),
+            'skipped' => $__dbgSkipped,
+            'index_keys' => array_keys($indexes),
+            'index_sizes' => array_map(fn (array $map) => count($map), $indexes),
+            'match_ms' => $__dbgMatchMs,
+        ]);
+        // #endregion
+
+        $prepared = [];
+
+        foreach ($drafts as $draft) {
+            $match = $this->findExistingMatch($draft['payload'], $indexes);
+
+            // #region agent log
+            if ($match['asset'] !== null) {
+                $__dbgMatchHits++;
+            }
+            // #endregion
+
+            $prepared[] = [
+                'index' => $draft['index'],
+                'payload' => $draft['payload'],
+                'custom_fields' => $draft['custom_fields'],
+                'mapped_custom_fields' => $draft['mapped_custom_fields'],
+                'item_type_name' => $draft['item_type_name'],
+                'location_building' => $draft['location_building'],
+                'location_level' => $draft['location_level'],
+                'location_room' => $draft['location_room'],
+                'location_rack' => $draft['location_rack'],
                 'existing_id' => $match['asset']?->id,
                 'matched_on' => $match['matched_on'],
                 'existing_summary' => $match['asset'] ? [
@@ -782,12 +788,11 @@ class ImportService
 
         // #region agent log
         $__dbgLog('prepareRows_complete', [
-            'processed' => $__dbgProcessed,
+            'processed' => count($prepared),
             'skipped' => $__dbgSkipped,
             'prepared' => count($prepared),
-            'match_queries_est' => $__dbgMatchQueries,
             'match_hits' => $__dbgMatchHits,
-            'match_ms' => (int) round($__dbgMatchMs),
+            'match_ms' => $__dbgMatchMs,
         ]);
         // #endregion
 
@@ -889,6 +894,30 @@ class ImportService
 
                         continue;
                     }
+
+                    // #region agent log
+                    $__dbgCommitPayload = [
+                        'sessionId' => 'ee61fc',
+                        'runId' => 'pre-fix',
+                        'hypothesisId' => 'H1',
+                        'location' => 'ImportService.php:commit',
+                        'message' => 'duplicate_action_resolved',
+                        'data' => [
+                            'row_index' => $row['index'] ?? null,
+                            'existing_id' => (int) $existingId,
+                            'action' => $action,
+                            'replace_flag' => $action === 'replace',
+                            'payload_keys' => array_keys($row['payload'] ?? []),
+                            'payload_empty_keys' => array_values(array_filter(array_keys($row['payload'] ?? []), function ($k) use ($row) {
+                                $v = $row['payload'][$k] ?? null;
+
+                                return $v === null || $v === '';
+                            })),
+                        ],
+                        'timestamp' => (int) round(microtime(true) * 1000),
+                    ];
+                    @file_put_contents(base_path('debug-ee61fc.log'), json_encode($__dbgCommitPayload)."\n", FILE_APPEND);
+                    // #endregion
 
                     $asset = $this->applyRow($asset, $row, $action === 'replace');
                     $counts[$action === 'replace' ? 'replaced' : 'updated']++;
@@ -1039,6 +1068,25 @@ class ImportService
         );
 
         $payload = $row['payload'];
+        // #region agent log
+        $__dbgStatusInRow = array_key_exists('status', $payload);
+        $__dbgMfrInRow = array_key_exists('manufacturer', $payload);
+        $__dbgModelInRow = array_key_exists('model', $payload);
+        $__dbgBefore = $existing ? [
+            'name' => $existing->name,
+            'status' => $existing->status?->value ?? $existing->status,
+            'notes' => $existing->notes,
+            'description' => $existing->description,
+            'serial_number' => $existing->serial_number,
+            'fmi_ast' => $existing->fmi_ast,
+            'tp_barcode' => $existing->tp_barcode,
+            'manufacturer_id' => $existing->manufacturer_id,
+            'manufacturer_model_id' => $existing->manufacturer_model_id,
+            'location_id' => $existing->location_id,
+            'supplier' => $existing->supplier,
+            'quantity' => $existing->quantity,
+        ] : null;
+        // #endregion
         $payload['item_type_id'] = $itemType->id;
         if ($locationId !== null) {
             $payload['location_id'] = $locationId;
@@ -1055,6 +1103,37 @@ class ImportService
             $payload['manufacturer_model_id'] = $catalogueIds['manufacturer_model_id'];
         }
 
+        // #region agent log
+        if ($existing) {
+            $__dbgNullPayloadKeys = [];
+            foreach ($payload as $__dbgK => $__dbgV) {
+                if ($__dbgV === null || $__dbgV === '') {
+                    $__dbgNullPayloadKeys[] = $__dbgK;
+                }
+            }
+            $__dbgApplyLog = [
+                'sessionId' => 'ee61fc',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'H2-H5',
+                'location' => 'ImportService.php:applyRow',
+                'message' => 'applyRow_before_persist',
+                'data' => [
+                    'existing_id' => $existing->id,
+                    'replace' => $replace,
+                    'status_in_row_payload' => $__dbgStatusInRow,
+                    'status_being_written' => $payload['status'] ?? null,
+                    'mfr_in_row' => $__dbgMfrInRow,
+                    'model_in_row' => $__dbgModelInRow,
+                    'payload_keys' => array_keys($payload),
+                    'null_or_empty_payload_keys' => $__dbgNullPayloadKeys,
+                    'before' => $__dbgBefore,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ];
+            @file_put_contents(base_path('debug-ee61fc.log'), json_encode($__dbgApplyLog)."\n", FILE_APPEND);
+        }
+        // #endregion
+
         if ($existing && $replace) {
             $existing = $this->replaceAsset($existing, $payload);
         } elseif ($existing) {
@@ -1062,6 +1141,50 @@ class ImportService
         } else {
             $existing = Asset::create($payload);
         }
+
+        // #region agent log
+        if ($__dbgBefore !== null) {
+            $existing->refresh();
+            $__dbgAfter = [
+                'name' => $existing->name,
+                'status' => $existing->status?->value ?? $existing->status,
+                'notes' => $existing->notes,
+                'description' => $existing->description,
+                'serial_number' => $existing->serial_number,
+                'fmi_ast' => $existing->fmi_ast,
+                'tp_barcode' => $existing->tp_barcode,
+                'manufacturer_id' => $existing->manufacturer_id,
+                'manufacturer_model_id' => $existing->manufacturer_model_id,
+                'location_id' => $existing->location_id,
+                'supplier' => $existing->supplier,
+                'quantity' => $existing->quantity,
+            ];
+            $__dbgCleared = [];
+            foreach ($__dbgBefore as $__dbgField => $__dbgOld) {
+                $__dbgNew = $__dbgAfter[$__dbgField] ?? null;
+                $__dbgHadValue = $__dbgOld !== null && $__dbgOld !== '';
+                $__dbgNowEmpty = $__dbgNew === null || $__dbgNew === '';
+                if ($__dbgHadValue && $__dbgNowEmpty) {
+                    $__dbgCleared[] = $__dbgField;
+                }
+            }
+            $__dbgAfterLog = [
+                'sessionId' => 'ee61fc',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'H2-H5',
+                'location' => 'ImportService.php:applyRow',
+                'message' => 'applyRow_after_persist',
+                'data' => [
+                    'existing_id' => $existing->id,
+                    'replace' => $replace,
+                    'cleared_fields' => $__dbgCleared,
+                    'after' => $__dbgAfter,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ];
+            @file_put_contents(base_path('debug-ee61fc.log'), json_encode($__dbgAfterLog)."\n", FILE_APPEND);
+        }
+        // #endregion
 
         $this->syncImportedCustomFields($existing, $itemType, $row['custom_fields'] ?? [], $replace);
         $this->syncMappedCustomFields($existing, $itemType, $row['mapped_custom_fields'] ?? [], $replace);
@@ -1378,10 +1501,73 @@ class ImportService
     }
 
     /**
+     * Prefetch existing assets for all duplicate keys in one query per key.
+     *
+     * @param  list<array{payload: array<string, mixed>}>  $drafts
+     * @return array<string, array<string, Asset>> key => (string)value => Asset
+     */
+    protected function buildExistingMatchIndexes(array $drafts): array
+    {
+        /** @var array<string, array<string, true>> $valuesByKey */
+        $valuesByKey = [];
+
+        foreach ($drafts as $draft) {
+            $payload = $draft['payload'];
+            foreach (self::DUPLICATE_KEYS as $key) {
+                $value = $payload[$key] ?? null;
+                if ($value === null || $value === '') {
+                    continue;
+                }
+
+                $valuesByKey[$key][(string) $value] = true;
+            }
+        }
+
+        /** @var array<string, array<string, Asset>> $indexes */
+        $indexes = [];
+        $columns = array_values(array_unique(array_merge(
+            ['id', 'name'],
+            self::DUPLICATE_KEYS,
+        )));
+
+        foreach ($valuesByKey as $key => $valueSet) {
+            $values = array_keys($valueSet);
+            if ($values === []) {
+                continue;
+            }
+
+            $found = Asset::query()
+                ->select($columns)
+                ->whereIn($key, $values)
+                ->orderBy('id')
+                ->get();
+
+            $map = [];
+            foreach ($found as $asset) {
+                $lookup = $asset->getAttribute($key);
+                if ($lookup === null || $lookup === '') {
+                    continue;
+                }
+
+                $lookupKey = (string) $lookup;
+                // Match query()->where()->first() behaviour: keep the earliest id.
+                if (! isset($map[$lookupKey])) {
+                    $map[$lookupKey] = $asset;
+                }
+            }
+
+            $indexes[$key] = $map;
+        }
+
+        return $indexes;
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
+     * @param  array<string, array<string, Asset>>|null  $indexes
      * @return array{asset: ?Asset, matched_on: list<string>}
      */
-    protected function findExistingMatch(array $payload): array
+    protected function findExistingMatch(array $payload, ?array $indexes = null): array
     {
         $matchedOn = [];
         $asset = null;
@@ -1392,7 +1578,12 @@ class ImportService
                 continue;
             }
 
-            $found = Asset::query()->where($key, $value)->first();
+            if ($indexes !== null) {
+                $found = $indexes[$key][(string) $value] ?? null;
+            } else {
+                $found = Asset::query()->where($key, $value)->orderBy('id')->first();
+            }
+
             if ($found) {
                 if ($asset && $asset->id !== $found->id) {
                     // Prefer the first match; still record the key that hit.

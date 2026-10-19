@@ -76,14 +76,31 @@ class ImportController extends Controller
         $__dbgLog = function (string $hypothesisId, string $message, array $data = []) use ($__dbgPrepareT0): void {
             $payload = [
                 'sessionId' => 'd766ca',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
                 'hypothesisId' => $hypothesisId,
                 'location' => 'ImportController.php:prepare',
                 'message' => $message,
                 'data' => array_merge(['elapsed_ms' => (int) round((microtime(true) - $__dbgPrepareT0) * 1000)], $data),
                 'timestamp' => (int) round(microtime(true) * 1000),
             ];
-            @file_put_contents(base_path('debug-d766ca.log'), json_encode($payload)."\n", FILE_APPEND);
+            $line = json_encode($payload)."\n";
+            @file_put_contents(base_path('debug-d766ca.log'), $line, FILE_APPEND);
+            @file_put_contents(storage_path('logs/debug-d766ca.log'), $line, FILE_APPEND);
+            try {
+                $ch = curl_init('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812');
+                if ($ch !== false) {
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Debug-Session-Id: d766ca'],
+                        CURLOPT_POSTFIELDS => json_encode($payload),
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT_MS => 100,
+                    ]);
+                    curl_exec($ch);
+                    curl_close($ch);
+                }
+            } catch (\Throwable) {
+            }
         };
         $__dbgLog('A', 'prepare_entered');
         // #endregion
