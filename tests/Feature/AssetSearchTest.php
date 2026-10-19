@@ -236,6 +236,91 @@ class AssetSearchTest extends TestCase
         );
     }
 
+    public function test_mac_search_is_case_and_separator_agnostic(): void
+    {
+        $user = $this->scanner();
+        $itemType = $this->itemType();
+
+        Asset::create([
+            'name' => 'MAC Colon Asset',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'mac_address' => 'AA:BB:CC:DD:EE:FF',
+        ]);
+
+        Asset::create([
+            'name' => 'Unrelated Asset',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'mac_address' => '11:22:33:44:55:66',
+        ]);
+
+        foreach (['aabbccddeeff', 'AA-BB-CC-DD-EE-FF', 'aa:bb:cc:dd:ee:ff', 'AABBCCDDEEFF'] as $term) {
+            $found = Asset::query()->search($term)->pluck('name')->all();
+            $this->assertSame(['MAC Colon Asset'], $found, "Failed for MAC search term [{$term}]");
+        }
+
+        $response = $this->actingAs($user)->get(route('assets.index', ['q' => 'aabbccddeeff']));
+        $response->assertOk();
+        $response->assertSee('MAC Colon Asset');
+        $response->assertSee('AA:BB:CC:DD:EE:FF', false);
+        $response->assertDontSee('Unrelated Asset');
+    }
+
+    public function test_mac_column_filter_matches_without_separators(): void
+    {
+        $user = $this->scanner();
+        $itemType = $this->itemType();
+
+        $preferences = $user->preferences ?? [];
+        $preferences['asset_table_columns'] = ['name', 'mac_address', 'status'];
+        $user->preferences = $preferences;
+        $user->save();
+
+        Asset::create([
+            'name' => 'Filtered MAC Asset',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'mac_address' => '00:11:22:33:44:55',
+        ]);
+
+        Asset::create([
+            'name' => 'Other MAC Asset',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'mac_address' => 'AA:BB:CC:DD:EE:FF',
+        ]);
+
+        $response = $this->actingAs($user->fresh())->get(route('assets.index', [
+            'mac_address' => '001122334455',
+        ]));
+
+        $response->assertOk();
+        $this->assertSame(
+            ['Filtered MAC Asset'],
+            $response->viewData('assets')->pluck('name')->all()
+        );
+    }
+
+    public function test_find_by_identifier_matches_mac_format_variants(): void
+    {
+        $itemType = $this->itemType();
+
+        Asset::create([
+            'name' => 'Scan MAC Asset',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'mac_address' => 'AA:BB:CC:DD:EE:11',
+        ]);
+
+        foreach (['aabbccddee11', 'aa-bb-cc-dd-ee-11', 'AA:BB:CC:DD:EE:11'] as $code) {
+            $asset = Asset::query()->findByIdentifier($code)->first();
+            $this->assertNotNull($asset, "Failed findByIdentifier for [{$code}]");
+            $this->assertSame('Scan MAC Asset', $asset->name);
+            $this->assertSame('AA:BB:CC:DD:EE:11', $asset->mac_address);
+        }
+    }
+
     private function itemType(): ItemType
     {
         return ItemType::create([

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Asset;
 use App\Models\AuditLog;
+use App\Support\MacAddress;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -269,9 +270,7 @@ class AssetDuplicateService
         }
 
         if ($key === 'mac_address') {
-            $compact = Str::lower(preg_replace('/[^a-fA-F0-9]/', '', $trimmed) ?? '');
-
-            return $compact === '' ? null : $compact;
+            return MacAddress::compact($trimmed);
         }
 
         return Str::lower($trimmed);

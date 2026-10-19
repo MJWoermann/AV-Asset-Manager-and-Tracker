@@ -96,6 +96,12 @@ class AssetSearch
     public static function orWhereTokenMatches(Builder $group, string $like, string $token = ''): void
     {
         foreach (self::COLUMNS as $column) {
+            if ($column === 'mac_address') {
+                MacAddress::orWhereMatches($group, $token, $column);
+
+                continue;
+            }
+
             $group->orWhereLike($column, $like);
         }
 
@@ -108,7 +114,17 @@ class AssetSearch
 
         $group->orWhereHas(
             'customFieldValues',
-            fn (Builder $cf) => $cf->whereLike('value', $like)
+            function (Builder $cf) use ($like, $token): void {
+                $cf->where(function (Builder $inner) use ($like, $token): void {
+                    $inner->whereLike('value', $like);
+
+                    $compact = MacAddress::compact($token);
+                    if ($compact !== null && strlen($compact) >= 6) {
+                        $compactLike = '%'.self::escapeLike($compact).'%';
+                        $inner->orWhereRaw(MacAddress::sqlCompactExpression('value').' LIKE ?', [$compactLike]);
+                    }
+                });
+            }
         );
 
         self::orWhereIdMatches($group, $token);
@@ -189,7 +205,16 @@ class AssetSearch
             $bindings[] = (int) $idTerm;
         }
 
+        $macCompact = MacAddress::compact($trimmed);
+
         foreach (self::IDENTIFIERS as $column) {
+            if ($column === 'mac_address' && $macCompact !== null) {
+                $exactIdentifier[] = MacAddress::sqlCompactExpression($column).' = ?';
+                $bindings[] = $macCompact;
+
+                continue;
+            }
+
             $exactIdentifier[] = "LOWER({$column}) = ?";
             $bindings[] = $lower;
         }
@@ -202,6 +227,13 @@ class AssetSearch
         }
 
         foreach (self::IDENTIFIERS as $column) {
+            if ($column === 'mac_address' && $macCompact !== null) {
+                $prefixIdentifier[] = MacAddress::sqlCompactExpression($column).' LIKE ?';
+                $bindings[] = self::escapeLike($macCompact).'%';
+
+                continue;
+            }
+
             $prefixIdentifier[] = "{$column} LIKE ?";
             $bindings[] = $prefix;
         }
@@ -209,6 +241,13 @@ class AssetSearch
         $bindings[] = $prefix;
 
         foreach (self::IDENTIFIERS as $column) {
+            if ($column === 'mac_address' && $macCompact !== null) {
+                $containsIdentifier[] = MacAddress::sqlCompactExpression($column).' LIKE ?';
+                $bindings[] = '%'.self::escapeLike($macCompact).'%';
+
+                continue;
+            }
+
             $containsIdentifier[] = "{$column} LIKE ?";
             $bindings[] = $contains;
         }
@@ -296,7 +335,9 @@ class AssetSearch
                 continue;
             }
 
-            $score = self::scoreValue($value, $full, $tokens);
+            $score = $column === 'mac_address'
+                ? self::scoreMacValue($value, $full, $tokens)
+                : self::scoreValue($value, $full, $tokens);
 
             if ($score === null) {
                 continue;
@@ -406,6 +447,37 @@ class AssetSearch
         }
 
         return null;
+    }
+
+    /**
+     * Score a MAC field with separator-agnostic, case-insensitive comparison.
+     *
+     * @param  list<string>  $tokens
+     */
+    public static function scoreMacValue(string $value, string $fullTerm, array $tokens): ?int
+    {
+        if (MacAddress::equals($value, $fullTerm)) {
+            return 0;
+        }
+
+        $compactValue = MacAddress::compact($value) ?? '';
+        $compactFull = MacAddress::compact($fullTerm) ?? '';
+
+        if ($compactFull !== '' && str_starts_with($compactValue, $compactFull)) {
+            return 2;
+        }
+
+        if ($compactFull !== '' && str_contains($compactValue, $compactFull)) {
+            return 4;
+        }
+
+        foreach ($tokens as $token) {
+            if (MacAddress::contains($value, $token)) {
+                return 5;
+            }
+        }
+
+        return self::scoreValue($value, $fullTerm, $tokens);
     }
 
     /**

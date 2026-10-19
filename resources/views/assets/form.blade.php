@@ -48,6 +48,12 @@
         >
             @csrf
             @if($asset->exists) @method('PUT') @endif
+            @php
+                $safeReturnTo = \App\Support\SafeReturnUrl::sanitize(old('return_to', $returnTo ?? null));
+            @endphp
+            @if(! $asset->exists && filled($safeReturnTo))
+                <input type="hidden" name="return_to" value="{{ $safeReturnTo }}">
+            @endif
             @if(! $asset->exists && ! empty($unknownScanId ?? null))
                 <input type="hidden" name="unknown_scan_id" value="{{ $unknownScanId }}">
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver border border-brand-silver dark:border-brand-charcoal px-3 py-2">
@@ -441,7 +447,12 @@
             @endfeature
 
             <div class="flex justify-end gap-2">
-                <a href="{{ $asset->exists ? route('assets.show', $asset) : route('assets.index') }}" class="px-4 py-2 text-sm border border-brand-charcoal dark:border-white">Cancel</a>
+                @php
+                    $cancelUrl = $asset->exists
+                        ? route('assets.show', $asset)
+                        : (filled($safeReturnTo ?? null) ? $safeReturnTo : route('assets.index'));
+                @endphp
+                <a href="{{ $cancelUrl }}" class="px-4 py-2 text-sm border border-brand-charcoal dark:border-white">Cancel</a>
                 <x-primary-button>Save</x-primary-button>
             </div>
         </form>

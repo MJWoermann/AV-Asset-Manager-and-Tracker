@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Models\Concerns\BelongsToDepartment;
 use App\Services\FileAttachmentService;
 use App\Support\AssetSearch;
+use App\Support\MacAddress;
 use Database\Factories\AssetFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -247,8 +248,8 @@ class Asset extends Model
             $q->where('fmi_ast', $code)
                 ->orWhere('tp_barcode', $code)
                 ->orWhere('rig_tag', $code)
-                ->orWhere('serial_number', $code)
-                ->orWhere('mac_address', $code);
+                ->orWhere('serial_number', $code);
+            MacAddress::orWhereEquals($q, $code, 'mac_address');
         });
     }
 }

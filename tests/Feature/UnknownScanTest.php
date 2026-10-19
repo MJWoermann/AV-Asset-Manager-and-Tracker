@@ -161,6 +161,109 @@ class UnknownScanTest extends TestCase
         $this->assertNotNull($unknown->resolved_at);
     }
 
+    public function test_creating_asset_with_return_to_scan_redirects_there(): void
+    {
+        $user = $this->scanner();
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'RETURN-SCAN-1',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $returnTo = route('scan.index', absolute: false);
+
+        $response = $this->actingAs($user)->post(route('assets.store'), [
+            'name' => 'Returned Fixture',
+            'item_type_id' => $this->itemType->id,
+            'status' => AssetStatus::Available->value,
+            'tp_barcode' => 'RETURN-SCAN-1',
+            'unknown_scan_id' => $unknown->id,
+            'return_to' => $returnTo,
+        ]);
+
+        $asset = Asset::query()->where('tp_barcode', 'RETURN-SCAN-1')->first();
+        $this->assertNotNull($asset);
+        $response->assertRedirect($returnTo);
+        $response->assertSessionHas('status', 'Asset created.');
+        $this->assertTrue($unknown->fresh()->isResolved());
+        $this->assertSame($asset->id, $unknown->fresh()->resolved_asset_id);
+    }
+
+    public function test_creating_asset_with_return_to_unknown_scans_report_redirects_there(): void
+    {
+        $user = $this->scanner();
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'RETURN-REPORT-1',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+
+        $returnTo = route('reports.unknown-scans', ['status' => 'open', 'q' => 'RETURN'], absolute: false);
+
+        $response = $this->actingAs($user)->post(route('assets.store'), [
+            'name' => 'Report Return Fixture',
+            'item_type_id' => $this->itemType->id,
+            'status' => AssetStatus::Available->value,
+            'tp_barcode' => 'RETURN-REPORT-1',
+            'unknown_scan_id' => $unknown->id,
+            'return_to' => $returnTo,
+        ]);
+
+        $this->assertNotNull(Asset::query()->where('tp_barcode', 'RETURN-REPORT-1')->first());
+        $response->assertRedirect($returnTo);
+        $this->assertTrue($unknown->fresh()->isResolved());
+    }
+
+    public function test_creating_asset_ignores_malicious_return_to_and_falls_back_to_show(): void
+    {
+        $user = $this->scanner();
+
+        foreach (['https://evil.example/phish', '//evil.example/phish'] as $index => $malicious) {
+            $code = 'RETURN-EVIL-'.$index;
+            $unknown = UnknownScan::create([
+                'scanned_code' => $code,
+                'user_id' => $user->id,
+                'quantity' => 1,
+            ]);
+
+            $response = $this->actingAs($user)->post(route('assets.store'), [
+                'name' => 'Safe Fixture '.$index,
+                'item_type_id' => $this->itemType->id,
+                'status' => AssetStatus::Available->value,
+                'tp_barcode' => $code,
+                'unknown_scan_id' => $unknown->id,
+                'return_to' => $malicious,
+            ]);
+
+            $asset = Asset::query()->where('tp_barcode', $code)->first();
+            $this->assertNotNull($asset);
+            $response->assertRedirect(route('assets.show', $asset));
+            $this->assertTrue($unknown->fresh()->isResolved());
+        }
+    }
+
+    public function test_create_form_includes_return_to_from_scan_and_cancel_uses_it(): void
+    {
+        $user = $this->scanner();
+        $unknown = UnknownScan::create([
+            'scanned_code' => 'FORM-RETURN-1',
+            'user_id' => $user->id,
+            'quantity' => 1,
+        ]);
+        $returnTo = route('scan.index', absolute: false);
+
+        $this->actingAs($user)
+            ->get(route('assets.create', [
+                'tp_barcode' => $unknown->scanned_code,
+                'unknown_scan_id' => $unknown->id,
+                'return_to' => $returnTo,
+            ]))
+            ->assertOk()
+            ->assertSee('name="return_to"', false)
+            ->assertSee('value="'.$returnTo.'"', false)
+            ->assertSee('href="'.$returnTo.'"', false);
+    }
+
     public function test_unknown_scans_report_lists_open_entries_and_exports(): void
     {
         $user = $this->scanner();
@@ -212,6 +315,10 @@ class UnknownScanTest extends TestCase
         $response->assertSee('SESSION-UNKNOWN-1');
         $response->assertSee('Unknown scan report');
         $response->assertSee('Create asset', false);
+        $response->assertSee('Link item', false);
+        $response->assertSee('Link to existing asset');
+        $response->assertSee('openLink', false);
+        $response->assertSee('Write scanned code to');
     }
 
     public function test_admin_can_clear_all_unknown_scans(): void

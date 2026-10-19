@@ -104,11 +104,23 @@ class UnknownScanController extends Controller
         );
 
         $unknownScan = $unknownScan->fresh(['resolvedAsset']);
+        $asset->loadMissing('itemType');
 
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'Unknown scan linked to existing asset.',
                 'unknown_scan' => $scanService->unknownScanSummary($unknownScan),
+                'asset' => [
+                    'id' => $asset->id,
+                    'name' => $asset->name,
+                    'tp_barcode' => $asset->tp_barcode,
+                    'fmi_ast' => $asset->fmi_ast,
+                    'rig_tag' => $asset->rig_tag,
+                    'serial_number' => $asset->serial_number,
+                    'item_type' => $asset->itemType?->name,
+                    'url' => route('assets.show', $asset),
+                ],
+                'added_to_event_list' => $request->boolean('add_to_event_list') && (bool) $unknownScan->event_list_id,
             ]);
         }
 

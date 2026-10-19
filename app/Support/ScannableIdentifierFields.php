@@ -98,6 +98,12 @@ final class ScannableIdentifierFields
         $like = '%'.$term.'%';
 
         foreach (self::FIELDS as $field) {
+            if ($field === 'mac_address') {
+                MacAddress::orWhereMatches($query, $term, $field);
+
+                continue;
+            }
+
             $query->orWhere($field, 'like', $like);
         }
     }

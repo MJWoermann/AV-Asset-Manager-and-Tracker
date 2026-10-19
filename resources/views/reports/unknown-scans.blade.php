@@ -186,6 +186,7 @@
                                                 'location_id' => $scan->location_id,
                                                 'unknown_scan_id' => $scan->id,
                                                 'status' => $scan->asset_status?->value,
+                                                'return_to' => request()->getRequestUri(),
                                             ]) }}"
                                             class="text-brand underline text-xs"
                                         >Add asset</a>

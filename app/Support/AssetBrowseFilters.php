@@ -169,6 +169,14 @@ class AssetBrowseFilters
                 continue;
             }
 
+            if ($column === 'mac_address') {
+                TextSearch::constrain($query, $value, function (Builder $group, string $like, string $token): void {
+                    MacAddress::orWhereMatches($group, $token, 'mac_address');
+                });
+
+                continue;
+            }
+
             TextSearch::constrainColumn($query, $value, $column);
         }
 

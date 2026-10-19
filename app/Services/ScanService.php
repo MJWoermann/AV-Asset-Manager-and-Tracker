@@ -247,12 +247,15 @@ class ScanService
             'quantity' => $unknown->quantity,
             'note' => $unknown->note,
             'location' => $unknown->location?->name,
+            'has_event_list' => (bool) $unknown->event_list_id,
+            'has_location' => (bool) $unknown->location_id,
             'resolved' => $unknown->isResolved(),
             'create_url' => route('assets.create', [
                 'tp_barcode' => $unknown->scanned_code,
                 'location_id' => $unknown->location_id,
                 'unknown_scan_id' => $unknown->id,
                 'status' => $unknown->asset_status?->value,
+                'return_to' => route('scan.index', absolute: false),
             ]),
         ];
     }

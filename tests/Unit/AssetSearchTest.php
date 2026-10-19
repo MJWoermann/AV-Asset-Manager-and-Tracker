@@ -35,6 +35,15 @@ class AssetSearchTest extends TestCase
         $this->assertSame(4, AssetSearch::scoreValue('xxabcxx', 'abc', $tokens));
     }
 
+    public function test_score_mac_value_ignores_separators_and_case(): void
+    {
+        $tokens = ['aabbccddeeff'];
+
+        $this->assertSame(0, AssetSearch::scoreMacValue('AA:BB:CC:DD:EE:FF', 'aabbccddeeff', $tokens));
+        $this->assertSame(0, AssetSearch::scoreMacValue('aa-bb-cc-dd-ee-ff', 'AA:BB:CC:DD:EE:FF', ['AA:BB:CC:DD:EE:FF']));
+        $this->assertSame(4, AssetSearch::scoreMacValue('AA:BB:CC:DD:EE:FF', 'bbcc', ['bbcc']));
+    }
+
     public function test_matches_text_requires_all_tokens(): void
     {
         $this->assertTrue(AssetSearch::matchesText('Yamaha Mixer Desk', 'Yamaha Mixer'));

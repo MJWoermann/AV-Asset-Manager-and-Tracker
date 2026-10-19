@@ -12,6 +12,7 @@ use App\Models\OutboundEmailThread;
 use App\Models\User;
 use App\Services\Mail\MailTransportManager;
 use App\Support\EmailIntegrationSettings;
+use App\Support\MacAddress;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -335,7 +336,13 @@ class InboundEmailService
 
         foreach (['fmi_ast', 'tp_barcode', 'rig_tag', 'serial_number', 'mac_address'] as $column) {
             if (preg_match('/\b('.preg_quote($column, '/').'|'.str_replace('_', ' ?', $column).')\s*[:=]\s*([A-Za-z0-9:._-]+)/i', $haystack, $matches)) {
-                $asset = Asset::query()->where($column, $matches[2])->first();
+                if ($column === 'mac_address') {
+                    $query = Asset::query();
+                    MacAddress::whereEquals($query, $matches[2], 'mac_address');
+                    $asset = $query->first();
+                } else {
+                    $asset = Asset::query()->where($column, $matches[2])->first();
+                }
                 if ($asset) {
                     return $asset;
                 }

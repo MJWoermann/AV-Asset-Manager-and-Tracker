@@ -17,6 +17,7 @@ use App\Models\ItemType;
 use App\Models\ItemTypeAlias;
 use App\Models\Location;
 use App\Models\LocationAlias;
+use App\Support\MacAddress;
 use App\Support\PerformanceLimits;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
@@ -1553,7 +1554,32 @@ class ImportService
             foreach (array_chunk($values, 500) as $valueChunk) {
                 $found = Asset::query()
                     ->select($columns)
-                    ->whereIn($key, $valueChunk)
+                    ->where(function ($query) use ($key, $valueChunk): void {
+                        $query->whereIn($key, $valueChunk);
+
+                        if ($key !== 'mac_address') {
+                            return;
+                        }
+
+                        $compacts = [];
+                        foreach ($valueChunk as $raw) {
+                            $compact = MacAddress::compact((string) $raw);
+                            if ($compact !== null) {
+                                $compacts[$compact] = true;
+                            }
+                        }
+
+                        if ($compacts === []) {
+                            return;
+                        }
+
+                        $compactList = array_keys($compacts);
+                        $placeholders = implode(',', array_fill(0, count($compactList), '?'));
+                        $query->orWhereRaw(
+                            MacAddress::sqlCompactExpression('mac_address').' IN ('.$placeholders.')',
+                            $compactList
+                        );
+                    })
                     ->orderBy('id')
                     ->toBase()
                     ->get();
@@ -1564,10 +1590,32 @@ class ImportService
                         continue;
                     }
 
+                    $summary = $this->assetMatchSummaryFromRow($asset);
                     $lookupKey = (string) $lookup;
                     // Match query()->where()->first() behaviour: keep the earliest id.
                     if (! isset($map[$lookupKey])) {
-                        $map[$lookupKey] = $this->assetMatchSummaryFromRow($asset);
+                        $map[$lookupKey] = $summary;
+                    }
+
+                    if ($key === 'mac_address') {
+                        $storedCompact = MacAddress::compact($lookupKey);
+                        if ($storedCompact !== null && ! isset($map[$storedCompact])) {
+                            $map[$storedCompact] = $summary;
+                        }
+                    }
+                }
+
+                if ($key === 'mac_address') {
+                    foreach ($valueChunk as $raw) {
+                        $rawKey = (string) $raw;
+                        if (isset($map[$rawKey])) {
+                            continue;
+                        }
+
+                        $compact = MacAddress::compact($rawKey);
+                        if ($compact !== null && isset($map[$compact])) {
+                            $map[$rawKey] = $map[$compact];
+                        }
                     }
                 }
 
@@ -1710,12 +1758,18 @@ class ImportService
 
             if ($indexes !== null) {
                 $found = $indexes[$key][(string) $value] ?? null;
+                if ($found === null && $key === 'mac_address') {
+                    $compact = MacAddress::compact((string) $value);
+                    $found = $compact !== null ? ($indexes[$key][$compact] ?? null) : null;
+                }
             } else {
-                $asset = Asset::query()
-                    ->select($columns)
-                    ->where($key, $value)
-                    ->orderBy('id')
-                    ->first();
+                $assetQuery = Asset::query()->select($columns)->orderBy('id');
+                if ($key === 'mac_address') {
+                    MacAddress::whereEquals($assetQuery, (string) $value, 'mac_address');
+                } else {
+                    $assetQuery->where($key, $value);
+                }
+                $asset = $assetQuery->first();
                 $found = $asset ? $this->assetMatchSummaryFromRow($asset) : null;
 
                 if ($found === null) {

@@ -39,6 +39,7 @@ use App\Support\AssetSearch;
 use App\Support\AssetTableColumns;
 use App\Support\EmailIntegrationSettings;
 use App\Support\PageSize;
+use App\Support\SafeReturnUrl;
 use App\Support\StockTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -207,6 +208,7 @@ class AssetController extends Controller
 
         return view('assets.form', $this->assetFormData($asset, [
             'unknownScanId' => $request->integer('unknown_scan_id') ?: null,
+            'returnTo' => SafeReturnUrl::sanitize($request->input('return_to')),
         ]));
     }
 
@@ -219,9 +221,11 @@ class AssetController extends Controller
         $data = $this->validated($request);
         $extra = $request->validate([
             'unknown_scan_id' => ['nullable', 'integer', 'exists:unknown_scans,id'],
+            'return_to' => ['nullable', 'string', 'max:'.SafeReturnUrl::MAX_LENGTH],
             'notify_mac_onboarding' => ['sometimes', 'boolean'],
         ]);
         $unknownScanId = $extra['unknown_scan_id'] ?? null;
+        $returnTo = SafeReturnUrl::sanitize($extra['return_to'] ?? null);
         $notifyMac = $request->boolean('notify_mac_onboarding');
 
         $asset = Asset::create($data);
@@ -257,7 +261,9 @@ class AssetController extends Controller
             }
         }
 
-        $redirect = redirect()->route('assets.show', $asset)->with('status', $status);
+        $redirect = $returnTo !== null
+            ? redirect()->to($returnTo)->with('status', $status)
+            : redirect()->route('assets.show', $asset)->with('status', $status);
 
         return $warning ? $redirect->with('warning', $warning) : $redirect;
     }

@@ -29,11 +29,12 @@ Dense browse surfaces should be filterable and, where users spend real time, cus
 - Prefer **per-user preferences** for view layout (columns, widget order/visibility) over one global layout for everyone.
 - Data tables that users browse often should support **search and/or per-column filters**. When a column is hidden, clear that column’s filter (do not keep filtering on an invisible field).
 - List/dropdown filters use **searchable** option lists. Choosing (or clearing) a list value **applies immediately** — do not require a separate Apply/Filter click for dropdowns. Keep an explicit Search submit for free-text fields. Provide a **Clear all filters** control whenever any filter is active.
+- On **narrow viewports** (`max-width: 639px`), opening a searchable dropdown scrolls the **field top to the top of the viewport** so the option list stays visible (above the on-screen keyboard). Focus the search input with `preventScroll` so the browser does not undo that pin.
 - **Site-wide** export/report column defaults may be admin-owned; day-to-day browse layout stays per-user.
 - When adding a new dense list page, plan **filters + customize affordances up front** — do not ship a bare unfilterable grid as the long-term UX.
 - Do **not** require column pickers on every admin CRUD index; apply them where browse density and frequency justify them.
 
-*In this project:* `AssetTableColumns`, `AssetBrowseFilters`, `asset-column-picker` / `asset-column-filters` components; `users.preferences.asset_table_columns` and `dashboard_modules`. Admin export columns are org-owned under `/admin`.
+*In this project:* `AssetTableColumns`, `AssetBrowseFilters`, `asset-column-picker` / `asset-column-filters` components; `users.preferences.asset_table_columns` and `dashboard_modules`. Admin export columns are org-owned under `/admin`. Mobile dropdown pinning: `pinDropdownFieldToViewportTop` / `focusDropdownSearch` in `resources/js/app.js` (searchable select, multi-select, import mapping, peer-asset picker).
 
 ---
 

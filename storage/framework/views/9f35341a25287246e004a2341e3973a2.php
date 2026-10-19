@@ -44,9 +44,6 @@
                 this.selectedLabel = '';
                 this.selectedAsset = null;
                 this.searching = false;
-                // #region agent log
-                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'307f2d'},body:JSON.stringify({sessionId:'307f2d',runId:'post-fix',hypothesisId:'A',location:'unknown-scans.blade.php:openLink',message:'Link modal opened',data:{scanId:id,scannedCode:code,hasEventList:Boolean(hasEventList),hasLocation:Boolean(hasLocation),uiOffersFieldSelect:true},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 this.$dispatch('open-modal', 'link-unknown-scan');
                 this.$nextTick(() => this.$refs.linkSearch?.focus());
             },
@@ -335,6 +332,7 @@
                                                 'location_id' => $scan->location_id,
                                                 'unknown_scan_id' => $scan->id,
                                                 'status' => $scan->asset_status?->value,
+                                                'return_to' => request()->getRequestUri(),
                                             ])); ?>"
                                             class="text-brand underline text-xs"
                                         >Add asset</a>

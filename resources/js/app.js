@@ -549,6 +549,36 @@ function searchTokens(term) {
         .filter(Boolean);
 }
 
+/** Strip MAC separators and lowercase hex for format-agnostic matching. */
+function compactMac(value) {
+    const compact = String(value ?? '').toLowerCase().replace(/[^a-f0-9]/g, '');
+
+    return compact || '';
+}
+
+/**
+ * Case-insensitive token match that also treats MAC :, -, ., and spaces as equivalent.
+ */
+function haystackMatchesToken(haystack, token) {
+    const value = String(haystack ?? '').toLowerCase();
+    const needle = String(token ?? '').toLowerCase();
+
+    if (!needle) {
+        return true;
+    }
+
+    if (value.includes(needle)) {
+        return true;
+    }
+
+    const compactNeedle = compactMac(needle);
+    if (compactNeedle.length < 2) {
+        return false;
+    }
+
+    return compactMac(value).includes(compactNeedle);
+}
+
 function escapeHtml(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -603,6 +633,50 @@ function matchScore(label, term) {
     }
 
     return 3;
+}
+
+/** Tailwind `sm` — searchable dropdowns pin to the viewport top below this width. */
+const COMPACT_VIEWPORT_MQ = '(max-width: 639px)';
+
+/**
+ * On mobile, scroll so the field top sits near the top of the viewport,
+ * leaving room for the open option list (and keyboard) below.
+ *
+ * @param {HTMLElement | null | undefined} el
+ */
+function pinDropdownFieldToViewportTop(el) {
+    if (!el || typeof window === 'undefined') {
+        return;
+    }
+    if (!window.matchMedia(COMPACT_VIEWPORT_MQ).matches) {
+        return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const padding = 8;
+    const delta = rect.top - padding;
+    if (Math.abs(delta) < 2) {
+        return;
+    }
+
+    window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+}
+
+/**
+ * Focus a dropdown search input without letting the browser undo mobile pinning.
+ *
+ * @param {HTMLElement | null | undefined} input
+ */
+function focusDropdownSearch(input) {
+    if (!input || typeof input.focus !== 'function') {
+        return;
+    }
+
+    try {
+        input.focus({ preventScroll: true });
+    } catch (_) {
+        input.focus();
+    }
 }
 
 Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
@@ -807,8 +881,10 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
         this.highlight = -1;
         this.bindPanelListeners();
         this.$nextTick(() => {
+            pinDropdownFieldToViewportTop(this.$refs.trigger || this.rootEl);
             this.updatePanelPosition();
-            this.$refs.search?.focus();
+            focusDropdownSearch(this.$refs.search);
+            requestAnimationFrame(() => this.updatePanelPosition());
         });
         if (this.searchUrl) {
             this.fetchRemote(this.query);
@@ -990,7 +1066,10 @@ Alpine.data('searchableMultiSelect', (options, selected = [], config = {}) => ({
     openList() {
         this.open = true;
         this.highlight = -1;
-        this.$nextTick(() => this.$refs.search?.focus());
+        this.$nextTick(() => {
+            pinDropdownFieldToViewportTop(this.$el);
+            focusDropdownSearch(this.$refs.search);
+        });
     },
 
     closeList() {
@@ -1006,7 +1085,7 @@ Alpine.data('searchableMultiSelect', (options, selected = [], config = {}) => ({
         this.values = [...this.values, option.value];
         this.query = '';
         this.highlight = -1;
-        this.$nextTick(() => this.$refs.search?.focus());
+        this.$nextTick(() => focusDropdownSearch(this.$refs.search));
     },
 
     remove(value) {
@@ -1144,9 +1223,7 @@ Alpine.data('comparisonSearch', (sections = []) => ({
             return true;
         }
 
-        const value = String(haystack ?? '').toLowerCase();
-
-        return tokens.every((token) => value.includes(token.toLowerCase()));
+        return tokens.every((token) => haystackMatchesToken(haystack, token));
     },
 
     visibleCount(section) {
@@ -1298,7 +1375,10 @@ Alpine.data('importMappingSelect', (column) => ({
     openList() {
         this.open = true;
         this.highlight = -1;
-        this.$nextTick(() => this.$refs.search?.focus());
+        this.$nextTick(() => {
+            pinDropdownFieldToViewportTop(this.$el);
+            focusDropdownSearch(this.$refs.search);
+        });
     },
 
     closeList() {
@@ -2211,7 +2291,10 @@ Alpine.data('assetConnectionsForm', (config = {}) => ({
     openPeerList() {
         this.peerOpen = true;
         this.peerHighlight = -1;
-        this.$nextTick(() => this.$refs.peerSearch?.focus());
+        this.$nextTick(() => {
+            pinDropdownFieldToViewportTop(this.$refs.peerSelect || this.$el);
+            focusDropdownSearch(this.$refs.peerSearch);
+        });
     },
 
     closePeerList() {
@@ -4318,10 +4401,9 @@ Alpine.data('shelfTagPrintSetup', (assets = [], preselectedIds = [], maxBatch = 
                 asset.status,
             ]
                 .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
+                .join(' ');
 
-            return tokens.every((token) => haystack.includes(token));
+            return tokens.every((token) => haystackMatchesToken(haystack, token));
         });
     },
 
@@ -4412,7 +4494,7 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
     },
 }));
 
-Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = [], clearRecent = false, scanNoiseEnabled = false, scanVibrateEnabled = false) => ({
+Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = [], noteUrlTemplate = '', initialUnknownScans = [], clearRecent = false, scanNoiseEnabled = false, scanVibrateEnabled = false, linkUrlTemplate = '', searchUrl = '') => ({
     scanning: false,
     code: '',
     quantity: 1,
@@ -4426,6 +4508,8 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     eventItems: [],
     eventListId: eventListId,
     noteUrlTemplate,
+    linkUrlTemplate,
+    searchUrl,
     serverUnknowns: [],
     lastCameraCode: '',
     lastCameraAt: 0,
@@ -4438,6 +4522,21 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
     _idleTimer: null,
     _onVisibilityChange: null,
     _onWedgeKeydown: null,
+    linkEntry: null,
+    linkScannedCode: '',
+    linkHasEventList: false,
+    linkHasLocation: false,
+    linkIdentifierField: '',
+    linkAddToEventList: false,
+    linkQuery: '',
+    linkResults: [],
+    linkSelectedId: null,
+    linkSelectedLabel: '',
+    linkSelectedAsset: null,
+    linkSearching: false,
+    linkSearchTimer: null,
+    linkSaving: false,
+    linkError: '',
 
     get cameraNeedsSecureOrigin() {
         return cameraBlockedByInsecureOrigin();
@@ -4760,10 +4859,159 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         return String(this.noteUrlTemplate || '').replace('__ID__', String(id));
     },
 
+    linkUrl(id) {
+        return String(this.linkUrlTemplate || '').replace('__ID__', String(id));
+    },
+
     toggleNoteEditor(entry) {
         entry.editingNote = !entry.editingNote;
         if (entry.editingNote) {
             entry.noteDraft = entry.unknown_scan?.note || '';
+        }
+    },
+
+    openLink(entry) {
+        const scan = entry?.unknown_scan;
+        if (!scan?.id || scan.resolved) {
+            return;
+        }
+
+        this.linkEntry = entry;
+        this.linkScannedCode = scan.scanned_code || '';
+        this.linkHasEventList = Boolean(scan.has_event_list);
+        this.linkHasLocation = Boolean(scan.has_location);
+        this.linkIdentifierField = '';
+        this.linkAddToEventList = Boolean(scan.has_event_list);
+        this.linkQuery = '';
+        this.linkResults = [];
+        this.linkSelectedId = null;
+        this.linkSelectedLabel = '';
+        this.linkSelectedAsset = null;
+        this.linkSearching = false;
+        this.linkSaving = false;
+        this.linkError = '';
+        this.$dispatch('open-modal', 'link-unknown-scan');
+        this.$nextTick(() => document.getElementById('scan-link-asset-search')?.focus());
+    },
+
+    scheduleLinkSearch() {
+        clearTimeout(this.linkSearchTimer);
+        this.linkSearchTimer = setTimeout(() => this.searchLinkAssets(), 250);
+    },
+
+    async searchLinkAssets() {
+        const term = String(this.linkQuery || '').trim();
+        if (term.length < 1 || !this.searchUrl) {
+            this.linkResults = [];
+            return;
+        }
+
+        this.linkSearching = true;
+        try {
+            const response = await fetch(`${this.searchUrl}?q=${encodeURIComponent(term)}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            const json = await response.json();
+            this.linkResults = json.data || [];
+        } catch (_) {
+            this.linkResults = [];
+        } finally {
+            this.linkSearching = false;
+        }
+    },
+
+    pickLinkAsset(asset) {
+        this.linkSelectedId = asset.id;
+        this.linkSelectedLabel = asset.label || asset.name;
+        this.linkSelectedAsset = asset;
+        this.linkQuery = asset.label || asset.name;
+        this.linkResults = [];
+        this.linkError = '';
+    },
+
+    linkSelectedFieldCurrentValue() {
+        if (!this.linkIdentifierField || !this.linkSelectedAsset) {
+            return null;
+        }
+        const value = this.linkSelectedAsset[this.linkIdentifierField];
+        return value == null || value === '' ? null : String(value);
+    },
+
+    async submitLink() {
+        const entry = this.linkEntry;
+        const scanId = entry?.unknown_scan?.id;
+        if (!scanId || !this.linkSelectedId || this.linkSaving) {
+            return;
+        }
+
+        this.linkSaving = true;
+        this.linkError = '';
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        try {
+            const res = await fetch(this.linkUrl(scanId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    asset_id: this.linkSelectedId,
+                    add_to_event_list: this.linkAddToEventList,
+                    identifier_field: this.linkIdentifierField || null,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                this.linkError =
+                    data.message ||
+                    Object.values(data.errors || {})
+                        .flat()
+                        .join(' ') ||
+                    'Could not link asset';
+                return;
+            }
+
+            const asset = data.asset || this.linkSelectedAsset || {};
+            if (asset.id && !asset.url) {
+                asset.url = `/assets/${asset.id}`;
+            }
+
+            entry.unknown = false;
+            entry.asset = asset;
+            entry.inventory_status = 'unknown';
+            entry.unknown_scan = {
+                ...(entry.unknown_scan || {}),
+                ...(data.unknown_scan || {}),
+                resolved: true,
+            };
+
+            if (data.added_to_event_list && asset.id) {
+                const alreadyOnList = this.eventItems.some((item) => item.asset?.id === asset.id);
+                if (!alreadyOnList) {
+                    this.eventItems.unshift(
+                        this.normalizeEventItem({
+                            id: `linked-${asset.id}-${Date.now()}`,
+                            quantity: entry.quantity || 1,
+                            asset,
+                        })
+                    );
+                }
+            }
+
+            this.message = data.message || 'Unknown scan linked to existing asset.';
+            this.error = '';
+            this.persistRecent();
+            this.$dispatch('close-modal', 'link-unknown-scan');
+            this.$nextTick(() => this.focusInput());
+        } catch (e) {
+            this.linkError = 'Could not link asset: ' + (e?.message || e);
+        } finally {
+            this.linkSaving = false;
         }
     },
 

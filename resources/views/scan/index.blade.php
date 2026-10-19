@@ -86,19 +86,22 @@
                     'quantity' => $scan->quantity,
                     'note' => $scan->note,
                     'location' => $scan->location?->name,
+                    'has_event_list' => (bool) $scan->event_list_id,
+                    'has_location' => (bool) $scan->location_id,
                     'resolved' => $scan->isResolved(),
                     'create_url' => route('assets.create', [
                         'tp_barcode' => $scan->scanned_code,
                         'location_id' => $scan->location_id,
                         'unknown_scan_id' => $scan->id,
                         'status' => $scan->asset_status?->value,
+                        'return_to' => route('scan.index', absolute: false),
                     ]),
                     'time' => $scan->created_at?->timezone(config('app.timezone'))->format('g:i:s A'),
                 ])->values();
             @endphp
 
             <div
-                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false), @js(auth()->user()?->wantsScanNoise() ?? false), @js(auth()->user()?->wantsScanVibrate() ?? false))"
+                x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false), @js(auth()->user()?->wantsScanNoise() ?? false), @js(auth()->user()?->wantsScanVibrate() ?? false), @js(route('unknown-scans.link', ['unknownScan' => '__ID__'])), @js(route('assets.search')))"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
                 <div
@@ -261,6 +264,19 @@
                                             <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
                                         </svg>
                                     </button>
+                                    <button
+                                        type="button"
+                                        x-show="!entry.unknown_scan.resolved"
+                                        class="inline-flex items-center justify-center p-1 border border-brand-charcoal dark:border-brand-silver"
+                                        title="Link item"
+                                        aria-label="Link item"
+                                        @click="openLink(entry)"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                                            <path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" />
+                                            <path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" />
+                                        </svg>
+                                    </button>
                                     <a
                                         x-show="!entry.unknown_scan.resolved"
                                         :href="entry.unknown_scan.create_url"
@@ -289,6 +305,103 @@
                         </template>
                     </ul>
                 </div>
+
+                <x-modal name="link-unknown-scan" focusable maxWidth="md">
+                    <form class="p-6 space-y-4" @submit.prevent="submitLink">
+                        <h2 class="text-lg font-medium text-gray-900 dark:text-white">
+                            Link to existing asset
+                        </h2>
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                            Resolve scanned code
+                            <span class="font-medium text-gray-900 dark:text-white" x-text="linkScannedCode"></span>
+                            by attaching it to an asset that already exists.
+                        </p>
+
+                        <div class="relative">
+                            <x-input-label for="scan-link-asset-search" value="Search assets" />
+                            <x-text-input
+                                id="scan-link-asset-search"
+                                x-ref="linkSearch"
+                                type="search"
+                                class="mt-1 block w-full"
+                                x-model="linkQuery"
+                                @input="scheduleLinkSearch()"
+                                placeholder="Name, barcode, FMI, serial…"
+                                autocomplete="off"
+                            />
+                            <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver" x-show="linkSearching" x-cloak>Searching…</p>
+                            <p class="mt-1 text-xs text-brand" x-show="linkSelectedId" x-cloak>
+                                Selected: <span x-text="linkSelectedLabel"></span>
+                            </p>
+                            <ul
+                                class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
+                                x-show="linkResults.length > 0"
+                                x-cloak
+                            >
+                                <template x-for="asset in linkResults" :key="asset.id">
+                                    <li>
+                                        <button
+                                            type="button"
+                                            class="block w-full px-3 py-2 text-left text-sm hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal"
+                                            @click="pickLinkAsset(asset)"
+                                        >
+                                            <span x-text="asset.label || asset.name"></span>
+                                            <span
+                                                class="ml-1 text-xs text-brand-charcoal dark:text-brand-silver"
+                                                x-show="asset.item_type"
+                                                x-text="asset.item_type"
+                                            ></span>
+                                        </button>
+                                    </li>
+                                </template>
+                            </ul>
+                            <p class="mt-2 text-sm text-red-600" x-show="linkError" x-text="linkError" x-cloak></p>
+                        </div>
+
+                        <label class="flex items-start gap-2 text-sm" x-show="linkHasEventList" x-cloak>
+                            <input type="checkbox" x-model="linkAddToEventList" class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand dark:border-brand-charcoal dark:bg-black">
+                            <span>Add asset to the event list from this scan (skip if already on the list)</span>
+                        </label>
+
+                        <div>
+                            <x-input-label for="scan-link-identifier-field" value="Write scanned code to" />
+                            <select
+                                id="scan-link-identifier-field"
+                                x-model="linkIdentifierField"
+                                class="mt-1 block w-full border-brand-silver dark:border-brand-charcoal dark:bg-black dark:text-white focus:border-brand focus:ring-brand rounded-md shadow-sm text-sm"
+                            >
+                                <option value="">Don’t update an identifier</option>
+                                @foreach(\App\Support\ScannableIdentifierFields::linkTargets() as $field)
+                                    <option value="{{ $field }}">{{ \App\Support\ScannableIdentifierFields::label($field) }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">
+                                Replaces the chosen field on the linked asset. Skipped if another asset already uses this code.
+                            </p>
+                            <p
+                                class="mt-1 text-xs text-amber-700 dark:text-amber-300"
+                                x-show="linkIdentifierField && linkSelectedFieldCurrentValue()"
+                                x-cloak
+                            >
+                                Current value will be overwritten:
+                                <span class="font-medium" x-text="linkSelectedFieldCurrentValue()"></span>
+                            </p>
+                        </div>
+
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="linkHasLocation" x-cloak>
+                            This scan has a location — the linked asset’s location will be updated (child assets keep their parent’s location).
+                        </p>
+
+                        <div class="flex justify-end gap-2 pt-2">
+                            <x-secondary-button type="button" x-on:click="$dispatch('close')">
+                                Cancel
+                            </x-secondary-button>
+                            <x-primary-button type="submit" x-bind:disabled="!linkSelectedId || linkSaving">
+                                Link asset
+                            </x-primary-button>
+                        </div>
+                    </form>
+                </x-modal>
 
                 @if($session->event_list_id)
                     <div class="space-y-2">
