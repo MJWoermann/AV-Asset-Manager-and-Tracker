@@ -109,20 +109,46 @@ class AssetController extends Controller
             ->limit(20)
             ->get(['id', 'name', 'tp_barcode', 'fmi_ast', 'rig_tag', 'serial_number', 'mac_address', 'item_type_id']);
 
+        $payload = $assets->map(static function (Asset $asset): array {
+            return [
+                'id' => $asset->id,
+                'name' => $asset->name,
+                'tp_barcode' => $asset->tp_barcode,
+                'fmi_ast' => $asset->fmi_ast,
+                'rig_tag' => $asset->rig_tag,
+                'serial_number' => $asset->serial_number,
+                'mac_address' => $asset->mac_address,
+                'item_type' => $asset->itemType?->name,
+                'label' => AssetSearch::optionLabel($asset),
+            ];
+        })->values();
+
+        // #region agent log
+        try {
+            file_put_contents(
+                base_path('debug-f3c37e.log'),
+                json_encode([
+                    'sessionId' => 'f3c37e',
+                    'hypothesisId' => 'B',
+                    'location' => 'AssetController.php:search',
+                    'message' => 'assets.search remote results',
+                    'data' => [
+                        'term' => $term,
+                        'parents_only' => $request->boolean('parents_only'),
+                        'exclude_id' => $excludeId,
+                        'resultCount' => $payload->count(),
+                        'sampleLabels' => $payload->take(3)->pluck('label')->all(),
+                    ],
+                    'timestamp' => (int) (microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES)."\n",
+                FILE_APPEND | LOCK_EX
+            );
+        } catch (\Throwable) {
+        }
+        // #endregion
+
         return response()->json([
-            'data' => $assets->map(static function (Asset $asset): array {
-                return [
-                    'id' => $asset->id,
-                    'name' => $asset->name,
-                    'tp_barcode' => $asset->tp_barcode,
-                    'fmi_ast' => $asset->fmi_ast,
-                    'rig_tag' => $asset->rig_tag,
-                    'serial_number' => $asset->serial_number,
-                    'mac_address' => $asset->mac_address,
-                    'item_type' => $asset->itemType?->name,
-                    'label' => AssetSearch::optionLabel($asset),
-                ];
-            })->values(),
+            'data' => $payload,
         ]);
     }
 
@@ -360,6 +386,49 @@ class AssetController extends Controller
                         ->all(),
                 ])
                 ->all();
+
+            // #region agent log
+            try {
+                file_put_contents(
+                    base_path('debug-f3c37e.log'),
+                    json_encode([
+                        'sessionId' => 'f3c37e',
+                        'hypothesisId' => 'A',
+                        'location' => 'AssetController.php:peerAssetOptions',
+                        'message' => 'Peer options built for connections tab',
+                        'data' => [
+                            'count' => count($peerAssetOptions),
+                            'selectedColumns' => ['id', 'name'],
+                            'sample' => array_slice(array_map(static fn (array $o): array => [
+                                'value' => $o['value'],
+                                'label' => $o['label'],
+                                'labelHasIdentifiers' => (bool) preg_match('/#\\d+|·/', (string) $o['label']),
+                            ], $peerAssetOptions), 0, 3),
+                        ],
+                        'timestamp' => (int) (microtime(true) * 1000),
+                    ], JSON_UNESCAPED_SLASHES)."\n",
+                    FILE_APPEND | LOCK_EX
+                );
+                file_put_contents(
+                    base_path('debug-f3c37e.log'),
+                    json_encode([
+                        'sessionId' => 'f3c37e',
+                        'runId' => 'protocol-select',
+                        'hypothesisId' => 'P1',
+                        'location' => 'AssetController.php:connections-protocol',
+                        'message' => 'Protocol select options from connection types',
+                        'data' => [
+                            'protocolOptionCount' => $connectionTypes->count(),
+                            'protocolOptions' => $connectionTypes->pluck('name')->values()->all(),
+                            'typesAllowingProtocol' => $connectionTypes->where('allows_protocol', true)->pluck('name')->values()->all(),
+                        ],
+                        'timestamp' => (int) (microtime(true) * 1000),
+                    ], JSON_UNESCAPED_SLASHES)."\n",
+                    FILE_APPEND | LOCK_EX
+                );
+            } catch (\Throwable) {
+            }
+            // #endregion
 
             $canApplyInterfaceTemplates = ($asset->itemType?->interfaceTemplates->isNotEmpty() ?? false)
                 || ($asset->manufacturerModel?->interfaceTemplates->isNotEmpty() ?? false);

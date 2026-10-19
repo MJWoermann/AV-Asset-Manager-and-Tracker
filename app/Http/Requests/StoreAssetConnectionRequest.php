@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\AssetInterface;
+use App\Models\ConnectionType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -18,6 +19,7 @@ class StoreAssetConnectionRequest extends FormRequest
     public function rules(): array
     {
         $assetId = (int) $this->route('asset')->id;
+        $protocolNames = ConnectionType::query()->orderBy('sort_order')->orderBy('name')->pluck('name')->all();
 
         return [
             'local_interface_id' => [
@@ -44,7 +46,7 @@ class StoreAssetConnectionRequest extends FormRequest
                 'max:255',
                 'required_without:peer_interface_id',
             ],
-            'protocol' => ['nullable', 'string', 'max:255'],
+            'protocol' => ['nullable', 'string', 'max:255', Rule::in($protocolNames)],
             'label' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ];

@@ -2185,7 +2185,7 @@ Alpine.data('assetConnectionsForm', (config = {}) => ({
             return options;
         }
 
-        return options
+        const scored = options
             .map((option) => ({ option, score: matchScore(option.label, q) }))
             .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
             .sort((a, b) => {
@@ -2196,6 +2196,12 @@ Alpine.data('assetConnectionsForm', (config = {}) => ({
                 return a.score - b.score || a.option.label.localeCompare(b.option.label);
             })
             .map((entry) => entry.option);
+
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f3c37e'},body:JSON.stringify({sessionId:'f3c37e',hypothesisId:'C',location:'app.js:filteredPeerAssets',message:'Peer client filter result',data:{query:q,tokenCount:searchTokens(q).length,optionCount:options.length,matchCount:scored.length,sampleLabels:options.slice(0,3).map((o)=>o.label),usesRemoteSearch:false},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+
+        return scored;
     },
 
     highlightedPeerLabel(label) {

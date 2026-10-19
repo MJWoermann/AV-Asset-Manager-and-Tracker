@@ -147,7 +147,7 @@ This is the main day-of-event workflow.
 5. When a match is found, the asset is added to the event list.
    - Scanning the same asset again on that list **warns** you — it does not create a duplicate row.
    - Scanning a **rack or container** can also bring in its **child** assets.
-6. Codes that do not match anything become **unknown scans** (see Reports). From **Reports → Unknown scans** you can **link** an open row to an existing asset (optionally add it to the event list and set TP barcode from the scanned code).
+6. Codes that do not match anything become **unknown scans** (see Reports). From **Reports → Unknown scans** you can **link** an open row to an existing asset (optionally add it to the event list, write the scanned code onto a chosen identifier field, and apply the scan location).
 7. When finished, close the session. Use **Reports → Compare** to produce a formal three-way report:
 
    - **Matched** — on both scanned and inventory lists  
@@ -344,7 +344,8 @@ Admins also get a dashboard module **Items & users by department** (enabled by d
 **Link existing asset (unknown scans):** on an open unknown-scan row, open **Link existing**, search/select the asset, then optionally:
 
 - **Add to event list** — if the unknown scan was tied to an event list, add the asset there  
-- **Set TP barcode** — copy the scanned code onto the asset when its TP barcode is empty and the code is not already used  
+- **Write scanned code to** — choose which identifier field to fill or overwrite (TP barcode, serial, MAC, FMI AST#, or RIG tag). Blocked if another asset already uses that code on the chosen field  
+- **Location** — when the unknown scan recorded a location, the linked asset’s location is updated (child assets keep their parent’s location)
 
 The unknown scan is marked resolved. The same action is available via API (`POST /api/unknown-scans/{id}/link`).
 

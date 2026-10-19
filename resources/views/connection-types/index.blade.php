@@ -27,7 +27,7 @@
                                 · {{ $type->buses_count }} {{ $type->buses_count === 1 ? 'bus' : 'buses' }}
                             @endif
                             @if($type->allows_protocol)
-                                · protocol field
+                                · protocol select
                             @endif
                             @if($type->allows_bus)
                                 · device bus

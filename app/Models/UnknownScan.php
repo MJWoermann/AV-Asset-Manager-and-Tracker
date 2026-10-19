@@ -101,34 +101,6 @@ class UnknownScan extends Model
             $resolvedField = 'tp_barcode';
         }
 
-        // #region agent log
-        $debugLogPath = base_path('debug-307f2d.log');
-        file_put_contents($debugLogPath, json_encode([
-            'sessionId' => '307f2d',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'B',
-            'location' => 'UnknownScan.php:linkToExisting:entry',
-            'message' => 'linkToExisting called',
-            'data' => [
-                'unknownScanId' => $this->id,
-                'assetId' => $asset->id,
-                'scannedCode' => $this->scanned_code,
-                'addToEventList' => $addToEventList,
-                'setIdentifier' => $setIdentifier,
-                'identifierField' => $resolvedField,
-                'scanLocationId' => $this->location_id,
-                'assetLocationId' => $asset->location_id,
-                'assetParentId' => $asset->parent_id,
-                'assetTpBarcode' => $asset->tp_barcode,
-                'assetSerial' => $asset->serial_number,
-                'assetFmiAst' => $asset->fmi_ast,
-                'assetRigTag' => $asset->rig_tag,
-                'assetMac' => $asset->mac_address,
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
-
         if ($this->isResolved()) {
             throw ValidationException::withMessages([
                 'asset_id' => 'This unknown scan is already resolved.',
@@ -150,23 +122,6 @@ class UnknownScan extends Model
                 ->where('id', '!=', $asset->id)
                 ->exists();
 
-            // #region agent log
-            file_put_contents($debugLogPath, json_encode([
-                'sessionId' => '307f2d',
-                'runId' => 'post-fix',
-                'hypothesisId' => 'C',
-                'location' => 'UnknownScan.php:linkToExisting:identifier_branch',
-                'message' => 'identifier field write evaluated',
-                'data' => [
-                    'field' => $resolvedField,
-                    'existingValue' => $asset->{$resolvedField},
-                    'collision' => $collision,
-                    'overwrite' => filled($asset->{$resolvedField}),
-                ],
-                'timestamp' => (int) (microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-            // #endregion
-
             if ($collision) {
                 throw ValidationException::withMessages([
                     'identifier_field' => 'Another asset already uses this '.ScannableIdentifierFields::label($resolvedField).'.',
@@ -176,28 +131,9 @@ class UnknownScan extends Model
             $attributes[$resolvedField] = $code;
         }
 
-        $willApplyLocation = (bool) $this->location_id && ! $asset->parent_id;
-
-        if ($willApplyLocation) {
+        if ($this->location_id && ! $asset->parent_id) {
             $attributes['location_id'] = $this->location_id;
         }
-
-        // #region agent log
-        file_put_contents($debugLogPath, json_encode([
-            'sessionId' => '307f2d',
-            'runId' => 'post-fix',
-            'hypothesisId' => 'F',
-            'location' => 'UnknownScan.php:linkToExisting:location_branch',
-            'message' => 'location update evaluated',
-            'data' => [
-                'scanLocationId' => $this->location_id,
-                'assetParentId' => $asset->parent_id,
-                'willApplyLocation' => $willApplyLocation,
-                'attributesKeys' => array_keys($attributes),
-            ],
-            'timestamp' => (int) (microtime(true) * 1000),
-        ], JSON_UNESCAPED_SLASHES)."\n", FILE_APPEND);
-        // #endregion
 
         if ($attributes !== []) {
             $asset->update($attributes);

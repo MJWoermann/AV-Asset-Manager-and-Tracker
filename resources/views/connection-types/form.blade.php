@@ -127,7 +127,7 @@
             <label class="inline-flex items-center gap-2 text-sm">
                 <input type="hidden" name="allows_protocol" value="0">
                 <input type="checkbox" name="allows_protocol" value="1" class="rounded text-brand" @checked(old('allows_protocol', $connectionType->allows_protocol))>
-                Allow free-text protocol on connections
+                Require protocol selection (from connection types) on connections
             </label>
 
             <label class="inline-flex items-start gap-2 text-sm">

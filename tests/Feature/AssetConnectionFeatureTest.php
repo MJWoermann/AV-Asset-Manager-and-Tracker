@@ -363,14 +363,63 @@ class AssetConnectionFeatureTest extends TestCase
                 'local_interface_id' => $ifaceA->id,
                 'peer_asset_id' => $assetB->id,
                 'peer_interface_id' => $ifaceB->id,
-                'protocol' => 'NDI|HX',
+                'protocol' => 'Network',
             ])
             ->assertRedirect(route('assets.show', [$assetA, 'tab' => 'connections']));
 
         $this->assertDatabaseHas('asset_connections', [
             'connection_type_id' => $custom->id,
-            'protocol' => 'NDI|HX',
+            'protocol' => 'Network',
         ]);
+    }
+
+    public function test_protocol_must_be_a_connection_type_name(): void
+    {
+        $user = $this->manager();
+        $assetA = $this->makeAsset(name: 'A');
+        $assetB = $this->makeAsset(name: 'B');
+        $custom = ConnectionType::query()->where('slug', 'custom-protocol')->firstOrFail();
+        $ifaceA = AssetInterface::factory()->create([
+            'asset_id' => $assetA->id,
+            'connection_type_id' => $custom->id,
+        ]);
+        $ifaceB = AssetInterface::factory()->create([
+            'asset_id' => $assetB->id,
+            'connection_type_id' => $custom->id,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('assets.show', [$assetA, 'tab' => 'connections']))
+            ->post(route('assets.connections.store', $assetA), [
+                'local_interface_id' => $ifaceA->id,
+                'peer_asset_id' => $assetB->id,
+                'peer_interface_id' => $ifaceB->id,
+                'protocol' => 'NDI|HX',
+            ])
+            ->assertSessionHasErrors('protocol');
+    }
+
+    public function test_connections_tab_renders_protocol_as_select_of_connection_types(): void
+    {
+        $user = $this->manager();
+        $asset = $this->makeAsset(name: 'Protocol Form Asset');
+        $custom = ConnectionType::query()->where('slug', 'custom-protocol')->firstOrFail();
+        AssetInterface::factory()->create([
+            'asset_id' => $asset->id,
+            'connection_type_id' => $custom->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('assets.show', [$asset, 'tab' => 'connections']));
+
+        $response->assertOk();
+        $response->assertSee('name="protocol"', false);
+        $response->assertDontSee('x-text-input id="protocol"', false);
+        $response->assertSee('<select', false);
+        $response->assertSee('id="protocol"', false);
+        $response->assertSee('Select protocol…', false);
+        $response->assertSee('>Network</option>', false);
+        $response->assertSee('>HDMI</option>', false);
     }
 
     public function test_connection_type_seeder_includes_xlr_dmx_power_and_usb(): void

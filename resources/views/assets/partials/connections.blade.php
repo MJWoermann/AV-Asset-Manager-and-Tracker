@@ -315,7 +315,18 @@
                 </div>
                 <div x-show="needsProtocol" x-cloak>
                     <x-input-label for="protocol" value="Protocol" />
-                    <x-text-input id="protocol" name="protocol" class="mt-1 block w-full" :value="old('protocol')" />
+                    <select
+                        id="protocol"
+                        name="protocol"
+                        class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                        :required="needsProtocol"
+                    >
+                        <option value="">Select protocol…</option>
+                        @foreach($connectionTypes as $type)
+                            <option value="{{ $type->name }}" @selected(old('protocol') === $type->name)>{{ $type->name }}</option>
+                        @endforeach
+                    </select>
+                    <x-input-error :messages="$errors->get('protocol')" class="mt-1" />
                 </div>
                 <div>
                     <x-input-label for="label" value="Label" />

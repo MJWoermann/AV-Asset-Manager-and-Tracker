@@ -163,7 +163,7 @@ Ability: `reports:write`. Roles: `admin`, `inventory_manager`, or `scanner`.
 {
   "asset_id": 123,
   "add_to_event_list": true,
-  "set_identifier": true
+  "identifier_field": "serial_number"
 }
 ```
 
@@ -171,7 +171,10 @@ Ability: `reports:write`. Roles: `admin`, `inventory_manager`, or `scanner`.
 |-------|----------|-------|
 | `asset_id` | yes | Existing asset to resolve the unknown scan against |
 | `add_to_event_list` | no | If true and the unknown scan has an event list, add the asset to that list |
-| `set_identifier` | no | If true, set the asset’s `tp_barcode` from the scanned code when the field is empty and the code is unique |
+| `identifier_field` | no | Identifier column to fill/overwrite from the scanned code: `serial_number`, `tp_barcode`, `mac_address`, `fmi_ast`, or `rig_tag`. Rejected if another asset already uses the code on that field |
+| `set_identifier` | no | Legacy alias: if true and `identifier_field` is omitted, writes to `tp_barcode` (overwrites) |
+
+When the unknown scan has a `location_id`, the linked asset’s location is updated unless the asset is a child (children inherit location from their parent).
 
 Returns **200** with `unknown_scan` summary (resolved). Already-resolved scans are rejected.
 
