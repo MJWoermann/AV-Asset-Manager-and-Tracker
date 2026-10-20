@@ -235,6 +235,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::get('/manufacturers', [ManufacturerController::class, 'index'])->name('manufacturers.index');
     Route::get('/manufacturers/create', [ManufacturerController::class, 'create'])->name('manufacturers.create');
     Route::post('/manufacturers', [ManufacturerController::class, 'store'])->name('manufacturers.store');
+    Route::get('/manufacturers/{manufacturer}/models', [ManufacturerModelController::class, 'index'])->name('manufacturers.models.index');
     Route::get('/manufacturers/{manufacturer}/models/create', [ManufacturerModelController::class, 'create'])->name('manufacturers.models.create');
     Route::post('/manufacturers/{manufacturer}/models', [ManufacturerModelController::class, 'store'])->name('manufacturers.models.store');
     Route::middleware('role:admin,inventory_manager')->group(function () {
@@ -243,6 +244,8 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
         Route::put('/locations/{location}', [LocationController::class, 'update'])->name('locations.update');
         Route::delete('/locations/{location}', [LocationController::class, 'destroy'])->name('locations.destroy');
 
+        Route::get('/manufacturers/replacement-models', [ManufacturerModelController::class, 'replacementOptions'])
+            ->name('manufacturers.replacement-models');
         Route::get('/manufacturers/{manufacturer}/edit', [ManufacturerController::class, 'edit'])->name('manufacturers.edit');
         Route::put('/manufacturers/{manufacturer}', [ManufacturerController::class, 'update'])->name('manufacturers.update');
         Route::delete('/manufacturers/{manufacturer}', [ManufacturerController::class, 'destroy'])->name('manufacturers.destroy');

@@ -3478,33 +3478,191 @@ Alpine.data('bulkLocations', (config = {}) => createBulkSelection({
     ...config,
 }));
 
-Alpine.data('manufacturerCatalogue', () => ({
-    collapsed: {},
+Alpine.data('manufacturerCatalogue', (config = {}) => ({
+    expanded: {},
+    modelsByManufacturer: {},
+    loadingModels: {},
+    modelLoadErrors: {},
+    manufacturerOptions: Array.isArray(config.manufacturerOptions) ? config.manufacturerOptions : [],
+    modelOptions: [],
+    modelOptionsLoaded: false,
+    modelOptionsLoading: false,
+    totalModelsCount: Number(config.totalModelsCount || 0),
+    canManageCatalogue: Boolean(config.canManageCatalogue),
+    replacementModelsUrl: config.replacementModelsUrl || null,
+    deleteManufacturer: null,
+    deleteModel: null,
+    selectedReplacementManufacturerId: '',
+    selectedReplacementModelId: '',
+
+    async init() {
+        if (config.initialDeleteManufacturer) {
+            this.openDeleteManufacturer(config.initialDeleteManufacturer);
+        }
+        if (config.initialDeleteModel) {
+            const manufacturerId = Number(config.initialDeleteModel.manufacturerId || 0);
+            if (manufacturerId > 0) {
+                this.expanded = { ...this.expanded, [manufacturerId]: true };
+                await this.ensureModelsLoaded(manufacturerId);
+            }
+            await this.openDeleteModel(config.initialDeleteModel);
+        }
+    },
 
     isOpen(id) {
-        return !this.collapsed[id];
+        return Boolean(this.expanded[id]);
     },
 
     toggle(id) {
-        this.collapsed = { ...this.collapsed, [id]: !this.collapsed[id] };
+        if (this.isOpen(id)) {
+            this.expanded = { ...this.expanded, [id]: false };
+            return;
+        }
+
+        this.expanded = { ...this.expanded, [id]: true };
+        this.ensureModelsLoaded(id);
     },
 
     expandAll() {
-        this.collapsed = {};
+        const next = {};
+        this.collapsibleIds().forEach((manufacturerId) => {
+            next[manufacturerId] = true;
+        });
+        this.expanded = next;
+        this.collapsibleIds().forEach((manufacturerId) => {
+            this.ensureModelsLoaded(manufacturerId);
+        });
     },
 
     collapseAll() {
-        const next = {};
-        this.collapsibleIds().forEach((id) => {
-            next[id] = true;
-        });
-        this.collapsed = next;
+        this.expanded = {};
     },
 
     collapsibleIds() {
         return [...this.$root.querySelectorAll('[data-manufacturer-collapsible="1"]')].map((el) =>
             Number(el.getAttribute('data-manufacturer-id'))
         );
+    },
+
+    modelsFor(id) {
+        return this.modelsByManufacturer[id] || [];
+    },
+
+    isLoadingModels(id) {
+        return Boolean(this.loadingModels[id]);
+    },
+
+    modelsError(id) {
+        return this.modelLoadErrors[id] || '';
+    },
+
+    async ensureModelsLoaded(id) {
+        const manufacturerId = Number(id);
+        if (
+            !manufacturerId
+            || this.modelsByManufacturer[manufacturerId]
+            || this.loadingModels[manufacturerId]
+        ) {
+            return;
+        }
+
+        const row = this.$root.querySelector(`[data-manufacturer-id="${manufacturerId}"]`);
+        const url = row?.getAttribute('data-models-url');
+        if (!url) {
+            return;
+        }
+
+        this.loadingModels = { ...this.loadingModels, [manufacturerId]: true };
+        this.modelLoadErrors = { ...this.modelLoadErrors, [manufacturerId]: '' };
+
+        try {
+            const response = await fetch(url, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                throw new Error('Unable to load models.');
+            }
+
+            const payload = await response.json();
+            this.modelsByManufacturer = {
+                ...this.modelsByManufacturer,
+                [manufacturerId]: Array.isArray(payload.data) ? payload.data : [],
+            };
+        } catch (error) {
+            this.modelLoadErrors = {
+                ...this.modelLoadErrors,
+                [manufacturerId]: error?.message || 'Unable to load models.',
+            };
+        } finally {
+            this.loadingModels = { ...this.loadingModels, [manufacturerId]: false };
+        }
+    },
+
+    async ensureModelOptionsLoaded() {
+        if (this.modelOptionsLoaded || this.modelOptionsLoading || !this.replacementModelsUrl) {
+            return;
+        }
+
+        this.modelOptionsLoading = true;
+
+        try {
+            const response = await fetch(this.replacementModelsUrl, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                throw new Error('Unable to load replacement models.');
+            }
+
+            const payload = await response.json();
+            this.modelOptions = Array.isArray(payload.data) ? payload.data : [];
+            this.modelOptionsLoaded = true;
+        } catch (error) {
+            this.modelOptions = [];
+            this.modelOptionsLoaded = false;
+        } finally {
+            this.modelOptionsLoading = false;
+        }
+    },
+
+    canDeleteManufacturer(id) {
+        return this.manufacturerOptions.some((option) => Number(option.id) !== Number(id));
+    },
+
+    canDeleteModel(id) {
+        if (this.modelOptionsLoaded) {
+            return this.modelOptions.some((option) => Number(option.id) !== Number(id));
+        }
+
+        return this.totalModelsCount > 1;
+    },
+
+    replacementManufacturers() {
+        const excludeId = Number(this.deleteManufacturer?.id || 0);
+
+        return this.manufacturerOptions.filter((option) => Number(option.id) !== excludeId);
+    },
+
+    replacementModels() {
+        const excludeId = Number(this.deleteModel?.id || 0);
+
+        return this.modelOptions.filter((option) => Number(option.id) !== excludeId);
+    },
+
+    openDeleteManufacturer({ id, name, action, replacementId = '' }) {
+        this.deleteManufacturer = { id, name, action };
+        this.selectedReplacementManufacturerId = replacementId ? String(replacementId) : '';
+        this.$dispatch('open-modal', 'delete-manufacturer');
+    },
+
+    async openDeleteModel({ id, name, label, assetsCount = 0, action, replacementId = '' }) {
+        this.deleteModel = { id, name, label, assetsCount, action };
+        this.selectedReplacementModelId = replacementId ? String(replacementId) : '';
+        await this.ensureModelOptionsLoaded();
+        this.$dispatch('open-modal', 'delete-model');
     },
 }));
 

@@ -50,7 +50,7 @@ class ManufacturerCatalogueTest extends TestCase
         ]);
     }
 
-    public function test_index_shows_nested_manufacturers_and_models(): void
+    public function test_index_shows_manufacturers_without_embedding_models(): void
     {
         $user = $this->scanner();
         $manufacturer = Manufacturer::factory()->create(['name' => 'Yamaha']);
@@ -63,8 +63,9 @@ class ManufacturerCatalogueTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Yamaha', false);
-        $response->assertSee('QL1', false);
+        $response->assertDontSee('QL1', false);
         $response->assertSee('Assets', false);
+        $response->assertSee(route('manufacturers.models.index', $manufacturer), false);
     }
 
     public function test_index_includes_hierarchy_expand_controls(): void
@@ -84,6 +85,69 @@ class ManufacturerCatalogueTest extends TestCase
         $response->assertSee('Collapse all', false);
         $response->assertSee('data-manufacturer-collapsible="1"', false);
         $response->assertSee('Toggle Yamaha models', false);
+        $response->assertSee('Loading models', false);
+    }
+
+    public function test_models_index_returns_manufacturer_models_as_json(): void
+    {
+        $user = $this->scanner();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'Yamaha']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'QL1',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('manufacturers.models.index', $manufacturer));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.id', $model->id);
+        $response->assertJsonPath('data.0.name', 'QL1');
+        $response->assertJsonPath('data.0.label', 'Yamaha / QL1');
+        $response->assertJsonPath('data.0.edit_url', null);
+        $response->assertJsonPath('data.0.destroy_url', null);
+    }
+
+    public function test_manager_models_index_includes_manage_urls(): void
+    {
+        $user = $this->manager();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'Yamaha']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'QL1',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('manufacturers.models.index', $manufacturer));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.edit_url', route('manufacturers.models.edit', [$manufacturer, $model]));
+        $response->assertJsonPath('data.0.destroy_url', route('manufacturers.models.destroy', [$manufacturer, $model]));
+    }
+
+    public function test_manager_can_fetch_replacement_model_options(): void
+    {
+        $user = $this->manager();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'Yamaha']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'QL1',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('manufacturers.replacement-models'));
+
+        $response->assertOk();
+        $response->assertJsonFragment([
+            'id' => $model->id,
+            'label' => 'Yamaha / QL1',
+        ]);
+    }
+
+    public function test_scanner_cannot_fetch_replacement_model_options(): void
+    {
+        $user = $this->scanner();
+
+        $this->actingAs($user)
+            ->getJson(route('manufacturers.replacement-models'))
+            ->assertForbidden();
     }
 
     public function test_manager_can_create_manufacturer_and_model(): void

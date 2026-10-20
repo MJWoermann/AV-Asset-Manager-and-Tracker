@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\DeleteManufacturerRequest;
 use App\Models\Manufacturer;
+use App\Models\ManufacturerModel;
 use App\Services\ManufacturerCatalogueService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,24 +13,69 @@ use Illuminate\View\View;
 
 class ManufacturerController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $manufacturers = Manufacturer::query()
-            ->with(['models' => fn ($query) => $query->withCount('assets')->orderBy('name')])
+            ->select(['id', 'name'])
             ->withCount(['assets', 'models'])
             ->orderBy('name')
             ->get();
 
+        $manufacturerOptions = $manufacturers
+            ->map(fn (Manufacturer $manufacturer) => [
+                'id' => $manufacturer->id,
+                'name' => $manufacturer->name,
+            ])
+            ->values();
+
+        $canManageCatalogue = $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+
+        $initialDeleteManufacturer = null;
+        $deletingManufacturerId = (int) old('deleting_manufacturer_id');
+        if ($canManageCatalogue && $deletingManufacturerId > 0) {
+            $deletingManufacturer = $manufacturers->firstWhere('id', $deletingManufacturerId);
+            if ($deletingManufacturer) {
+                $initialDeleteManufacturer = [
+                    'id' => $deletingManufacturer->id,
+                    'name' => $deletingManufacturer->name,
+                    'action' => route('manufacturers.destroy', $deletingManufacturer),
+                    'replacementId' => (string) old('replacement_manufacturer_id', ''),
+                ];
+            }
+        }
+
+        $initialDeleteModel = null;
+        $deletingModelId = (int) old('deleting_model_id');
+        if ($canManageCatalogue && $deletingModelId > 0) {
+            $deletingModel = ManufacturerModel::query()
+                ->select(['id', 'manufacturer_id', 'name'])
+                ->with(['manufacturer:id,name'])
+                ->withCount('assets')
+                ->find($deletingModelId);
+
+            if ($deletingModel?->manufacturer) {
+                $initialDeleteModel = [
+                    'id' => $deletingModel->id,
+                    'name' => $deletingModel->name,
+                    'label' => $deletingModel->manufacturer->name.' / '.$deletingModel->name,
+                    'assetsCount' => (int) $deletingModel->assets_count,
+                    'action' => route('manufacturers.models.destroy', [$deletingModel->manufacturer, $deletingModel]),
+                    'replacementId' => (string) old('replacement_manufacturer_model_id', ''),
+                    'manufacturerId' => $deletingModel->manufacturer_id,
+                ];
+            }
+        }
+
         return view('manufacturers.index', [
             'manufacturers' => $manufacturers,
-            'replacementManufacturers' => $manufacturers,
-            'allModels' => $manufacturers->flatMap(
-                fn (Manufacturer $manufacturer) => $manufacturer->models->map(fn ($model) => [
-                    'id' => $model->id,
-                    'label' => $manufacturer->name.' / '.$model->name,
-                    'manufacturer_id' => $manufacturer->id,
-                ])
-            )->values(),
+            'manufacturerOptions' => $manufacturerOptions,
+            'totalModelsCount' => (int) ManufacturerModel::query()->count(),
+            'canManageCatalogue' => $canManageCatalogue,
+            'replacementModelsUrl' => $canManageCatalogue
+                ? route('manufacturers.replacement-models')
+                : null,
+            'initialDeleteManufacturer' => $initialDeleteManufacturer,
+            'initialDeleteModel' => $initialDeleteModel,
         ]);
     }
 

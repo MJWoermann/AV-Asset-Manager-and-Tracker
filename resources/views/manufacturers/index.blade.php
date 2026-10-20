@@ -8,7 +8,17 @@
         </div>
     </x-slot>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="manufacturerCatalogue()">
+    <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+        x-data="manufacturerCatalogue({
+            manufacturerOptions: @js($manufacturerOptions),
+            totalModelsCount: @js($totalModelsCount),
+            canManageCatalogue: @js($canManageCatalogue),
+            replacementModelsUrl: @js($replacementModelsUrl),
+            initialDeleteManufacturer: @js($initialDeleteManufacturer),
+            initialDeleteModel: @js($initialDeleteModel),
+        })"
+    >
         @if (session('status'))
             <div class="mb-4 text-sm text-brand">{{ session('status') }}</div>
         @endif
@@ -41,11 +51,106 @@
                     @include('manufacturers.partials.node', [
                         'manufacturer' => $manufacturer,
                         'alternate' => $index % 2 === 1,
-                        'replacementManufacturers' => $replacementManufacturers,
-                        'allModels' => $allModels,
                     ])
                 @endforeach
             </ul>
         @endif
+
+        @role('admin|inventory_manager')
+            <x-modal name="delete-manufacturer" :show="$errors->has('replacement_manufacturer_id')" focusable maxWidth="md">
+                <form
+                    method="POST"
+                    class="p-6 space-y-4"
+                    x-bind:action="deleteManufacturer?.action || '#'"
+                >
+                    @csrf
+                    @method('DELETE')
+                    <input type="hidden" name="deleting_manufacturer_id" x-bind:value="deleteManufacturer?.id || ''">
+
+                    <h2 class="text-lg font-medium text-gray-900 dark:text-white">
+                        Delete “<span x-text="deleteManufacturer?.name || ''"></span>”?
+                    </h2>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                        Models under this manufacturer are moved to the replacement (merged by name).
+                        Assets are reassigned to the replacement manufacturer.
+                    </p>
+                    <div>
+                        <x-input-label for="replacement_manufacturer_id" value="Replacement manufacturer" />
+                        <select
+                            id="replacement_manufacturer_id"
+                            name="replacement_manufacturer_id"
+                            class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                            required
+                            x-model="selectedReplacementManufacturerId"
+                        >
+                            <option value="">Select a manufacturer…</option>
+                            <template x-for="option in replacementManufacturers()" :key="option.id">
+                                <option
+                                    x-bind:value="option.id"
+                                    x-text="option.name"
+                                ></option>
+                            </template>
+                        </select>
+                        <x-input-error :messages="$errors->get('replacement_manufacturer_id')" class="mt-2" />
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <x-secondary-button type="button" x-on:click="$dispatch('close')">Cancel</x-secondary-button>
+                        <x-danger-button>Delete permanently</x-danger-button>
+                    </div>
+                </form>
+            </x-modal>
+
+            <x-modal name="delete-model" :show="$errors->has('replacement_manufacturer_model_id')" focusable maxWidth="md">
+                <form
+                    method="POST"
+                    class="p-6 space-y-4"
+                    x-bind:action="deleteModel?.action || '#'"
+                >
+                    @csrf
+                    @method('DELETE')
+                    <input type="hidden" name="deleting_model_id" x-bind:value="deleteModel?.id || ''">
+
+                    <h2 class="text-lg font-medium text-gray-900 dark:text-white">
+                        Delete “<span x-text="deleteModel?.label || ''"></span>”?
+                    </h2>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                        <template x-if="(deleteModel?.assetsCount || 0) > 0">
+                            <span>
+                                This model is used by
+                                <span x-text="deleteModel?.assetsCount || 0"></span>
+                                <span x-text="(deleteModel?.assetsCount || 0) === 1 ? 'asset' : 'assets'"></span>.
+                                Choose a replacement model for those assets, then delete.
+                            </span>
+                        </template>
+                        <template x-if="(deleteModel?.assetsCount || 0) === 0">
+                            <span>No assets use this model. Choose a replacement model, then delete.</span>
+                        </template>
+                    </p>
+                    <div>
+                        <x-input-label for="replacement_manufacturer_model_id" value="Replacement model" />
+                        <select
+                            id="replacement_manufacturer_model_id"
+                            name="replacement_manufacturer_model_id"
+                            class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                            required
+                            x-model="selectedReplacementModelId"
+                        >
+                            <option value="">Select a model…</option>
+                            <template x-for="option in replacementModels()" :key="option.id">
+                                <option
+                                    x-bind:value="option.id"
+                                    x-text="option.label"
+                                ></option>
+                            </template>
+                        </select>
+                        <x-input-error :messages="$errors->get('replacement_manufacturer_model_id')" class="mt-2" />
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <x-secondary-button type="button" x-on:click="$dispatch('close')">Cancel</x-secondary-button>
+                        <x-danger-button>Delete permanently</x-danger-button>
+                    </div>
+                </form>
+            </x-modal>
+        @endrole
     </div>
 </x-app-layout>

@@ -9,6 +9,7 @@ use App\Models\ManufacturerModel;
 use App\Models\SparePart;
 use App\Services\AssetInterfaceService;
 use App\Services\ManufacturerCatalogueService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,6 +17,51 @@ use Illuminate\View\View;
 
 class ManufacturerModelController extends Controller
 {
+    public function index(Request $request, Manufacturer $manufacturer): JsonResponse
+    {
+        $canManageCatalogue = $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+
+        $models = $manufacturer->models()
+            ->select(['id', 'manufacturer_id', 'name'])
+            ->withCount('assets')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ManufacturerModel $model) => [
+                'id' => $model->id,
+                'name' => $model->name,
+                'label' => $manufacturer->name.' / '.$model->name,
+                'assets_count' => (int) $model->assets_count,
+                'assets_url' => route('assets.index', ['manufacturer_model_id' => $model->id]),
+                'edit_url' => $canManageCatalogue
+                    ? route('manufacturers.models.edit', [$manufacturer, $model])
+                    : null,
+                'destroy_url' => $canManageCatalogue
+                    ? route('manufacturers.models.destroy', [$manufacturer, $model])
+                    : null,
+            ])
+            ->values();
+
+        return response()->json(['data' => $models]);
+    }
+
+    public function replacementOptions(): JsonResponse
+    {
+        $options = Manufacturer::query()
+            ->select(['id', 'name'])
+            ->with(['models' => fn ($query) => $query->select(['id', 'manufacturer_id', 'name'])->orderBy('name')])
+            ->orderBy('name')
+            ->get()
+            ->flatMap(
+                fn (Manufacturer $manufacturer) => $manufacturer->models->map(fn (ManufacturerModel $model) => [
+                    'id' => $model->id,
+                    'label' => $manufacturer->name.' / '.$model->name,
+                ])
+            )
+            ->values();
+
+        return response()->json(['data' => $options]);
+    }
+
     public function create(Manufacturer $manufacturer): View
     {
         return view('manufacturers.models.form', [
