@@ -95,6 +95,41 @@ class AssetSearchTest extends TestCase
             ->assertJsonFragment(['name' => 'ID Lookup Asset']);
     }
 
+    public function test_assets_index_lists_and_searches_child_assets(): void
+    {
+        $user = $this->scanner();
+        $itemType = $this->itemType();
+
+        $parent = Asset::create([
+            'name' => 'Parent Rack',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+        ]);
+
+        Asset::create([
+            'name' => 'child',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'parent_id' => $parent->id,
+        ]);
+
+        $listed = $this->actingAs($user)->get(route('assets.index'));
+
+        $listed->assertOk();
+        $this->assertEqualsCanonicalizing(
+            ['Parent Rack', 'child'],
+            $listed->viewData('assets')->pluck('name')->all()
+        );
+
+        $searched = $this->actingAs($user)->get(route('assets.index', ['q' => 'child']));
+
+        $searched->assertOk();
+        $this->assertSame(
+            ['child'],
+            $searched->viewData('assets')->pluck('name')->all()
+        );
+    }
+
     public function test_parent_search_endpoint_limits_to_top_level_and_excludes_self(): void
     {
         $user = $this->scanner();

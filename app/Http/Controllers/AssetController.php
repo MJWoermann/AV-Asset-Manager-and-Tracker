@@ -63,8 +63,7 @@ class AssetController extends Controller
         $term = AssetBrowseFilters::term($request);
 
         $assets = Asset::query()
-            ->with(['itemType', 'location', 'parent', 'manufacturer', 'manufacturerModel', 'customFieldValues'])
-            ->whereNull('parent_id');
+            ->with(['itemType', 'location', 'parent', 'manufacturer', 'manufacturerModel', 'customFieldValues']);
 
         AssetBrowseFilters::applyToAssetQuery($assets, $request, selectedColumns: $selectedColumns);
 
