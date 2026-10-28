@@ -67,7 +67,7 @@ class AssetCheckoutTest extends TestCase
         $checkout = AssetCheckout::query()->first();
         $this->assertNotNull($checkout);
         $this->assertNull($checkout->returned_at);
-        $this->assertSame(CheckoutPurpose::Hire, $checkout->purpose);
+        $this->assertSame(CheckoutPurpose::Hire->value, $checkout->purpose);
         $this->assertSame(AssetStatus::Available->value, $checkout->asset_status_before);
 
         $asset->refresh();

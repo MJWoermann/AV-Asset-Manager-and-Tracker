@@ -26,6 +26,7 @@ use App\Http\Controllers\AssetRuPlacementController;
 use App\Http\Controllers\AssetShelfTagPrintController;
 use App\Http\Controllers\AssetStockController;
 use App\Http\Controllers\AssetStockTokenController;
+use App\Http\Controllers\CheckoutReportController;
 use App\Http\Controllers\ConnectionMapController;
 use App\Http\Controllers\ConnectionTypeController;
 use App\Http\Controllers\CustomFieldSetController;
@@ -284,6 +285,18 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::post('/reports/compare', [ReportController::class, 'compare'])
         ->middleware('throttle:compare')
         ->name('reports.compare.run');
+    Route::middleware('role:admin,inventory_manager')->group(function () {
+        Route::get('/reports/checkouts', [CheckoutReportController::class, 'index'])->name('reports.checkouts');
+        Route::get('/reports/checkouts/export', [CheckoutReportController::class, 'export'])
+            ->middleware('throttle:export')
+            ->name('reports.checkouts.export');
+        Route::post('/reports/checkouts/purposes', [CheckoutReportController::class, 'storePurpose'])
+            ->name('reports.checkouts.purposes.store');
+        Route::patch('/reports/checkouts/purposes/{checkoutPurpose}', [CheckoutReportController::class, 'updatePurpose'])
+            ->name('reports.checkouts.purposes.update');
+        Route::delete('/reports/checkouts/purposes/{checkoutPurpose}', [CheckoutReportController::class, 'destroyPurpose'])
+            ->name('reports.checkouts.purposes.destroy');
+    });
     Route::get('/reports/unknown-scans', [UnknownScanController::class, 'index'])->name('reports.unknown-scans');
     Route::get('/reports/unknown-scans/export', [UnknownScanController::class, 'export'])
         ->middleware('throttle:export')

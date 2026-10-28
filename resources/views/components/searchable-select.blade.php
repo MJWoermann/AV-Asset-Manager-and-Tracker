@@ -23,12 +23,14 @@
             return [
                 'value' => (string) ($option['value'] ?? ''),
                 'label' => (string) ($option['label'] ?? ''),
+                'keywords' => (string) ($option['keywords'] ?? ''),
             ];
         }
 
         return [
             'value' => (string) data_get($option, 'value', data_get($option, 'id', '')),
             'label' => (string) data_get($option, 'label', data_get($option, 'name', '')),
+            'keywords' => (string) data_get($option, 'keywords', ''),
         ];
     })->values();
 
@@ -50,6 +52,7 @@
 @endphp
 
 <div
+    data-searchable-select
     {{ $attributes->except('aria-label')->class($compact ? 'relative' : 'relative mt-1') }}
     x-data="searchableSelect(@js($normalized), @js($selected !== null ? (string) $selected : ''), {
         placeholder: @js($placeholder),

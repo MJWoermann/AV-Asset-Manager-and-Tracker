@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AssetStatus;
-use App\Enums\CheckoutPurpose;
 use App\Enums\MaintenanceLogType;
 use App\Enums\NotificationEventKey;
 use App\Http\Requests\BulkUpdateAssetsRequest;
@@ -11,6 +10,7 @@ use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
 use App\Models\AssetList;
 use App\Models\AssetRuPlacement;
+use App\Models\CheckoutPurpose;
 use App\Models\ConnectionType;
 use App\Models\CustomFieldDefinition;
 use App\Models\Department;
@@ -567,11 +567,11 @@ class AssetController extends Controller
         if ($tab === 'checkout') {
             $openCheckout = $asset->checkouts()
                 ->open()
-                ->with(['checkedOutTo', 'checkedOutBy', 'repair'])
+                ->with(['checkedOutTo', 'checkedOutBy', 'repair', 'checkoutPurpose'])
                 ->first();
 
             $checkoutHistory = $asset->checkouts()
-                ->with(['checkedOutTo', 'checkedOutBy', 'returnedBy', 'repair'])
+                ->with(['checkedOutTo', 'checkedOutBy', 'returnedBy', 'repair', 'checkoutPurpose'])
                 ->paginate(25)
                 ->withQueryString();
 
@@ -624,7 +624,11 @@ class AssetController extends Controller
             'openCheckout' => $openCheckout,
             'checkoutHistory' => $checkoutHistory,
             'canManageCheckouts' => $canManageCheckouts,
-            'checkoutPurposes' => CheckoutPurpose::options(),
+            'checkoutPurposes' => CheckoutPurpose::query()
+                ->active()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->pluck('name', 'slug'),
             'checkoutAssigneeOptions' => $checkoutAssigneeOptions,
             'checkoutOpenRepairs' => $checkoutOpenRepairs,
         ]);

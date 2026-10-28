@@ -76,21 +76,17 @@
                     </p>
                     <div>
                         <x-input-label for="replacement_manufacturer_id" value="Replacement manufacturer" />
-                        <select
-                            id="replacement_manufacturer_id"
+                        <x-searchable-select
                             name="replacement_manufacturer_id"
-                            class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                            id="replacement_manufacturer_id"
+                            placeholder="Search manufacturers…"
+                            :options="$manufacturerOptions->map(fn ($option) => [
+                                'value' => $option['id'],
+                                'label' => $option['name'],
+                            ])"
+                            :selected="old('replacement_manufacturer_id')"
                             required
-                            x-model="selectedReplacementManufacturerId"
-                        >
-                            <option value="">Select a manufacturer…</option>
-                            <template x-for="option in replacementManufacturers()" :key="option.id">
-                                <option
-                                    x-bind:value="option.id"
-                                    x-text="option.name"
-                                ></option>
-                            </template>
-                        </select>
+                        />
                         <x-input-error :messages="$errors->get('replacement_manufacturer_id')" class="mt-2" />
                     </div>
                     <div class="flex justify-end gap-2">
@@ -128,21 +124,14 @@
                     </p>
                     <div>
                         <x-input-label for="replacement_manufacturer_model_id" value="Replacement model" />
-                        <select
-                            id="replacement_manufacturer_model_id"
+                        <x-searchable-select
                             name="replacement_manufacturer_model_id"
-                            class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                            id="replacement_manufacturer_model_id"
+                            placeholder="Search models…"
+                            :options="[]"
+                            :selected="old('replacement_manufacturer_model_id')"
                             required
-                            x-model="selectedReplacementModelId"
-                        >
-                            <option value="">Select a model…</option>
-                            <template x-for="option in replacementModels()" :key="option.id">
-                                <option
-                                    x-bind:value="option.id"
-                                    x-text="option.label"
-                                ></option>
-                            </template>
-                        </select>
+                        />
                         <x-input-error :messages="$errors->get('replacement_manufacturer_model_id')" class="mt-2" />
                     </div>
                     <div class="flex justify-end gap-2">

@@ -69,20 +69,114 @@ class BulkUpdateLocationsTest extends TestCase
         $response->assertSee('Delete', false);
     }
 
-    public function test_individual_location_can_be_deleted(): void
+    public function test_deleting_a_location_moves_assets_to_the_chosen_replacement(): void
     {
         $user = $this->manager();
         $location = Location::create(['name' => 'Temp Site', 'type' => LocationType::Site]);
+        $replacement = Location::create(['name' => 'Keep Site', 'type' => LocationType::Site]);
+        $child = Location::create([
+            'name' => 'Empty Room',
+            'type' => LocationType::Room,
+            'parent_id' => $location->id,
+        ]);
         $asset = $this->makeAsset(['location_id' => $location->id]);
 
-        $response = $this->actingAs($user)->delete(route('locations.destroy', $location));
+        $response = $this->actingAs($user)->delete(route('locations.destroy', $location), [
+            'replacement_location_id' => $replacement->id,
+            'deleting_location_id' => $location->id,
+        ]);
 
         $response->assertRedirect(route('locations.index'));
         $this->assertDatabaseMissing('locations', ['id' => $location->id]);
-        $this->assertNull($asset->fresh()->location_id);
+        $this->assertSame($replacement->id, $asset->fresh()->location_id);
+        $this->assertDatabaseHas('locations', [
+            'id' => $child->id,
+            'parent_id' => null,
+        ]);
+        $this->assertDatabaseHas('location_aliases', [
+            'former_name' => 'Temp Site',
+            'type' => LocationType::Site->value,
+            'location_id' => $replacement->id,
+        ]);
     }
 
-    public function test_bulk_delete_removes_selected_locations(): void
+    public function test_location_with_no_assets_stays_on_the_list(): void
+    {
+        $user = $this->manager();
+        $empty = Location::create(['name' => 'Unused Room', 'type' => LocationType::Room]);
+        $replacement = Location::create(['name' => 'Keep Site', 'type' => LocationType::Site]);
+
+        $response = $this->actingAs($user)->from(route('locations.index'))->delete(route('locations.destroy', $empty), [
+            'replacement_location_id' => $replacement->id,
+            'deleting_location_id' => $empty->id,
+        ]);
+
+        $response->assertRedirect(route('locations.index'));
+        $response->assertSessionHasErrors([
+            'location' => 'Locations with no assets stay on the list.',
+        ]);
+        $this->assertDatabaseHas('locations', ['id' => $empty->id]);
+    }
+
+    public function test_location_delete_requires_a_replacement_location(): void
+    {
+        $user = $this->manager();
+        $location = Location::create(['name' => 'Temp Site', 'type' => LocationType::Site]);
+        $this->makeAsset(['location_id' => $location->id]);
+
+        $response = $this->actingAs($user)->from(route('locations.index'))->delete(route('locations.destroy', $location), [
+            'deleting_location_id' => $location->id,
+        ]);
+
+        $response->assertRedirect(route('locations.index'));
+        $response->assertSessionHasErrors([
+            'replacement_location_id' => 'Choose a replacement location for assets at this location.',
+        ]);
+        $this->assertDatabaseHas('locations', ['id' => $location->id]);
+    }
+
+    public function test_location_delete_rejects_the_same_location_as_replacement(): void
+    {
+        $user = $this->manager();
+        $location = Location::create(['name' => 'Temp Site', 'type' => LocationType::Site]);
+        $this->makeAsset(['location_id' => $location->id]);
+
+        $response = $this->actingAs($user)->from(route('locations.index'))->delete(route('locations.destroy', $location), [
+            'replacement_location_id' => $location->id,
+            'deleting_location_id' => $location->id,
+        ]);
+
+        $response->assertRedirect(route('locations.index'));
+        $response->assertSessionHasErrors([
+            'replacement_location_id' => 'Choose a valid replacement location.',
+        ]);
+        $this->assertDatabaseHas('locations', ['id' => $location->id]);
+    }
+
+    public function test_location_index_lists_empty_locations_without_a_delete_action(): void
+    {
+        $user = $this->manager();
+        $empty = Location::create([
+            'name' => 'Unused Room',
+            'room_code' => 'A12',
+            'type' => LocationType::Room,
+        ]);
+        $busy = Location::create(['name' => 'Loaded Site', 'type' => LocationType::Site]);
+        $this->makeAsset(['location_id' => $busy->id]);
+
+        $response = $this->actingAs($user)->get(route('locations.index'));
+
+        $response->assertOk();
+        $response->assertSee($empty->name, false);
+        $response->assertSee('A12', false);
+        $response->assertSee('Search by name or room code…', false);
+        $response->assertSee('0 assets', false);
+        $response->assertSee('Locations with no assets stay on this list.', false);
+        $response->assertSee("name: '{$busy->name}'", false);
+        $response->assertDontSee("name: '{$empty->name}'", false);
+    }
+
+    public function test_bulk_delete_keeps_locations_with_no_assets(): void
     {
         $user = $this->manager();
         $a = Location::create(['name' => 'Site A', 'type' => LocationType::Site]);
@@ -96,10 +190,73 @@ class BulkUpdateLocationsTest extends TestCase
         ]);
 
         $response->assertRedirect(route('locations.index'));
-        $response->assertSessionHas('status');
-        $this->assertDatabaseMissing('locations', ['id' => $a->id]);
-        $this->assertDatabaseMissing('locations', ['id' => $b->id]);
+        $response->assertSessionHas('status', '2 locations with no assets kept.');
+        $this->assertDatabaseHas('locations', ['id' => $a->id]);
+        $this->assertDatabaseHas('locations', ['id' => $b->id]);
         $this->assertDatabaseHas('locations', ['id' => $keep->id]);
+    }
+
+    public function test_bulk_delete_moves_assets_and_keeps_empty_locations(): void
+    {
+        $user = $this->manager();
+        $busy = Location::create(['name' => 'Busy Site', 'type' => LocationType::Site]);
+        $empty = Location::create(['name' => 'Empty Room', 'type' => LocationType::Room]);
+        $keep = Location::create(['name' => 'Keep', 'type' => LocationType::Site]);
+        $asset = $this->makeAsset(['location_id' => $busy->id]);
+
+        $response = $this->actingAs($user)->post(route('locations.bulk-update'), [
+            'action' => 'delete',
+            'confirm_delete' => '1',
+            'replacement_location_id' => $keep->id,
+            'location_ids' => [$busy->id, $empty->id],
+        ]);
+
+        $response->assertRedirect(route('locations.index'));
+        $this->assertDatabaseMissing('locations', ['id' => $busy->id]);
+        $this->assertDatabaseHas('locations', ['id' => $empty->id]);
+        $this->assertSame($keep->id, $asset->fresh()->location_id);
+    }
+
+    public function test_bulk_delete_of_locations_with_assets_requires_a_replacement(): void
+    {
+        $user = $this->manager();
+        $busy = Location::create(['name' => 'Busy Site', 'type' => LocationType::Site]);
+        $this->makeAsset(['location_id' => $busy->id]);
+
+        $response = $this->actingAs($user)->from(route('locations.index'))->post(route('locations.bulk-update'), [
+            'action' => 'delete',
+            'confirm_delete' => '1',
+            'location_ids' => [$busy->id],
+        ]);
+
+        $response->assertRedirect(route('locations.index'));
+        $response->assertSessionHasErrors([
+            'replacement_location_id' => 'Choose a replacement location for assets.',
+        ]);
+        $this->assertDatabaseHas('locations', ['id' => $busy->id]);
+    }
+
+    public function test_bulk_delete_rejects_a_selected_location_as_the_replacement(): void
+    {
+        $user = $this->manager();
+        $busy = Location::create(['name' => 'Busy Site', 'type' => LocationType::Site]);
+        $other = Location::create(['name' => 'Other Site', 'type' => LocationType::Site]);
+        $this->makeAsset(['location_id' => $busy->id]);
+        $this->makeAsset(['location_id' => $other->id]);
+
+        $response = $this->actingAs($user)->from(route('locations.index'))->post(route('locations.bulk-update'), [
+            'action' => 'delete',
+            'confirm_delete' => '1',
+            'replacement_location_id' => $busy->id,
+            'location_ids' => [$busy->id, $other->id],
+        ]);
+
+        $response->assertRedirect(route('locations.index'));
+        $response->assertSessionHasErrors([
+            'replacement_location_id' => 'Choose a location that is not being deleted.',
+        ]);
+        $this->assertDatabaseHas('locations', ['id' => $busy->id]);
+        $this->assertDatabaseHas('locations', ['id' => $other->id]);
     }
 
     public function test_bulk_assign_parent_to_selected_locations(): void

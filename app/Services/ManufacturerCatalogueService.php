@@ -7,6 +7,8 @@ use App\Models\Manufacturer;
 use App\Models\ManufacturerAlias;
 use App\Models\ManufacturerModel;
 use App\Models\ManufacturerModelAlias;
+use App\Models\RepairProcedure;
+use App\Models\SparePart;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -153,6 +155,21 @@ class ManufacturerCatalogueService
         });
     }
 
+    /**
+     * Drop a manufacturer and/or model once no asset, spare, or repair procedure still uses it.
+     * Asset and spare counts ignore the acting user's department scope.
+     */
+    public function releaseUnusedAssignments(?int $manufacturerId, ?int $manufacturerModelId): void
+    {
+        if ($manufacturerModelId !== null) {
+            $this->deleteModelIfUnassigned($manufacturerModelId);
+        }
+
+        if ($manufacturerId !== null) {
+            $this->deleteManufacturerIfUnassigned($manufacturerId);
+        }
+    }
+
     public function deleteModel(ManufacturerModel $model, ManufacturerModel $replacement): void
     {
         if ($model->is($replacement)) {
@@ -170,6 +187,78 @@ class ManufacturerCatalogueService
             ManufacturerModelAlias::recordMerge($model, $replacement);
             $model->delete();
         });
+    }
+
+    protected function deleteModelIfUnassigned(int $modelId): void
+    {
+        $model = ManufacturerModel::query()->find($modelId);
+
+        if ($model === null || $this->modelStillReferenced($model)) {
+            return;
+        }
+
+        $manufacturerId = (int) $model->manufacturer_id;
+        $model->delete();
+        $this->deleteManufacturerIfUnassigned($manufacturerId);
+    }
+
+    protected function deleteManufacturerIfUnassigned(int $manufacturerId): void
+    {
+        $manufacturer = Manufacturer::query()->find($manufacturerId);
+
+        if ($manufacturer === null || $this->manufacturerStillReferenced($manufacturer)) {
+            return;
+        }
+
+        $manufacturer->delete();
+    }
+
+    protected function modelStillReferenced(ManufacturerModel $model): bool
+    {
+        if (Asset::withoutDepartmentScope()->where('manufacturer_model_id', $model->id)->exists()) {
+            return true;
+        }
+
+        if (SparePart::withoutDepartmentScope()->where('manufacturer_model_id', $model->id)->exists()) {
+            return true;
+        }
+
+        if (DB::table('spare_part_models')->where('manufacturer_model_id', $model->id)->exists()) {
+            return true;
+        }
+
+        return RepairProcedure::query()->where('manufacturer_model_id', $model->id)->exists();
+    }
+
+    protected function manufacturerStillReferenced(Manufacturer $manufacturer): bool
+    {
+        if (Asset::withoutDepartmentScope()->where('manufacturer_id', $manufacturer->id)->exists()) {
+            return true;
+        }
+
+        if (SparePart::withoutDepartmentScope()->where('manufacturer_id', $manufacturer->id)->exists()) {
+            return true;
+        }
+
+        $modelIds = $manufacturer->models()->pluck('id');
+
+        if ($modelIds->isEmpty()) {
+            return false;
+        }
+
+        if (Asset::withoutDepartmentScope()->whereIn('manufacturer_model_id', $modelIds)->exists()) {
+            return true;
+        }
+
+        if (SparePart::withoutDepartmentScope()->whereIn('manufacturer_model_id', $modelIds)->exists()) {
+            return true;
+        }
+
+        if (DB::table('spare_part_models')->whereIn('manufacturer_model_id', $modelIds)->exists()) {
+            return true;
+        }
+
+        return RepairProcedure::query()->whereIn('manufacturer_model_id', $modelIds)->exists();
     }
 
     protected function findOrCreateModelUnder(Manufacturer $manufacturer, string $name): ManufacturerModel

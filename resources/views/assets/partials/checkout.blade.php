@@ -29,7 +29,7 @@
                 </p>
                 <p>
                     <span class="text-brand-charcoal dark:text-brand-silver">Purpose</span>
-                    {{ $openCheckout->purpose?->label() ?? $openCheckout->purpose }}
+                    {{ $openCheckout->purposeLabel() }}
                     @if($openCheckout->repair)
                         · <a class="text-brand" href="{{ route('repairs.show', $openCheckout->repair) }}">Repair #{{ $openCheckout->repair->id }}</a>
                     @endif
@@ -192,7 +192,7 @@
                             </td>
                             <td class="px-3 py-2">{{ $row->assigneeLabel() }}</td>
                             <td class="px-3 py-2">
-                                {{ $row->purpose?->label() ?? $row->purpose }}
+                                {{ $row->purposeLabel() }}
                                 @if($row->repair)
                                     <div>
                                         <a class="text-brand" href="{{ route('repairs.show', $row->repair) }}">Repair #{{ $row->repair->id }}</a>

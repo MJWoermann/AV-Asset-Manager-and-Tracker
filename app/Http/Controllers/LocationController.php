@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\LocationType;
 use App\Http\Requests\BulkUpdateLocationsRequest;
+use App\Http\Requests\DeleteLocationRequest;
 use App\Models\Location;
 use App\Services\BulkLocationUpdateService;
 use Illuminate\Http\RedirectResponse;
@@ -14,22 +15,53 @@ use Illuminate\View\View;
 
 class LocationController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $locations = Location::tree();
-        $flatLocations = Location::query()->with('parent.parent.parent.parent')->orderByHierarchy()->get();
+        $flatLocations = Location::query()
+            ->with('parent.parent.parent.parent')
+            ->withCount('assets')
+            ->orderByHierarchy()
+            ->get();
+        $locations = Location::tree($flatLocations);
         $parentOptions = Location::query()
             ->canBeParent()
             ->with('parent.parent.parent.parent')
             ->orderByHierarchy()
             ->get();
         $duplicateNames = $this->duplicateNormalizedNames($flatLocations);
+        $canManageLocations = $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+
+        $initialDeleteLocation = null;
+        $deletingLocationId = (int) old('deleting_location_id');
+        if ($canManageLocations && $deletingLocationId > 0) {
+            $deletingLocation = $flatLocations->firstWhere('id', $deletingLocationId);
+            if ($deletingLocation && (int) $deletingLocation->assets_count > 0) {
+                $initialDeleteLocation = [
+                    'id' => $deletingLocation->id,
+                    'name' => $deletingLocation->name,
+                    'assetsCount' => (int) $deletingLocation->assets_count,
+                    'action' => route('locations.destroy', $deletingLocation),
+                    'replacementId' => (string) old('replacement_location_id', ''),
+                ];
+            }
+        }
 
         return view('locations.index', [
             'locations' => $locations,
             'flatLocations' => $flatLocations,
             'parentOptions' => $parentOptions,
             'duplicateNames' => $duplicateNames,
+            'locationOptions' => $flatLocations
+                ->map(fn (Location $location): array => [
+                    'id' => $location->id,
+                    'name' => $location->name,
+                    'room_code' => $location->room_code ?? '',
+                    'label' => filled($location->room_code)
+                        ? $location->breadcrumb().' ('.$location->room_code.')'
+                        : $location->breadcrumb(),
+                ])
+                ->values(),
+            'initialDeleteLocation' => $initialDeleteLocation,
         ]);
     }
 
@@ -76,10 +108,16 @@ class LocationController extends Controller
         return redirect()->route('locations.index')->with('status', 'Location updated.');
     }
 
-    public function destroy(Location $location): RedirectResponse
-    {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
-        $location->delete();
+    public function destroy(
+        DeleteLocationRequest $request,
+        Location $location,
+        BulkLocationUpdateService $locations,
+    ): RedirectResponse {
+        $replacement = Location::query()->findOrFail(
+            (int) $request->validated('replacement_location_id')
+        );
+
+        $locations->deleteWithReplacement($location, $replacement);
 
         return redirect()->route('locations.index')->with('status', 'Location deleted.');
     }
@@ -92,7 +130,7 @@ class LocationController extends Controller
     }
 
     /**
-     * @param  array{updated: int, deleted: int, merged: int, assets_moved: int}  $result
+     * @param  array{updated: int, deleted: int, merged: int, assets_moved: int, kept?: int}  $result
      */
     protected function bulkStatusMessage(array $result): string
     {
@@ -108,6 +146,11 @@ class LocationController extends Controller
 
         if ($result['deleted'] > 0) {
             $parts[] = $result['deleted'].' location'.($result['deleted'] === 1 ? '' : 's').' deleted';
+        }
+
+        $kept = (int) ($result['kept'] ?? 0);
+        if ($kept > 0) {
+            $parts[] = $kept.' location'.($kept === 1 ? '' : 's').' with no assets kept';
         }
 
         if ($result['updated'] > 0) {

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssetStatus;
 use App\Models\Concerns\BelongsToDepartment;
 use App\Services\FileAttachmentService;
+use App\Services\ManufacturerCatalogueService;
 use App\Support\AssetSearch;
 use App\Support\MacAddress;
 use Database\Factories\AssetFactory;
@@ -121,6 +122,52 @@ class Asset extends Model
         static::deleting(function (Asset $asset): void {
             app(FileAttachmentService::class)->detachAll($asset);
         });
+
+        static::updated(function (Asset $asset): void {
+            if (! $asset->wasChanged('manufacturer_id') && ! $asset->wasChanged('manufacturer_model_id')) {
+                return;
+            }
+
+            $previousManufacturerId = $asset->wasChanged('manufacturer_id')
+                ? self::nullableCatalogueId($asset->getOriginal('manufacturer_id'))
+                : null;
+            $previousModelId = $asset->wasChanged('manufacturer_model_id')
+                ? self::nullableCatalogueId($asset->getOriginal('manufacturer_model_id'))
+                : null;
+
+            if ($previousManufacturerId === self::nullableCatalogueId($asset->manufacturer_id)) {
+                $previousManufacturerId = null;
+            }
+
+            if ($previousModelId === self::nullableCatalogueId($asset->manufacturer_model_id)) {
+                $previousModelId = null;
+            }
+
+            if ($previousManufacturerId === null && $previousModelId === null) {
+                return;
+            }
+
+            app(ManufacturerCatalogueService::class)->releaseUnusedAssignments(
+                $previousManufacturerId,
+                $previousModelId,
+            );
+        });
+
+        static::deleted(function (Asset $asset): void {
+            app(ManufacturerCatalogueService::class)->releaseUnusedAssignments(
+                self::nullableCatalogueId($asset->manufacturer_id),
+                self::nullableCatalogueId($asset->manufacturer_model_id),
+            );
+        });
+    }
+
+    protected static function nullableCatalogueId(mixed $id): ?int
+    {
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        return (int) $id;
     }
 
     public function itemType(): BelongsTo

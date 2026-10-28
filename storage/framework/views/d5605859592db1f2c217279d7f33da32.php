@@ -66,12 +66,14 @@ unset($__defined_vars, $__key, $__value); ?>
             return [
                 'value' => (string) ($option['value'] ?? ''),
                 'label' => (string) ($option['label'] ?? ''),
+                'keywords' => (string) ($option['keywords'] ?? ''),
             ];
         }
 
         return [
             'value' => (string) data_get($option, 'value', data_get($option, 'id', '')),
             'label' => (string) data_get($option, 'label', data_get($option, 'name', '')),
+            'keywords' => (string) data_get($option, 'keywords', ''),
         ];
     })->values();
 
@@ -93,6 +95,7 @@ unset($__defined_vars, $__key, $__value); ?>
 ?>
 
 <div
+    data-searchable-select
     <?php echo e($attributes->except('aria-label')->class($compact ? 'relative' : 'relative mt-1')); ?>
 
     x-data="searchableSelect(<?php echo \Illuminate\Support\Js::from($normalized)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($selected !== null ? (string) $selected : '')->toHtml() ?>, {

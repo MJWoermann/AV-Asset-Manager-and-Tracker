@@ -9,7 +9,6 @@ use App\Models\AuditLog;
 use App\Models\ConnectionBus;
 use App\Models\ConnectionType;
 use App\Support\AssetExportColumns;
-use App\Support\ScannableIdentifierFields;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -386,6 +385,71 @@ class AssetConnectionService
                 ];
             }
         }
+
+        // #region agent log
+        $nodeIds = [];
+        $duplicateIds = [];
+        $parentIds = [];
+        foreach ($nodes as $node) {
+            $nodeId = (string) ($node['data']['id'] ?? '');
+            if (isset($nodeIds[$nodeId])) {
+                $duplicateIds[] = $nodeId;
+            }
+            $nodeIds[$nodeId] = true;
+            if (($node['data']['compound'] ?? false) === true) {
+                $parentIds[$nodeId] = true;
+            }
+        }
+        $missingEndpoints = [];
+        $selfLoops = [];
+        $parentEndpoints = [];
+        foreach ($edges as $edge) {
+            $source = (string) ($edge['data']['source'] ?? '');
+            $target = (string) ($edge['data']['target'] ?? '');
+            $edgeId = (string) ($edge['data']['id'] ?? '');
+            if (! isset($nodeIds[$source]) || ! isset($nodeIds[$target])) {
+                $missingEndpoints[] = $edgeId;
+            }
+            if ($source !== '' && $source === $target) {
+                $selfLoops[] = $edgeId;
+            }
+            if (isset($parentIds[$source]) || isset($parentIds[$target])) {
+                $parentEndpoints[] = $edgeId;
+            }
+        }
+        $multiTypeAssets = [];
+        foreach ($typesByAsset as $assetId => $types) {
+            if (count($types) < 2) {
+                continue;
+            }
+            $multiTypeAssets[] = [
+                'asset_id' => $assetId,
+                'types' => array_values(array_map(
+                    fn (ConnectionType $type): string => (string) $type->slug,
+                    $types
+                )),
+            ];
+        }
+        file_put_contents(base_path('debug-3223d1.log'), json_encode([
+            'sessionId' => '3223d1',
+            'hypothesisId' => 'H1',
+            'location' => 'AssetConnectionService.php:buildGraph',
+            'message' => 'graph built',
+            'data' => [
+                'filters' => array_values($filters['connection_type_ids'] ?? []),
+                'asset_count' => count($assets),
+                'node_count' => count($nodes),
+                'edge_count' => count($edges),
+                'multi_type_count' => count($multiTypeAssets),
+                'multi_type_assets' => array_slice($multiTypeAssets, 0, 20),
+                'duplicate_ids' => array_slice($duplicateIds, 0, 20),
+                'missing_endpoints' => array_slice($missingEndpoints, 0, 20),
+                'self_loops' => array_slice($selfLoops, 0, 20),
+                'parent_endpoints' => array_slice($parentEndpoints, 0, 20),
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
+        // #endregion
 
         return [
             'nodes' => $nodes,

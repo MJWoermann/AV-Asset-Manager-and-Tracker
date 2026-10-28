@@ -38,6 +38,10 @@ class BulkUpdateLocationsRequest extends FormRequest
             $merged['parent_id'] = null;
         }
 
+        if ($this->has('replacement_location_id') && $this->input('replacement_location_id') === '') {
+            $merged['replacement_location_id'] = null;
+        }
+
         $this->merge($merged);
     }
 
@@ -49,6 +53,12 @@ class BulkUpdateLocationsRequest extends FormRequest
             'location_ids.*' => ['integer', 'distinct', 'exists:locations,id'],
             'action' => ['required', Rule::in(['update', 'delete', 'merge_duplicates'])],
             'confirm_delete' => ['exclude_unless:action,delete', 'accepted'],
+            'replacement_location_id' => [
+                'exclude_unless:action,delete',
+                'nullable',
+                'integer',
+                Rule::exists('locations', 'id'),
+            ],
 
             'update_parent' => ['sometimes', 'boolean'],
             'clear_parent' => ['sometimes', 'boolean'],
@@ -66,12 +76,19 @@ class BulkUpdateLocationsRequest extends FormRequest
     {
         return [
             'parent_id.exists' => 'Racks cannot be a parent for another location.',
+            'replacement_location_id.exists' => 'Choose a valid replacement location.',
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            if ($this->input('action') === 'delete') {
+                $this->validateDeleteReplacement($validator);
+
+                return;
+            }
+
             if ($this->input('action') !== 'update') {
                 return;
             }
@@ -110,11 +127,44 @@ class BulkUpdateLocationsRequest extends FormRequest
         });
     }
 
+    protected function validateDeleteReplacement(Validator $validator): void
+    {
+        if ($validator->errors()->has('replacement_location_id')) {
+            return;
+        }
+
+        $selected = collect($this->input('location_ids', []))->map(fn ($id) => (int) $id);
+        if ($selected->isEmpty()) {
+            return;
+        }
+
+        $needsReplacement = Location::query()
+            ->whereIn('id', $selected)
+            ->whereHas('assets')
+            ->exists();
+
+        if (! $needsReplacement) {
+            return;
+        }
+
+        $replacementId = $this->input('replacement_location_id');
+        if ($replacementId === null || $replacementId === '') {
+            $validator->errors()->add('replacement_location_id', 'Choose a replacement location for assets.');
+
+            return;
+        }
+
+        if ($selected->contains((int) $replacementId)) {
+            $validator->errors()->add('replacement_location_id', 'Choose a location that is not being deleted.');
+        }
+    }
+
     /**
      * @return array{
      *     location_ids: array<int, int>,
      *     action: string,
      *     fields?: array<string, mixed>,
+     *     replacement_location_id?: int|null,
      * }
      */
     public function bulkPayload(): array
@@ -123,6 +173,13 @@ class BulkUpdateLocationsRequest extends FormRequest
             'location_ids' => $this->validated('location_ids'),
             'action' => $this->validated('action'),
         ];
+
+        if ($payload['action'] === 'delete') {
+            $replacementId = $this->validated('replacement_location_id');
+            $payload['replacement_location_id'] = $replacementId !== null ? (int) $replacementId : null;
+
+            return $payload;
+        }
 
         if ($payload['action'] !== 'update') {
             return $payload;

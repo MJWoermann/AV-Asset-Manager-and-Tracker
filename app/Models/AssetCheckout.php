@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
-use App\Enums\CheckoutPurpose;
+use App\Enums\CheckoutPurpose as SystemCheckoutPurpose;
 use App\Models\Concerns\BelongsToDepartment;
+use BackedEnum;
 use Database\Factories\AssetCheckoutFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,10 +38,22 @@ class AssetCheckout extends Model
     protected function casts(): array
     {
         return [
-            'purpose' => CheckoutPurpose::class,
             'expected_return_at' => 'datetime',
             'returned_at' => 'datetime',
         ];
+    }
+
+    protected function purpose(): Attribute
+    {
+        return Attribute::make(
+            set: function (BackedEnum|string|null $value): ?string {
+                if ($value instanceof BackedEnum) {
+                    return $value->value;
+                }
+
+                return $value;
+            },
+        );
     }
 
     public function asset(): BelongsTo
@@ -70,6 +84,32 @@ class AssetCheckout extends Model
     public function repair(): BelongsTo
     {
         return $this->belongsTo(Repair::class);
+    }
+
+    public function checkoutPurpose(): BelongsTo
+    {
+        return $this->belongsTo(CheckoutPurpose::class, 'purpose', 'slug');
+    }
+
+    public function purposeLabel(): string
+    {
+        $name = $this->checkoutPurpose?->name;
+
+        if (is_string($name) && $name !== '') {
+            return $name;
+        }
+
+        return SystemCheckoutPurpose::tryFrom((string) $this->purpose)?->label()
+            ?? (string) $this->purpose;
+    }
+
+    public function isRepairPurpose(): bool
+    {
+        if ($this->checkoutPurpose !== null) {
+            return $this->checkoutPurpose->isRepair();
+        }
+
+        return (string) $this->purpose === SystemCheckoutPurpose::Repair->value;
     }
 
     public function isOpen(): bool

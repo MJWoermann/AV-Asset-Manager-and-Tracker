@@ -128,7 +128,7 @@ Authenticated routes require `admin`, `inventory_manager`, or `scanner`. See `ro
 | Auth | `POST /api/auth/token`, `DELETE /api/auth/token`, `GET /api/user` |
 | Assets | `GET/POST/PUT/DELETE /api/assets`, `POST /api/assets/bulk-update`, `GET /api/assets/{id}/history`, maintenance log sub-routes |
 | Lists & scan | `GET/POST/PUT/DELETE /api/lists`, `POST /api/lists/compare`, `POST /api/scan`, `POST /api/scan-sessions`, session patch/close |
-| Locations | `GET/POST/PUT/DELETE /api/locations`, `POST /api/locations/bulk-update` |
+| Locations | `GET/POST/PUT/DELETE /api/locations`, `POST /api/locations/bulk-update`. Delete requires `replacement_location_id`. Locations with no assets are kept. |
 | Catalogue | `/api/manufacturers`, nested models, `/api/item-types`, `/api/custom-field-sets` |
 | Spares | `/api/spares`, `/api/spares/groups`, movements, supersede, chart |
 | Repairs | `/api/repairs`, workflow actions, `/api/repair-procedures` |

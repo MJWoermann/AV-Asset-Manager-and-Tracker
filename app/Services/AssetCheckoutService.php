@@ -3,10 +3,11 @@
 namespace App\Services;
 
 use App\Enums\AssetStatus;
-use App\Enums\CheckoutPurpose;
+use App\Enums\CheckoutPurpose as SystemCheckoutPurpose;
 use App\Models\Asset;
 use App\Models\AssetCheckout;
 use App\Models\AuditLog;
+use App\Models\CheckoutPurpose;
 use App\Models\Repair;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ class AssetCheckoutService
 
     /**
      * @param  array{
-     *     purpose: CheckoutPurpose|string,
+     *     purpose: SystemCheckoutPurpose|string,
      *     checked_out_to_user_id?: int|null,
      *     checked_out_to_name?: string|null,
      *     checked_out_to_email?: string|null,
@@ -34,9 +35,17 @@ class AssetCheckoutService
      */
     public function checkout(Asset $asset, array $input, User $by): AssetCheckout
     {
-        $purpose = $input['purpose'] instanceof CheckoutPurpose
-            ? $input['purpose']
-            : CheckoutPurpose::from((string) $input['purpose']);
+        $slug = $input['purpose'] instanceof SystemCheckoutPurpose
+            ? $input['purpose']->value
+            : trim((string) $input['purpose']);
+
+        $definition = CheckoutPurpose::query()->where('slug', $slug)->first();
+
+        if ($definition === null || ! $definition->is_active) {
+            throw ValidationException::withMessages([
+                'purpose' => 'Choose an active checkout option.',
+            ]);
+        }
 
         $toUserId = isset($input['checked_out_to_user_id'])
             ? (int) $input['checked_out_to_user_id']
@@ -72,13 +81,13 @@ class AssetCheckoutService
             ]);
         }
 
-        return DB::transaction(function () use ($asset, $input, $by, $purpose, $toUserId, $toName, $toEmail, $toCompany): AssetCheckout {
+        return DB::transaction(function () use ($asset, $input, $by, $definition, $toUserId, $toName, $toEmail, $toCompany): AssetCheckout {
             $current = $asset->status instanceof AssetStatus
                 ? $asset->status
                 : AssetStatus::from((string) $asset->status);
 
             $statusBefore = $current->value;
-            $statusAfter = $purpose === CheckoutPurpose::Repair
+            $statusAfter = $definition->isRepair()
                 ? AssetStatus::Maintenance
                 : AssetStatus::OnEvent;
 
@@ -91,7 +100,7 @@ class AssetCheckoutService
                 $repairId = null;
             }
 
-            if ($purpose === CheckoutPurpose::Repair && $repairId === null && (bool) ($input['create_repair'] ?? false)) {
+            if ($definition->isRepair() && $repairId === null && (bool) ($input['create_repair'] ?? false)) {
                 $summary = $this->nullableString($input['repair_summary'] ?? null)
                     ?? ('Checkout repair: '.$asset->name);
 
@@ -118,7 +127,7 @@ class AssetCheckoutService
                 }
             }
 
-            if ($purpose !== CheckoutPurpose::Repair) {
+            if (! $definition->isRepair()) {
                 $repairId = null;
             }
 
@@ -132,7 +141,7 @@ class AssetCheckoutService
                 'checked_out_to_company' => $toUserId !== null ? null : $toCompany,
                 'location_id' => $input['location_id'] ?? $asset->location_id,
                 'expected_return_at' => $input['expected_return_at'] ?? null,
-                'purpose' => $purpose,
+                'purpose' => $definition->slug,
                 'repair_id' => $repairId,
                 'asset_status_before' => $statusBefore,
                 'notes' => $this->nullableString($input['notes'] ?? null),
@@ -147,7 +156,7 @@ class AssetCheckoutService
                 'old_values' => ['status' => $statusBefore],
                 'new_values' => [
                     'checkout_id' => $checkout->id,
-                    'purpose' => $purpose->value,
+                    'purpose' => $definition->slug,
                     'status' => $statusAfter->value,
                     'checked_out_to_user_id' => $toUserId,
                     'checked_out_to_name' => $checkout->checked_out_to_name,
@@ -156,7 +165,7 @@ class AssetCheckoutService
                 'created_at' => now(),
             ]);
 
-            return $checkout->fresh(['asset', 'checkedOutTo', 'checkedOutBy', 'repair']);
+            return $checkout->fresh(['asset', 'checkedOutTo', 'checkedOutBy', 'repair', 'checkoutPurpose']);
         });
     }
 
@@ -171,11 +180,7 @@ class AssetCheckoutService
             ]);
         }
 
-        $purpose = $checkout->purpose instanceof CheckoutPurpose
-            ? $checkout->purpose
-            : CheckoutPurpose::from((string) $checkout->purpose);
-
-        if ($purpose === CheckoutPurpose::Repair && $checkout->repair_id && ! ($input['force'] ?? false)) {
+        if ($checkout->isRepairPurpose() && $checkout->repair_id && ! ($input['force'] ?? false)) {
             $repair = $checkout->repair ?? Repair::query()->find($checkout->repair_id);
             if ($repair !== null && $repair->isActive()) {
                 throw ValidationException::withMessages([
@@ -223,9 +228,7 @@ class AssetCheckoutService
                 'new_values' => [
                     'checkout_id' => $checkout->id,
                     'status' => $statusAfter->value,
-                    'purpose' => $checkout->purpose instanceof CheckoutPurpose
-                        ? $checkout->purpose->value
-                        : (string) $checkout->purpose,
+                    'purpose' => (string) $checkout->purpose,
                 ],
                 'created_at' => now(),
             ]);

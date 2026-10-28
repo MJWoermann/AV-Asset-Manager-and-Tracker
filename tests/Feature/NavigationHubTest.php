@@ -60,7 +60,8 @@ class NavigationHubTest extends TestCase
         $this->actingAs($user)->get(route('reports.index'))
             ->assertOk()
             ->assertSee('Compare')
-            ->assertSee('Unknown scans');
+            ->assertSee('Unknown scans')
+            ->assertDontSee('Checkout holdings');
     }
 
     public function test_inventory_manager_sees_manager_data_and_maintenance_links(): void

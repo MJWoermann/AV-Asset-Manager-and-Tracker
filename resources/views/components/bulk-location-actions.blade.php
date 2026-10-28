@@ -1,5 +1,6 @@
 @props([
     'parents',
+    'locations',
 ])
 
 <div
@@ -21,6 +22,7 @@
     </div>
 
     <form
+        id="locations-bulk-form"
         method="POST"
         action="{{ route('locations.bulk-update') }}"
         class="mt-4 space-y-4 border-t border-brand-silver dark:border-brand-charcoal pt-4"
@@ -76,11 +78,26 @@
     <div class="relative w-full max-w-md max-h-[calc(100vh-3rem)] overflow-y-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-6 space-y-4 shadow-xl">
         <h3 class="text-lg font-semibold">Confirm delete</h3>
         <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-            Permanently delete
-            <span class="font-semibold text-brand-black dark:text-white" x-text="selectedCount"></span>
-            <span x-text="selectedCount === 1 ? 'location' : 'locations'"></span>?
-            Child locations become top-level and assets at these locations lose their location.
+            Permanently delete selected locations that have assets.
+            Those assets move to the replacement location.
+            Locations with no assets stay on the list.
+            Child locations stay and become top-level.
         </p>
+        <div x-show="selectionIncludesAssets()" class="space-y-2">
+            <label class="block text-sm font-medium" for="bulk_replacement_location_id">Replacement location</label>
+            <x-searchable-select
+                name="replacement_location_id"
+                id="bulk_replacement_location_id"
+                form="locations-bulk-form"
+                placeholder="Search by name or room code…"
+                :options="$locations->map(fn ($option) => [
+                    'value' => $option['id'],
+                    'label' => $option['label'],
+                    'keywords' => trim(($option['name'] ?? '').' '.($option['room_code'] ?? '')),
+                ])"
+            />
+            <p class="text-sm text-red-700" x-show="bulkReplacementError" x-text="bulkReplacementError"></p>
+        </div>
         <div class="flex justify-end gap-2">
             <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="cancelDelete()">Cancel</button>
             <button type="button" class="px-3 py-2 text-sm bg-red-700 text-white" @click="confirmDelete()">Delete permanently</button>

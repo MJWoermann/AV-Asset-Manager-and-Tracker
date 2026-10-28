@@ -120,6 +120,41 @@ class StockMovementService
 
         $recordedAt = $this->resolveRecordedAt($input['recorded_at'] ?? null);
 
+        // #region agent log
+        $chronologicalPrevious = StockMovement::query()
+            ->where('asset_id', $asset->id)
+            ->where('recorded_at', '<=', $recordedAt)
+            ->orderByDesc('recorded_at')
+            ->orderByDesc('id')
+            ->first(['id', 'recorded_at', 'quantity_after', 'type']);
+        $latestMovement = StockMovement::query()
+            ->where('asset_id', $asset->id)
+            ->orderByDesc('recorded_at')
+            ->orderByDesc('id')
+            ->first(['id', 'recorded_at', 'quantity_after']);
+        file_put_contents(base_path('debug-ff4d0e.log'), json_encode([
+            'sessionId' => 'ff4d0e',
+            'runId' => 'pre-fix',
+            'hypothesisId' => 'H5',
+            'location' => 'StockMovementService.php:record',
+            'message' => 'restock base quantity vs chronological previous',
+            'data' => [
+                'assetId' => $asset->id,
+                'type' => $type->value,
+                'inputQuantity' => $input['quantity'] ?? $input['quantity_delta'] ?? null,
+                'assetQuantityBefore' => $before,
+                'resolvedAfter' => $after,
+                'recordedAt' => $recordedAt->toIso8601String(),
+                'chronologicalPreviousAfter' => $chronologicalPrevious?->quantity_after,
+                'chronologicalPreviousAt' => $chronologicalPrevious?->recorded_at?->toIso8601String(),
+                'latestMovementAfter' => $latestMovement?->quantity_after,
+                'latestMovementAt' => $latestMovement?->recorded_at?->toIso8601String(),
+                'baseDiffersFromPrevious' => $chronologicalPrevious !== null && (int) $chronologicalPrevious->quantity_after !== $before,
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ]).PHP_EOL, FILE_APPEND);
+        // #endregion
+
         return DB::transaction(function () use ($asset, $type, $source, $before, $after, $input, $user, $uploads, $recordedAt): StockMovement {
             $movement = StockMovement::query()->create([
                 'asset_id' => $asset->id,

@@ -4,9 +4,12 @@ namespace Tests\Feature;
 
 use App\Enums\AssetStatus;
 use App\Models\Asset;
+use App\Models\Department;
 use App\Models\ItemType;
 use App\Models\Manufacturer;
 use App\Models\ManufacturerModel;
+use App\Models\RepairProcedure;
+use App\Models\SparePart;
 use App\Models\User;
 use App\Services\ManufacturerCatalogueService;
 use Database\Seeders\RoleSeeder;
@@ -66,6 +69,46 @@ class ManufacturerCatalogueTest extends TestCase
         $response->assertDontSee('QL1', false);
         $response->assertSee('Assets', false);
         $response->assertSee(route('manufacturers.models.index', $manufacturer), false);
+    }
+
+    public function test_manager_delete_dialogs_use_searchable_replacement_lists(): void
+    {
+        $user = $this->manager();
+        $keep = Manufacturer::factory()->create(['name' => 'KeepCo']);
+        $delete = Manufacturer::factory()->create(['name' => 'DeleteCo']);
+        ManufacturerModel::factory()->create([
+            'manufacturer_id' => $keep->id,
+            'name' => 'Keep Model',
+        ]);
+        $deleteModel = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $delete->id,
+            'name' => 'Delete Model',
+        ]);
+
+        $index = $this->actingAs($user)->get(route('manufacturers.index'));
+
+        $index->assertOk();
+        $index->assertSee('id="replacement_manufacturer_id"', false);
+        $index->assertSee('id="replacement_manufacturer_model_id"', false);
+        $index->assertSee('Search manufacturers…', false);
+        $index->assertSee('Search models…', false);
+        $index->assertSee('searchableSelect(', false);
+        $index->assertDontSee('<select id="replacement_manufacturer_id"', false);
+        $index->assertDontSee('<select id="replacement_manufacturer_model_id"', false);
+
+        $manufacturerEdit = $this->actingAs($user)->get(route('manufacturers.edit', $delete));
+
+        $manufacturerEdit->assertOk();
+        $manufacturerEdit->assertSee('id="replacement_manufacturer_id"', false);
+        $manufacturerEdit->assertSee('Search manufacturers…', false);
+        $manufacturerEdit->assertDontSee('<select id="replacement_manufacturer_id"', false);
+
+        $modelEdit = $this->actingAs($user)->get(route('manufacturers.models.edit', [$delete, $deleteModel]));
+
+        $modelEdit->assertOk();
+        $modelEdit->assertSee('id="replacement_manufacturer_model_id"', false);
+        $modelEdit->assertSee('Search models…', false);
+        $modelEdit->assertDontSee('<select id="replacement_manufacturer_model_id"', false);
     }
 
     public function test_index_includes_hierarchy_expand_controls(): void
@@ -410,6 +453,205 @@ class ManufacturerCatalogueTest extends TestCase
         $this->assertSame('BrandNew', $wash->manufacturer?->name);
         $this->assertSame('WashX', $wash->manufacturerModel?->name);
         $this->assertSame(1, Manufacturer::query()->where('name', 'BrandNew')->count());
+    }
+
+    public function test_reassigning_the_last_asset_removes_the_previous_model_and_manufacturer(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->itemType();
+        $drop = Manufacturer::factory()->create(['name' => 'DropCo']);
+        $keep = Manufacturer::factory()->create(['name' => 'KeepCo']);
+        $dropModel = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $drop->id,
+            'name' => 'DropModel',
+        ]);
+        $keepModel = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $keep->id,
+            'name' => 'KeepModel',
+        ]);
+        $asset = Asset::create([
+            'name' => 'Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $drop->id,
+            'manufacturer_model_id' => $dropModel->id,
+        ]);
+
+        $response = $this->actingAs($user)->put(route('assets.update', $asset), [
+            'name' => 'Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available->value,
+            'manufacturer_id' => $keep->id,
+            'manufacturer_model_id' => $keepModel->id,
+        ]);
+
+        $response->assertRedirect(route('assets.show', $asset));
+        $asset->refresh();
+        $this->assertSame($keep->id, $asset->manufacturer_id);
+        $this->assertSame($keepModel->id, $asset->manufacturer_model_id);
+        $this->assertModelMissing($drop);
+        $this->assertModelMissing($dropModel);
+        $this->assertModelExists($keep);
+        $this->assertModelExists($keepModel);
+    }
+
+    public function test_deleting_the_last_asset_removes_its_model_and_manufacturer(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->itemType();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'GoneCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'GoneModel',
+        ]);
+        $asset = Asset::create([
+            'name' => 'Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('assets.destroy', $asset));
+
+        $response->assertRedirect(route('assets.index'));
+        $this->assertModelMissing($asset);
+        $this->assertModelMissing($manufacturer);
+        $this->assertModelMissing($model);
+    }
+
+    public function test_model_and_manufacturer_remain_while_another_asset_uses_them(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->itemType();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'StillCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'StillModel',
+        ]);
+        $removed = Asset::create([
+            'name' => 'Removed Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+        Asset::create([
+            'name' => 'Remaining Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('assets.destroy', $removed));
+
+        $response->assertRedirect(route('assets.index'));
+        $this->assertModelExists($manufacturer);
+        $this->assertModelExists($model);
+    }
+
+    public function test_model_linked_to_a_spare_part_remains_after_its_last_asset_is_cleared(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->itemType();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'SpareCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'SpareModel',
+        ]);
+        $asset = Asset::create([
+            'name' => 'Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+        SparePart::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+
+        $response = $this->actingAs($user)->put(route('assets.update', $asset), [
+            'name' => 'Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available->value,
+            'manufacturer_id' => '',
+            'manufacturer_model_id' => '',
+        ]);
+
+        $response->assertRedirect(route('assets.show', $asset));
+        $asset->refresh();
+        $this->assertNull($asset->manufacturer_id);
+        $this->assertNull($asset->manufacturer_model_id);
+        $this->assertModelExists($manufacturer);
+        $this->assertModelExists($model);
+    }
+
+    public function test_model_linked_to_a_repair_procedure_remains_after_its_last_asset_is_cleared(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->itemType();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'ProcedureCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'ProcedureModel',
+        ]);
+        $asset = Asset::create([
+            'name' => 'Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+        RepairProcedure::factory()->create([
+            'manufacturer_model_id' => $model->id,
+        ]);
+
+        $response = $this->actingAs($user)->put(route('assets.update', $asset), [
+            'name' => 'Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available->value,
+            'manufacturer_id' => '',
+            'manufacturer_model_id' => '',
+        ]);
+
+        $response->assertRedirect(route('assets.show', $asset));
+        $this->assertModelExists($manufacturer);
+        $this->assertModelExists($model);
+    }
+
+    public function test_manufacturer_remains_when_another_department_still_has_an_asset(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->itemType();
+        $otherDepartment = Department::factory()->create();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'SharedCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'SharedModel',
+        ]);
+        $visible = Asset::create([
+            'name' => 'Visible Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+        Asset::withoutDepartmentScope()->create([
+            'department_id' => $otherDepartment->id,
+            'name' => 'Other Department Fixture',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('assets.destroy', $visible));
+
+        $response->assertRedirect(route('assets.index'));
+        $this->assertModelExists($manufacturer);
+        $this->assertModelExists($model);
     }
 
     public function test_catalogue_service_resolves_case_insensitive_names(): void

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\LocationType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BulkUpdateLocationsRequest;
+use App\Http\Requests\DeleteLocationRequest;
 use App\Models\Location;
 use App\Services\BulkLocationUpdateService;
 use App\Support\TextSearch;
@@ -58,10 +59,16 @@ class LocationApiController extends Controller
         return response()->json($location->fresh());
     }
 
-    public function destroy(Request $request, Location $location): JsonResponse
-    {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
-        $location->delete();
+    public function destroy(
+        DeleteLocationRequest $request,
+        Location $location,
+        BulkLocationUpdateService $locations,
+    ): JsonResponse {
+        $replacement = Location::query()->findOrFail(
+            (int) $request->validated('replacement_location_id')
+        );
+
+        $locations->deleteWithReplacement($location, $replacement);
 
         return response()->json(['message' => 'Location deleted.']);
     }

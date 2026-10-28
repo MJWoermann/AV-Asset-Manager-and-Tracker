@@ -28,7 +28,27 @@ class ConnectionMapController extends Controller
             'asset_id' => $assetId,
         ];
 
-        $graph = $connections->buildGraph($filters);
+        try {
+            $graph = $connections->buildGraph($filters);
+        } catch (\Throwable $exception) {
+            // #region agent log
+            file_put_contents(base_path('debug-3223d1.log'), json_encode([
+                'sessionId' => '3223d1',
+                'hypothesisId' => 'H5',
+                'location' => 'ConnectionMapController.php:index',
+                'message' => 'buildGraph threw',
+                'data' => [
+                    'filters' => $filters['connection_type_ids'] ?? [],
+                    'error' => $exception->getMessage(),
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ])."\n", FILE_APPEND);
+            // #endregion
+
+            throw $exception;
+        }
 
         $focusAsset = $assetId
             ? Asset::query()->find($assetId)

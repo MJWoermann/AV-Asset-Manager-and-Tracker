@@ -508,14 +508,14 @@
 
                     <?php case ('items_users_by_department'): ?>
                         <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin')): ?>
-                            <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal h-full flex flex-col">
                                 <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
                                     <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Items &amp; users by department</h3>
                                 </div>
                                 <?php if(($itemsUsersByDepartment ?? []) === []): ?>
-                                    <p class="px-4 py-6 text-sm text-center text-brand-charcoal dark:text-brand-silver">No departments yet.</p>
+                                    <p class="px-4 py-6 text-sm text-center text-brand-charcoal dark:text-brand-silver min-h-80 flex items-center justify-center">No departments yet.</p>
                                 <?php else: ?>
-                                    <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                                    <div class="overflow-x-auto h-80 overflow-y-auto flex-1">
                                         <table class="min-w-full text-sm">
                                             <thead class="bg-brand-silver dark:bg-brand-charcoal text-left sticky top-0">
                                                 <tr>

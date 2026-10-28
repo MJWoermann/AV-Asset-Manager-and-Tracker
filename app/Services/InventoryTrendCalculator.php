@@ -42,6 +42,38 @@ class InventoryTrendCalculator
 
         [$slope, $intercept] = $this->linearRegression($xs, $ys);
 
+        // #region agent log
+        $debugProjectionPreview = $this->projectionPoints($movements, $slope, $intercept, $origin, null);
+        $debugRestocks = 0;
+        foreach ($movements as $debugMovement) {
+            $debugType = $debugMovement->type->value ?? null;
+            if ($debugType === 'restock') {
+                $debugRestocks++;
+            }
+        }
+        file_put_contents(base_path('debug-ff4d0e.log'), json_encode([
+            'sessionId' => 'ff4d0e',
+            'runId' => 'pre-fix',
+            'hypothesisId' => 'H2-H4',
+            'location' => 'InventoryTrendCalculator.php:compute',
+            'message' => 'trend fit vs actual counts',
+            'data' => [
+                'movementCount' => count($xs),
+                'restockCount' => $debugRestocks,
+                'slopePerDay' => $slope,
+                'intercept' => $intercept,
+                'actualYMin' => min($ys),
+                'actualYMax' => max($ys),
+                'projection' => $debugProjectionPreview,
+                'minLevel' => $minLevel,
+                'daysToMin' => $slope < -0.0001 ? ($minLevel - $intercept) / $slope : null,
+                'firstRecordedAt' => $movements->first()->recorded_at?->toIso8601String(),
+                'lastRecordedAt' => $movements->last()->recorded_at?->toIso8601String(),
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ]).PHP_EOL, FILE_APPEND);
+        // #endregion
+
         // Declining stock only projects a useful reorder ETA.
         if ($slope >= -0.0001) {
             return [

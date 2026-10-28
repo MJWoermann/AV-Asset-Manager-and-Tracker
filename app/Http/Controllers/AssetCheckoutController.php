@@ -21,7 +21,7 @@ class AssetCheckoutController extends Controller
 
         return redirect()
             ->route('assets.show', [$asset, 'tab' => 'checkout'])
-            ->with('status', 'Asset checked out ('.$checkout->purpose->label().').');
+            ->with('status', 'Asset checked out ('.$checkout->purposeLabel().').');
     }
 
     public function returnCheckout(

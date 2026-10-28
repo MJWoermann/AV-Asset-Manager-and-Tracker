@@ -4,8 +4,13 @@ namespace App\Services;
 
 use App\Enums\LocationType;
 use App\Models\Asset;
+use App\Models\AssetCheckout;
 use App\Models\Location;
 use App\Models\LocationAlias;
+use App\Models\ScanSession;
+use App\Models\SpareGroup;
+use App\Models\SparePart;
+use App\Models\UnknownScan;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -17,8 +22,9 @@ class BulkLocationUpdateService
      *     location_ids: array<int, int>,
      *     action: string,
      *     fields?: array<string, mixed>,
+     *     replacement_location_id?: int|null,
      * }  $payload
-     * @return array{updated: int, deleted: int, merged: int, assets_moved: int}
+     * @return array{updated: int, deleted: int, merged: int, assets_moved: int, kept: int}
      */
     public function handle(array $payload): array
     {
@@ -26,7 +32,10 @@ class BulkLocationUpdateService
 
         return DB::transaction(function () use ($payload, $locationIds) {
             return match ($payload['action'] ?? '') {
-                'delete' => $this->deleteLocations($locationIds),
+                'delete' => $this->deleteLocations(
+                    $locationIds,
+                    isset($payload['replacement_location_id']) ? (int) $payload['replacement_location_id'] : null,
+                ),
                 'merge_duplicates' => $this->mergeDuplicateNames($locationIds),
                 'update' => $this->updateLocations($locationIds, $payload['fields'] ?? []),
                 default => throw ValidationException::withMessages([
@@ -39,7 +48,7 @@ class BulkLocationUpdateService
     /**
      * @param  Collection<int, int|string>  $locationIds
      * @param  array<string, mixed>  $fields
-     * @return array{updated: int, deleted: int, merged: int, assets_moved: int}
+     * @return array{updated: int, deleted: int, merged: int, assets_moved: int, kept: int}
      */
     protected function updateLocations(Collection $locationIds, array $fields): array
     {
@@ -62,6 +71,7 @@ class BulkLocationUpdateService
             'deleted' => 0,
             'merged' => 0,
             'assets_moved' => 0,
+            'kept' => 0,
         ];
     }
 
@@ -98,15 +108,45 @@ class BulkLocationUpdateService
 
     /**
      * @param  Collection<int, int|string>  $locationIds
-     * @return array{updated: int, deleted: int, merged: int, assets_moved: int}
+     * @return array{updated: int, deleted: int, merged: int, assets_moved: int, kept: int}
      */
-    protected function deleteLocations(Collection $locationIds): array
+    protected function deleteLocations(Collection $locationIds, ?int $replacementId): array
     {
-        $locations = Location::query()->whereIn('id', $locationIds)->orderByDesc('id')->get();
+        $locations = Location::query()
+            ->whereIn('id', $locationIds)
+            ->withCount('assets')
+            ->orderByDesc('id')
+            ->get();
+
+        $replacement = null;
+        if ($locations->contains(fn (Location $location): bool => (int) $location->assets_count > 0)) {
+            $replacement = $replacementId !== null
+                ? Location::query()->find($replacementId)
+                : null;
+
+            if ($replacement === null) {
+                throw ValidationException::withMessages([
+                    'replacement_location_id' => 'Choose a replacement location for assets.',
+                ]);
+            }
+        }
+
         $deleted = 0;
+        $kept = 0;
+        $assetsMoved = 0;
 
         foreach ($locations as $location) {
-            $location->delete();
+            if ((int) $location->assets_count === 0) {
+                $kept++;
+
+                continue;
+            }
+
+            if ($replacement === null || $location->is($replacement)) {
+                continue;
+            }
+
+            $assetsMoved += $this->reassignAndDelete($location, $replacement);
             $deleted++;
         }
 
@@ -114,8 +154,54 @@ class BulkLocationUpdateService
             'updated' => 0,
             'deleted' => $deleted,
             'merged' => 0,
-            'assets_moved' => 0,
+            'assets_moved' => $assetsMoved,
+            'kept' => $kept,
         ];
+    }
+
+    public function deleteWithReplacement(Location $location, Location $replacement): void
+    {
+        if ($location->is($replacement)) {
+            throw ValidationException::withMessages([
+                'replacement_location_id' => 'Choose a different location.',
+            ]);
+        }
+
+        DB::transaction(function () use ($location, $replacement): void {
+            if (! $location->assets()->exists()) {
+                throw ValidationException::withMessages([
+                    'location' => 'Locations with no assets stay on the list.',
+                ]);
+            }
+
+            $this->reassignAndDelete($location, $replacement);
+        });
+    }
+
+    /**
+     * Move records that point at the location, then delete it.
+     * Child locations are left in place (their parent becomes empty) so locations
+     * with no assets remain on the list.
+     */
+    protected function reassignAndDelete(Location $location, Location $replacement): int
+    {
+        $fromId = (int) $location->id;
+        $toId = (int) $replacement->id;
+
+        $assetsMoved = Asset::query()
+            ->where('location_id', $fromId)
+            ->update(['location_id' => $toId]);
+
+        SparePart::query()->where('location_id', $fromId)->update(['location_id' => $toId]);
+        SpareGroup::query()->where('location_id', $fromId)->update(['location_id' => $toId]);
+        ScanSession::query()->where('location_id', $fromId)->update(['location_id' => $toId]);
+        UnknownScan::query()->where('location_id', $fromId)->update(['location_id' => $toId]);
+        AssetCheckout::query()->where('location_id', $fromId)->update(['location_id' => $toId]);
+
+        LocationAlias::recordMerge($location, $replacement);
+        $location->delete();
+
+        return $assetsMoved;
     }
 
     /**
@@ -124,7 +210,7 @@ class BulkLocationUpdateService
      * Prefer keeping a location that has a room code and sits under a site.
      *
      * @param  Collection<int, int|string>  $locationIds
-     * @return array{updated: int, deleted: int, merged: int, assets_moved: int}
+     * @return array{updated: int, deleted: int, merged: int, assets_moved: int, kept: int}
      */
     protected function mergeDuplicateNames(Collection $locationIds): array
     {
@@ -180,6 +266,7 @@ class BulkLocationUpdateService
             'deleted' => $deleted,
             'merged' => $merged,
             'assets_moved' => $assetsMoved,
+            'kept' => 0,
         ];
     }
 

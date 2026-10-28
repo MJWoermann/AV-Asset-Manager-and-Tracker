@@ -290,7 +290,7 @@
             </div>
         <?php endif; ?>
 
-        <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+        <div data-debug-unknown-scans class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver/40 dark:bg-brand-charcoal/40 text-left">
                     <tr>
@@ -308,7 +308,9 @@
                     <?php $__empty_1 = true; $__currentLoopData = $scans; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $scan): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                         <tr>
                             <td class="px-3 py-2 whitespace-nowrap"><?php echo e($scan->created_at?->format('Y-m-d H:i')); ?></td>
-                            <td class="px-3 py-2 font-medium"><?php echo e($scan->scanned_code); ?></td>
+                            <td class="px-3 py-2 font-medium">
+                                <div class="max-w-xs break-all"><?php echo e($scan->scanned_code); ?></div>
+                            </td>
                             <td class="px-3 py-2"><?php echo e($scan->user?->name); ?></td>
                             <td class="px-3 py-2"><?php echo e($scan->location?->breadcrumb() ?? '—'); ?></td>
                             <td class="px-3 py-2"><?php echo e($scan->eventList?->name ?? '—'); ?></td>
@@ -360,6 +362,62 @@
             <?php echo e($scans->links()); ?>
 
         </div>
+
+        
+        <script>
+            requestAnimationFrame(() => {
+                const wrap = document.querySelector('[data-debug-unknown-scans]');
+                const table = wrap?.querySelector('table');
+                const rows = [...(wrap?.querySelectorAll('tbody tr') ?? [])];
+                const codeCell = rows.reduce((best, row) => {
+                    const cell = row.children[1];
+                    if (!cell) return best;
+                    return (cell.textContent?.trim().length ?? 0) > (best?.textContent?.trim().length ?? 0) ? cell : best;
+                }, null);
+                const row = codeCell?.parentElement;
+                const actionCell = row?.children[7] ?? null;
+                const noteCell = row?.children[5] ?? null;
+                const locationCell = row?.children[3] ?? null;
+                const actionRect = actionCell?.getBoundingClientRect();
+                const codeStyle = codeCell ? getComputedStyle(codeCell) : null;
+                const codeInner = codeCell?.querySelector('div') ?? null;
+                const innerStyle = codeInner ? getComputedStyle(codeInner) : null;
+                const payload = {
+                    sessionId: '8b670d',
+                    runId: 'post-fix',
+                    hypothesisId: 'A-E',
+                    location: 'unknown-scans.blade.php:layout',
+                    message: 'unknown scan table overflow',
+                    timestamp: Date.now(),
+                    data: {
+                        viewport: window.innerWidth,
+                        wrapClient: wrap?.clientWidth ?? null,
+                        wrapScroll: wrap?.scrollWidth ?? null,
+                        tableScroll: table?.scrollWidth ?? null,
+                        codeLen: codeCell?.textContent?.trim().length ?? 0,
+                        codeHasSpace: /\s/.test(codeCell?.textContent ?? ''),
+                        codeClient: codeCell?.clientWidth ?? null,
+                        codeScroll: codeCell?.scrollWidth ?? null,
+                        codeWhiteSpace: codeStyle?.whiteSpace ?? null,
+                        codeWordBreak: codeStyle?.wordBreak ?? null,
+                        codeOverflowWrap: codeStyle?.overflowWrap ?? null,
+                        noteClient: noteCell?.clientWidth ?? null,
+                        noteScroll: noteCell?.scrollWidth ?? null,
+                        locationClient: locationCell?.clientWidth ?? null,
+                        locationScroll: locationCell?.scrollWidth ?? null,
+                        actionRight: actionRect ? Math.round(actionRect.right) : null,
+                        actionOffscreen: actionRect ? actionRect.right > window.innerWidth + 1 : null,
+                        wrapScrolls: wrap ? wrap.scrollWidth > wrap.clientWidth + 1 : null,
+                    },
+                };
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '8b670d' },
+                    body: JSON.stringify(payload),
+                }).catch(() => {});
+            });
+        </script>
+        
 
         <?php if (isset($component)) { $__componentOriginal9f64f32e90b9102968f2bc548315018c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal9f64f32e90b9102968f2bc548315018c = $attributes; } ?>

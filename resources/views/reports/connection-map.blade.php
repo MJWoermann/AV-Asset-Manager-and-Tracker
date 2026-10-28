@@ -7,6 +7,41 @@
         class="px-4 sm:px-6 lg:px-8"
         x-data="connectionMap(@js($graph))"
     >
+        <script>
+            (function () {
+                const graph = @js($graph);
+                const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+                const edges = Array.isArray(graph.edges) ? graph.edges : [];
+                const post = (hypothesisId, message, data) => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3223d1'},body:JSON.stringify({sessionId:'3223d1',hypothesisId,location:'connection-map.blade.php',message,data,timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
+                };
+                post('H1', 'page graph', {
+                    nodeCount: nodes.length,
+                    edgeCount: edges.length,
+                    compoundCount: nodes.filter((node) => node?.data?.compound).length,
+                    portCount: nodes.filter((node) => node?.data?.kind === 'type-port').length,
+                    focusAssetId: graph.focus_asset_id ?? null,
+                });
+                window.addEventListener('error', (event) => {
+                    post('HR', 'window error', {
+                        message: event.message,
+                        filename: event.filename,
+                        lineno: event.lineno,
+                        colno: event.colno,
+                        stack: event.error && event.error.stack ? String(event.error.stack).slice(0, 1500) : null,
+                    });
+                });
+                window.addEventListener('unhandledrejection', (event) => {
+                    const reason = event.reason;
+                    post('HR', 'unhandled rejection', {
+                        message: reason && (reason.message || String(reason)),
+                        stack: reason && reason.stack ? String(reason.stack).slice(0, 1500) : null,
+                    });
+                });
+            })();
+        </script>
         <form method="GET" action="{{ route('reports.connection-map') }}" class="space-y-2">
             @if($filters['asset_id'] ?? null)
                 <input type="hidden" name="asset_id" value="{{ $filters['asset_id'] }}">

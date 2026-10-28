@@ -122,19 +122,17 @@
                     </p>
                     <div>
                         <x-input-label for="replacement_manufacturer_model_id" value="Replacement model" />
-                        <select
-                            id="replacement_manufacturer_model_id"
+                        <x-searchable-select
                             name="replacement_manufacturer_model_id"
-                            class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                            id="replacement_manufacturer_model_id"
+                            placeholder="Search models…"
+                            :options="$replacementModels->map(fn ($option) => [
+                                'value' => $option->id,
+                                'label' => trim(($option->manufacturer?->name ?? '').' / '.$option->name, ' /'),
+                            ])"
+                            :selected="old('replacement_manufacturer_model_id')"
                             required
-                        >
-                            <option value="">Select a model…</option>
-                            @foreach($replacementModels as $option)
-                                <option value="{{ $option->id }}" @selected((string) old('replacement_manufacturer_model_id') === (string) $option->id)>
-                                    {{ $option->manufacturer?->name }} / {{ $option->name }}
-                                </option>
-                            @endforeach
-                        </select>
+                        />
                         <x-input-error :messages="$errors->get('replacement_manufacturer_model_id')" class="mt-2" />
                     </div>
                     <div class="flex justify-end gap-2">

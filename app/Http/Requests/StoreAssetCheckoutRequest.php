@@ -31,7 +31,14 @@ class StoreAssetCheckoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'purpose' => ['required', Rule::enum(CheckoutPurpose::class)],
+            'purpose' => [
+                'required',
+                'string',
+                'max:32',
+                Rule::exists('checkout_purposes', 'slug')->where(
+                    fn ($query) => $query->where('is_active', true)
+                ),
+            ],
             'checked_out_to_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'checked_out_to_name' => ['nullable', 'string', 'max:255'],
             'checked_out_to_email' => ['nullable', 'email', 'max:255'],
@@ -43,6 +50,16 @@ class StoreAssetCheckoutRequest extends FormRequest
             'create_repair' => ['nullable', 'boolean'],
             'repair_summary' => ['nullable', 'string', 'max:255'],
             'repair_notes' => ['nullable', 'string', 'max:10000'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'purpose.exists' => 'Choose an active checkout option.',
         ];
     }
 

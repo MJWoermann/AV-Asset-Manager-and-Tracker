@@ -145,7 +145,7 @@
             </div>
         @endrole
 
-        <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+        <div data-debug-unknown-scans class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
             <table class="min-w-full text-sm">
                 <thead class="bg-brand-silver/40 dark:bg-brand-charcoal/40 text-left">
                     <tr>
@@ -163,7 +163,9 @@
                     @forelse($scans as $scan)
                         <tr>
                             <td class="px-3 py-2 whitespace-nowrap">{{ $scan->created_at?->format('Y-m-d H:i') }}</td>
-                            <td class="px-3 py-2 font-medium">{{ $scan->scanned_code }}</td>
+                            <td class="px-3 py-2 font-medium">
+                                <div class="max-w-xs break-all">{{ $scan->scanned_code }}</div>
+                            </td>
                             <td class="px-3 py-2">{{ $scan->user?->name }}</td>
                             <td class="px-3 py-2">{{ $scan->location?->breadcrumb() ?? '—' }}</td>
                             <td class="px-3 py-2">{{ $scan->eventList?->name ?? '—' }}</td>
@@ -213,6 +215,62 @@
         <div>
             {{ $scans->links() }}
         </div>
+
+        {{-- #region agent log --}}
+        <script>
+            requestAnimationFrame(() => {
+                const wrap = document.querySelector('[data-debug-unknown-scans]');
+                const table = wrap?.querySelector('table');
+                const rows = [...(wrap?.querySelectorAll('tbody tr') ?? [])];
+                const codeCell = rows.reduce((best, row) => {
+                    const cell = row.children[1];
+                    if (!cell) return best;
+                    return (cell.textContent?.trim().length ?? 0) > (best?.textContent?.trim().length ?? 0) ? cell : best;
+                }, null);
+                const row = codeCell?.parentElement;
+                const actionCell = row?.children[7] ?? null;
+                const noteCell = row?.children[5] ?? null;
+                const locationCell = row?.children[3] ?? null;
+                const actionRect = actionCell?.getBoundingClientRect();
+                const codeStyle = codeCell ? getComputedStyle(codeCell) : null;
+                const codeInner = codeCell?.querySelector('div') ?? null;
+                const innerStyle = codeInner ? getComputedStyle(codeInner) : null;
+                const payload = {
+                    sessionId: '8b670d',
+                    runId: 'post-fix',
+                    hypothesisId: 'A-E',
+                    location: 'unknown-scans.blade.php:layout',
+                    message: 'unknown scan table overflow',
+                    timestamp: Date.now(),
+                    data: {
+                        viewport: window.innerWidth,
+                        wrapClient: wrap?.clientWidth ?? null,
+                        wrapScroll: wrap?.scrollWidth ?? null,
+                        tableScroll: table?.scrollWidth ?? null,
+                        codeLen: codeCell?.textContent?.trim().length ?? 0,
+                        codeHasSpace: /\s/.test(codeCell?.textContent ?? ''),
+                        codeClient: codeCell?.clientWidth ?? null,
+                        codeScroll: codeCell?.scrollWidth ?? null,
+                        codeWhiteSpace: codeStyle?.whiteSpace ?? null,
+                        codeWordBreak: codeStyle?.wordBreak ?? null,
+                        codeOverflowWrap: codeStyle?.overflowWrap ?? null,
+                        noteClient: noteCell?.clientWidth ?? null,
+                        noteScroll: noteCell?.scrollWidth ?? null,
+                        locationClient: locationCell?.clientWidth ?? null,
+                        locationScroll: locationCell?.scrollWidth ?? null,
+                        actionRight: actionRect ? Math.round(actionRect.right) : null,
+                        actionOffscreen: actionRect ? actionRect.right > window.innerWidth + 1 : null,
+                        wrapScrolls: wrap ? wrap.scrollWidth > wrap.clientWidth + 1 : null,
+                    },
+                };
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '8b670d' },
+                    body: JSON.stringify(payload),
+                }).catch(() => {});
+            });
+        </script>
+        {{-- #endregion --}}
 
         <x-modal name="link-unknown-scan" :show="$errors->has('asset_id') || $errors->has('identifier_field')" focusable maxWidth="md">
             <form method="POST" :action="linkAction()" class="p-6 space-y-4" @submit="if (!selectedId) { $event.preventDefault(); }">

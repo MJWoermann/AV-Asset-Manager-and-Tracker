@@ -16,6 +16,8 @@
             'update_parent' => false,
             'clear_parent' => false,
         ],
+        'locationOptions' => $locationOptions,
+        'initialDeleteLocation' => $initialDeleteLocation,
     ]))">
         @if (session('status'))
             <div class="mb-4 text-sm text-brand">{{ session('status') }}</div>
@@ -49,7 +51,11 @@
                 </div>
             @endif
 
-            <x-bulk-location-actions :parents="$parentOptions" />
+            <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">
+                Locations with no assets stay on this list. Deleting a location that has assets asks where those assets should go.
+            </p>
+
+            <x-bulk-location-actions :parents="$parentOptions" :locations="$locationOptions" />
         @endrole
 
         @if ($locations->isEmpty())
@@ -105,5 +111,50 @@
                 @endforeach
             </ul>
         @endif
+
+        @role('admin|inventory_manager')
+            <x-modal name="delete-location" :show="$errors->has('replacement_location_id')" focusable maxWidth="md">
+                <form
+                    method="POST"
+                    class="p-6 space-y-4"
+                    x-bind:action="deleteLocation?.action || '#'"
+                >
+                    @csrf
+                    @method('DELETE')
+                    <input type="hidden" name="deleting_location_id" x-bind:value="deleteLocation?.id || ''">
+
+                    <h2 class="text-lg font-medium text-gray-900 dark:text-white">
+                        Delete “<span x-text="deleteLocation?.name || ''"></span>”?
+                    </h2>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                        This location is used by
+                        <span x-text="deleteLocation?.assetsCount || 0"></span>
+                        <span x-text="(deleteLocation?.assetsCount || 0) === 1 ? 'asset' : 'assets'"></span>.
+                        Choose a replacement location for those assets, then delete.
+                        Child locations stay on the list and become top-level.
+                    </p>
+                    <div>
+                        <x-input-label for="replacement_location_id" value="Replacement location" />
+                        <x-searchable-select
+                            name="replacement_location_id"
+                            id="replacement_location_id"
+                            placeholder="Search by name or room code…"
+                            :options="$locationOptions->map(fn ($option) => [
+                                'value' => $option['id'],
+                                'label' => $option['label'],
+                                'keywords' => trim(($option['name'] ?? '').' '.($option['room_code'] ?? '')),
+                            ])"
+                            :selected="old('replacement_location_id')"
+                            required
+                        />
+                        <x-input-error :messages="$errors->get('replacement_location_id')" class="mt-2" />
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <x-secondary-button type="button" x-on:click="$dispatch('close')">Cancel</x-secondary-button>
+                        <x-danger-button>Delete permanently</x-danger-button>
+                    </div>
+                </form>
+            </x-modal>
+        @endrole
     </div>
 </x-app-layout>

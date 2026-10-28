@@ -30,7 +30,7 @@ class AssetCheckoutFactory extends Factory
             'expected_return_at' => null,
             'returned_at' => null,
             'returned_by_user_id' => null,
-            'purpose' => CheckoutPurpose::Hire,
+            'purpose' => CheckoutPurpose::Hire->value,
             'repair_id' => null,
             'asset_status_before' => 'available',
             'notes' => null,
@@ -50,7 +50,7 @@ class AssetCheckoutFactory extends Factory
     public function repairPurpose(?int $repairId = null): static
     {
         return $this->state(fn (): array => [
-            'purpose' => CheckoutPurpose::Repair,
+            'purpose' => CheckoutPurpose::Repair->value,
             'repair_id' => $repairId,
         ]);
     }

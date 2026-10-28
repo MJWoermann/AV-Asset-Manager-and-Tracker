@@ -194,6 +194,13 @@ class ScannableIdentifierFieldsComplianceTest extends TestCase
                 ],
             ],
             [
+                'url' => route('reports.checkouts'),
+                'needles' => [
+                    "fieldBarcodeScanner('checkouts-q'",
+                    'id="field-qr-checkouts-q"',
+                ],
+            ],
+            [
                 'url' => route('reports.unknown-scans'),
                 'needles' => [
                     "fieldBarcodeScanner('unknown-scans-q'",

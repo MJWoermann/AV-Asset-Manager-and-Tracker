@@ -679,14 +679,55 @@ function focusDropdownSearch(input) {
     }
 }
 
+function normalizeSearchableOption(option) {
+    return {
+        value: String(option?.value ?? option?.id ?? ''),
+        label: String(option?.label ?? option?.name ?? ''),
+        keywords: String(option?.keywords ?? ''),
+    };
+}
+
+function searchableOptionText(option) {
+    return `${option?.label ?? ''} ${option?.keywords ?? ''}`.trim();
+}
+
+function syncSearchableSelect(root, id, detail = {}) {
+    const apply = () => {
+        const input = root?.querySelector(`#${CSS.escape(id)}`);
+        const host = input?.closest('[data-searchable-select]');
+        if (!host || typeof Alpine === 'undefined') {
+            return false;
+        }
+
+        const select = Alpine.$data(host);
+        if (!select || typeof select.setOptions !== 'function') {
+            return false;
+        }
+
+        if (Array.isArray(detail.options)) {
+            select.setOptions(detail.options);
+        }
+        if (detail.excludeValue !== undefined) {
+            select.setExclude(detail.excludeValue);
+        }
+        if (detail.value !== undefined) {
+            select.setValue(detail.value);
+        }
+
+        return true;
+    };
+
+    if (!apply()) {
+        queueMicrotask(apply);
+    }
+}
+
 Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     open: false,
     query: '',
     value: selected === null || selected === undefined ? '' : String(selected),
-    options: (options || []).map((o) => ({
-        value: String(o.value),
-        label: String(o.label ?? ''),
-    })),
+    options: (options || []).map((option) => normalizeSearchableOption(option)),
+    excludeValue: '',
     placeholder: config.placeholder ?? '—',
     nullable: Boolean(config.nullable),
     disabled: Boolean(config.disabled),
@@ -761,13 +802,15 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     },
 
     get filtered() {
-        let list = this.options;
+        let list = this.excludeValue
+            ? this.options.filter((option) => option.value !== this.excludeValue)
+            : this.options;
 
         if (!this.searchUrl) {
             const q = this.query.trim();
             if (q) {
-                list = this.options
-                    .map((option) => ({ option, score: matchScore(option.label, q) }))
+                list = list
+                    .map((option) => ({ option, score: matchScore(searchableOptionText(option), q) }))
                     .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
                     .sort((a, b) => a.score - b.score || a.option.label.localeCompare(b.option.label))
                     .map((entry) => entry.option);
@@ -818,9 +861,10 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             }
 
             const payload = await response.json();
-            this.options = (payload.data || []).map((row) => ({
-                value: String(row.id ?? row.value ?? ''),
-                label: String(row.label ?? row.name ?? ''),
+            this.options = (payload.data || []).map((row) => normalizeSearchableOption({
+                value: row.id ?? row.value ?? '',
+                label: row.label ?? row.name ?? '',
+                keywords: row.keywords ?? '',
             })).filter((option) => option.value !== '');
         } catch (error) {
             if (seq === this._searchSeq) {
@@ -942,10 +986,19 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     },
 
     setOptions(next) {
-        this.options = (next || []).map((o) => ({
-            value: String(o.value),
-            label: String(o.label ?? ''),
-        }));
+        this.options = (next || []).map((option) => normalizeSearchableOption(option));
+        if (this.excludeValue && this.value === this.excludeValue) {
+            this.value = '';
+            this.selectedOption = null;
+        }
+    },
+
+    setExclude(next) {
+        this.excludeValue = next === null || next === undefined || next === '' ? '' : String(next);
+        if (this.excludeValue && this.value === this.excludeValue) {
+            this.value = '';
+            this.selectedOption = null;
+        }
     },
 
     setValue(next, { emit = false } = {}) {
@@ -1841,6 +1894,41 @@ function createInventoryChartPanel(config = {}) {
             });
 
             // #region agent log
+            const pointYs = points.map((point) => Number(point.y)).filter((value) => Number.isFinite(value));
+            const trendYs = trend.map((point) => Number(point.y)).filter((value) => Number.isFinite(value));
+            const yScale = this.chart.scales?.y;
+            const xScale = this.chart.scales?.x;
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ff4d0e' },
+                body: JSON.stringify({
+                    sessionId: 'ff4d0e',
+                    runId: 'pre-fix',
+                    hypothesisId: 'H1-H3',
+                    location: 'app.js:mountChart',
+                    message: 'chart scale vs stepped line and trend',
+                    data: {
+                        stepped: this.chart.data.datasets[0]?.stepped ?? null,
+                        tension: this.chart.data.datasets[0]?.tension ?? null,
+                        pointYMin: pointYs.length ? Math.min(...pointYs) : null,
+                        pointYMax: pointYs.length ? Math.max(...pointYs) : null,
+                        trendYMin: trendYs.length ? Math.min(...trendYs) : null,
+                        trendYMax: trendYs.length ? Math.max(...trendYs) : null,
+                        trendX: trend.map((point) => point.x),
+                        yScaleMin: yScale?.min ?? null,
+                        yScaleMax: yScale?.max ?? null,
+                        xScaleMin: xScale?.min ?? null,
+                        xScaleMax: xScale?.max ?? null,
+                        minLine: this.chartPayload.min_line ?? null,
+                        maxLine: this.chartPayload.max_line ?? null,
+                        restockCount: restocks.length,
+                    },
+                    timestamp: Date.now(),
+                }),
+            }).catch(() => {});
+            // #endregion
+
+            // #region agent log
             dbgLog('B', 'post-mount canvas metrics', {
                 canvasClientH: canvas.clientHeight,
                 canvasOffsetH: canvas.offsetHeight,
@@ -2439,6 +2527,20 @@ function defaultConnectionMapDisplay() {
     };
 }
 
+function cmDebug(hypothesisId, location, message, data) {
+    // #region agent log
+    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3223d1'},body:JSON.stringify({sessionId:'3223d1',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+}
+
+function cmErr(error) {
+    return {
+        name: error && error.name ? error.name : null,
+        message: error && error.message ? error.message : String(error),
+        stack: error && error.stack ? String(error.stack).slice(0, 1500) : null,
+    };
+}
+
 function loadConnectionMapDisplay() {
     const defaults = defaultConnectionMapDisplay();
     try {
@@ -2511,6 +2613,7 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
             return;
         }
 
+        try {
         this.cy.batch(() => {
             this.cy.nodes(':parent').forEach((parent) => {
                 const children = parent.children();
@@ -2597,6 +2700,12 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                 });
             });
         });
+        } catch (error) {
+            // #region agent log
+            cmDebug('H4', 'app.js:packCompoundGroups', 'threw', cmErr(error));
+            // #endregion
+            throw error;
+        }
     },
 
     /**
@@ -2608,6 +2717,7 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
             return;
         }
 
+        try {
         const edges = this.cy.edges().toArray();
         const shifts = new Map();
 
@@ -2687,6 +2797,12 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                 });
             });
         });
+        } catch (error) {
+            // #region agent log
+            cmDebug('H4', 'app.js:untangleEdgeOverlays', 'threw', cmErr(error));
+            // #endregion
+            throw error;
+        }
     },
 
     runGraphLayout() {
@@ -2697,24 +2813,65 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
         const elements = this.cy.elements();
         const layout = this.cy.layout(this.layoutOptions(elements));
         layout.on('layoutstop', () => {
-            this.packCompoundGroups();
-            this.untangleEdgeOverlays();
-            this.packCompoundGroups();
+            try {
+                this.packCompoundGroups();
+                this.untangleEdgeOverlays();
+                this.packCompoundGroups();
 
-            const focusId = graph.focus_asset_id ? Number(graph.focus_asset_id) : null;
-            const focusNode = focusId ? this.cy.$id(`asset-${focusId}`) : null;
-            if (focusNode && focusNode.nonempty()) {
-                this.cy.center(focusNode);
+                const focusId = graph.focus_asset_id ? Number(graph.focus_asset_id) : null;
+                const focusNode = focusId ? this.cy.$id(`asset-${focusId}`) : null;
+                if (focusNode && focusNode.nonempty()) {
+                    this.cy.center(focusNode);
+                }
+                this.cy.fit(undefined, 48);
+                // #region agent log
+                const nanNodes = this.cy.nodes().filter((node) => {
+                    const pos = node.position();
+                    return !Number.isFinite(pos.x) || !Number.isFinite(pos.y);
+                });
+                cmDebug('H2', 'app.js:layoutstop', 'layout finished', {
+                    nodes: this.cy.nodes().length,
+                    parents: this.cy.nodes(':parent').length,
+                    nanCount: nanNodes.length,
+                });
+                // #endregion
+            } catch (error) {
+                // #region agent log
+                cmDebug('H2', 'app.js:layoutstop', 'layoutstop threw', cmErr(error));
+                // #endregion
+                throw error;
             }
-            this.cy.fit(undefined, 48);
         });
-        layout.run();
+        try {
+            layout.run();
+        } catch (error) {
+            // #region agent log
+            cmDebug('H2', 'app.js:runGraphLayout', 'layout.run threw', cmErr(error));
+            // #endregion
+            throw error;
+        }
     },
 
     async init() {
         const elements = [...(graph.nodes || []), ...(graph.edges || [])];
+        const nodes = graph.nodes || [];
+        const edges = graph.edges || [];
+        const nodeIds = new Set(nodes.map((node) => node?.data?.id));
+        // #region agent log
+        cmDebug('H1', 'app.js:init', 'client graph', {
+            nodeCount: nodes.length,
+            edgeCount: edges.length,
+            compoundCount: nodes.filter((node) => node?.data?.compound).length,
+            portCount: nodes.filter((node) => node?.data?.kind === 'type-port').length,
+            missingEndpoints: edges
+                .filter((edge) => !nodeIds.has(edge?.data?.source) || !nodeIds.has(edge?.data?.target))
+                .slice(0, 10)
+                .map((edge) => edge?.data?.id),
+        });
+        // #endregion
         const cytoscape = await loadCytoscape();
 
+        try {
         this.cy = cytoscape({
             container: this.$refs.cy,
             elements,
@@ -2855,8 +3012,24 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
             ],
             layout: { name: 'null' },
         });
+        } catch (error) {
+            // #region agent log
+            cmDebug('H1', 'app.js:init', 'cytoscape constructor threw', cmErr(error));
+            // #endregion
+            throw error;
+        }
 
-        this.applyDisplayOptions();
+        try {
+            this.applyDisplayOptions();
+            // #region agent log
+            cmDebug('H3', 'app.js:applyDisplayOptions', 'applied', { nodes: this.cy.nodes().length });
+            // #endregion
+        } catch (error) {
+            // #region agent log
+            cmDebug('H3', 'app.js:applyDisplayOptions', 'threw', cmErr(error));
+            // #endregion
+            throw error;
+        }
         this.runGraphLayout();
 
         this.cy.on('tap', 'node', (event) => {
@@ -2952,18 +3125,31 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
 
         this.cy.batch(() => {
             this.cy.nodes().forEach((node) => {
-                const data = node.data();
-                node.data('map_label', this.mapLabelForNode(data));
+                try {
+                    const data = node.data();
+                    node.data('map_label', this.mapLabelForNode(data));
 
-                const canShowIcon = this.display.showTypeIcons
-                    && data.kind !== undefined
-                    && (data.kind === 'type-port' || data.kind === 'bus' || (data.kind === 'asset' && !data.compound));
+                    const canShowIcon = this.display.showTypeIcons
+                        && data.kind !== undefined
+                        && (data.kind === 'type-port' || data.kind === 'bus' || (data.kind === 'asset' && !data.compound));
 
-                if (canShowIcon && data.icon) {
-                    node.data('icon_url', connectionTypeIconDataUri(data.icon));
-                    node.style('background-image', node.data('icon_url'));
-                } else {
-                    node.style('background-image', 'none');
+                    if (canShowIcon && data.icon) {
+                        node.data('icon_url', connectionTypeIconDataUri(data.icon));
+                        node.style('background-image', node.data('icon_url'));
+                    } else {
+                        node.style('background-image', 'none');
+                    }
+                } catch (error) {
+                    // #region agent log
+                    cmDebug('H3', 'app.js:applyDisplayOptions', 'node style threw', {
+                        id: node.id(),
+                        kind: node.data('kind'),
+                        icon: node.data('icon'),
+                        compound: node.data('compound'),
+                        ...cmErr(error),
+                    });
+                    // #endregion
+                    throw error;
                 }
             });
 
@@ -3203,6 +3389,16 @@ function createBulkSelection(config = {}) {
         fields: initialFields,
         enableMerge,
         enableTreeCollapse,
+        locationOptions: Array.isArray(config.locationOptions) ? config.locationOptions : [],
+        deleteLocation: null,
+        selectedReplacementLocationId: '',
+        bulkReplacementError: '',
+
+        init() {
+            if (config.initialDeleteLocation) {
+                this.openDeleteLocation(config.initialDeleteLocation);
+            }
+        },
 
         isOpen(id) {
             return !this.collapsed[id];
@@ -3378,15 +3574,72 @@ function createBulkSelection(config = {}) {
             }
             this.pendingDelete = false;
             this.pendingMerge = false;
+            this.bulkReplacementError = '';
             this.deleteConfirmOpen = true;
+            this.$nextTick(() => {
+                syncSearchableSelect(this.$root, 'bulk_replacement_location_id', {
+                    options: this.locationSearchOptions(this.selectedIds),
+                    excludeValue: '',
+                    value: '',
+                });
+            });
         },
 
         cancelDelete() {
             this.deleteConfirmOpen = false;
             this.pendingDelete = false;
+            this.bulkReplacementError = '';
+        },
+
+        selectionIncludesAssets() {
+            return this.selectedIds.some((id) => {
+                const el = this.$root.querySelector(`[${idAttribute}="${id}"]`);
+
+                return Number(el?.getAttribute('data-bulk-location-assets') || 0) > 0;
+            });
+        },
+
+        locationSearchOptions(excludeIds) {
+            const excluded = new Set((excludeIds || []).map((id) => Number(id)));
+
+            return this.locationOptions
+                .filter((option) => !excluded.has(Number(option.id)))
+                .map((option) => ({
+                    value: option.id,
+                    label: option.label || '',
+                    keywords: `${option.name || ''} ${option.room_code || ''}`.trim(),
+                }));
+        },
+
+        canDeleteLocation(id) {
+            return this.locationOptions.some((option) => Number(option.id) !== Number(id));
+        },
+
+        openDeleteLocation({ id, name, assetsCount = 0, action, replacementId = '' }) {
+            this.deleteLocation = {
+                id,
+                name,
+                assetsCount: Number(assetsCount || 0),
+                action,
+            };
+            this.selectedReplacementLocationId = replacementId ? String(replacementId) : '';
+            this.$nextTick(() => {
+                syncSearchableSelect(this.$root, 'replacement_location_id', {
+                    excludeValue: id,
+                    value: this.selectedReplacementLocationId,
+                });
+            });
+            this.$dispatch('open-modal', 'delete-location');
         },
 
         confirmDelete() {
+            const replacement = this.$root.querySelector('#bulk_replacement_location_id');
+            if (this.locationOptions.length > 0 && this.selectionIncludesAssets() && !replacement?.value) {
+                this.bulkReplacementError = 'Choose a replacement location for assets.';
+                return;
+            }
+
+            this.bulkReplacementError = '';
             this.pendingDelete = true;
             this.pendingMerge = false;
             this.deleteConfirmOpen = false;
@@ -3655,6 +3908,12 @@ Alpine.data('manufacturerCatalogue', (config = {}) => ({
     openDeleteManufacturer({ id, name, action, replacementId = '' }) {
         this.deleteManufacturer = { id, name, action };
         this.selectedReplacementManufacturerId = replacementId ? String(replacementId) : '';
+        this.$nextTick(() => {
+            syncSearchableSelect(this.$root, 'replacement_manufacturer_id', {
+                excludeValue: id,
+                value: this.selectedReplacementManufacturerId,
+            });
+        });
         this.$dispatch('open-modal', 'delete-manufacturer');
     },
 
@@ -3662,6 +3921,16 @@ Alpine.data('manufacturerCatalogue', (config = {}) => ({
         this.deleteModel = { id, name, label, assetsCount, action };
         this.selectedReplacementModelId = replacementId ? String(replacementId) : '';
         await this.ensureModelOptionsLoaded();
+        this.$nextTick(() => {
+            syncSearchableSelect(this.$root, 'replacement_manufacturer_model_id', {
+                options: this.modelOptions.map((option) => ({
+                    value: option.id,
+                    label: option.label,
+                })),
+                excludeValue: id,
+                value: this.selectedReplacementModelId,
+            });
+        });
         this.$dispatch('open-modal', 'delete-model');
     },
 }));
