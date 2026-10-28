@@ -19,7 +19,7 @@
         <div class="print:hidden bg-white dark:bg-brand-slate border p-4 max-w-md">
             @if($layouts->isEmpty())
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                    Create a <a href="{{ route('labels.layouts.create') }}" class="text-brand underline">label layout</a> before printing.
+                    Create a <a href="{{ route('labels.layouts.create') }}" data-history-roundtrip class="text-brand underline">label layout</a> before printing.
                 </p>
             @else
                 <form method="GET" action="{{ route('assets.label', $asset) }}">

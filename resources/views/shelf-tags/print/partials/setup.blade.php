@@ -22,7 +22,7 @@
 
     @if ($layouts->isEmpty())
         <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">
-            Create a <a href="{{ route('labels.layouts.create') }}" class="text-brand underline">label layout</a> before printing.
+            Create a <a href="{{ route('labels.layouts.create') }}" data-history-roundtrip class="text-brand underline">label layout</a> before printing.
         </p>
     @endif
 

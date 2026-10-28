@@ -13,7 +13,7 @@
                 @can('reports:export')
                     <a href="{{ route('export.assets', ['format' => 'xlsx']) }}" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Export</a>
                 @endcan
-                <a href="{{ route('assets.create') }}" class="text-sm px-3 py-2 bg-brand text-white">Add asset</a>
+                <a href="{{ route('assets.create') }}" data-history-roundtrip class="text-sm px-3 py-2 bg-brand text-white">Add asset</a>
             </div>
         </div>
     </x-slot>
@@ -65,6 +65,7 @@
                 class="flex-1"
                 aria-label="Search assets"
                 scan-aria-label="Scan barcode into asset search"
+                autofocus
             />
             <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand shrink-0">Search</button>
             <x-clear-filters

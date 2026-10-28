@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center gap-3">
             <h2 class="font-semibold text-xl">Email</h2>
-            <a href="{{ route('admin.email.rules.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add rule</a>
+            <a href="{{ route('admin.email.rules.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add rule</a>
         </div>
     </x-slot>
 
@@ -28,7 +28,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3 text-sm">
-                    <a href="{{ route('admin.email.rules.edit', $rule) }}" class="text-brand">Edit</a>
+                    <a href="{{ route('admin.email.rules.edit', $rule) }}" data-history-roundtrip class="text-brand">Edit</a>
                     <form method="POST" action="{{ route('admin.email.rules.destroy', $rule) }}" onsubmit="return confirm('Delete this rule?')">
                         @csrf
                         @method('DELETE')

@@ -131,9 +131,11 @@ The viewport and view configuration should feel stable — users return to a fam
 - Prefer **URL query** for filters so refresh/share/back keep the same “viewport” into the data.
 - After mutating actions on the same page, **restore scroll** (and other ephemeral view state) so the viewport does not jump.
 - Do not restore a previous page’s scroll onto a **different** route; document intentional “jump to top” exceptions (e.g. landing on a newly created show page).
+- Scan **Update lists** is an intentional exception: a successful update flashes `scroll_to=scan-section`, and the scan page scrolls so the top of `#scan-section` meets the top of the viewport instead of restoring the pre-submit position. A failed update keeps the usual scroll restore so validation stays in view.
+- After a full-page edit or create opened from another screen, collapse that form — and the duplicate of the page you came from — out of the tab history on Save or Cancel, so one Back returns to the screen that opened the form. Browser Back while the form is still open still returns to that screen. Do not collapse multi-step wizards (import, label print preview) or in-page posts that stay on the same URL. The page you return to loads at the top; the form page’s scroll position stays on the form URL.
 - Be explicit about what is **not** remembered (one-shot bulk forms) so learning features do not become creepy or wrong.
 
-*In this project:* `users.preferences` (`asset_table_columns`, `dashboard_modules`, …), `users.theme`, GET `AssetBrowseFilters`, `SCROLL_RESTORE_KEY` in `resources/js/app.js`, scan session rows.
+*In this project:* `users.preferences` (`asset_table_columns`, `dashboard_modules`, …), `users.theme`, GET `AssetBrowseFilters`, `SCROLL_RESTORE_KEY` in `resources/js/app.js`, `data-history-roundtrip` for edit/create back-stack collapse, scan session rows.
 
 ---
 
@@ -241,7 +243,7 @@ Use when validating an app (or this reference implementation) against the playbo
 3. **Actions** — Cancel/secondary left; primary/proceed right; destructive separated.
 4. **Clarity** — Contrast OK in light/dark; gaps/tap targets OK; in-field controls pad inputs.
 5. **Modals** — Centered, max-height, internal scroll, shared contract for custom overlays.
-6. **View continuity** — Preferences merge; URL filters; scroll restore scoped to same route; intentional exceptions documented.
+6. **View continuity** — Preferences merge; URL filters; scroll restore scoped to same route; edit/create back-stack collapse; intentional exceptions documented.
 7. **Learning** — Mapping recall and rename aliases work; no secret retention; no speculative ML.
 8. **Passwords** — Shared rules; no plaintext; redact audits; throttle auth.
 9. **Security** — Authz on mutate; validate IDs; escape output; no secrets in repo; CSRF; safe uploads.

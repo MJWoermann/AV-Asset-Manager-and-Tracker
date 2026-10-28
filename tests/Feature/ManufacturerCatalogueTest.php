@@ -84,6 +84,13 @@ class ManufacturerCatalogueTest extends TestCase
             'manufacturer_id' => $delete->id,
             'name' => 'Delete Model',
         ]);
+        Asset::create([
+            'name' => 'Delete Fixture',
+            'item_type_id' => $this->itemType()->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $delete->id,
+            'manufacturer_model_id' => $deleteModel->id,
+        ]);
 
         $index = $this->actingAs($user)->get(route('manufacturers.index'));
 
@@ -109,6 +116,38 @@ class ManufacturerCatalogueTest extends TestCase
         $modelEdit->assertSee('id="replacement_manufacturer_model_id"', false);
         $modelEdit->assertSee('Search models…', false);
         $modelEdit->assertDontSee('<select id="replacement_manufacturer_model_id"', false);
+    }
+
+    public function test_manager_can_delete_unused_manufacturer_without_a_replacement(): void
+    {
+        $user = $this->manager();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'UnusedCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'Unused Model',
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('manufacturers.destroy', $manufacturer));
+
+        $response->assertRedirect(route('manufacturers.index'));
+        $this->assertDatabaseMissing('manufacturers', ['id' => $manufacturer->id]);
+        $this->assertDatabaseMissing('manufacturer_models', ['id' => $model->id]);
+        $this->assertDatabaseMissing('manufacturer_aliases', [
+            'former_name' => 'UnusedCo',
+        ]);
+    }
+
+    public function test_unused_manufacturer_edit_confirms_delete_without_a_replacement_list(): void
+    {
+        $user = $this->manager();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'SoloCo']);
+
+        $response = $this->actingAs($user)->get(route('manufacturers.edit', $manufacturer));
+
+        $response->assertOk();
+        $response->assertSee('Delete manufacturer', false);
+        $response->assertSee('This manufacturer has no assets. Delete it? Its models will be removed.', false);
+        $response->assertDontSee('id="replacement_manufacturer_id"', false);
     }
 
     public function test_index_includes_hierarchy_expand_controls(): void

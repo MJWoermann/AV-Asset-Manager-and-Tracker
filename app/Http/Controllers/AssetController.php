@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\AssetStatus;
 use App\Enums\MaintenanceLogType;
 use App\Enums\NotificationEventKey;
+use App\Enums\RuPlacementWidth;
 use App\Http\Requests\BulkUpdateAssetsRequest;
 use App\Models\Asset;
 use App\Models\AssetCustomFieldValue;
@@ -448,6 +449,7 @@ class AssetController extends Controller
                 ->sortBy([
                     ['face', 'asc'],
                     ['start_ru', 'asc'],
+                    ['slot', 'asc'],
                 ])
                 ->values()
                 ->map(fn (AssetRuPlacement $placement): array => [
@@ -456,6 +458,8 @@ class AssetController extends Controller
                     'start_ru' => (int) $placement->start_ru,
                     'ru_height' => (int) $placement->ru_height,
                     'full_depth' => (bool) $placement->full_depth,
+                    'width' => ($placement->width ?? RuPlacementWidth::Full)->value,
+                    'slot' => (int) ($placement->slot ?? 1),
                     'kind' => $placement->kind->value,
                     'child_asset_id' => $placement->child_asset_id ? (string) $placement->child_asset_id : null,
                     'child_name' => $placement->childAsset?->name,

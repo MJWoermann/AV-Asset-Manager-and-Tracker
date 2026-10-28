@@ -46,12 +46,12 @@
             >Assets</a>
             @can('catalog:write')
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                <a href="{{ route('manufacturers.models.create', $manufacturer) }}" class="text-sm text-brand">Add model</a>
+                <a href="{{ route('manufacturers.models.create', $manufacturer) }}" data-history-roundtrip class="text-sm text-brand">Add model</a>
             @endcan
             @can('catalog:update')
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                <a href="{{ route('manufacturers.edit', $manufacturer) }}" class="text-sm text-brand">Edit</a>
-                <template x-if="canDeleteManufacturer({{ $manufacturer->id }})">
+                <a href="{{ route('manufacturers.edit', $manufacturer) }}" data-history-roundtrip class="text-sm text-brand">Edit</a>
+                <template x-if="canDeleteManufacturer({{ $manufacturer->id }}, {{ (int) ($manufacturer->unscoped_assets_count ?? 0) }})">
                     <span class="inline-flex items-center gap-2">
                         <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                         <button
@@ -60,6 +60,7 @@
                             x-on:click.prevent="openDeleteManufacturer({
                                 id: {{ $manufacturer->id }},
                                 name: @js($manufacturer->name),
+                                assetsCount: {{ (int) ($manufacturer->unscoped_assets_count ?? 0) }},
                                 action: @js(route('manufacturers.destroy', $manufacturer)),
                             })"
                         >Delete</button>
@@ -103,7 +104,7 @@
                             <template x-if="canManageCatalogue && model.edit_url">
                                 <span class="inline-flex items-center gap-2">
                                     <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                                    <a :href="model.edit_url" class="text-sm text-brand">Edit</a>
+                                    <a :href="model.edit_url" data-history-roundtrip class="text-sm text-brand">Edit</a>
                                 </span>
                             </template>
                             <template x-if="canManageCatalogue && model.destroy_url && canDeleteModel(model.id)">

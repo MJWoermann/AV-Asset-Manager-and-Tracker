@@ -3,7 +3,7 @@
         <div class="flex items-center justify-between gap-3">
             <h2 class="font-semibold text-xl">Lists</h2>
             @can('lists:write')
-                <a href="{{ route('lists.create') }}" class="px-3 py-2 bg-brand text-white text-sm">New list</a>
+                <a href="{{ route('lists.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">New list</a>
             @endcan
         </div>
     </x-slot>

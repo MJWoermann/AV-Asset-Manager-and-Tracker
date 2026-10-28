@@ -5,7 +5,7 @@
             <div class="flex gap-2 text-sm">
                 <a href="{{ route('spares.index') }}" class="px-3 py-2 border">Spares</a>
                 @can('spares:manage')
-                    <a href="{{ route('spares.groups.create') }}" class="px-3 py-2 bg-brand text-white">Add group</a>
+                    <a href="{{ route('spares.groups.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white">Add group</a>
                 @endcan
             </div>
         </div>
@@ -21,7 +21,7 @@
                         <p class="text-xs text-brand-charcoal dark:text-brand-silver">{{ $group->items_count }} line(s) @if($group->linkedSystem)— {{ $group->linkedSystem->name }}@endif</p>
                     </div>
                     @can('spares:manage')
-                        <a href="{{ route('spares.groups.edit', $group) }}" class="text-xs border px-2 py-1">Edit</a>
+                        <a href="{{ route('spares.groups.edit', $group) }}" data-history-roundtrip class="text-xs border px-2 py-1">Edit</a>
                     @endcan
                 </li>
             @empty

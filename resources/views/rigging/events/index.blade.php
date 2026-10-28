@@ -4,7 +4,7 @@
             <h2 class="font-semibold text-xl">Rig Events</h2>
             <div class="flex gap-3 text-sm">
                 <a href="{{ route('rigging.index') }}" class="text-brand-charcoal dark:text-brand-silver">Hub</a>
-                <a href="{{ route('rigging.events.create') }}" class="text-brand font-medium">New Rig Event</a>
+                <a href="{{ route('rigging.events.create') }}" data-history-roundtrip class="text-brand font-medium">New Rig Event</a>
             </div>
         </div>
     </x-slot>
@@ -46,7 +46,7 @@
                     @forelse($events as $event)
                         <tr class="border-t border-brand-silver dark:border-brand-charcoal">
                             <td class="px-3 py-2">
-                                <a href="{{ route('rigging.events.show', $event) }}" class="text-brand font-medium">{{ $event->name }}</a>
+                                <a href="{{ route('rigging.events.show', $event) }}" data-history-roundtrip class="text-brand font-medium">{{ $event->name }}</a>
                             </td>
                             <td class="px-3 py-2">{{ $event->event_date?->format('Y-m-d') ?? '—' }}</td>
                             <td class="px-3 py-2">{{ $event->venue_space ?: '—' }}</td>

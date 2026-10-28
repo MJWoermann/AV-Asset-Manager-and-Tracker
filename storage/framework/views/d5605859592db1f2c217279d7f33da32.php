@@ -109,7 +109,7 @@ unset($__defined_vars, $__key, $__value); ?>
         searchParams: <?php echo \Illuminate\Support\Js::from($searchParams ?: new \stdClass)->toHtml() ?>,
     })"
     @keydown="onKeydown($event)"
-    @click.outside="closeList()"
+    @click.outside="($refs.panel && $refs.panel.contains($event.target)) || closeList()"
 >
     <input type="hidden" name="<?php echo e($name); ?>" id="<?php echo e($id); ?>" x-model="value" <?php if($required): ?> required <?php endif; ?> <?php if($form): ?> form="<?php echo e($form); ?>" <?php endif; ?>>
 
@@ -142,12 +142,14 @@ unset($__defined_vars, $__key, $__value); ?>
         >&times;</button>
     </div>
 
+    <template x-teleport="body">
     <div
         x-show="open"
         x-cloak
         x-ref="panel"
         :style="panelStyle"
-        class="border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
+        @keydown="onKeydown($event)"
+        class="fixed z-[60] border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
         id="<?php echo e($id); ?>-listbox"
         role="listbox"
     >
@@ -186,5 +188,6 @@ unset($__defined_vars, $__key, $__value); ?>
             </template>
         </ul>
     </div>
+    </template>
 </div>
 <?php /**PATH C:\Users\MatthewWoermann\Software Projects\AV-Asset-Manager-and-Tracker\resources\views/components/searchable-select.blade.php ENDPATH**/ ?>

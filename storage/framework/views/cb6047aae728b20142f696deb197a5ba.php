@@ -9,6 +9,7 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'submitOnScan' => true,
     'scanAriaLabel' => 'Scan barcode into search',
     'inputClass' => '',
+    'autofocus' => false,
 ]));
 
 foreach ($attributes->all() as $__key => $__value) {
@@ -32,6 +33,7 @@ foreach (array_filter(([
     'submitOnScan' => true,
     'scanAriaLabel' => 'Scan barcode into search',
     'inputClass' => '',
+    'autofocus' => false,
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
     $$__key = $$__key ?? $__value;
 }
@@ -62,6 +64,9 @@ unset($__defined_vars, $__key, $__value); ?>
             <?php endif; ?>
             value="<?php echo e($value); ?>"
             placeholder="<?php echo e($placeholder); ?>"
+            <?php if($autofocus): ?>
+                x-init="$nextTick(() => { try { $el.focus({ preventScroll: true }); } catch (e) { $el.focus(); } $el.select(); })"
+            <?php endif; ?>
             <?php echo e($attributes->except('class')->class([
                 'w-full rounded border-brand-charcoal/30 pe-16 dark:bg-black dark:border-brand-charcoal dark:text-white',
                 $inputClass,

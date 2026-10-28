@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center gap-3">
             <h2 class="font-semibold text-xl">Connection types</h2>
-            <a href="{{ route('connection-types.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add</a>
+            <a href="{{ route('connection-types.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add</a>
         </div>
     </x-slot>
 
@@ -36,7 +36,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3 text-sm">
-                    <a href="{{ route('connection-types.edit', $type) }}" class="text-brand">Edit</a>
+                    <a href="{{ route('connection-types.edit', $type) }}" data-history-roundtrip class="text-brand">Edit</a>
                     @if($type->connections_count === 0 && ($type->buses_count ?? 0) === 0)
                         <form method="POST" action="{{ route('connection-types.destroy', $type) }}" onsubmit="return confirm('Delete this connection type?')">
                             @csrf

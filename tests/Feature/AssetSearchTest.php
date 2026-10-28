@@ -44,6 +44,8 @@ class AssetSearchTest extends TestCase
         $response->assertSee('id="asset-search-q"', false);
         $response->assertSee('id="field-qr-asset-search-q"', false);
         $response->assertSee('submitOnScan: true', false);
+        $response->assertSee('$el.focus({ preventScroll: true })', false);
+        $response->assertSee('$el.select()', false);
     }
 
     public function test_search_matches_partial_identifier_fields(): void

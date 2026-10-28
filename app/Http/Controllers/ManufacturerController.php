@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\DeleteManufacturerRequest;
+use App\Models\Asset;
 use App\Models\Manufacturer;
 use App\Models\ManufacturerModel;
 use App\Services\ManufacturerCatalogueService;
@@ -17,7 +18,11 @@ class ManufacturerController extends Controller
     {
         $manufacturers = Manufacturer::query()
             ->select(['id', 'name'])
-            ->withCount(['assets', 'models'])
+            ->withCount([
+                'assets',
+                'models',
+                'assets as unscoped_assets_count' => fn ($query) => $query->withoutGlobalScope('department'),
+            ])
             ->orderBy('name')
             ->get();
 
@@ -38,6 +43,7 @@ class ManufacturerController extends Controller
                 $initialDeleteManufacturer = [
                     'id' => $deletingManufacturer->id,
                     'name' => $deletingManufacturer->name,
+                    'assetsCount' => (int) $deletingManufacturer->unscoped_assets_count,
                     'action' => route('manufacturers.destroy', $deletingManufacturer),
                     'replacementId' => (string) old('replacement_manufacturer_id', ''),
                 ];
@@ -106,7 +112,7 @@ class ManufacturerController extends Controller
                 ->whereKeyNot($manufacturer->id)
                 ->orderBy('name')
                 ->get(['id', 'name']),
-            'assetCount' => $manufacturer->assets()->count(),
+            'assetCount' => Asset::withoutDepartmentScope()->where('manufacturer_id', $manufacturer->id)->count(),
             'modelCount' => $manufacturer->models()->count(),
         ]);
     }
@@ -123,11 +129,14 @@ class ManufacturerController extends Controller
         Manufacturer $manufacturer,
         ManufacturerCatalogueService $catalogue,
     ): RedirectResponse {
-        $replacement = Manufacturer::query()->findOrFail(
-            (int) $request->validated('replacement_manufacturer_id')
-        );
-
-        $catalogue->deleteManufacturer($manufacturer, $replacement);
+        if ($request->requiresReplacement()) {
+            $replacement = Manufacturer::query()->findOrFail(
+                (int) $request->validated('replacement_manufacturer_id')
+            );
+            $catalogue->deleteManufacturer($manufacturer, $replacement);
+        } else {
+            $catalogue->deleteWithoutReassignment($manufacturer);
+        }
 
         return redirect()->route('manufacturers.index')->with('status', 'Manufacturer deleted.');
     }

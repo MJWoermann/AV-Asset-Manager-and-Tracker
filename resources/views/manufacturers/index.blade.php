@@ -3,7 +3,7 @@
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Manufacturers / Models</h2>
             @can('catalog:write')
-                <a href="{{ route('manufacturers.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add manufacturer</a>
+                <a href="{{ route('manufacturers.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add manufacturer</a>
             @endcan
         </div>
     </x-slot>
@@ -70,11 +70,14 @@
                     <h2 class="text-lg font-medium text-gray-900 dark:text-white">
                         Delete “<span x-text="deleteManufacturer?.name || ''"></span>”?
                     </h2>
-                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="(deleteManufacturer?.assetsCount || 0) > 0">
                         Models under this manufacturer are moved to the replacement (merged by name).
                         Assets are reassigned to the replacement manufacturer.
                     </p>
-                    <div>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="(deleteManufacturer?.assetsCount || 0) === 0">
+                        This manufacturer has no assets. Delete it? Its models will be removed.
+                    </p>
+                    <div x-show="(deleteManufacturer?.assetsCount || 0) > 0">
                         <x-input-label for="replacement_manufacturer_id" value="Replacement manufacturer" />
                         <x-searchable-select
                             name="replacement_manufacturer_id"

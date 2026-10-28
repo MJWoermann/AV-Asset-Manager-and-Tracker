@@ -34,10 +34,13 @@
             'start_ru' => old('start_ru'),
             'ru_height' => old('ru_height'),
             'full_depth' => (bool) old('full_depth', false),
+            'width' => old('width', 'full'),
+            'slot' => (string) old('slot', '1'),
             'kind' => $oldKind,
             'child_asset_id' => old('child_asset_id', ''),
             'note' => old('note', ''),
             'confirm_parent_change' => old('confirm_parent_change', false),
+            'move_row' => filter_var(old('move_row', false), FILTER_VALIDATE_BOOLEAN),
         ],
     ])->toHtml() ?>)"
 >
@@ -59,7 +62,7 @@
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                 This rack needs a capacity before you can place equipment or notes.
             </p>
-            <a href="<?php echo e(route('assets.edit', $asset)); ?>" class="inline-flex px-3 py-2 bg-brand text-white text-sm">
+            <a href="<?php echo e(route('assets.edit', $asset)); ?>" data-history-roundtrip class="inline-flex px-3 py-2 bg-brand text-white text-sm">
                 Edit asset to set RU height
             </a>
         </div>
@@ -130,6 +133,7 @@
                         <input type="hidden" name="_method" value="PUT" x-bind:disabled="panel !== 'edit'">
                         <input type="hidden" name="_placement_id" :value="editingId || ''">
                         <input type="hidden" name="confirm_parent_change" :value="form.confirm_parent_change ? '1' : '0'">
+                        <input type="hidden" name="move_row" :value="form.move_row ? '1' : '0'" :disabled="panel !== 'edit'">
 
                         <div>
                             <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
@@ -152,6 +156,15 @@
 <?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
 <?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
 <?php endif; ?>
+                            
+                            <input
+                                type="hidden"
+                                name="face"
+                                value="front"
+                                disabled
+                                :value="form.face"
+                                :disabled="!(form.full_depth && form.kind === 'asset')"
+                            >
                             <select
                                 name="face"
                                 class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
@@ -232,6 +245,75 @@
                                 >
                             </div>
                         </div>
+
+                        <div>
+                            <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['value' => 'Width']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['value' => 'Width']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                            <select
+                                name="width"
+                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                x-model="form.width"
+                                @change="clampSlot()"
+                                required
+                            >
+                                <option value="full">Full</option>
+                                <option value="half">Half</option>
+                                <option value="third">Third</option>
+                            </select>
+                        </div>
+
+                        <div x-show="form.width !== 'full'" x-cloak>
+                            <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['value' => 'Position']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['value' => 'Position']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                            <select
+                                name="slot"
+                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                x-model="form.slot"
+                                :disabled="form.width === 'full'"
+                                :required="form.width !== 'full'"
+                            >
+                                <template x-for="option in slotOptions()" :key="option.value">
+                                    <option :value="option.value" x-text="option.label"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <input type="hidden" name="slot" value="1" :disabled="form.width !== 'full'">
 
                         <div>
                             <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
@@ -357,6 +439,28 @@
                                 :required="form.kind === 'note'"
                                 :disabled="form.kind !== 'note'"
                             ></textarea>
+                        </div>
+
+                        <div x-show="panel === 'edit' && rowMates().length > 0" x-cloak class="space-y-2 border-t border-brand-silver dark:border-brand-charcoal pt-3">
+                            <p class="text-xs text-brand-charcoal dark:text-brand-silver">Also in this row</p>
+                            <ul class="text-sm space-y-1">
+                                <template x-for="mate in rowMates()" :key="mate.id">
+                                    <li class="truncate" x-text="placementLabel(mate)"></li>
+                                </template>
+                            </ul>
+                            <label class="flex items-start gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand"
+                                    x-model="form.move_row"
+                                >
+                                <span>
+                                    Move the whole row
+                                    <span class="block text-xs text-brand-charcoal dark:text-brand-silver">
+                                        Each item keeps its own position, height, and full depth.
+                                    </span>
+                                </span>
+                            </label>
                         </div>
 
                         <div class="flex flex-wrap justify-end gap-2">

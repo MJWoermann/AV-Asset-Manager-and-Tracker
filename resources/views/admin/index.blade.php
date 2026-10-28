@@ -26,20 +26,20 @@
                 </a>
             @endcan
             @can('admin:settings')
-                <a href="{{ route('admin.export-columns.edit') }}" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
+                <a href="{{ route('admin.export-columns.edit') }}" data-history-roundtrip class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                     <h3 class="font-semibold">Export columns</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Default columns for asset exports.</p>
                 </a>
-                <a href="{{ route('admin.storage.edit') }}" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
+                <a href="{{ route('admin.storage.edit') }}" data-history-roundtrip class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                     <h3 class="font-semibold">Storage</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Attachment disks, migration, and backups.</p>
                 </a>
-                <a href="{{ route('admin.sso.edit') }}" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
+                <a href="{{ route('admin.sso.edit') }}" data-history-roundtrip class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                     <h3 class="font-semibold">SSO</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Single sign-on configuration.</p>
                 </a>
                 @feature('email_integration')
-                    <a href="{{ route('admin.email.edit') }}" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
+                    <a href="{{ route('admin.email.edit') }}" data-history-roundtrip class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                         <h3 class="font-semibold">Email</h3>
                         <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Inbound and outbound email integration.</p>
                     </a>

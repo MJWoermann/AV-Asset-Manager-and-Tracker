@@ -9,6 +9,7 @@
             'label' => 'Settings',
             'href' => route('admin.email.edit'),
             'active' => request()->routeIs('admin.email.edit', 'admin.email.update', 'admin.email.test'),
+            'roundtrip' => true,
         ];
         $tabs[] = [
             'label' => 'Recipients',
@@ -46,6 +47,7 @@
         @foreach ($tabs as $tab)
             <a
                 href="{{ $tab['href'] }}"
+                @if (! empty($tab['roundtrip'])) data-history-roundtrip @endif
                 role="tab"
                 aria-selected="{{ $tab['active'] ? 'true' : 'false' }}"
                 class="px-4 py-2 text-sm border-b-2 -mb-px {{ $tab['active'] ? 'border-brand text-brand' : 'border-transparent text-brand-charcoal dark:text-brand-silver hover:text-black dark:hover:text-white' }}"

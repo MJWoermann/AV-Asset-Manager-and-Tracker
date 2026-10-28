@@ -114,7 +114,7 @@ class BulkLocationUpdateService
     {
         $locations = Location::query()
             ->whereIn('id', $locationIds)
-            ->withCount('assets')
+            ->withCount(['assets as assets_count' => fn ($query) => $query->withoutGlobalScope('department')])
             ->orderByDesc('id')
             ->get();
 
@@ -136,13 +136,20 @@ class BulkLocationUpdateService
         $assetsMoved = 0;
 
         foreach ($locations as $location) {
-            if ((int) $location->assets_count === 0) {
+            if ($replacement !== null && $location->is($replacement)) {
                 $kept++;
 
                 continue;
             }
 
-            if ($replacement === null || $location->is($replacement)) {
+            if ((int) $location->assets_count === 0) {
+                $this->deleteWithoutReassignment($location);
+                $deleted++;
+
+                continue;
+            }
+
+            if ($replacement === null) {
                 continue;
             }
 
@@ -168,14 +175,26 @@ class BulkLocationUpdateService
         }
 
         DB::transaction(function () use ($location, $replacement): void {
-            if (! $location->assets()->exists()) {
-                throw ValidationException::withMessages([
-                    'location' => 'Locations with no assets stay on the list.',
-                ]);
-            }
-
             $this->reassignAndDelete($location, $replacement);
         });
+    }
+
+    public function deleteWithoutReassignment(Location $location): void
+    {
+        if ($this->hasAssets($location)) {
+            throw ValidationException::withMessages([
+                'replacement_location_id' => 'Choose a replacement location for assets at this location.',
+            ]);
+        }
+
+        $location->delete();
+    }
+
+    public function hasAssets(Location $location): bool
+    {
+        return Asset::withoutDepartmentScope()
+            ->where('location_id', $location->id)
+            ->exists();
     }
 
     /**

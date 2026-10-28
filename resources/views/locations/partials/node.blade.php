@@ -56,7 +56,7 @@
                     class="mt-1 rounded border-brand-charcoal/40 shrink-0"
                     data-bulk-location-id="{{ $location->id }}"
                     data-bulk-location-name="{{ mb_strtolower(trim($location->name)) }}"
-                    data-bulk-location-assets="{{ (int) ($location->assets_count ?? 0) }}"
+                    data-bulk-location-assets="{{ (int) ($location->unscoped_assets_count ?? 0) }}"
                     :checked="!!selected[{{ $location->id }}]"
                     @change="setSelected({{ $location->id }}, $event.target.checked)"
                     aria-label="Select {{ $location->name }}"
@@ -79,24 +79,22 @@
             >Assets</a>
             @can('locations:update')
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                <a href="{{ route('locations.edit', $location) }}" class="text-sm text-brand">Edit</a>
-                @if ((int) ($location->assets_count ?? 0) > 0)
-                    <template x-if="canDeleteLocation({{ $location->id }})">
-                        <span class="inline-flex items-center gap-2">
-                            <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                            <button
-                                type="button"
-                                class="text-sm text-red-700"
-                                x-on:click.prevent="openDeleteLocation({
-                                    id: {{ $location->id }},
-                                    name: @js($location->name),
-                                    assetsCount: {{ (int) $location->assets_count }},
-                                    action: @js(route('locations.destroy', $location)),
-                                })"
-                            >Delete</button>
-                        </span>
-                    </template>
-                @endif
+                <a href="{{ route('locations.edit', $location) }}" data-history-roundtrip class="text-sm text-brand">Edit</a>
+                <template x-if="canDeleteLocation({{ $location->id }}, {{ (int) ($location->unscoped_assets_count ?? 0) }})">
+                    <span class="inline-flex items-center gap-2">
+                        <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
+                        <button
+                            type="button"
+                            class="text-sm text-red-700"
+                            x-on:click.prevent="openDeleteLocation({
+                                id: {{ $location->id }},
+                                name: @js($location->name),
+                                assetsCount: {{ (int) ($location->unscoped_assets_count ?? 0) }},
+                                action: @js(route('locations.destroy', $location)),
+                            })"
+                        >Delete</button>
+                    </span>
+                </template>
             @endcan
         </div>
     </div>

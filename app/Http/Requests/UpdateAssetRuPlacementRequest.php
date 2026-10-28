@@ -4,9 +4,12 @@ namespace App\Http\Requests;
 
 use App\Enums\RuPlacementFace;
 use App\Enums\RuPlacementKind;
+use App\Enums\RuPlacementWidth;
+use App\Models\AssetRuPlacement;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateAssetRuPlacementRequest extends FormRequest
 {
@@ -27,30 +30,13 @@ class UpdateAssetRuPlacementRequest extends FormRequest
             $merge['full_depth'] = $this->boolean('full_depth');
         }
 
+        if ($this->has('move_row')) {
+            $merge['move_row'] = $this->boolean('move_row');
+        }
+
         if ($merge !== []) {
             $this->merge($merge);
         }
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-ca5636.log'), json_encode([
-                'sessionId' => 'ca5636',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'H5',
-                'location' => 'UpdateAssetRuPlacementRequest.php:prepareForValidation',
-                'message' => 'update ru placement input',
-                'data' => [
-                    'has_face' => $this->has('face'),
-                    'face' => $this->input('face'),
-                    'full_depth' => $this->input('full_depth'),
-                    'kind' => $this->input('kind'),
-                    'keys' => array_values(array_diff(array_keys($this->all()), ['_token'])),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable) {
-        }
-        // #endregion
     }
 
     /**
@@ -63,6 +49,8 @@ class UpdateAssetRuPlacementRequest extends FormRequest
             'start_ru' => ['sometimes', 'integer', 'min:1', 'max:65535'],
             'ru_height' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:65535'],
             'full_depth' => ['sometimes', 'boolean'],
+            'width' => ['sometimes', Rule::enum(RuPlacementWidth::class)],
+            'slot' => ['sometimes', 'integer', 'min:1', 'max:3'],
             'kind' => ['sometimes', Rule::enum(RuPlacementKind::class)],
             'child_asset_id' => [
                 'nullable',
@@ -77,6 +65,51 @@ class UpdateAssetRuPlacementRequest extends FormRequest
                 'max:5000',
             ],
             'confirm_parent_change' => ['sometimes', 'boolean'],
+            'move_row' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->hasAny(['width', 'slot'])) {
+                    return;
+                }
+
+                $placement = $this->route('ruPlacement');
+                $widthValue = $this->input('width');
+                $width = is_string($widthValue) && $widthValue !== ''
+                    ? RuPlacementWidth::tryFrom($widthValue)
+                    : ($placement instanceof AssetRuPlacement ? $placement->width : RuPlacementWidth::Full);
+
+                if (! $width instanceof RuPlacementWidth) {
+                    return;
+                }
+
+                $slotProvided = $this->exists('slot');
+                if ($width === RuPlacementWidth::Full && ! $slotProvided) {
+                    return;
+                }
+
+                $slot = $slotProvided
+                    ? (int) $this->input('slot')
+                    : (int) ($placement instanceof AssetRuPlacement ? $placement->slot : 1);
+
+                if ($width->acceptsSlot($slot)) {
+                    return;
+                }
+
+                $validator->errors()->add(
+                    'slot',
+                    $width === RuPlacementWidth::Full
+                        ? RuPlacementWidth::FULL_SLOT_MESSAGE
+                        : RuPlacementWidth::INVALID_SLOT_MESSAGE,
+                );
+            },
         ];
     }
 }

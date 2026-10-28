@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\RuPlacementFace;
 use App\Enums\RuPlacementKind;
+use App\Enums\RuPlacementWidth;
 use Database\Factories\AssetRuPlacementFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,8 @@ class AssetRuPlacement extends Model
         'start_ru',
         'ru_height',
         'full_depth',
+        'width',
+        'slot',
         'kind',
         'child_asset_id',
         'note',
@@ -30,8 +33,10 @@ class AssetRuPlacement extends Model
         return [
             'face' => RuPlacementFace::class,
             'kind' => RuPlacementKind::class,
+            'width' => RuPlacementWidth::class,
             'start_ru' => 'integer',
             'ru_height' => 'integer',
+            'slot' => 'integer',
             'full_depth' => 'boolean',
         ];
     }

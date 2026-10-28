@@ -120,7 +120,7 @@
             <?php endif; ?>
 
             <div class="mt-6 space-y-2">
-                <?php if($replacementManufacturers->isEmpty()): ?>
+                <?php if($assetCount > 0 && $replacementManufacturers->isEmpty()): ?>
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                         Create another manufacturer before deleting this one. Models and assets need a replacement.
                     </p>
@@ -166,15 +166,16 @@
                     <h2 class="text-lg font-medium text-gray-900 dark:text-white">
                         Delete “<?php echo e($manufacturer->name); ?>”?
                     </h2>
-                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                        This manufacturer has <?php echo e($modelCount); ?> model<?php echo e($modelCount === 1 ? '' : 's'); ?>
+                    <?php if($assetCount > 0): ?>
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                            This manufacturer has <?php echo e($modelCount); ?> model<?php echo e($modelCount === 1 ? '' : 's'); ?>
 
-                        and <?php echo e($assetCount); ?> asset<?php echo e($assetCount === 1 ? '' : 's'); ?>.
-                        Choose a replacement manufacturer, then delete.
-                        The deleted name is kept so future imports that still use it map to the replacement.
-                    </p>
-                    <div>
-                        <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+                            and <?php echo e($assetCount); ?> asset<?php echo e($assetCount === 1 ? '' : 's'); ?>.
+                            Choose a replacement manufacturer, then delete.
+                            The deleted name is kept so future imports that still use it map to the replacement.
+                        </p>
+                        <div>
+                            <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'replacement_manufacturer_id','value' => 'Replacement manufacturer']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('input-label'); ?>
@@ -194,7 +195,7 @@
 <?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
 <?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
 <?php endif; ?>
-                        <?php if (isset($component)) { $__componentOriginal93f56a9791a1857c74a51e0e80d6e731 = $component; } ?>
+                            <?php if (isset($component)) { $__componentOriginal93f56a9791a1857c74a51e0e80d6e731 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal93f56a9791a1857c74a51e0e80d6e731 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.searchable-select','data' => ['name' => 'replacement_manufacturer_id','id' => 'replacement_manufacturer_id','placeholder' => 'Search manufacturers…','options' => $replacementManufacturers->map(fn ($option) => ['value' => $option->id, 'label' => $option->name]),'selected' => old('replacement_manufacturer_id'),'required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('searchable-select'); ?>
@@ -214,7 +215,7 @@
 <?php $component = $__componentOriginal93f56a9791a1857c74a51e0e80d6e731; ?>
 <?php unset($__componentOriginal93f56a9791a1857c74a51e0e80d6e731); ?>
 <?php endif; ?>
-                        <?php if (isset($component)) { $__componentOriginalf94ed9c5393ef72725d159fe01139746 = $component; } ?>
+                            <?php if (isset($component)) { $__componentOriginalf94ed9c5393ef72725d159fe01139746 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalf94ed9c5393ef72725d159fe01139746 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-error','data' => ['messages' => $errors->get('replacement_manufacturer_id'),'class' => 'mt-2']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('input-error'); ?>
@@ -234,7 +235,12 @@
 <?php $component = $__componentOriginalf94ed9c5393ef72725d159fe01139746; ?>
 <?php unset($__componentOriginalf94ed9c5393ef72725d159fe01139746); ?>
 <?php endif; ?>
-                    </div>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                            This manufacturer has no assets. Delete it? Its models will be removed.
+                        </p>
+                    <?php endif; ?>
                     <div class="flex justify-end gap-2">
                         <?php if (isset($component)) { $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af = $attributes; } ?>

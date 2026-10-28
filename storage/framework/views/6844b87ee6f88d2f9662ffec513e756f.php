@@ -59,7 +59,7 @@
                             </form>
                         <?php endif; ?>
                     <?php endif; ?>
-                    <a href="<?php echo e(route('assets.edit', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
+                    <a href="<?php echo e(route('assets.edit', $asset)); ?>" data-history-roundtrip class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
                     <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('labels:read')): ?>
                         <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
                             <a href="<?php echo e(route('assets.label', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>

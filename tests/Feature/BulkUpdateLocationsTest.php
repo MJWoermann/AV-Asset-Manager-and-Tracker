@@ -100,22 +100,27 @@ class BulkUpdateLocationsTest extends TestCase
         ]);
     }
 
-    public function test_location_with_no_assets_stays_on_the_list(): void
+    public function test_location_with_no_assets_can_be_deleted_without_a_replacement(): void
     {
         $user = $this->manager();
         $empty = Location::create(['name' => 'Unused Room', 'type' => LocationType::Room]);
-        $replacement = Location::create(['name' => 'Keep Site', 'type' => LocationType::Site]);
-
-        $response = $this->actingAs($user)->from(route('locations.index'))->delete(route('locations.destroy', $empty), [
-            'replacement_location_id' => $replacement->id,
-            'deleting_location_id' => $empty->id,
+        $child = Location::create([
+            'name' => 'Nested Rack',
+            'type' => LocationType::Rack,
+            'parent_id' => $empty->id,
         ]);
+
+        $response = $this->actingAs($user)->delete(route('locations.destroy', $empty));
 
         $response->assertRedirect(route('locations.index'));
-        $response->assertSessionHasErrors([
-            'location' => 'Locations with no assets stay on the list.',
+        $this->assertDatabaseMissing('locations', ['id' => $empty->id]);
+        $this->assertDatabaseHas('locations', [
+            'id' => $child->id,
+            'parent_id' => null,
         ]);
-        $this->assertDatabaseHas('locations', ['id' => $empty->id]);
+        $this->assertDatabaseMissing('location_aliases', [
+            'former_name' => 'Unused Room',
+        ]);
     }
 
     public function test_location_delete_requires_a_replacement_location(): void
@@ -171,12 +176,13 @@ class BulkUpdateLocationsTest extends TestCase
         $response->assertSee('A12', false);
         $response->assertSee('Search by name or room code…', false);
         $response->assertSee('0 assets', false);
-        $response->assertSee('Locations with no assets stay on this list.', false);
+        $response->assertSee('Deleting a location with no assets asks for confirmation.', false);
+        $response->assertSee('This location has no assets. Delete it?', false);
         $response->assertSee("name: '{$busy->name}'", false);
-        $response->assertDontSee("name: '{$empty->name}'", false);
+        $response->assertSee("name: '{$empty->name}'", false);
     }
 
-    public function test_bulk_delete_keeps_locations_with_no_assets(): void
+    public function test_bulk_delete_removes_locations_with_no_assets(): void
     {
         $user = $this->manager();
         $a = Location::create(['name' => 'Site A', 'type' => LocationType::Site]);
@@ -190,13 +196,13 @@ class BulkUpdateLocationsTest extends TestCase
         ]);
 
         $response->assertRedirect(route('locations.index'));
-        $response->assertSessionHas('status', '2 locations with no assets kept.');
-        $this->assertDatabaseHas('locations', ['id' => $a->id]);
-        $this->assertDatabaseHas('locations', ['id' => $b->id]);
+        $response->assertSessionHas('status', '2 locations deleted.');
+        $this->assertDatabaseMissing('locations', ['id' => $a->id]);
+        $this->assertDatabaseMissing('locations', ['id' => $b->id]);
         $this->assertDatabaseHas('locations', ['id' => $keep->id]);
     }
 
-    public function test_bulk_delete_moves_assets_and_keeps_empty_locations(): void
+    public function test_bulk_delete_moves_assets_and_removes_empty_locations(): void
     {
         $user = $this->manager();
         $busy = Location::create(['name' => 'Busy Site', 'type' => LocationType::Site]);
@@ -213,7 +219,7 @@ class BulkUpdateLocationsTest extends TestCase
 
         $response->assertRedirect(route('locations.index'));
         $this->assertDatabaseMissing('locations', ['id' => $busy->id]);
-        $this->assertDatabaseHas('locations', ['id' => $empty->id]);
+        $this->assertDatabaseMissing('locations', ['id' => $empty->id]);
         $this->assertSame($keep->id, $asset->fresh()->location_id);
     }
 

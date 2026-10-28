@@ -22,7 +22,7 @@
                             <td class="px-3 py-2">{{ $log->creator?->name ?? '—' }}</td>
                             <td class="px-3 py-2">
                                 @if($log->rigEvent)
-                                    <a href="{{ route('rigging.events.show', $log->rigEvent) }}" class="text-brand">{{ $log->rigEvent->name }}</a>
+                                    <a href="{{ route('rigging.events.show', $log->rigEvent) }}" data-history-roundtrip class="text-brand">{{ $log->rigEvent->name }}</a>
                                 @else
                                     —
                                 @endif

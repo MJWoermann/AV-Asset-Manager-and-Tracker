@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\AuthorizesShelfTagFeature;
+use App\Models\File;
+use App\Models\ShelfTagLayout;
 use App\Support\ShelfTagFieldKeys;
 use App\Support\ShelfTagPaperPresets;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,6 +31,7 @@ class StoreShelfTagLayoutRequest extends FormRequest
             'snap_to_grid' => ['sometimes', 'boolean'],
             'grid_size_mm' => ['sometimes', 'numeric', Rule::in([2.5, 5, 10])],
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'logo_file_id' => ['nullable', 'integer'],
             'remove_logo' => ['sometimes', 'boolean'],
         ];
     }
@@ -71,6 +74,17 @@ class StoreShelfTagLayoutRequest extends FormRequest
                     $validator->errors()->add(
                         'length_mode',
                         'Auto length is only available for continuous paper presets.'
+                    );
+                }
+            }
+
+            $logoFileId = $this->input('logo_file_id');
+            if ($logoFileId !== null && $logoFileId !== '') {
+                $logoFile = File::query()->find((int) $logoFileId);
+                if (! ShelfTagLayout::isUsableLogoFile($logoFile)) {
+                    $validator->errors()->add(
+                        'logo_file_id',
+                        'Choose a JPEG or PNG image that is already in Files.'
                     );
                 }
             }

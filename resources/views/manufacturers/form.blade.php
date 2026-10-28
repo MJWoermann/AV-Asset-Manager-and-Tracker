@@ -36,7 +36,7 @@
             @endif
 
             <div class="mt-6 space-y-2">
-                @if($replacementManufacturers->isEmpty())
+                @if($assetCount > 0 && $replacementManufacturers->isEmpty())
                     <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                         Create another manufacturer before deleting this one. Models and assets need a replacement.
                     </p>
@@ -59,24 +59,30 @@
                     <h2 class="text-lg font-medium text-gray-900 dark:text-white">
                         Delete “{{ $manufacturer->name }}”?
                     </h2>
-                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                        This manufacturer has {{ $modelCount }} model{{ $modelCount === 1 ? '' : 's' }}
-                        and {{ $assetCount }} asset{{ $assetCount === 1 ? '' : 's' }}.
-                        Choose a replacement manufacturer, then delete.
-                        The deleted name is kept so future imports that still use it map to the replacement.
-                    </p>
-                    <div>
-                        <x-input-label for="replacement_manufacturer_id" value="Replacement manufacturer" />
-                        <x-searchable-select
-                            name="replacement_manufacturer_id"
-                            id="replacement_manufacturer_id"
-                            placeholder="Search manufacturers…"
-                            :options="$replacementManufacturers->map(fn ($option) => ['value' => $option->id, 'label' => $option->name])"
-                            :selected="old('replacement_manufacturer_id')"
-                            required
-                        />
-                        <x-input-error :messages="$errors->get('replacement_manufacturer_id')" class="mt-2" />
-                    </div>
+                    @if($assetCount > 0)
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                            This manufacturer has {{ $modelCount }} model{{ $modelCount === 1 ? '' : 's' }}
+                            and {{ $assetCount }} asset{{ $assetCount === 1 ? '' : 's' }}.
+                            Choose a replacement manufacturer, then delete.
+                            The deleted name is kept so future imports that still use it map to the replacement.
+                        </p>
+                        <div>
+                            <x-input-label for="replacement_manufacturer_id" value="Replacement manufacturer" />
+                            <x-searchable-select
+                                name="replacement_manufacturer_id"
+                                id="replacement_manufacturer_id"
+                                placeholder="Search manufacturers…"
+                                :options="$replacementManufacturers->map(fn ($option) => ['value' => $option->id, 'label' => $option->name])"
+                                :selected="old('replacement_manufacturer_id')"
+                                required
+                            />
+                            <x-input-error :messages="$errors->get('replacement_manufacturer_id')" class="mt-2" />
+                        </div>
+                    @else
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                            This manufacturer has no assets. Delete it? Its models will be removed.
+                        </p>
+                    @endif
                     <div class="flex justify-end gap-2">
                         <x-secondary-button type="button" x-on:click="$dispatch('close')">Cancel</x-secondary-button>
                         <x-danger-button>Delete permanently</x-danger-button>

@@ -24,6 +24,7 @@ class ShelfTagLayout extends Model
         'elements',
         'editor_settings',
         'logo_path',
+        'logo_file_id',
         'created_by',
     ];
 
@@ -37,12 +38,17 @@ class ShelfTagLayout extends Model
         ];
     }
 
+    /** @var list<string> */
+    public const LOGO_MIME_TYPES = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+    ];
+
     protected static function booted(): void
     {
         static::deleting(function (ShelfTagLayout $layout): void {
-            if ($layout->logo_path) {
-                Storage::disk('public')->delete($layout->logo_path);
-            }
+            $layout->releasePublicLogo();
         });
     }
 
@@ -51,13 +57,53 @@ class ShelfTagLayout extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function logoFile(): BelongsTo
+    {
+        return $this->belongsTo(File::class, 'logo_file_id');
+    }
+
+    public static function isUsableLogoFile(?File $file): bool
+    {
+        if ($file === null || ! $file->isUpload() || ! $file->path || ! $file->disk) {
+            return false;
+        }
+
+        return in_array(strtolower((string) $file->mime_type), self::LOGO_MIME_TYPES, true);
+    }
+
     public function logoUrl(): ?string
     {
+        $file = $this->logoFile;
+
+        if ($this->logo_file_id && self::isUsableLogoFile($file)) {
+            return route('labels.layouts.logo-file', $file);
+        }
+
         if (! $this->logo_path) {
             return null;
         }
 
-        return Storage::disk('public')->url($this->logo_path);
+        return asset('storage/'.ltrim((string) $this->logo_path, '/'));
+    }
+
+    /**
+     * Delete a legacy public-disk logo when no other layout still uses that path.
+     */
+    public function releasePublicLogo(): void
+    {
+        if (! $this->logo_path) {
+            return;
+        }
+
+        $path = $this->logo_path;
+        $shared = static::query()
+            ->where('logo_path', $path)
+            ->when($this->exists, fn ($query) => $query->whereKeyNot($this->getKey()))
+            ->exists();
+
+        if (! $shared) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     /**
@@ -65,6 +111,17 @@ class ShelfTagLayout extends Model
      */
     public function logoAbsolutePath(): ?string
     {
+        $file = $this->logoFile;
+
+        if ($this->logo_file_id && self::isUsableLogoFile($file)) {
+            $driver = config('filesystems.disks.'.$file->disk.'.driver');
+            $disk = Storage::disk($file->disk);
+
+            if ($driver === 'local' && $disk->exists($file->path)) {
+                return $disk->path($file->path);
+            }
+        }
+
         if (! $this->logo_path || ! Storage::disk('public')->exists($this->logo_path)) {
             return null;
         }

@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center gap-3">
             <h2 class="font-semibold text-xl">Custom field sets</h2>
-            <a href="{{ route('custom-field-sets.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add</a>
+            <a href="{{ route('custom-field-sets.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add</a>
         </div>
     </x-slot>
     <div class="max-w-7xl mx-auto px-4 space-y-3">
@@ -22,12 +22,12 @@
                         <div class="text-sm mt-1">{{ $set->description }}</div>
                     @endif
                 </div>
-                <a href="{{ route('custom-field-sets.edit', $set) }}" class="text-brand text-sm shrink-0">Edit</a>
+                <a href="{{ route('custom-field-sets.edit', $set) }}" data-history-roundtrip class="text-brand text-sm shrink-0">Edit</a>
             </div>
         @empty
             <div class="bg-white dark:bg-brand-slate border p-4 text-sm text-brand-charcoal dark:text-brand-silver">
                 No custom field sets yet.
-                <a href="{{ route('custom-field-sets.create') }}" class="text-brand">Create one</a>
+                <a href="{{ route('custom-field-sets.create') }}" data-history-roundtrip class="text-brand">Create one</a>
                 to assign on item types.
             </div>
         @endforelse

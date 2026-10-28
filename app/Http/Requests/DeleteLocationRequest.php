@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Asset;
 use App\Models\Location;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class DeleteLocationRequest extends FormRequest
 {
@@ -22,13 +22,27 @@ class DeleteLocationRequest extends FormRequest
 
         return [
             'replacement_location_id' => [
-                'required',
+                Rule::excludeIf(fn (): bool => ! $this->requiresReplacement()),
+                Rule::requiredIf(fn (): bool => $this->requiresReplacement()),
                 'integer',
                 Rule::exists('locations', 'id')->where(
                     fn ($query) => $query->where('id', '!=', $locationId)
                 ),
             ],
         ];
+    }
+
+    public function requiresReplacement(): bool
+    {
+        $location = $this->route('location');
+
+        if (! $location instanceof Location) {
+            return true;
+        }
+
+        return Asset::withoutDepartmentScope()
+            ->where('location_id', $location->id)
+            ->exists();
     }
 
     /** @return array<string, string> */
@@ -38,18 +52,5 @@ class DeleteLocationRequest extends FormRequest
             'replacement_location_id.required' => 'Choose a replacement location for assets at this location.',
             'replacement_location_id.exists' => 'Choose a valid replacement location.',
         ];
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator): void {
-            $location = $this->route('location');
-
-            if (! $location instanceof Location || $location->assets()->exists()) {
-                return;
-            }
-
-            $validator->errors()->add('location', 'Locations with no assets stay on the list.');
-        });
     }
 }

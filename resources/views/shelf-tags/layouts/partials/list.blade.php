@@ -13,7 +13,7 @@
             </div>
         </div>
         <div class="flex items-center gap-3 text-sm">
-            <a href="{{ route('labels.layouts.edit', $layout) }}" class="text-brand">Edit</a>
+            <a href="{{ route('labels.layouts.edit', $layout) }}" data-history-roundtrip class="text-brand">Edit</a>
             <form method="POST" action="{{ route('labels.layouts.destroy', $layout) }}" onsubmit="return confirm('Delete this layout?')">
                 @csrf
                 @method('DELETE')

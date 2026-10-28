@@ -11,6 +11,7 @@ use App\Models\RepairProcedure;
 use App\Models\SparePart;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class ManufacturerCatalogueService
@@ -115,6 +116,24 @@ class ManufacturerCatalogueService
             'manufacturer_id' => $manufacturer?->id,
             'manufacturer_model_id' => $model?->id,
         ];
+    }
+
+    public function hasAssets(Manufacturer $manufacturer): bool
+    {
+        return Asset::withoutDepartmentScope()
+            ->where('manufacturer_id', $manufacturer->id)
+            ->exists();
+    }
+
+    public function deleteWithoutReassignment(Manufacturer $manufacturer): void
+    {
+        if ($this->hasAssets($manufacturer)) {
+            throw ValidationException::withMessages([
+                'replacement_manufacturer_id' => 'Choose a replacement manufacturer for models and assets.',
+            ]);
+        }
+
+        $manufacturer->delete();
     }
 
     public function deleteManufacturer(Manufacturer $manufacturer, Manufacturer $replacement): void

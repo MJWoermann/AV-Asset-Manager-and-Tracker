@@ -140,7 +140,7 @@
                             :disabled="!canParentChildGroup({{ $groupIndex }})"
                             @click="openParentModal({{ $groupIndex }})"
                         >Make parent/child…</button>
-                        <form method="GET" action="{{ route('assets.duplicates.merge') }}" class="inline"
+                        <form method="GET" action="{{ route('assets.duplicates.merge') }}" class="inline" data-history-roundtrip
                               @submit="prepareMergeSubmit($event, {{ $groupIndex }})">
                             <template x-for="id in selectedByGroup[{{ $groupIndex }}] || []" :key="'merge-g{{ $groupIndex }}-'+id">
                                 <input type="hidden" name="asset_ids[]" :value="id">

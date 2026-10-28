@@ -7,7 +7,7 @@
             </div>
             <div class="flex flex-wrap gap-2 text-sm">
                 @can('spares:manage')
-                    <a href="{{ route('spares.edit', $spare) }}" class="px-3 py-2 border">Edit</a>
+                    <a href="{{ route('spares.edit', $spare) }}" data-history-roundtrip class="px-3 py-2 border">Edit</a>
                 @endcan
                 @can('labels:read')
                     @feature('shelf_tag_generator')

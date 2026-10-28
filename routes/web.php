@@ -515,6 +515,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
             Route::get('/layouts', [ShelfTagLayoutController::class, 'index'])->name('layouts.index');
             Route::get('/layouts/import', [ShelfTagLayoutController::class, 'importForm'])->middleware('permission:labels:write')->name('layouts.import');
             Route::post('/layouts/import', [ShelfTagLayoutController::class, 'import'])->middleware('permission:labels:write')->name('layouts.import.store');
+            Route::get('/layouts/logo-library', [ShelfTagLayoutController::class, 'logoLibrary'])->middleware('permission:labels:write')->name('layouts.logo-library');
+            Route::get('/layouts/logo-files/{file}', [ShelfTagLayoutController::class, 'showLogoFile'])->name('layouts.logo-file');
             Route::get('/layouts/create', [ShelfTagLayoutController::class, 'create'])->middleware('permission:labels:write')->name('layouts.create');
             Route::post('/layouts', [ShelfTagLayoutController::class, 'store'])->middleware('permission:labels:write')->name('layouts.store');
             Route::get('/layouts/{layout}/edit', [ShelfTagLayoutController::class, 'edit'])->middleware('permission:labels:write')->name('layouts.edit');

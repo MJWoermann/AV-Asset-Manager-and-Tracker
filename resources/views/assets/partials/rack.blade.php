@@ -34,10 +34,13 @@
             'start_ru' => old('start_ru'),
             'ru_height' => old('ru_height'),
             'full_depth' => (bool) old('full_depth', false),
+            'width' => old('width', 'full'),
+            'slot' => (string) old('slot', '1'),
             'kind' => $oldKind,
             'child_asset_id' => old('child_asset_id', ''),
             'note' => old('note', ''),
             'confirm_parent_change' => old('confirm_parent_change', false),
+            'move_row' => filter_var(old('move_row', false), FILTER_VALIDATE_BOOLEAN),
         ],
     ]))"
 >
@@ -59,7 +62,7 @@
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                 This rack needs a capacity before you can place equipment or notes.
             </p>
-            <a href="{{ route('assets.edit', $asset) }}" class="inline-flex px-3 py-2 bg-brand text-white text-sm">
+            <a href="{{ route('assets.edit', $asset) }}" data-history-roundtrip class="inline-flex px-3 py-2 bg-brand text-white text-sm">
                 Edit asset to set RU height
             </a>
         </div>
@@ -119,52 +122,18 @@
                         <button type="button" class="text-sm text-brand-charcoal dark:text-brand-silver" @click="closePanel()">Close</button>
                     </div>
 
-                    {{-- #region agent log --}}
-                    <script>
-                        window.__dbgRuPlace = function (event, form) {
-                            try {
-                                const faceEl = event.target.querySelector('[name="face"]');
-                                const entries = {};
-                                new FormData(event.target).forEach((value, key) => {
-                                    if (key !== '_token' && key !== 'note') {
-                                        entries[key] = String(value);
-                                    }
-                                });
-                                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca5636' },
-                                    body: JSON.stringify({
-                                        sessionId: 'ca5636',
-                                        runId: 'pre-fix',
-                                        hypothesisId: 'H1-H2',
-                                        location: 'rack.blade.php:submit',
-                                        message: 'ru placement form submit',
-                                        data: {
-                                            alpineFace: form?.face ?? null,
-                                            fullDepth: Boolean(form?.full_depth),
-                                            kind: form?.kind ?? null,
-                                            faceDisabled: Boolean(faceEl?.disabled),
-                                            faceDomValue: faceEl?.value ?? null,
-                                            entries,
-                                        },
-                                        timestamp: Date.now(),
-                                    }),
-                                }).catch(() => {});
-                            } catch (_) {}
-                        };
-                    </script>
-                    {{-- #endregion --}}
                     <form
                         method="POST"
                         x-ref="placementForm"
                         :action="panel === 'edit' && editingPlacement() ? editingPlacement().update_url : storeUrl"
-                        @submit="prepareSubmit($event); window.__dbgRuPlace?.($event, form)"
+                        @submit="prepareSubmit($event)"
                         class="space-y-3"
                     >
                         @csrf
                         <input type="hidden" name="_method" value="PUT" x-bind:disabled="panel !== 'edit'">
                         <input type="hidden" name="_placement_id" :value="editingId || ''">
                         <input type="hidden" name="confirm_parent_change" :value="form.confirm_parent_change ? '1' : '0'">
+                        <input type="hidden" name="move_row" :value="form.move_row ? '1' : '0'" :disabled="panel !== 'edit'">
 
                         <div>
                             <x-input-label value="Face" />
@@ -219,6 +188,37 @@
                                 >
                             </div>
                         </div>
+
+                        <div>
+                            <x-input-label value="Width" />
+                            <select
+                                name="width"
+                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                x-model="form.width"
+                                @change="clampSlot()"
+                                required
+                            >
+                                <option value="full">Full</option>
+                                <option value="half">Half</option>
+                                <option value="third">Third</option>
+                            </select>
+                        </div>
+
+                        <div x-show="form.width !== 'full'" x-cloak>
+                            <x-input-label value="Position" />
+                            <select
+                                name="slot"
+                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                x-model="form.slot"
+                                :disabled="form.width === 'full'"
+                                :required="form.width !== 'full'"
+                            >
+                                <template x-for="option in slotOptions()" :key="option.value">
+                                    <option :value="option.value" x-text="option.label"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <input type="hidden" name="slot" value="1" :disabled="form.width !== 'full'">
 
                         <div>
                             <x-input-label value="Kind" />
@@ -287,6 +287,28 @@
                                 :required="form.kind === 'note'"
                                 :disabled="form.kind !== 'note'"
                             ></textarea>
+                        </div>
+
+                        <div x-show="panel === 'edit' && rowMates().length > 0" x-cloak class="space-y-2 border-t border-brand-silver dark:border-brand-charcoal pt-3">
+                            <p class="text-xs text-brand-charcoal dark:text-brand-silver">Also in this row</p>
+                            <ul class="text-sm space-y-1">
+                                <template x-for="mate in rowMates()" :key="mate.id">
+                                    <li class="truncate" x-text="placementLabel(mate)"></li>
+                                </template>
+                            </ul>
+                            <label class="flex items-start gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand"
+                                    x-model="form.move_row"
+                                >
+                                <span>
+                                    Move the whole row
+                                    <span class="block text-xs text-brand-charcoal dark:text-brand-silver">
+                                        Each item keeps its own position, height, and full depth.
+                                    </span>
+                                </span>
+                            </label>
                         </div>
 
                         <div class="flex flex-wrap justify-end gap-2">

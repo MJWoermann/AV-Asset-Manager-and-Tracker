@@ -16,6 +16,7 @@
             ? (is_string(old('elements')) ? json_decode(old('elements'), true) : old('elements'))
             : ($layout->elements ?? []),
         'logo_url' => $layout->logoUrl(),
+        'logo_library_url' => route('labels.layouts.logo-library'),
         'editor_settings' => ShelfTagPaperPresets::normalizeEditorSettings(
             is_array($editorSettingsRaw) ? $editorSettingsRaw : null
         ),
@@ -328,12 +329,18 @@
 <?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
 <?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
 <?php endif; ?>
-                        <input id="logo" name="logo" type="file" accept="image/jpeg,image/png" class="mt-1 block w-full text-sm">
+                        <input type="hidden" name="logo_file_id" :value="selectedLogoFileId || ''">
+                        <input id="logo" name="logo" type="file" accept="image/jpeg,image/png" class="mt-1 block w-full text-sm" x-ref="logoUpload" @change="onLogoUploadChosen()">
+                        <button type="button" class="mt-2 text-sm text-brand" @click="openLogoLibrary()">Choose an uploaded image</button>
+                        <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">Uses an image already in Files. Uploading the same picture again reuses that file.</p>
                         <template x-if="logoUrl">
-                            <label class="mt-2 inline-flex items-center gap-2 text-sm">
-                                <input type="checkbox" name="remove_logo" value="1" class="rounded text-brand">
-                                Remove current logo
-                            </label>
+                            <div class="mt-2 space-y-2">
+                                <img :src="logoUrl" alt="Current logo" class="h-16 max-w-full object-contain border bg-white">
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input type="checkbox" name="remove_logo" value="1" class="rounded text-brand" x-ref="removeLogo">
+                                    Remove current logo
+                                </label>
+                            </div>
                         </template>
                     </div>
                     <p class="text-xs text-brand-charcoal dark:text-brand-silver">
@@ -686,6 +693,97 @@
 <?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
 <?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
 <?php endif; ?>
+            </div>
+
+            <div
+                x-show="logoLibraryOpen"
+                x-cloak
+                class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6 sm:px-0"
+                @keydown.escape.window="closeLogoLibrary()"
+            >
+                <div class="fixed inset-0 bg-gray-500 opacity-75" @click="closeLogoLibrary()"></div>
+                <div
+                    class="relative w-full sm:max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto bg-white dark:bg-brand-slate dark:text-white rounded-lg shadow-xl sm:mx-auto"
+                    @click.stop
+                >
+                    <div class="p-6 space-y-4">
+                        <h2 class="text-lg font-medium">Choose an uploaded image</h2>
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">JPEG and PNG files already in Files. Picking one does not upload another copy.</p>
+                        <div>
+                            <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'logo_library_search','value' => 'Search']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['for' => 'logo_library_search','value' => 'Search']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                            <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal18c21970322f9e5c938bc954620c12bb = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => 'logo_library_search','type' => 'search','class' => 'mt-1 block w-full','xModel' => 'logoLibraryQuery','@input.debounce.300ms' => 'searchLogoLibrary()','@keydown.enter.prevent' => 'searchLogoLibrary()','placeholder' => 'Search by title or filename','autocomplete' => 'off']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('text-input'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => 'logo_library_search','type' => 'search','class' => 'mt-1 block w-full','x-model' => 'logoLibraryQuery','@input.debounce.300ms' => 'searchLogoLibrary()','@keydown.enter.prevent' => 'searchLogoLibrary()','placeholder' => 'Search by title or filename','autocomplete' => 'off']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal18c21970322f9e5c938bc954620c12bb)): ?>
+<?php $attributes = $__attributesOriginal18c21970322f9e5c938bc954620c12bb; ?>
+<?php unset($__attributesOriginal18c21970322f9e5c938bc954620c12bb); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal18c21970322f9e5c938bc954620c12bb)): ?>
+<?php $component = $__componentOriginal18c21970322f9e5c938bc954620c12bb; ?>
+<?php unset($__componentOriginal18c21970322f9e5c938bc954620c12bb); ?>
+<?php endif; ?>
+                            <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver" x-show="logoLibrarySearching" x-cloak>Searching…</p>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" x-show="logoLibraryResults.length" x-cloak>
+                            <template x-for="file in logoLibraryResults" :key="file.id">
+                                <button type="button" class="border p-1 text-left hover:border-brand" @click="pickLogo(file)">
+                                    <img :src="file.url" alt="" class="h-16 w-full object-contain bg-white">
+                                    <span class="mt-1 block text-xs truncate" x-text="file.title"></span>
+                                </button>
+                            </template>
+                        </div>
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="!logoLibrarySearching && logoLibraryResults.length === 0" x-cloak>No JPEG or PNG images in Files yet.</p>
+                        <div class="flex justify-end">
+                            <?php if (isset($component)) { $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.secondary-button','data' => ['type' => 'button','@click' => 'closeLogoLibrary()']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('secondary-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','@click' => 'closeLogoLibrary()']); ?>Close <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af)): ?>
+<?php $attributes = $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
+<?php unset($__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af)): ?>
+<?php $component = $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
+<?php unset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
+<?php endif; ?>
+                        </div>
+                    </div>
+                </div>
             </div>
         </form>
     </div>

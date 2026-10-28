@@ -2,18 +2,27 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FileCategory;
+use App\Enums\FileSourceType;
 use App\Http\Requests\ImportShelfTagLbxRequest;
 use App\Http\Requests\StoreShelfTagLayoutRequest;
 use App\Http\Requests\UpdateShelfTagLayoutRequest;
+use App\Models\File;
 use App\Models\ShelfTagLayout;
+use App\Services\FileAttachmentService;
 use App\Services\ShelfTagLbxImporter;
 use App\Support\ShelfTagFieldKeys;
 use App\Support\ShelfTagPaperPresets;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use InvalidArgumentException;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ShelfTagLayoutController extends Controller
 {
@@ -61,11 +70,11 @@ class ShelfTagLayoutController extends Controller
         return view('shelf-tags.layouts.form', $this->formData($layout));
     }
 
-    public function store(StoreShelfTagLayoutRequest $request): RedirectResponse
+    public function store(StoreShelfTagLayoutRequest $request, FileAttachmentService $attachments): RedirectResponse
     {
         $data = $request->layoutAttributes();
         $data['created_by'] = $request->user()?->id;
-        $data['logo_path'] = $this->storeLogo($request);
+        $this->applyLogo($request, $data, null, $attachments);
 
         $layout = ShelfTagLayout::query()->create($data);
 
@@ -79,22 +88,10 @@ class ShelfTagLayoutController extends Controller
         return view('shelf-tags.layouts.form', $this->formData($layout));
     }
 
-    public function update(UpdateShelfTagLayoutRequest $request, ShelfTagLayout $layout): RedirectResponse
+    public function update(UpdateShelfTagLayoutRequest $request, ShelfTagLayout $layout, FileAttachmentService $attachments): RedirectResponse
     {
         $data = $request->layoutAttributes();
-
-        if ($request->boolean('remove_logo') && $layout->logo_path) {
-            Storage::disk('public')->delete($layout->logo_path);
-            $data['logo_path'] = null;
-        }
-
-        $newLogo = $this->storeLogo($request);
-        if ($newLogo !== null) {
-            if ($layout->logo_path) {
-                Storage::disk('public')->delete($layout->logo_path);
-            }
-            $data['logo_path'] = $newLogo;
-        }
+        $this->applyLogo($request, $data, $layout, $attachments);
 
         $layout->update($data);
 
@@ -124,12 +121,90 @@ class ShelfTagLayoutController extends Controller
         ];
     }
 
-    protected function storeLogo(Request $request): ?string
+    public function logoLibrary(Request $request): JsonResponse
     {
-        if (! $request->hasFile('logo')) {
-            return null;
+        $term = trim((string) $request->string('q'));
+
+        $files = File::query()
+            ->where('source_type', FileSourceType::Upload)
+            ->whereIn('mime_type', ShelfTagLayout::LOGO_MIME_TYPES)
+            ->when($term !== '', fn ($query) => $query->search($term))
+            ->latest()
+            ->limit(24)
+            ->get();
+
+        return response()->json([
+            'data' => $files->map(fn (File $file): array => [
+                'id' => $file->id,
+                'title' => $file->title,
+                'url' => route('labels.layouts.logo-file', $file),
+            ])->values(),
+        ]);
+    }
+
+    public function showLogoFile(Request $request, File $file): StreamedResponse
+    {
+        abort_unless(ShelfTagLayout::isUsableLogoFile($file), 404);
+
+        $assigned = ShelfTagLayout::query()->where('logo_file_id', $file->id)->exists();
+        abort_unless($assigned || $request->user()?->can('labels:write'), 404);
+
+        $disk = Storage::disk((string) $file->disk);
+        abort_unless($disk->exists((string) $file->path), 404);
+
+        return $disk->response((string) $file->path, null, [
+            'Content-Type' => (string) $file->mime_type,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function applyLogo(Request $request, array &$data, ?ShelfTagLayout $layout, FileAttachmentService $attachments): void
+    {
+        if ($request->hasFile('logo')) {
+            $upload = $request->file('logo');
+            if (! $upload instanceof UploadedFile) {
+                return;
+            }
+
+            try {
+                $stored = $attachments->storeUpload($upload, [
+                    'title' => $this->logoTitle($upload),
+                    'category' => FileCategory::Photo->value,
+                ]);
+            } catch (RuntimeException $exception) {
+                throw ValidationException::withMessages([
+                    'logo' => $exception->getMessage(),
+                ]);
+            }
+
+            $layout?->releasePublicLogo();
+            $data['logo_file_id'] = $stored->id;
+            $data['logo_path'] = null;
+
+            return;
         }
 
-        return $request->file('logo')->store('shelf-tag-logos', 'public');
+        if ($request->filled('logo_file_id')) {
+            $layout?->releasePublicLogo();
+            $data['logo_file_id'] = (int) $request->input('logo_file_id');
+            $data['logo_path'] = null;
+
+            return;
+        }
+
+        if ($request->boolean('remove_logo')) {
+            $layout?->releasePublicLogo();
+            $data['logo_file_id'] = null;
+            $data['logo_path'] = null;
+        }
+    }
+
+    protected function logoTitle(UploadedFile $upload): string
+    {
+        $name = trim(pathinfo($upload->getClientOriginalName(), PATHINFO_FILENAME));
+
+        return $name !== '' ? mb_substr($name, 0, 255) : 'Label logo';
     }
 }

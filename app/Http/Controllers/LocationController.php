@@ -19,7 +19,10 @@ class LocationController extends Controller
     {
         $flatLocations = Location::query()
             ->with('parent.parent.parent.parent')
-            ->withCount('assets')
+            ->withCount([
+                'assets',
+                'assets as unscoped_assets_count' => fn ($query) => $query->withoutGlobalScope('department'),
+            ])
             ->orderByHierarchy()
             ->get();
         $locations = Location::tree($flatLocations);
@@ -35,11 +38,11 @@ class LocationController extends Controller
         $deletingLocationId = (int) old('deleting_location_id');
         if ($canManageLocations && $deletingLocationId > 0) {
             $deletingLocation = $flatLocations->firstWhere('id', $deletingLocationId);
-            if ($deletingLocation && (int) $deletingLocation->assets_count > 0) {
+            if ($deletingLocation) {
                 $initialDeleteLocation = [
                     'id' => $deletingLocation->id,
                     'name' => $deletingLocation->name,
-                    'assetsCount' => (int) $deletingLocation->assets_count,
+                    'assetsCount' => (int) $deletingLocation->unscoped_assets_count,
                     'action' => route('locations.destroy', $deletingLocation),
                     'replacementId' => (string) old('replacement_location_id', ''),
                 ];
@@ -113,11 +116,14 @@ class LocationController extends Controller
         Location $location,
         BulkLocationUpdateService $locations,
     ): RedirectResponse {
-        $replacement = Location::query()->findOrFail(
-            (int) $request->validated('replacement_location_id')
-        );
-
-        $locations->deleteWithReplacement($location, $replacement);
+        if ($request->requiresReplacement()) {
+            $replacement = Location::query()->findOrFail(
+                (int) $request->validated('replacement_location_id')
+            );
+            $locations->deleteWithReplacement($location, $replacement);
+        } else {
+            $locations->deleteWithoutReassignment($location);
+        }
 
         return redirect()->route('locations.index')->with('status', 'Location deleted.');
     }
@@ -150,7 +156,7 @@ class LocationController extends Controller
 
         $kept = (int) ($result['kept'] ?? 0);
         if ($kept > 0) {
-            $parts[] = $kept.' location'.($kept === 1 ? '' : 's').' with no assets kept';
+            $parts[] = $kept.' location'.($kept === 1 ? '' : 's').' kept as the replacement';
         }
 
         if ($result['updated'] > 0) {

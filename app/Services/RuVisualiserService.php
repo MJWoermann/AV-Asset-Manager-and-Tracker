@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Enums\RuPlacementFace;
 use App\Enums\RuPlacementKind;
+use App\Enums\RuPlacementWidth;
 use App\Models\Asset;
 use App\Models\AssetRuPlacement;
 use App\Models\AuditLog;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -69,6 +71,8 @@ class RuVisualiserService
      *     start_ru: int,
      *     ru_height?: int|null,
      *     full_depth?: bool,
+     *     width?: string|RuPlacementWidth,
+     *     slot?: int|null,
      *     kind: string|RuPlacementKind,
      *     child_asset_id?: int|null,
      *     note?: string|null,
@@ -86,6 +90,8 @@ class RuVisualiserService
             $startRu = (int) ($data['start_ru'] ?? 0);
             $confirmParentChange = (bool) ($data['confirm_parent_change'] ?? false);
             $fullDepth = $kind === RuPlacementKind::Asset && (bool) ($data['full_depth'] ?? false);
+            $width = $this->resolveWidth($data['width'] ?? null);
+            $slot = $this->resolveSlot($width, $data['slot'] ?? null, array_key_exists('slot', $data));
 
             $child = null;
             $note = null;
@@ -121,7 +127,7 @@ class RuVisualiserService
             }
 
             $this->assertFaceAllowed($rack, $face);
-            $this->assertSpanValid($rack, $face, $startRu, $ruHeight, null, $fullDepth);
+            $this->assertSpanValid($rack, $face, $startRu, $ruHeight, null, $fullDepth, $width, $slot);
 
             $placement = AssetRuPlacement::query()->create([
                 'rack_asset_id' => $rack->id,
@@ -129,6 +135,8 @@ class RuVisualiserService
                 'start_ru' => $startRu,
                 'ru_height' => $ruHeight,
                 'full_depth' => $fullDepth,
+                'width' => $width,
+                'slot' => $slot,
                 'kind' => $kind,
                 'child_asset_id' => $child?->id,
                 'note' => $kind === RuPlacementKind::Note ? $note : null,
@@ -144,6 +152,8 @@ class RuVisualiserService
                 'start_ru' => $startRu,
                 'ru_height' => $ruHeight,
                 'full_depth' => $fullDepth,
+                'width' => $width->value,
+                'slot' => $slot,
                 'kind' => $kind->value,
                 'child_asset_id' => $child?->id,
                 'note' => $kind === RuPlacementKind::Note ? $note : null,
@@ -159,10 +169,13 @@ class RuVisualiserService
      *     start_ru?: int,
      *     ru_height?: int|null,
      *     full_depth?: bool,
+     *     width?: string|RuPlacementWidth,
+     *     slot?: int|null,
      *     kind?: string|RuPlacementKind,
      *     child_asset_id?: int|null,
      *     note?: string|null,
-     *     confirm_parent_change?: bool
+     *     confirm_parent_change?: bool,
+     *     move_row?: bool
      * }  $data
      */
     public function update(AssetRuPlacement $placement, array $data): AssetRuPlacement
@@ -172,6 +185,10 @@ class RuVisualiserService
             $rack = Asset::query()->lockForUpdate()->findOrFail($placement->rack_asset_id);
             $this->assertRackReady($rack);
 
+            $originalStartRu = (int) $placement->start_ru;
+            $originalWidth = $placement->width ?? RuPlacementWidth::Full;
+            $originalFace = $placement->face;
+
             $face = array_key_exists('face', $data)
                 ? $this->resolveFace($data['face'])
                 : $placement->face;
@@ -180,8 +197,16 @@ class RuVisualiserService
                 : $placement->kind;
             $startRu = array_key_exists('start_ru', $data)
                 ? (int) $data['start_ru']
-                : (int) $placement->start_ru;
+                : $originalStartRu;
             $confirmParentChange = (bool) ($data['confirm_parent_change'] ?? false);
+            $width = array_key_exists('width', $data)
+                ? $this->resolveWidth($data['width'])
+                : ($placement->width ?? RuPlacementWidth::Full);
+            $slot = $this->resolveSlot(
+                $width,
+                array_key_exists('slot', $data) ? $data['slot'] : ($placement->slot ?? 1),
+                array_key_exists('slot', $data),
+            );
 
             $previousChildId = $placement->child_asset_id ? (int) $placement->child_asset_id : null;
             $child = null;
@@ -230,10 +255,41 @@ class RuVisualiserService
             }
 
             $this->assertFaceAllowed($rack, $face);
-            $this->assertSpanValid($rack, $face, $startRu, $ruHeight, $placement->id, $fullDepth);
+
+            $moveRow = (bool) ($data['move_row'] ?? false);
+            $rowMembers = new Collection;
+            if ($moveRow && $originalWidth !== RuPlacementWidth::Full && $startRu !== $originalStartRu) {
+                $rowMembers = AssetRuPlacement::query()
+                    ->where('rack_asset_id', $rack->id)
+                    ->where('face', $originalFace->value)
+                    ->where('width', $originalWidth->value)
+                    ->where('start_ru', $originalStartRu)
+                    ->orderBy('slot')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+            }
+
+            if ($rowMembers->count() > 1) {
+                return $this->moveRowTogether($rack, $placement, $rowMembers, [
+                    'face' => $face,
+                    'start_ru' => $startRu,
+                    'ru_height' => $ruHeight,
+                    'full_depth' => $fullDepth,
+                    'width' => $width,
+                    'slot' => $slot,
+                    'kind' => $kind,
+                    'child' => $child,
+                    'note' => $kind === RuPlacementKind::Note ? $note : null,
+                    'confirm_parent_change' => $confirmParentChange,
+                    'original_start_ru' => $originalStartRu,
+                ]);
+            }
+
+            $this->assertSpanValid($rack, $face, $startRu, $ruHeight, $placement->id, $fullDepth, $width, $slot);
 
             $old = $placement->only([
-                'face', 'start_ru', 'ru_height', 'full_depth', 'kind', 'child_asset_id', 'note',
+                'face', 'start_ru', 'ru_height', 'full_depth', 'width', 'slot', 'kind', 'child_asset_id', 'note',
             ]);
 
             $placement->update([
@@ -241,6 +297,8 @@ class RuVisualiserService
                 'start_ru' => $startRu,
                 'ru_height' => $ruHeight,
                 'full_depth' => $fullDepth,
+                'width' => $width,
+                'slot' => $slot,
                 'kind' => $kind,
                 'child_asset_id' => $child?->id,
                 'note' => $kind === RuPlacementKind::Note ? $note : null,
@@ -256,6 +314,8 @@ class RuVisualiserService
                 'start_ru' => $startRu,
                 'ru_height' => $ruHeight,
                 'full_depth' => $fullDepth,
+                'width' => $width->value,
+                'slot' => $slot,
                 'kind' => $kind->value,
                 'child_asset_id' => $child?->id,
                 'note' => $kind === RuPlacementKind::Note ? $note : null,
@@ -272,7 +332,7 @@ class RuVisualiserService
             $rack = Asset::query()->lockForUpdate()->findOrFail($placement->rack_asset_id);
 
             $old = $placement->only([
-                'id', 'face', 'start_ru', 'ru_height', 'full_depth', 'kind', 'child_asset_id', 'note',
+                'id', 'face', 'start_ru', 'ru_height', 'full_depth', 'width', 'slot', 'kind', 'child_asset_id', 'note',
             ]);
 
             // Keep parent_id — child remains under the rack and shows as unplaced.
@@ -366,6 +426,135 @@ class RuVisualiserService
         }
     }
 
+    /**
+     * Move every half or third that shares the open item's face, width, and start RU.
+     *
+     * @param  Collection<int, AssetRuPlacement>  $members
+     * @param  array{
+     *     face: RuPlacementFace,
+     *     start_ru: int,
+     *     ru_height: int,
+     *     full_depth: bool,
+     *     width: RuPlacementWidth,
+     *     slot: int,
+     *     kind: RuPlacementKind,
+     *     child: ?Asset,
+     *     note: ?string,
+     *     confirm_parent_change: bool,
+     *     original_start_ru: int
+     * }  $edited
+     */
+    protected function moveRowTogether(Asset $rack, AssetRuPlacement $placement, Collection $members, array $edited): AssetRuPlacement
+    {
+        $memberIds = $members
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+
+        $proposed = [];
+        foreach ($members as $member) {
+            $isEdited = (int) $member->id === (int) $placement->id;
+            $proposed[] = [
+                'face' => $isEdited ? $edited['face'] : $member->face,
+                'start_ru' => (int) $edited['start_ru'],
+                'ru_height' => $isEdited ? (int) $edited['ru_height'] : (int) $member->ru_height,
+                'full_depth' => $isEdited ? (bool) $edited['full_depth'] : (bool) $member->full_depth,
+                'width' => $isEdited ? $edited['width'] : ($member->width ?? RuPlacementWidth::Full),
+                'slot' => $isEdited ? (int) $edited['slot'] : (int) $member->slot,
+            ];
+        }
+
+        foreach ($proposed as $candidate) {
+            $this->assertSpanValid(
+                $rack,
+                $candidate['face'],
+                $candidate['start_ru'],
+                $candidate['ru_height'],
+                null,
+                $candidate['full_depth'],
+                $candidate['width'],
+                $candidate['slot'],
+                $memberIds,
+            );
+        }
+
+        $count = count($proposed);
+        for ($index = 0; $index < $count; $index++) {
+            for ($other = $index + 1; $other < $count; $other++) {
+                if ($this->spansConflict($proposed[$index], $proposed[$other])) {
+                    throw ValidationException::withMessages([
+                        'start_ru' => 'This placement overlaps another placement on the same face.',
+                    ]);
+                }
+            }
+        }
+
+        $previousPlacement = [
+            'id' => (int) $placement->id,
+            'face' => $placement->face->value,
+            'width' => ($placement->width ?? RuPlacementWidth::Full)->value,
+            'slot' => (int) $placement->slot,
+            'ru_height' => (int) $placement->ru_height,
+            'full_depth' => (bool) $placement->full_depth,
+            'kind' => $placement->kind->value,
+            'child_asset_id' => $placement->child_asset_id ? (int) $placement->child_asset_id : null,
+            'note' => $placement->note,
+        ];
+
+        foreach ($members as $member) {
+            if ((int) $member->id === (int) $placement->id) {
+                $member->update([
+                    'face' => $edited['face'],
+                    'start_ru' => $edited['start_ru'],
+                    'ru_height' => $edited['ru_height'],
+                    'full_depth' => $edited['full_depth'],
+                    'width' => $edited['width'],
+                    'slot' => $edited['slot'],
+                    'kind' => $edited['kind'],
+                    'child_asset_id' => $edited['child']?->id,
+                    'note' => $edited['kind'] === RuPlacementKind::Note ? $edited['note'] : null,
+                ]);
+
+                continue;
+            }
+
+            $member->update([
+                'start_ru' => $edited['start_ru'],
+            ]);
+        }
+
+        if ($edited['child'] instanceof Asset) {
+            $this->assignParent($rack, $edited['child'], $edited['confirm_parent_change']);
+        }
+
+        $this->auditRack($rack, 'ru_placement_row_moved', [
+            'start_ru' => (int) $edited['original_start_ru'],
+            'member_ids' => $memberIds,
+            'placement' => $previousPlacement,
+        ], [
+            'start_ru' => (int) $edited['start_ru'],
+            'member_ids' => $memberIds,
+            'placement' => [
+                'id' => (int) $placement->id,
+                'face' => $edited['face']->value,
+                'width' => $edited['width']->value,
+                'slot' => (int) $edited['slot'],
+                'ru_height' => (int) $edited['ru_height'],
+                'full_depth' => (bool) $edited['full_depth'],
+                'kind' => $edited['kind']->value,
+                'child_asset_id' => $edited['child']?->id,
+                'note' => $edited['kind'] === RuPlacementKind::Note ? $edited['note'] : null,
+            ],
+        ]);
+
+        return $placement->fresh(['childAsset']);
+    }
+
+    /**
+     * @param  list<int>  $ignorePlacementIds
+     */
     protected function assertSpanValid(
         Asset $rack,
         RuPlacementFace $face,
@@ -373,6 +562,9 @@ class RuVisualiserService
         int $ruHeight,
         ?int $ignorePlacementId,
         bool $fullDepth = false,
+        RuPlacementWidth $width = RuPlacementWidth::Full,
+        int $slot = 1,
+        array $ignorePlacementIds = [],
     ): void {
         $capacity = (int) $rack->ru_height;
 
@@ -395,27 +587,33 @@ class RuVisualiserService
             ]);
         }
 
-        $occupiedFaces = $fullDepth
-            ? [RuPlacementFace::Front->value, RuPlacementFace::Rear->value]
-            : [$face->value];
+        $ignoreIds = $ignorePlacementIds;
+        if ($ignorePlacementId !== null) {
+            $ignoreIds[] = $ignorePlacementId;
+        }
+        $ignoreIds = array_values(array_unique(array_map(intval(...), $ignoreIds)));
+
+        $candidate = [
+            'face' => $face,
+            'start_ru' => $startRu,
+            'ru_height' => $ruHeight,
+            'full_depth' => $fullDepth,
+            'width' => $width,
+            'slot' => $slot,
+        ];
 
         $overlaps = AssetRuPlacement::query()
             ->where('rack_asset_id', $rack->id)
-            ->when($ignorePlacementId, fn ($q) => $q->where('id', '!=', $ignorePlacementId))
+            ->when($ignoreIds !== [], fn ($query) => $query->whereNotIn('id', $ignoreIds))
             ->get()
-            ->filter(function (AssetRuPlacement $existing) use ($startRu, $endRu, $occupiedFaces): bool {
-                $existingEnd = (int) $existing->start_ru + (int) $existing->ru_height - 1;
-                $spansOverlap = $startRu <= $existingEnd && (int) $existing->start_ru <= $endRu;
-                if (! $spansOverlap) {
-                    return false;
-                }
-
-                $existingFaces = (bool) $existing->full_depth
-                    ? [RuPlacementFace::Front->value, RuPlacementFace::Rear->value]
-                    : [$existing->face->value];
-
-                return count(array_intersect($occupiedFaces, $existingFaces)) > 0;
-            });
+            ->filter(fn (AssetRuPlacement $existing): bool => $this->spansConflict($candidate, [
+                'face' => $existing->face,
+                'start_ru' => (int) $existing->start_ru,
+                'ru_height' => (int) $existing->ru_height,
+                'full_depth' => (bool) $existing->full_depth,
+                'width' => $existing->width ?? RuPlacementWidth::Full,
+                'slot' => (int) ($existing->slot ?? 1),
+            ]));
 
         if ($overlaps->isNotEmpty()) {
             throw ValidationException::withMessages([
@@ -424,6 +622,47 @@ class RuVisualiserService
                     : 'This placement overlaps another placement on the same face.',
             ]);
         }
+    }
+
+    /**
+     * A shared RU span conflicts when either bay is full width, the widths differ, or the slot matches.
+     *
+     * @param  array{face: RuPlacementFace, start_ru: int, ru_height: int, full_depth: bool, width: RuPlacementWidth, slot: int}  $left
+     * @param  array{face: RuPlacementFace, start_ru: int, ru_height: int, full_depth: bool, width: RuPlacementWidth, slot: int}  $right
+     */
+    protected function spansConflict(array $left, array $right): bool
+    {
+        $leftEnd = $left['start_ru'] + $left['ru_height'] - 1;
+        $rightEnd = $right['start_ru'] + $right['ru_height'] - 1;
+        if ($left['start_ru'] > $rightEnd || $right['start_ru'] > $leftEnd) {
+            return false;
+        }
+
+        $leftFaces = $left['full_depth']
+            ? [RuPlacementFace::Front->value, RuPlacementFace::Rear->value]
+            : [$left['face']->value];
+        $rightFaces = $right['full_depth']
+            ? [RuPlacementFace::Front->value, RuPlacementFace::Rear->value]
+            : [$right['face']->value];
+
+        if (array_intersect($leftFaces, $rightFaces) === []) {
+            return false;
+        }
+
+        return $this->baysConflict($left['width'], $left['slot'], $right['width'], $right['slot']);
+    }
+
+    protected function baysConflict(RuPlacementWidth $width, int $slot, RuPlacementWidth $otherWidth, int $otherSlot): bool
+    {
+        if ($width === RuPlacementWidth::Full || $otherWidth === RuPlacementWidth::Full) {
+            return true;
+        }
+
+        if ($width !== $otherWidth) {
+            return true;
+        }
+
+        return $slot === $otherSlot;
     }
 
     protected function assertChildPlaceableOnRack(
@@ -501,6 +740,50 @@ class RuVisualiserService
         }
 
         return false;
+    }
+
+    protected function resolveWidth(mixed $width): RuPlacementWidth
+    {
+        if ($width instanceof RuPlacementWidth) {
+            return $width;
+        }
+
+        if ($width === null || $width === '') {
+            return RuPlacementWidth::Full;
+        }
+
+        $resolved = RuPlacementWidth::tryFrom((string) $width);
+        if (! $resolved) {
+            throw ValidationException::withMessages([
+                'width' => 'Width must be full, half, or third.',
+            ]);
+        }
+
+        return $resolved;
+    }
+
+    protected function resolveSlot(RuPlacementWidth $width, mixed $slot, bool $explicit): int
+    {
+        $hasValue = $slot !== null && $slot !== '';
+        $resolved = $hasValue ? (int) $slot : 1;
+
+        if ($width === RuPlacementWidth::Full) {
+            if ($explicit && $hasValue && $resolved !== 1) {
+                throw ValidationException::withMessages([
+                    'slot' => RuPlacementWidth::FULL_SLOT_MESSAGE,
+                ]);
+            }
+
+            return 1;
+        }
+
+        if ($resolved < 1 || $resolved > $width->maxSlot()) {
+            throw ValidationException::withMessages([
+                'slot' => RuPlacementWidth::INVALID_SLOT_MESSAGE,
+            ]);
+        }
+
+        return $resolved;
     }
 
     protected function resolveFace(mixed $face): RuPlacementFace

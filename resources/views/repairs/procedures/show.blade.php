@@ -8,7 +8,7 @@
                 @endif
             </div>
             <div class="flex flex-wrap gap-2 text-sm">
-                <a href="{{ route('repair-procedures.edit', $procedure) }}" class="px-3 py-2 border">Edit</a>
+                <a href="{{ route('repair-procedures.edit', $procedure) }}" data-history-roundtrip class="px-3 py-2 border">Edit</a>
                 <a href="{{ route('repair-procedures.index') }}" class="px-3 py-2 border">Back</a>
             </div>
         </div>

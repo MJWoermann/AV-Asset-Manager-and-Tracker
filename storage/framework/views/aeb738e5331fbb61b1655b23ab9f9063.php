@@ -11,8 +11,8 @@
      <?php $__env->slot('header', null, []); ?> 
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Locations</h2>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager|scanner')): ?>
-                <a href="<?php echo e(route('locations.create')); ?>" class="px-3 py-2 bg-brand text-white text-sm">Add</a>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('locations:write')): ?>
+                <a href="<?php echo e(route('locations.create')); ?>" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add</a>
             <?php endif; ?>
         </div>
      <?php $__env->endSlot(); ?>
@@ -40,7 +40,7 @@
             </div>
         <?php endif; ?>
 
-        <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('locations:update')): ?>
             <?php if(count($duplicateNames) > 0): ?>
                 <div class="mb-4 border border-brand-charcoal/30 dark:border-brand-charcoal bg-white dark:bg-brand-slate p-3 text-sm space-y-2">
                     <p>
@@ -61,7 +61,7 @@
             <?php endif; ?>
 
             <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">
-                Locations with no assets stay on this list. Deleting a location that has assets asks where those assets should go.
+                Deleting a location with no assets asks for confirmation. Deleting a location that has assets asks where those assets should go.
             </p>
 
             <?php if (isset($component)) { $__componentOriginal814ff6ab62d605e0998112d73e57bd93 = $component; } ?>
@@ -90,7 +90,7 @@
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">No locations yet.</p>
         <?php else: ?>
             <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('locations:update')): ?>
                     <label class="inline-flex items-center gap-2 mr-2">
                         <input
                             type="checkbox"
@@ -140,7 +140,7 @@
             </ul>
         <?php endif; ?>
 
-        <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('locations:update')): ?>
             <?php if (isset($component)) { $__componentOriginal9f64f32e90b9102968f2bc548315018c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal9f64f32e90b9102968f2bc548315018c = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.modal','data' => ['name' => 'delete-location','show' => $errors->has('replacement_location_id'),'focusable' => true,'maxWidth' => 'md']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -163,14 +163,18 @@
                     <h2 class="text-lg font-medium text-gray-900 dark:text-white">
                         Delete “<span x-text="deleteLocation?.name || ''"></span>”?
                     </h2>
-                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="(deleteLocation?.assetsCount || 0) > 0">
                         This location is used by
                         <span x-text="deleteLocation?.assetsCount || 0"></span>
                         <span x-text="(deleteLocation?.assetsCount || 0) === 1 ? 'asset' : 'assets'"></span>.
                         Choose a replacement location for those assets, then delete.
                         Child locations stay on the list and become top-level.
                     </p>
-                    <div>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="(deleteLocation?.assetsCount || 0) === 0">
+                        This location has no assets. Delete it?
+                        Child locations stay on the list and become top-level.
+                    </p>
+                    <div x-show="(deleteLocation?.assetsCount || 0) > 0">
                         <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'replacement_location_id','value' => 'Replacement location']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>

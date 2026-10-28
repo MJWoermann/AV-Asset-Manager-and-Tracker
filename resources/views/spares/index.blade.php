@@ -5,7 +5,7 @@
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('spares.groups.index') }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Groups</a>
                 @can('spares:manage')
-                    <a href="{{ route('spares.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add spare</a>
+                    <a href="{{ route('spares.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add spare</a>
                 @endcan
             </div>
         </div>

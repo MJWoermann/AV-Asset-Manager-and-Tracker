@@ -6,6 +6,7 @@
     'submitOnScan' => true,
     'scanAriaLabel' => 'Scan barcode into search',
     'inputClass' => '',
+    'autofocus' => false,
 ])
 
 @php
@@ -25,6 +26,9 @@
             @endif
             value="{{ $value }}"
             placeholder="{{ $placeholder }}"
+            @if ($autofocus)
+                x-init="$nextTick(() => { try { $el.focus({ preventScroll: true }); } catch (e) { $el.focus(); } $el.select(); })"
+            @endif
             {{ $attributes->except('class')->class([
                 'w-full rounded border-brand-charcoal/30 pe-16 dark:bg-black dark:border-brand-charcoal dark:text-white',
                 $inputClass,

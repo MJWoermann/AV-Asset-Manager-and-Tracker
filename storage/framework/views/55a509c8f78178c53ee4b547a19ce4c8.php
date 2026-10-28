@@ -11,7 +11,7 @@
      <?php $__env->slot('header', null, []); ?> 
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Manufacturers / Models</h2>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager|scanner')): ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:write')): ?>
                 <a href="<?php echo e(route('manufacturers.create')); ?>" class="px-3 py-2 bg-brand text-white text-sm">Add manufacturer</a>
             <?php endif; ?>
         </div>
@@ -65,7 +65,7 @@
             </ul>
         <?php endif; ?>
 
-        <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:update')): ?>
             <?php if (isset($component)) { $__componentOriginal9f64f32e90b9102968f2bc548315018c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal9f64f32e90b9102968f2bc548315018c = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.modal','data' => ['name' => 'delete-manufacturer','show' => $errors->has('replacement_manufacturer_id'),'focusable' => true,'maxWidth' => 'md']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -88,11 +88,14 @@
                     <h2 class="text-lg font-medium text-gray-900 dark:text-white">
                         Delete “<span x-text="deleteManufacturer?.name || ''"></span>”?
                     </h2>
-                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="(deleteManufacturer?.assetsCount || 0) > 0">
                         Models under this manufacturer are moved to the replacement (merged by name).
                         Assets are reassigned to the replacement manufacturer.
                     </p>
-                    <div>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="(deleteManufacturer?.assetsCount || 0) === 0">
+                        This manufacturer has no assets. Delete it? Its models will be removed.
+                    </p>
+                    <div x-show="(deleteManufacturer?.assetsCount || 0) > 0">
                         <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'replacement_manufacturer_id','value' => 'Replacement manufacturer']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>

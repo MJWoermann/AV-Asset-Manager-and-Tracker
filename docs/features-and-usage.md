@@ -364,7 +364,7 @@ Administrators opt in under **Profile → Developer features**. Other users rece
 |---------|--------------|----------|
 | **Asset connections** | Ports/interfaces on assets, link cable/signal paths, Connection types under Data, Connection map report | Documenting how racks and devices are wired |
 | **RU visualiser** | **Rack** tab: place child gear in rack-unit slots (front/rear) | Visual rack elevation for touring racks |
-| **Label generator** | Layout editor + print/PDF from Assets, lists, or Reports → Labels | Warehouse shelf labels and bag tags |
+| **Label generator** | Layout editor + print/PDF from Assets, lists, or Reports → Labels. A logo can be a new JPEG/PNG or an image already in Files; uploading the same image again reuses that file | Warehouse shelf labels and bag tags |
 | **Stock / consumables** | **Stock** tab on an asset: quantities, movements, min/max, charts; Kanban/QR tags for managers | Counting cables/consumables *on that asset* — not the Maintenance → Spares catalogue |
 | **Email integration** | Admin → Email: outbound notifications, inbound helpdesk replies, optional **digests** | MAC onboarding and maintenance mail; see [email-setup.md](email-setup.md) |
 
@@ -373,6 +373,8 @@ Administrators opt in under **Profile → Developer features**. Other users rece
 Ask an admin before enabling preview features in production if your organisation has a staged rollout.
 
 **RU visualiser** (Rack tab on a container asset)
+
+Half-width and third-width placements can share one RU side by side. Editing one of those bays can move that whole row to a new start RU together.
 
 | Desktop | Mobile |
 |---------|--------|

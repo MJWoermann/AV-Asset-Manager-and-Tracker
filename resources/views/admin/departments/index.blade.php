@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center gap-3">
             <h2 class="font-semibold text-xl">Departments</h2>
-            <a href="{{ route('admin.departments.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add department</a>
+            <a href="{{ route('admin.departments.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add department</a>
         </div>
     </x-slot>
     <div class="max-w-7xl mx-auto px-4">
@@ -71,7 +71,7 @@
                         <td class="px-3 py-2">{{ $department->is_active ? 'Active' : 'Inactive' }}</td>
                         <td class="px-3 py-2">{{ $department->users_count }}</td>
                         <td class="px-3 py-2 space-x-3 whitespace-nowrap">
-                            <a class="text-brand" href="{{ route('admin.departments.edit', $department) }}">Edit</a>
+                            <a class="text-brand" href="{{ route('admin.departments.edit', $department) }}" data-history-roundtrip>Edit</a>
                             @unless($department->isGeneral())
                                 <form
                                     method="POST"

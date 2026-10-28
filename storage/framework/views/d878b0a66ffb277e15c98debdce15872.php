@@ -123,9 +123,9 @@ unset($__defined_vars, $__key, $__value); ?>
     <div class="relative w-full max-w-md max-h-[calc(100vh-3rem)] overflow-y-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-6 space-y-4 shadow-xl">
         <h3 class="text-lg font-semibold">Confirm delete</h3>
         <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-            Permanently delete selected locations that have assets.
-            Those assets move to the replacement location.
-            Locations with no assets stay on the list.
+            Permanently delete the selected locations.
+            Locations with assets move those assets to the replacement location.
+            Locations with no assets are deleted after confirmation.
             Child locations stay and become top-level.
         </p>
         <div x-show="selectionIncludesAssets()" class="space-y-2">

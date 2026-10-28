@@ -679,71 +679,6 @@ function focusDropdownSearch(input) {
     }
 }
 
-// #region agent log
-function debugSearchableViewport(reason, rootEl, panelEl, triggerEl, panelStyle) {
-    const doc = document.documentElement;
-    let transformed = null;
-    let node = panelEl?.parentElement ?? null;
-    while (node && node !== document.documentElement) {
-        const style = window.getComputedStyle(node);
-        if (style.transform && style.transform !== 'none') {
-            transformed = {
-                tag: node.tagName,
-                className: String(node.className || '').slice(0, 180),
-                transform: String(style.transform).slice(0, 140),
-                overflowX: style.overflowX,
-                overflowY: style.overflowY,
-            };
-            break;
-        }
-        node = node.parentElement;
-    }
-    const scrollHost = panelEl?.closest('[class*="overflow-"]') ?? null;
-    const hostStyle = scrollHost ? window.getComputedStyle(scrollHost) : null;
-    const panelRect = panelEl?.getBoundingClientRect?.() ?? null;
-    const triggerRect = triggerEl?.getBoundingClientRect?.() ?? null;
-    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4dcd19' },
-        body: JSON.stringify({
-            sessionId: '4dcd19',
-            runId: 'pre-fix',
-            hypothesisId: 'A',
-            location: 'resources/js/app.js:debugSearchableViewport',
-            message: reason,
-            timestamp: Date.now(),
-            data: {
-                field: rootEl?.querySelector('input[type="hidden"]')?.id || '',
-                queryLength: rootEl?.querySelector('input[type="search"]')?.value?.length ?? 0,
-                compact: window.matchMedia(COMPACT_VIEWPORT_MQ).matches,
-                viewport: { w: window.innerWidth, h: window.innerHeight },
-                panelStyle: panelStyle || null,
-                computedPosition: panelEl ? window.getComputedStyle(panelEl).position : null,
-                trigger: triggerRect ? { top: Math.round(triggerRect.top), left: Math.round(triggerRect.left), w: Math.round(triggerRect.width), h: Math.round(triggerRect.height) } : null,
-                panel: panelRect ? { top: Math.round(panelRect.top), left: Math.round(panelRect.left), w: Math.round(panelRect.width), h: Math.round(panelRect.height), bottom: Math.round(panelRect.bottom), right: Math.round(panelRect.right) } : null,
-                transformed,
-                scrollHost: scrollHost ? {
-                    className: String(scrollHost.className || '').slice(0, 180),
-                    overflowX: hostStyle.overflowX,
-                    overflowY: hostStyle.overflowY,
-                    clientW: scrollHost.clientWidth,
-                    scrollW: scrollHost.scrollWidth,
-                    clientH: scrollHost.clientHeight,
-                    scrollH: scrollHost.scrollHeight,
-                } : null,
-                doc: {
-                    clientW: doc.clientWidth,
-                    scrollW: doc.scrollWidth,
-                    clientH: doc.clientHeight,
-                    scrollH: doc.scrollHeight,
-                    bodyOverflow: document.body.className,
-                },
-            },
-        }),
-    }).catch(() => {});
-}
-// #endregion
-
 function normalizeSearchableOption(option) {
     return {
         value: String(option?.value ?? option?.id ?? ''),
@@ -845,27 +780,7 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
                 this._searchTimer = setTimeout(() => this.fetchRemote(q), 200);
             });
         }
-
-        // #region agent log
-        this.$watch('query', () => {
-            if (!this.open) {
-                return;
-            }
-            this.$nextTick(() => this.logSearchableViewport('query'));
-        });
-        // #endregion
     },
-
-    // #region agent log
-    logSearchableViewport(reason) {
-        const now = Date.now();
-        if (reason === 'position' && now - (this._debugAt || 0) < 400) {
-            return;
-        }
-        this._debugAt = now;
-        debugSearchableViewport(reason, this.rootEl, this.$refs.panel, this.$refs.trigger, this.panelStyle);
-    },
-    // #endregion
 
     get emptyMessage() {
         if (this.searchUrl && !this.query.trim()) {
@@ -990,9 +905,6 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             width: `${width}px`,
             zIndex: '60',
         };
-        // #region agent log
-        this.$nextTick(() => this.logSearchableViewport('position'));
-        // #endregion
     },
 
     bindPanelListeners() {
@@ -1016,12 +928,7 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             pinDropdownFieldToViewportTop(this.$refs.trigger || this.rootEl);
             this.updatePanelPosition();
             focusDropdownSearch(this.$refs.search);
-            requestAnimationFrame(() => {
-                this.updatePanelPosition();
-                // #region agent log
-                this.logSearchableViewport('open');
-                // #endregion
-            });
+            requestAnimationFrame(() => this.updatePanelPosition());
         });
         if (this.searchUrl) {
             this.fetchRemote(this.query);
@@ -2266,8 +2173,18 @@ Alpine.data('kanbanQr', (url) => ({
     },
 }));
 
+const ruPlacementWidth = (placement) => placement?.width || 'full';
+
+const ruPlacementSlot = (placement) => {
+    if (ruPlacementWidth(placement) === 'full') {
+        return 1;
+    }
+
+    return Number(placement?.slot || 1);
+};
+
 const buildRuFaceRows = (capacity, placements, face) => {
-    const occupied = {};
+    const byRu = {};
     const mirrored = {};
 
     (Array.isArray(placements) ? placements : []).forEach((placement) => {
@@ -2277,28 +2194,54 @@ const buildRuFaceRows = (capacity, placements, face) => {
             return;
         }
 
+        const slot = ruPlacementSlot(placement);
         const start = Number(placement.start_ru);
         const height = Number(placement.ru_height);
         for (let ru = start; ru < start + height; ru += 1) {
-            occupied[ru] = placement;
+            if (!byRu[ru]) {
+                byRu[ru] = {};
+            }
+            byRu[ru][slot] = placement;
             if (mirrorOnRear) {
-                mirrored[ru] = true;
+                if (!mirrored[ru]) {
+                    mirrored[ru] = {};
+                }
+                mirrored[ru][slot] = true;
             }
         }
     });
 
     const rows = [];
     for (let ru = capacity; ru >= 1; ru -= 1) {
-        const placement = occupied[ru] || null;
-        const isStart = placement && Number(placement.start_ru) + Number(placement.ru_height) - 1 === ru;
-        rows.push({
-            ru,
-            placement,
-            isStart,
-            span: isStart ? Number(placement.ru_height) : 0,
-            occupied: Boolean(placement),
-            mirrored: Boolean(mirrored[ru]),
-        });
+        const placed = byRu[ru] || {};
+        const widths = Object.values(placed).map((placement) => ruPlacementWidth(placement));
+        let columns = 1;
+        let rowWidth = 'full';
+        if (widths.includes('third')) {
+            columns = 3;
+            rowWidth = 'third';
+        } else if (widths.includes('half')) {
+            columns = 2;
+            rowWidth = 'half';
+        }
+
+        const slots = [];
+        for (let slot = 1; slot <= columns; slot += 1) {
+            const placement = placed[slot] || null;
+            const isStart = Boolean(
+                placement && Number(placement.start_ru) + Number(placement.ru_height) - 1 === ru
+            );
+            slots.push({
+                slot,
+                placement,
+                isStart,
+                occupied: Boolean(placement),
+                mirrored: Boolean(mirrored[ru]?.[slot]),
+                width: placement ? ruPlacementWidth(placement) : rowWidth,
+            });
+        }
+
+        rows.push({ ru, columns, width: rowWidth, slots });
     }
 
     return rows;
@@ -2314,6 +2257,25 @@ const ruPlacementLabel = (placement) => {
     return placement.child_name || 'Asset';
 };
 
+const ruSlotLabel = (width, slot) => {
+    if (!width || width === 'full') {
+        return '';
+    }
+
+    const position = Number(slot);
+    if (width === 'half') {
+        return position === 2 ? 'Right' : 'Left';
+    }
+    if (position === 2) {
+        return 'Centre';
+    }
+    if (position === 3) {
+        return 'Right';
+    }
+
+    return 'Left';
+};
+
 Alpine.data('ruRackPreview', (config = {}) => ({
     capacity: Number(config.capacity) || 0,
     face: 'front',
@@ -2324,6 +2286,8 @@ Alpine.data('ruRackPreview', (config = {}) => ({
     },
 
     placementLabel: ruPlacementLabel,
+
+    slotLabel: ruSlotLabel,
 }));
 
 Alpine.data('ruVisualiser', (config = {}) => ({
@@ -2342,10 +2306,13 @@ Alpine.data('ruVisualiser', (config = {}) => ({
         start_ru: config.old?.start_ru || '',
         ru_height: config.old?.ru_height || '',
         full_depth: Boolean(config.old?.full_depth),
+        width: config.old?.width || 'full',
+        slot: String(config.old?.slot || 1),
         kind: config.old?.kind || 'asset',
         child_asset_id: config.old?.child_asset_id || '',
         note: config.old?.note || '',
         confirm_parent_change: Boolean(config.old?.confirm_parent_change),
+        move_row: config.old?.move_row !== undefined ? Boolean(config.old.move_row) : false,
     },
 
     init() {
@@ -2382,6 +2349,55 @@ Alpine.data('ruVisualiser', (config = {}) => ({
 
     placementLabel: ruPlacementLabel,
 
+    slotLabel: ruSlotLabel,
+
+    slotOptions() {
+        if (this.form.width === 'half') {
+            return [
+                { value: '1', label: 'Left' },
+                { value: '2', label: 'Right' },
+            ];
+        }
+        if (this.form.width === 'third') {
+            return [
+                { value: '1', label: 'Left' },
+                { value: '2', label: 'Centre' },
+                { value: '3', label: 'Right' },
+            ];
+        }
+
+        return [{ value: '1', label: 'Left' }];
+    },
+
+    clampSlot() {
+        const max = this.form.width === 'third' ? 3 : (this.form.width === 'half' ? 2 : 1);
+        let slot = Number(this.form.slot) || 1;
+        if (slot > max) {
+            slot = max;
+        }
+        if (slot < 1) {
+            slot = 1;
+        }
+        this.form.slot = String(slot);
+    },
+
+    rowMates() {
+        const placement = this.editingPlacement();
+        if (!placement || ruPlacementWidth(placement) === 'full') {
+            return [];
+        }
+
+        return this.placements.filter((candidate) => {
+            if (candidate.id === placement.id) {
+                return false;
+            }
+
+            return candidate.face === placement.face
+                && ruPlacementWidth(candidate) === ruPlacementWidth(placement)
+                && Number(candidate.start_ru) === Number(placement.start_ru);
+        });
+    },
+
     selectedChild() {
         return this.childOptions.find((option) => String(option.value) === String(this.form.child_asset_id));
     },
@@ -2394,7 +2410,7 @@ Alpine.data('ruVisualiser', (config = {}) => ({
         }
     },
 
-    openAdd(ru = null) {
+    openAdd(ru = null, width = 'full', slot = 1) {
         this.panel = 'add';
         this.editingId = null;
         this.confirmParent = false;
@@ -2403,11 +2419,15 @@ Alpine.data('ruVisualiser', (config = {}) => ({
             start_ru: ru || '',
             ru_height: 1,
             full_depth: false,
+            width: width || 'full',
+            slot: String(slot || 1),
             kind: 'asset',
             child_asset_id: '',
             note: '',
             confirm_parent_change: false,
+            move_row: false,
         };
+        this.clampSlot();
     },
 
     openAddForChild(childId, ruHeight = 1) {
@@ -2427,11 +2447,16 @@ Alpine.data('ruVisualiser', (config = {}) => ({
             start_ru: placement.start_ru,
             ru_height: placement.ru_height,
             full_depth: Boolean(placement.full_depth),
+            width: placement.width || 'full',
+            slot: String(placement.slot || 1),
             kind: placement.kind,
             child_asset_id: placement.child_asset_id || '',
             note: placement.note || '',
             confirm_parent_change: false,
+            move_row: false,
         };
+        this.form.move_row = this.rowMates().length > 0;
+        this.clampSlot();
 
         if (
             placement.child_asset_id &&
@@ -3880,7 +3905,11 @@ function createBulkSelection(config = {}) {
                 }));
         },
 
-        canDeleteLocation(id) {
+        canDeleteLocation(id, assetsCount = 0) {
+            if (Number(assetsCount) === 0) {
+                return true;
+            }
+
             return this.locationOptions.some((option) => Number(option.id) !== Number(id));
         },
 
@@ -4150,7 +4179,11 @@ Alpine.data('manufacturerCatalogue', (config = {}) => ({
         }
     },
 
-    canDeleteManufacturer(id) {
+    canDeleteManufacturer(id, assetsCount = 0) {
+        if (Number(assetsCount) === 0) {
+            return true;
+        }
+
         return this.manufacturerOptions.some((option) => Number(option.id) !== Number(id));
     },
 
@@ -4174,8 +4207,13 @@ Alpine.data('manufacturerCatalogue', (config = {}) => ({
         return this.modelOptions.filter((option) => Number(option.id) !== excludeId);
     },
 
-    openDeleteManufacturer({ id, name, action, replacementId = '' }) {
-        this.deleteManufacturer = { id, name, action };
+    openDeleteManufacturer({ id, name, action, assetsCount = 0, replacementId = '' }) {
+        this.deleteManufacturer = {
+            id,
+            name,
+            action,
+            assetsCount: Number(assetsCount || 0),
+        };
         this.selectedReplacementManufacturerId = replacementId ? String(replacementId) : '';
         this.$nextTick(() => {
             syncSearchableSelect(this.$root, 'replacement_manufacturer_id', {
@@ -4216,6 +4254,13 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         props: { ...(el.props || {}) },
     })) : [],
     logoUrl: initial.logo_url || null,
+    logoLibraryUrl: initial.logo_library_url || '',
+    originalLogoUrl: initial.logo_url || null,
+    logoLibraryQuery: '',
+    logoLibraryResults: [],
+    selectedLogoFileId: null,
+    logoLibrarySearching: false,
+    logoLibraryOpen: false,
     presets,
     fieldOptions,
     selectedIds: [],
@@ -4236,6 +4281,47 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     continuousMinMm: 29,
     continuousMaxMm: 300,
     viewReady: false,
+
+    async searchLogoLibrary() {
+        this.logoLibrarySearching = true;
+        try {
+            const response = await fetch(`${this.logoLibraryUrl}?q=${encodeURIComponent(this.logoLibraryQuery)}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const json = await response.json();
+            this.logoLibraryResults = json.data || [];
+        } finally {
+            this.logoLibrarySearching = false;
+        }
+    },
+
+    openLogoLibrary() {
+        this.logoLibraryOpen = true;
+        document.body.classList.add('overflow-y-hidden');
+        this.searchLogoLibrary();
+    },
+
+    closeLogoLibrary() {
+        this.logoLibraryOpen = false;
+        document.body.classList.remove('overflow-y-hidden');
+    },
+
+    pickLogo(file) {
+        this.selectedLogoFileId = file.id;
+        this.logoUrl = file.url;
+        if (this.$refs.logoUpload) {
+            this.$refs.logoUpload.value = '';
+        }
+        if (this.$refs.removeLogo) {
+            this.$refs.removeLogo.checked = false;
+        }
+        this.closeLogoLibrary();
+    },
+
+    onLogoUploadChosen() {
+        this.selectedLogoFileId = null;
+        this.logoUrl = this.originalLogoUrl;
+    },
 
     init() {
         const allowed = [2.5, 5, 10];
@@ -6047,7 +6133,46 @@ function saveScrollPosition() {
     }
 }
 
+/**
+ * Place the top edge of an element at the top of the viewport.
+ *
+ * @param {HTMLElement} el
+ */
+function scrollElementToViewportTop(el) {
+    const apply = () => {
+        const top = el.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo(0, top);
+    };
+
+    if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+    }
+
+    apply();
+    requestAnimationFrame(apply);
+
+    if (document.readyState !== 'complete') {
+        window.addEventListener('load', apply, { once: true });
+    }
+
+    document.fonts?.ready?.then(apply).catch(() => {});
+}
+
 function restoreScrollPosition() {
+    const scrollTarget = document.querySelector('[data-scroll-into-view]');
+
+    if (scrollTarget instanceof HTMLElement) {
+        try {
+            sessionStorage.removeItem(SCROLL_RESTORE_KEY);
+        } catch {
+            // Ignore quota / private-mode failures.
+        }
+
+        scrollElementToViewportTop(scrollTarget);
+
+        return;
+    }
+
     let data;
 
     try {
@@ -6098,6 +6223,232 @@ document.addEventListener(
 );
 
 restoreScrollPosition();
+
+const HISTORY_ROUNDTRIP_KEY = 'av.historyRoundtrip';
+const HISTORY_COLLAPSE_KEY = 'av.historyCollapse';
+const HISTORY_DEPTH_KEY = 'av.navDepth';
+const HISTORY_FLASH_KEY = 'av.historyFlash';
+
+function historyStorageGet(key) {
+    try {
+        return sessionStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function historyStorageSet(key, value) {
+    try {
+        sessionStorage.setItem(key, value);
+    } catch {
+        // Ignore quota / private-mode failures.
+    }
+}
+
+function historyStorageRemove(key) {
+    try {
+        sessionStorage.removeItem(key);
+    } catch {
+        // Ignore quota / private-mode failures.
+    }
+}
+
+function rememberHistoryRoundtrip(formUrl) {
+    let url;
+
+    try {
+        url = new URL(formUrl, window.location.origin);
+    } catch {
+        return;
+    }
+
+    if (url.origin !== window.location.origin || url.pathname === window.location.pathname) {
+        return;
+    }
+
+    const state = history.state && typeof history.state === 'object' ? history.state : {};
+    if (typeof state.avDepth !== 'number') {
+        return;
+    }
+
+    historyStorageSet(HISTORY_ROUNDTRIP_KEY, JSON.stringify({
+        fromHref: `${window.location.pathname}${window.location.search}`,
+        fromPath: window.location.pathname,
+        fromDepth: state.avDepth,
+        formPath: url.pathname,
+    }));
+}
+
+function continueHistoryCollapse() {
+    if (window.__avHistoryCollapseStarted) {
+        return;
+    }
+
+    const raw = historyStorageGet(HISTORY_COLLAPSE_KEY);
+    if (!raw) {
+        return;
+    }
+
+    let pending;
+
+    try {
+        pending = JSON.parse(raw);
+    } catch {
+        historyStorageRemove(HISTORY_COLLAPSE_KEY);
+        return;
+    }
+
+    let target;
+
+    try {
+        target = new URL(pending?.replaceUrl || '', window.location.origin);
+    } catch {
+        historyStorageRemove(HISTORY_COLLAPSE_KEY);
+        return;
+    }
+
+    if (!pending?.replaceUrl || target.origin !== window.location.origin) {
+        historyStorageRemove(HISTORY_COLLAPSE_KEY);
+        return;
+    }
+
+    historyStorageRemove(HISTORY_COLLAPSE_KEY);
+    window.__avHistoryCollapseStarted = true;
+    document.documentElement.style.visibility = 'hidden';
+    target.searchParams.set('_hc', String(Date.now()));
+    window.location.replace(target.href);
+}
+
+function syncHistoryDepthFromState() {
+    const state = history.state;
+    if (!state || typeof state.avDepth !== 'number') {
+        return null;
+    }
+
+    historyStorageSet(HISTORY_DEPTH_KEY, String(state.avDepth));
+
+    return state.avDepth;
+}
+
+function clearHistoryRoundtripIfReturned() {
+    const raw = historyStorageGet(HISTORY_ROUNDTRIP_KEY);
+    if (!raw) {
+        return;
+    }
+
+    let trip;
+
+    try {
+        trip = JSON.parse(raw);
+    } catch {
+        historyStorageRemove(HISTORY_ROUNDTRIP_KEY);
+        return;
+    }
+
+    const depth = syncHistoryDepthFromState();
+    if (typeof depth !== 'number' || typeof trip.fromDepth !== 'number') {
+        return;
+    }
+
+    if (depth <= trip.fromDepth) {
+        historyStorageRemove(HISTORY_ROUNDTRIP_KEY);
+    }
+}
+
+function restoreHistoryFlash() {
+    if (window.__avHistoryCollapseStarted || historyStorageGet(HISTORY_COLLAPSE_KEY)) {
+        return;
+    }
+
+    const raw = historyStorageGet(HISTORY_FLASH_KEY);
+    if (!raw) {
+        return;
+    }
+
+    historyStorageRemove(HISTORY_FLASH_KEY);
+    if (document.querySelector('[data-flash-banner]')) {
+        return;
+    }
+
+    let data;
+
+    try {
+        data = JSON.parse(raw);
+    } catch {
+        return;
+    }
+
+    const main = document.querySelector('main');
+    if (!main?.parentNode) {
+        return;
+    }
+
+    const insert = (text, kind) => {
+        if (!text) {
+            return;
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4';
+        wrap.setAttribute('data-flash-banner', kind);
+
+        const inner = document.createElement('div');
+        inner.className = kind === 'warning'
+            ? 'rounded border border-brand-gold bg-white dark:bg-brand-slate px-4 py-3 text-sm text-brand-charcoal dark:text-brand-gold'
+            : 'rounded border border-brand bg-white dark:bg-brand-slate px-4 py-3 text-sm text-brand-teal dark:text-brand-teal-bright';
+        inner.textContent = text;
+        wrap.appendChild(inner);
+        main.parentNode.insertBefore(wrap, main);
+    };
+
+    insert(data.status, 'status');
+    insert(data.warning, 'warning');
+}
+
+document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0) {
+        return;
+    }
+
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+    }
+
+    if (!(event.target instanceof Element)) {
+        return;
+    }
+
+    const link = event.target.closest('a[data-history-roundtrip]');
+    if (!link || link.target === '_blank' || link.hasAttribute('download')) {
+        return;
+    }
+
+    rememberHistoryRoundtrip(link.href);
+});
+
+document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-history-roundtrip')) {
+        return;
+    }
+
+    if (event.defaultPrevented) {
+        return;
+    }
+
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'get') {
+        return;
+    }
+
+    rememberHistoryRoundtrip(form.action);
+});
+
+window.addEventListener('pageshow', () => {
+    syncHistoryDepthFromState();
+    continueHistoryCollapse();
+    clearHistoryRoundtripIfReturned();
+    restoreHistoryFlash();
+});
 
 function defaultRiggingInputs(calculator) {
     switch (calculator) {

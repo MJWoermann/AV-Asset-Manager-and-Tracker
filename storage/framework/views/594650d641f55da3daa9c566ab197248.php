@@ -44,14 +44,14 @@
                 href="<?php echo e(route('assets.index', ['manufacturer_id' => $manufacturer->id])); ?>"
                 class="text-sm text-brand"
             >Assets</a>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager|scanner')): ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:write')): ?>
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="<?php echo e(route('manufacturers.models.create', $manufacturer)); ?>" class="text-sm text-brand">Add model</a>
             <?php endif; ?>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:update')): ?>
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="<?php echo e(route('manufacturers.edit', $manufacturer)); ?>" class="text-sm text-brand">Edit</a>
-                <template x-if="canDeleteManufacturer(<?php echo e($manufacturer->id); ?>)">
+                <template x-if="canDeleteManufacturer(<?php echo e($manufacturer->id); ?>, <?php echo e((int) ($manufacturer->unscoped_assets_count ?? 0)); ?>)">
                     <span class="inline-flex items-center gap-2">
                         <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                         <button
@@ -60,6 +60,7 @@
                             x-on:click.prevent="openDeleteManufacturer({
                                 id: <?php echo e($manufacturer->id); ?>,
                                 name: <?php echo \Illuminate\Support\Js::from($manufacturer->name)->toHtml() ?>,
+                                assetsCount: <?php echo e((int) ($manufacturer->unscoped_assets_count ?? 0)); ?>,
                                 action: <?php echo \Illuminate\Support\Js::from(route('manufacturers.destroy', $manufacturer))->toHtml() ?>,
                             })"
                         >Delete</button>

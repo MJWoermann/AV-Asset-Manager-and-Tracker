@@ -9,6 +9,7 @@ use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\CustomFieldDefinition;
 use App\Models\CustomFieldSet;
+use App\Models\File;
 use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\ShelfTagLayout;
@@ -80,6 +81,32 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         ], $overrides));
     }
 
+    protected function pngBytes(): string
+    {
+        $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', true);
+        $this->assertNotFalse($bytes);
+
+        return $bytes;
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    protected function layoutPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'name' => 'Layout',
+            'paper_preset' => ShelfTagPaperPresets::DEFAULT,
+            'width_mm' => 62,
+            'height_mm' => 40,
+            'orientation' => 'portrait',
+            'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
+            'elements' => json_encode([]),
+            'editor_settings' => json_encode(ShelfTagPaperPresets::defaultEditorSettings()),
+        ], $overrides);
+    }
+
     protected function attachToList(AssetList $list, Asset $asset, User $user): void
     {
         AssetListItem::query()->create([
@@ -132,10 +159,11 @@ class ShelfTagGeneratorFeatureTest extends TestCase
     public function test_manager_with_flag_can_crud_layout_and_upload_logo(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         $user = $this->manager();
 
         $create = $this->actingAs($user)->get(route('labels.layouts.create'));
-        $create->assertOk()->assertSee('New label layout');
+        $create->assertOk()->assertSee('New label layout')->assertSee('Choose an uploaded image');
 
         $response = $this->actingAs($user)->post(route('labels.layouts.store'), [
             'name' => 'Warehouse 62mm',
@@ -146,15 +174,18 @@ class ShelfTagGeneratorFeatureTest extends TestCase
             'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
             'elements' => json_encode(ShelfTagLayoutFactory::sampleElements()),
             'editor_settings' => json_encode(ShelfTagPaperPresets::defaultEditorSettings()),
-            'logo' => UploadedFile::fake()->image('logo.png', 80, 40),
+            'logo' => UploadedFile::fake()->createWithContent('logo.png', $this->pngBytes()),
         ]);
 
         $layout = ShelfTagLayout::query()->first();
         $this->assertNotNull($layout);
         $response->assertRedirect(route('labels.layouts.edit', $layout));
         $this->assertSame('Warehouse 62mm', $layout->name);
-        $this->assertNotNull($layout->logo_path);
-        Storage::disk('public')->assertExists($layout->logo_path);
+        $this->assertNotNull($layout->logo_file_id);
+        $this->assertNull($layout->logo_path);
+        $file = $layout->logoFile;
+        $this->assertNotNull($file);
+        Storage::disk('local')->assertExists($file->path);
 
         $this->actingAs($user)
             ->put(route('labels.layouts.update', $layout), [
@@ -177,6 +208,102 @@ class ShelfTagGeneratorFeatureTest extends TestCase
             ->assertRedirect(route('labels.index'));
 
         $this->assertDatabaseMissing('shelf_tag_layouts', ['id' => $layout->id]);
+        $this->assertModelExists($file);
+        Storage::disk('local')->assertExists($file->path);
+    }
+
+    public function test_uploading_the_same_logo_reuses_the_existing_file(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+        $bytes = $this->pngBytes();
+
+        $this->actingAs($user)->post(route('labels.layouts.store'), $this->layoutPayload([
+            'name' => 'First logo',
+            'logo' => UploadedFile::fake()->createWithContent('logo.png', $bytes),
+        ]))->assertRedirect();
+
+        $this->actingAs($user)->post(route('labels.layouts.store'), $this->layoutPayload([
+            'name' => 'Second logo',
+            'logo' => UploadedFile::fake()->createWithContent('logo-again.png', $bytes),
+        ]))->assertRedirect();
+
+        $layouts = ShelfTagLayout::query()->orderBy('id')->get();
+        $this->assertCount(2, $layouts);
+        $this->assertSame($layouts[0]->logo_file_id, $layouts[1]->logo_file_id);
+        $this->assertSame(1, File::query()->count());
+    }
+
+    public function test_layout_can_use_an_image_already_in_files(): void
+    {
+        Storage::fake('local');
+        $user = $this->manager();
+        Storage::disk('local')->put('attachments/test/mark.png', 'png-bytes');
+        $file = File::factory()->create([
+            'title' => 'House mark',
+            'mime_type' => 'image/png',
+            'disk' => 'local',
+            'path' => 'attachments/test/mark.png',
+            'original_filename' => 'mark.png',
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('labels.layouts.logo-library', ['q' => 'House mark']))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $file->id)
+            ->assertJsonPath('data.0.title', 'House mark');
+
+        $this->actingAs($user)
+            ->post(route('labels.layouts.store'), $this->layoutPayload([
+                'name' => 'From library',
+                'logo_file_id' => $file->id,
+            ]))
+            ->assertRedirect();
+
+        $layout = ShelfTagLayout::query()->first();
+        $this->assertNotNull($layout);
+        $this->assertSame($file->id, $layout->logo_file_id);
+        $this->assertSame(1, File::query()->count());
+
+        $this->actingAs($user)
+            ->get(route('labels.layouts.logo-file', $file))
+            ->assertOk();
+    }
+
+    public function test_non_image_library_file_is_rejected_as_a_logo(): void
+    {
+        $user = $this->manager();
+        $file = File::factory()->create([
+            'title' => 'Manual',
+            'mime_type' => 'application/pdf',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('labels.layouts.store'), $this->layoutPayload([
+                'name' => 'Bad logo',
+                'logo_file_id' => $file->id,
+            ]))
+            ->assertSessionHasErrors('logo_file_id');
+
+        $this->assertDatabaseCount('shelf_tag_layouts', 0);
+    }
+
+    public function test_label_reader_cannot_open_an_unassigned_library_image(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('attachments/test/mark.png', 'png-bytes');
+        $file = File::factory()->create([
+            'mime_type' => 'image/png',
+            'disk' => 'local',
+            'path' => 'attachments/test/mark.png',
+        ]);
+        $reader = User::factory()->create();
+        $reader->givePermissionTo('labels:read');
+        $reader = $this->enableFeature($reader, 'shelf_tag_generator');
+
+        $this->actingAs($reader)
+            ->get(route('labels.layouts.logo-file', $file))
+            ->assertNotFound();
     }
 
     public function test_invalid_paper_preset_is_rejected(): void

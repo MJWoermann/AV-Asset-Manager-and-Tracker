@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between"><h2 class="font-semibold text-xl">Item types</h2>
-            <a href="{{ route('item-types.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add</a></div>
+            <a href="{{ route('item-types.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add</a></div>
     </x-slot>
     <div
         class="max-w-7xl mx-auto px-4 space-y-3"
@@ -49,7 +49,7 @@
                         <div class="text-xs text-brand-charcoal dark:text-brand-silver mt-1">{{ $type->assets_count }} {{ $type->assets_count === 1 ? 'asset' : 'assets' }}</div>
                     </div>
                 </div>
-                <a href="{{ route('item-types.edit', $type) }}" class="text-brand text-sm shrink-0">Edit</a>
+                <a href="{{ route('item-types.edit', $type) }}" data-history-roundtrip class="text-brand text-sm shrink-0">Edit</a>
             </div>
         @endforeach
     </div>

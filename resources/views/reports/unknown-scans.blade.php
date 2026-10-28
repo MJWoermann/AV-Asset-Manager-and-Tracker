@@ -190,6 +190,7 @@
                                                 'status' => $scan->asset_status?->value,
                                                 'return_to' => request()->getRequestUri(),
                                             ]) }}"
+                                            data-history-roundtrip
                                             class="text-brand underline text-xs"
                                         >Add asset</a>
                                         <button

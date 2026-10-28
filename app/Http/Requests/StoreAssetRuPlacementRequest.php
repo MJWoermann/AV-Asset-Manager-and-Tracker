@@ -4,10 +4,11 @@ namespace App\Http\Requests;
 
 use App\Enums\RuPlacementFace;
 use App\Enums\RuPlacementKind;
+use App\Enums\RuPlacementWidth;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreAssetRuPlacementRequest extends FormRequest
 {
@@ -31,53 +32,6 @@ class StoreAssetRuPlacementRequest extends FormRequest
         if ($merge !== []) {
             $this->merge($merge);
         }
-
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-ca5636.log'), json_encode([
-                'sessionId' => 'ca5636',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'H1-H3',
-                'location' => 'StoreAssetRuPlacementRequest.php:prepareForValidation',
-                'message' => 'store ru placement input',
-                'data' => [
-                    'has_face' => $this->has('face'),
-                    'face' => $this->input('face'),
-                    'full_depth' => $this->input('full_depth'),
-                    'kind' => $this->input('kind'),
-                    'keys' => array_values(array_diff(array_keys($this->all()), ['_token'])),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable) {
-        }
-        // #endregion
-    }
-
-    protected function failedValidation(Validator $validator): void
-    {
-        // #region agent log
-        try {
-            file_put_contents(base_path('debug-ca5636.log'), json_encode([
-                'sessionId' => 'ca5636',
-                'runId' => 'pre-fix',
-                'hypothesisId' => 'H1-H3',
-                'location' => 'StoreAssetRuPlacementRequest.php:failedValidation',
-                'message' => 'store ru placement validation failed',
-                'data' => [
-                    'error_keys' => array_keys($validator->errors()->toArray()),
-                    'face_errors' => $validator->errors()->get('face'),
-                    'has_face' => $this->has('face'),
-                    'face' => $this->input('face'),
-                    'full_depth' => $this->input('full_depth'),
-                ],
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable) {
-        }
-        // #endregion
-
-        parent::failedValidation($validator);
     }
 
     /**
@@ -94,6 +48,8 @@ class StoreAssetRuPlacementRequest extends FormRequest
                 'boolean',
                 'prohibited_unless:kind,asset',
             ],
+            'width' => ['sometimes', Rule::enum(RuPlacementWidth::class)],
+            'slot' => ['sometimes', 'integer', 'min:1', 'max:3'],
             'kind' => ['required', Rule::enum(RuPlacementKind::class)],
             'child_asset_id' => [
                 'nullable',
@@ -110,6 +66,40 @@ class StoreAssetRuPlacementRequest extends FormRequest
                 'max:5000',
             ],
             'confirm_parent_change' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->hasAny(['width', 'slot'])) {
+                    return;
+                }
+
+                $width = RuPlacementWidth::tryFrom((string) $this->input('width', RuPlacementWidth::Full->value))
+                    ?? RuPlacementWidth::Full;
+                $slotProvided = $this->exists('slot');
+
+                if ($width === RuPlacementWidth::Full && ! $slotProvided) {
+                    return;
+                }
+
+                $slot = $slotProvided ? (int) $this->input('slot') : 1;
+                if ($width->acceptsSlot($slot)) {
+                    return;
+                }
+
+                $validator->errors()->add(
+                    'slot',
+                    $width === RuPlacementWidth::Full
+                        ? RuPlacementWidth::FULL_SLOT_MESSAGE
+                        : RuPlacementWidth::INVALID_SLOT_MESSAGE,
+                );
+            },
         ];
     }
 }

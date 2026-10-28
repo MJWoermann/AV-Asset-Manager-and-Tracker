@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center gap-3">
             <h2 class="font-semibold text-xl">Roles</h2>
-            <a href="{{ route('admin.roles.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add role</a>
+            <a href="{{ route('admin.roles.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add role</a>
         </div>
     </x-slot>
 
@@ -38,7 +38,7 @@
                         <td class="px-3 py-2">{{ $role->users_count }}</td>
                         <td class="px-3 py-2">
                             <div class="flex items-center justify-between gap-3">
-                                <a class="text-brand" href="{{ route('admin.roles.edit', $role) }}">Edit</a>
+                                <a class="text-brand" href="{{ route('admin.roles.edit', $role) }}" data-history-roundtrip>Edit</a>
                                 @if (! \App\Support\AccessPermissions::isSystemRole($role->name) && $role->users_count === 0)
                                     <form
                                         method="POST"

@@ -130,7 +130,7 @@
                         </button>
                     </x-slot>
                     <x-slot name="content">
-                        <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
+                        <x-dropdown-link :href="route('profile.edit')" data-history-roundtrip>Profile</x-dropdown-link>
                         @unlessrole('external_repairer')
                         <x-dropdown-link
                             href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"
@@ -149,13 +149,13 @@
                                 <x-dropdown-link :href="route('admin.roles.index')">Roles</x-dropdown-link>
                             @endcan
                             @can('admin:settings')
-                                <x-dropdown-link :href="route('admin.export-columns.edit')">Export columns</x-dropdown-link>
-                                <x-dropdown-link :href="route('admin.storage.edit')">Storage</x-dropdown-link>
-                                <x-dropdown-link :href="route('admin.sso.edit')">SSO</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.export-columns.edit')" data-history-roundtrip>Export columns</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.storage.edit')" data-history-roundtrip>Storage</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.sso.edit')" data-history-roundtrip>SSO</x-dropdown-link>
                             @endcan
                             @feature('email_integration')
                                 @can('admin:settings')
-                                    <x-dropdown-link :href="route('admin.email.edit')">Email</x-dropdown-link>
+                                    <x-dropdown-link :href="route('admin.email.edit')" data-history-roundtrip>Email</x-dropdown-link>
                                 @endcan
                             @endfeature
                         @endif
@@ -218,7 +218,7 @@
             @endrole
 
             <div class="pt-2 pb-1 px-4 text-xs font-semibold uppercase tracking-wide text-brand-silver/70">Account</div>
-            <x-responsive-nav-link :href="route('profile.edit')">Profile</x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('profile.edit')" data-history-roundtrip>Profile</x-responsive-nav-link>
             @unlessrole('external_repairer')
             <x-responsive-nav-link
                 href="https://github.com/MJWoermann/AV-Asset-Manager-and-Tracker/wiki"

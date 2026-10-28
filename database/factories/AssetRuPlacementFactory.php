@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\AssetStatus;
 use App\Enums\RuPlacementFace;
 use App\Enums\RuPlacementKind;
+use App\Enums\RuPlacementWidth;
 use App\Models\Asset;
 use App\Models\AssetRuPlacement;
 use App\Models\ItemType;
@@ -26,6 +27,8 @@ class AssetRuPlacementFactory extends Factory
             'start_ru' => 1,
             'ru_height' => 1,
             'full_depth' => false,
+            'width' => RuPlacementWidth::Full,
+            'slot' => 1,
             'kind' => RuPlacementKind::Note,
             'child_asset_id' => null,
             'note' => fake()->sentence(),
@@ -53,6 +56,22 @@ class AssetRuPlacementFactory extends Factory
                 'full_depth' => false,
             ];
         });
+    }
+
+    public function half(int $slot = 1): static
+    {
+        return $this->state(fn (): array => [
+            'width' => RuPlacementWidth::Half,
+            'slot' => $slot,
+        ]);
+    }
+
+    public function third(int $slot = 1): static
+    {
+        return $this->state(fn (): array => [
+            'width' => RuPlacementWidth::Third,
+            'slot' => $slot,
+        ]);
     }
 
     public function fullDepth(): static

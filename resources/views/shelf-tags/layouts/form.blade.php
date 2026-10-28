@@ -16,6 +16,7 @@
             ? (is_string(old('elements')) ? json_decode(old('elements'), true) : old('elements'))
             : ($layout->elements ?? []),
         'logo_url' => $layout->logoUrl(),
+        'logo_library_url' => route('labels.layouts.logo-library'),
         'editor_settings' => ShelfTagPaperPresets::normalizeEditorSettings(
             is_array($editorSettingsRaw) ? $editorSettingsRaw : null
         ),
@@ -140,12 +141,18 @@
                     </div>
                     <div>
                         <x-input-label for="logo" value="Logo (jpg/png, max 2MB)" />
-                        <input id="logo" name="logo" type="file" accept="image/jpeg,image/png" class="mt-1 block w-full text-sm">
+                        <input type="hidden" name="logo_file_id" :value="selectedLogoFileId || ''">
+                        <input id="logo" name="logo" type="file" accept="image/jpeg,image/png" class="mt-1 block w-full text-sm" x-ref="logoUpload" @change="onLogoUploadChosen()">
+                        <button type="button" class="mt-2 text-sm text-brand" @click="openLogoLibrary()">Choose an uploaded image</button>
+                        <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">Uses an image already in Files. Uploading the same picture again reuses that file.</p>
                         <template x-if="logoUrl">
-                            <label class="mt-2 inline-flex items-center gap-2 text-sm">
-                                <input type="checkbox" name="remove_logo" value="1" class="rounded text-brand">
-                                Remove current logo
-                            </label>
+                            <div class="mt-2 space-y-2">
+                                <img :src="logoUrl" alt="Current logo" class="h-16 max-w-full object-contain border bg-white">
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input type="checkbox" name="remove_logo" value="1" class="rounded text-brand" x-ref="removeLogo">
+                                    Remove current logo
+                                </label>
+                            </div>
                         </template>
                     </div>
                     <p class="text-xs text-brand-charcoal dark:text-brand-silver">
@@ -480,6 +487,50 @@
             <div class="flex flex-wrap items-center justify-end gap-3">
                 <a href="{{ route('labels.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Cancel</a>
                 <x-primary-button>Save layout</x-primary-button>
+            </div>
+
+            <div
+                x-show="logoLibraryOpen"
+                x-cloak
+                class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6 sm:px-0"
+                @keydown.escape.window="closeLogoLibrary()"
+            >
+                <div class="fixed inset-0 bg-gray-500 opacity-75" @click="closeLogoLibrary()"></div>
+                <div
+                    class="relative w-full sm:max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto bg-white dark:bg-brand-slate dark:text-white rounded-lg shadow-xl sm:mx-auto"
+                    @click.stop
+                >
+                    <div class="p-6 space-y-4">
+                        <h2 class="text-lg font-medium">Choose an uploaded image</h2>
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver">JPEG and PNG files already in Files. Picking one does not upload another copy.</p>
+                        <div>
+                            <x-input-label for="logo_library_search" value="Search" />
+                            <x-text-input
+                                id="logo_library_search"
+                                type="search"
+                                class="mt-1 block w-full"
+                                x-model="logoLibraryQuery"
+                                @input.debounce.300ms="searchLogoLibrary()"
+                                @keydown.enter.prevent="searchLogoLibrary()"
+                                placeholder="Search by title or filename"
+                                autocomplete="off"
+                            />
+                            <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver" x-show="logoLibrarySearching" x-cloak>Searching…</p>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" x-show="logoLibraryResults.length" x-cloak>
+                            <template x-for="file in logoLibraryResults" :key="file.id">
+                                <button type="button" class="border p-1 text-left hover:border-brand" @click="pickLogo(file)">
+                                    <img :src="file.url" alt="" class="h-16 w-full object-contain bg-white">
+                                    <span class="mt-1 block text-xs truncate" x-text="file.title"></span>
+                                </button>
+                            </template>
+                        </div>
+                        <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="!logoLibrarySearching && logoLibraryResults.length === 0" x-cloak>No JPEG or PNG images in Files yet.</p>
+                        <div class="flex justify-end">
+                            <x-secondary-button type="button" @click="closeLogoLibrary()">Close</x-secondary-button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </form>
     </div>

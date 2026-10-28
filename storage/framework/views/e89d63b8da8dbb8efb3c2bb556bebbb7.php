@@ -40,7 +40,7 @@
                         <a href="<?php echo e(route('labels.index', ['asset_list_id' => $list->id])); ?>" class="px-3 py-2 border text-sm">Labels</a>
                     <?php endif; ?>
                     <a href="<?php echo e(route('export.list', [$list, 'format' => 'xlsx'])); ?>" class="px-3 py-2 border text-sm">Export</a>
-                    <a href="<?php echo e(route('lists.edit', $list)); ?>" class="px-3 py-2 border text-sm">Edit</a>
+                    <a href="<?php echo e(route('lists.edit', $list)); ?>" data-history-roundtrip class="px-3 py-2 border text-sm">Edit</a>
                     <form
                         method="POST"
                         action="<?php echo e(route('lists.destroy', $list)); ?>"

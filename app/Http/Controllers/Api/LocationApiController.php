@@ -64,11 +64,14 @@ class LocationApiController extends Controller
         Location $location,
         BulkLocationUpdateService $locations,
     ): JsonResponse {
-        $replacement = Location::query()->findOrFail(
-            (int) $request->validated('replacement_location_id')
-        );
-
-        $locations->deleteWithReplacement($location, $replacement);
+        if ($request->requiresReplacement()) {
+            $replacement = Location::query()->findOrFail(
+                (int) $request->validated('replacement_location_id')
+            );
+            $locations->deleteWithReplacement($location, $replacement);
+        } else {
+            $locations->deleteWithoutReassignment($location);
+        }
 
         return response()->json(['message' => 'Location deleted.']);
     }

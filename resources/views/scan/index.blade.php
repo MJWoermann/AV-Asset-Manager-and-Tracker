@@ -108,6 +108,8 @@
             @endphp
 
             <div
+                id="scan-section"
+                @if (session('scroll_to') === 'scan-section') data-scroll-into-view @endif
                 x-data="barcodeScanner(@js(route('scan.scan', $session)), @js($session->event_list_id), @js($initialEventItems), @js(route('unknown-scans.update', ['unknownScan' => '__ID__'])), @js($initialUnknownScans), @js($clearScanRecent ?? false), @js(auth()->user()?->wantsScanNoise() ?? false), @js(auth()->user()?->wantsScanVibrate() ?? false), @js(route('unknown-scans.link', ['unknownScan' => '__ID__'])), @js(route('assets.search')))"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
@@ -305,6 +307,7 @@
                                     <a
                                         x-show="!entry.unknown_scan.resolved"
                                         :href="entry.unknown_scan.create_url"
+                                        data-history-roundtrip
                                         class="inline-flex items-center justify-center p-1 border border-brand-charcoal dark:border-brand-silver"
                                         title="Create asset"
                                         aria-label="Create asset"

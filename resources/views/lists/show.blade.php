@@ -12,7 +12,7 @@
                         <a href="{{ route('labels.index', ['asset_list_id' => $list->id]) }}" class="px-3 py-2 border text-sm">Labels</a>
                     @endfeature
                     <a href="{{ route('export.list', [$list, 'format' => 'xlsx']) }}" class="px-3 py-2 border text-sm">Export</a>
-                    <a href="{{ route('lists.edit', $list) }}" class="px-3 py-2 border text-sm">Edit</a>
+                    <a href="{{ route('lists.edit', $list) }}" data-history-roundtrip class="px-3 py-2 border text-sm">Edit</a>
                     <form
                         method="POST"
                         action="{{ route('lists.destroy', $list) }}"

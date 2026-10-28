@@ -339,6 +339,8 @@
             ?>
 
             <div
+                id="scan-section"
+                <?php if(session('scroll_to') === 'scan-section'): ?> data-scroll-into-view <?php endif; ?>
                 x-data="barcodeScanner(<?php echo \Illuminate\Support\Js::from(route('scan.scan', $session))->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($session->event_list_id)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($initialEventItems)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(route('unknown-scans.update', ['unknownScan' => '__ID__']))->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($initialUnknownScans)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($clearScanRecent ?? false)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(auth()->user()?->wantsScanNoise() ?? false)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(auth()->user()?->wantsScanVibrate() ?? false)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(route('unknown-scans.link', ['unknownScan' => '__ID__']))->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(route('assets.search'))->toHtml() ?>)"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
@@ -536,6 +538,7 @@
                                     <a
                                         x-show="!entry.unknown_scan.resolved"
                                         :href="entry.unknown_scan.create_url"
+                                        data-history-roundtrip
                                         class="inline-flex items-center justify-center p-1 border border-brand-charcoal dark:border-brand-silver"
                                         title="Create asset"
                                         aria-label="Create asset"

@@ -50,13 +50,13 @@
             <?php else: ?>
                 <span class="mt-0.5 inline-block w-5 shrink-0" aria-hidden="true"></span>
             <?php endif; ?>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('locations:update')): ?>
                 <input
                     type="checkbox"
                     class="mt-1 rounded border-brand-charcoal/40 shrink-0"
                     data-bulk-location-id="<?php echo e($location->id); ?>"
                     data-bulk-location-name="<?php echo e(mb_strtolower(trim($location->name))); ?>"
-                    data-bulk-location-assets="<?php echo e((int) ($location->assets_count ?? 0)); ?>"
+                    data-bulk-location-assets="<?php echo e((int) ($location->unscoped_assets_count ?? 0)); ?>"
                     :checked="!!selected[<?php echo e($location->id); ?>]"
                     @change="setSelected(<?php echo e($location->id); ?>, $event.target.checked)"
                     aria-label="Select <?php echo e($location->name); ?>"
@@ -77,26 +77,24 @@
                 href="<?php echo e(route('assets.index', ['location_id' => $location->id])); ?>"
                 class="text-sm text-brand"
             >Assets</a>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('locations:update')): ?>
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                <a href="<?php echo e(route('locations.edit', $location)); ?>" class="text-sm text-brand">Edit</a>
-                <?php if((int) ($location->assets_count ?? 0) > 0): ?>
-                    <template x-if="canDeleteLocation(<?php echo e($location->id); ?>)">
-                        <span class="inline-flex items-center gap-2">
-                            <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                            <button
-                                type="button"
-                                class="text-sm text-red-700"
-                                x-on:click.prevent="openDeleteLocation({
-                                    id: <?php echo e($location->id); ?>,
-                                    name: <?php echo \Illuminate\Support\Js::from($location->name)->toHtml() ?>,
-                                    assetsCount: <?php echo e((int) $location->assets_count); ?>,
-                                    action: <?php echo \Illuminate\Support\Js::from(route('locations.destroy', $location))->toHtml() ?>,
-                                })"
-                            >Delete</button>
-                        </span>
-                    </template>
-                <?php endif; ?>
+                <a href="<?php echo e(route('locations.edit', $location)); ?>" data-history-roundtrip class="text-sm text-brand">Edit</a>
+                <template x-if="canDeleteLocation(<?php echo e($location->id); ?>, <?php echo e((int) ($location->unscoped_assets_count ?? 0)); ?>)">
+                    <span class="inline-flex items-center gap-2">
+                        <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
+                        <button
+                            type="button"
+                            class="text-sm text-red-700"
+                            x-on:click.prevent="openDeleteLocation({
+                                id: <?php echo e($location->id); ?>,
+                                name: <?php echo \Illuminate\Support\Js::from($location->name)->toHtml() ?>,
+                                assetsCount: <?php echo e((int) ($location->unscoped_assets_count ?? 0)); ?>,
+                                action: <?php echo \Illuminate\Support\Js::from(route('locations.destroy', $location))->toHtml() ?>,
+                            })"
+                        >Delete</button>
+                    </span>
+                </template>
             <?php endif; ?>
         </div>
     </div>

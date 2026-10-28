@@ -4,7 +4,7 @@
             <h2 class="font-semibold text-xl">Repair procedures</h2>
             <div class="flex gap-2 text-sm">
                 <a href="{{ route('maintenance.index') }}" class="px-3 py-2 border">Maintenance</a>
-                <a href="{{ route('repair-procedures.create') }}" class="px-3 py-2 bg-brand text-white">Add procedure</a>
+                <a href="{{ route('repair-procedures.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white">Add procedure</a>
             </div>
         </div>
     </x-slot>
@@ -30,7 +30,7 @@
                             @endif
                         </p>
                     </div>
-                    <a href="{{ route('repair-procedures.edit', $procedure) }}" class="text-xs border px-2 py-1 self-start">Edit</a>
+                    <a href="{{ route('repair-procedures.edit', $procedure) }}" data-history-roundtrip class="text-xs border px-2 py-1 self-start">Edit</a>
                 </li>
             @empty
                 <li class="p-4 text-brand-charcoal">No repair procedures yet.</li>

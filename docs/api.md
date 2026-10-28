@@ -128,8 +128,8 @@ Authenticated routes require the matching role permission (for example `import:r
 | Auth | `POST /api/auth/token`, `DELETE /api/auth/token`, `GET /api/user` |
 | Assets | `GET/POST/PUT/DELETE /api/assets`, `POST /api/assets/bulk-update`, `GET /api/assets/{id}/history`, maintenance log sub-routes |
 | Lists & scan | `GET/POST/PUT/DELETE /api/lists`, `POST /api/lists/compare`, `POST /api/scan`, `POST /api/scan-sessions`, session patch/close |
-| Locations | `GET/POST/PUT/DELETE /api/locations`, `POST /api/locations/bulk-update`. Delete requires `replacement_location_id`. Locations with no assets are kept. |
-| Catalogue | `/api/manufacturers`, nested models, `/api/item-types`, `/api/custom-field-sets` |
+| Locations | `GET/POST/PUT/DELETE /api/locations`, `POST /api/locations/bulk-update`. Delete with assets requires `replacement_location_id`. Locations with no assets are deleted after confirmation. |
+| Catalogue | `/api/manufacturers`, nested models, `/api/item-types`, `/api/custom-field-sets`. Manufacturers with no assets are deleted after confirmation; manufacturers with assets require `replacement_manufacturer_id`. |
 | Spares | `/api/spares`, `/api/spares/groups`, movements, supersede, chart |
 | Repairs | `/api/repairs`, workflow actions, `/api/repair-procedures` |
 | Reports | `/api/unknown-scans`, export, note update, `POST /api/unknown-scans/{id}/link`, purge/dedupe (`reports:purge` plus token ability `reports:write`); `GET /api/dashboard/stats`, `GET /api/export/assets` (`reports:export`) |

@@ -132,7 +132,8 @@ class ScanController extends Controller
         return redirect()
             ->route('scan.index')
             ->with('status', 'Scan lists updated.')
-            ->with('clear_scan_recent', $eventListChanged);
+            ->with('clear_scan_recent', $eventListChanged)
+            ->with('scroll_to', 'scan-section');
     }
 
     public function updateLocation(Request $request, ScanSession $scan): RedirectResponse

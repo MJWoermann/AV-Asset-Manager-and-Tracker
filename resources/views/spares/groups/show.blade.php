@@ -3,7 +3,7 @@
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">{{ $group->name }}</h2>
             @can('spares:manage')
-                <a href="{{ route('spares.groups.edit', $group) }}" class="px-3 py-2 border text-sm">Edit</a>
+                <a href="{{ route('spares.groups.edit', $group) }}" data-history-roundtrip class="px-3 py-2 border text-sm">Edit</a>
             @endcan
         </div>
     </x-slot>

@@ -327,9 +327,19 @@ class ScanSessionTest extends TestCase
         ]);
 
         $response->assertRedirect(route('scan.index'));
+        $response->assertSessionHas('scroll_to', 'scan-section');
         $session->refresh();
         $this->assertSame($eventB->id, $session->event_list_id);
         $this->assertSame($inventory->id, $session->inventory_list_id);
+
+        $page = $this->followRedirects($response);
+        $page->assertOk();
+        $page->assertSee('id="scan-section"', false);
+        $page->assertSee('data-scroll-into-view', false);
+
+        $again = $this->actingAs($user)->get(route('scan.index'));
+        $again->assertOk();
+        $again->assertDontSee('data-scroll-into-view', false);
     }
 
     public function test_starting_session_can_create_a_new_location(): void

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between"><h2 class="font-semibold text-xl">Users</h2>
-            <a href="{{ route('admin.users.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add user</a></div>
+            <a href="{{ route('admin.users.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add user</a></div>
     </x-slot>
     <div class="max-w-7xl mx-auto px-4">
         <table class="min-w-full text-sm bg-white dark:bg-brand-slate border">
@@ -16,7 +16,7 @@
                         <td class="px-3 py-2">{{ $user->roles->pluck('name')->map(fn (string $name): string => \App\Support\AccessPermissions::roleLabel($name))->join(', ') }}</td>
                         <td class="px-3 py-2">{{ $user->departments->pluck('name')->join(', ') ?: '—' }}</td>
                         <td class="px-3 py-2 space-x-3 whitespace-nowrap">
-                            <a class="text-brand" href="{{ route('admin.users.edit', $user) }}">Edit</a>
+                            <a class="text-brand" href="{{ route('admin.users.edit', $user) }}" data-history-roundtrip>Edit</a>
                             @unless($user->hasRole('admin'))
                                 <form
                                     method="POST"

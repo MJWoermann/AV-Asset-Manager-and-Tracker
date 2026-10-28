@@ -50,11 +50,14 @@ class ManufacturerApiController extends Controller
         Manufacturer $manufacturer,
         ManufacturerCatalogueService $catalogue,
     ): JsonResponse {
-        $replacement = Manufacturer::query()->findOrFail(
-            (int) $request->validated('replacement_manufacturer_id')
-        );
-
-        $catalogue->deleteManufacturer($manufacturer, $replacement);
+        if ($request->requiresReplacement()) {
+            $replacement = Manufacturer::query()->findOrFail(
+                (int) $request->validated('replacement_manufacturer_id')
+            );
+            $catalogue->deleteManufacturer($manufacturer, $replacement);
+        } else {
+            $catalogue->deleteWithoutReassignment($manufacturer);
+        }
 
         return response()->json(['message' => 'Manufacturer deleted.']);
     }

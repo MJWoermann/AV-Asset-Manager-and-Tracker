@@ -3,7 +3,7 @@
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Locations</h2>
             @can('locations:write')
-                <a href="{{ route('locations.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add</a>
+                <a href="{{ route('locations.create') }}" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add</a>
             @endcan
         </div>
     </x-slot>
@@ -52,7 +52,7 @@
             @endif
 
             <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">
-                Locations with no assets stay on this list. Deleting a location that has assets asks where those assets should go.
+                Deleting a location with no assets asks for confirmation. Deleting a location that has assets asks where those assets should go.
             </p>
 
             <x-bulk-location-actions :parents="$parentOptions" :locations="$locationOptions" />
@@ -126,14 +126,18 @@
                     <h2 class="text-lg font-medium text-gray-900 dark:text-white">
                         Delete “<span x-text="deleteLocation?.name || ''"></span>”?
                     </h2>
-                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="(deleteLocation?.assetsCount || 0) > 0">
                         This location is used by
                         <span x-text="deleteLocation?.assetsCount || 0"></span>
                         <span x-text="(deleteLocation?.assetsCount || 0) === 1 ? 'asset' : 'assets'"></span>.
                         Choose a replacement location for those assets, then delete.
                         Child locations stay on the list and become top-level.
                     </p>
-                    <div>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver" x-show="(deleteLocation?.assetsCount || 0) === 0">
+                        This location has no assets. Delete it?
+                        Child locations stay on the list and become top-level.
+                    </p>
+                    <div x-show="(deleteLocation?.assetsCount || 0) > 0">
                         <x-input-label for="replacement_location_id" value="Replacement location" />
                         <x-searchable-select
                             name="replacement_location_id"
