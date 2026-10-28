@@ -65,7 +65,7 @@
         searchParams: @js($searchParams ?: new \stdClass),
     })"
     @keydown="onKeydown($event)"
-    @click.outside="closeList()"
+    @click.outside="($refs.panel && $refs.panel.contains($event.target)) || closeList()"
 >
     <input type="hidden" name="{{ $name }}" id="{{ $id }}" x-model="value" @if($required) required @endif @if($form) form="{{ $form }}" @endif>
 
@@ -98,12 +98,14 @@
         >&times;</button>
     </div>
 
+    <template x-teleport="body">
     <div
         x-show="open"
         x-cloak
         x-ref="panel"
         :style="panelStyle"
-        class="border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
+        @keydown="onKeydown($event)"
+        class="fixed z-[60] border border-brand-silver bg-white shadow-sm dark:border-brand-charcoal dark:bg-brand-slate"
         id="{{ $id }}-listbox"
         role="listbox"
     >
@@ -142,4 +144,5 @@
             </template>
         </ul>
     </div>
+    </template>
 </div>

@@ -605,69 +605,87 @@
                                     </li>
                                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </ul>
-                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
-                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Faults without an open repair</p>
-                                <?php if($maintenanceActivities['unrepairedFaults']->isEmpty()): ?>
-                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No faults waiting for a repair.</p>
-                                <?php else: ?>
-                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
-                                        <?php $__currentLoopData = $maintenanceActivities['unrepairedFaults']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $faultAsset): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                            <li>
-                                                <a
-                                                    href="<?php echo e(route('assets.show', [$faultAsset, 'tab' => 'maintenance'])); ?>"
-                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
-                                                >
-                                                    <span class="font-medium"><?php echo e($faultAsset->name); ?></span>
-                                                </a>
-                                            </li>
-                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                    </ul>
-                                <?php endif; ?>
-                            </div>
-                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
-                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Damaged</p>
-                                <?php if($maintenanceActivities['damagedAssets']->isEmpty()): ?>
-                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No damaged assets.</p>
-                                <?php else: ?>
-                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
-                                        <?php $__currentLoopData = $maintenanceActivities['damagedAssets']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $damagedAsset): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                            <li>
-                                                <a
-                                                    href="<?php echo e(route('assets.show', $damagedAsset)); ?>"
-                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
-                                                >
-                                                    <span class="font-medium"><?php echo e($damagedAsset->name); ?></span>
-                                                </a>
-                                            </li>
-                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                    </ul>
-                                <?php endif; ?>
-                            </div>
-                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
-                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Active repairs</p>
-                                <?php if($maintenanceActivities['recent']->isEmpty()): ?>
-                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No open repairs.</p>
-                                <?php else: ?>
-                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
-                                        <?php $__currentLoopData = $maintenanceActivities['recent']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $repair): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                            <li>
-                                                <a
-                                                    href="<?php echo e(route('repairs.show', $repair)); ?>"
-                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
-                                                >
-                                                    <span class="font-medium"><?php echo e($repair->summary); ?></span>
-                                                    <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
-                                                        <?php echo e($repair->asset?->name ?? 'Unknown asset'); ?>
+                        </div>
+                        <?php break; ?>
 
-                                                        — <?php echo e($repair->status?->label()); ?>
-
-                                                    </span>
-                                                </a>
-                                            </li>
-                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                    </ul>
-                                <?php endif; ?>
+                    <?php case ('unrepaired_faults'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Faults without repair</h3>
+                                <a href="<?php echo e(route('assets.index', ['unrepaired_fault' => 1])); ?>" class="text-xs text-brand hover:underline">View all</a>
                             </div>
+                            <?php if($unrepairedFaults->isEmpty()): ?>
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No faults waiting for a repair.</p>
+                            <?php else: ?>
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    <?php $__currentLoopData = $unrepairedFaults; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $faultAsset): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <li>
+                                            <a
+                                                href="<?php echo e(route('assets.show', [$faultAsset, 'tab' => 'maintenance'])); ?>"
+                                                class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="font-medium"><?php echo e($faultAsset->name); ?></span>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </ul>
+                            <?php endif; ?>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('damaged_assets'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Damaged assets</h3>
+                                <a href="<?php echo e(route('assets.index', ['status' => \App\Enums\AssetStatus::Damaged->value])); ?>" class="text-xs text-brand hover:underline">View all</a>
+                            </div>
+                            <?php if($damagedAssets->isEmpty()): ?>
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No damaged assets.</p>
+                            <?php else: ?>
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    <?php $__currentLoopData = $damagedAssets; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $damagedAsset): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <li>
+                                            <a
+                                                href="<?php echo e(route('assets.show', $damagedAsset)); ?>"
+                                                class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="font-medium"><?php echo e($damagedAsset->name); ?></span>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </ul>
+                            <?php endif; ?>
+                        </div>
+                        <?php break; ?>
+
+                    <?php case ('active_repairs'): ?>
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Active repairs</h3>
+                                <a href="<?php echo e(route('repairs.index')); ?>" class="text-xs text-brand hover:underline">View all</a>
+                            </div>
+                            <?php if($activeRepairs->isEmpty()): ?>
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No open repairs.</p>
+                            <?php else: ?>
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    <?php $__currentLoopData = $activeRepairs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $repair): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <li>
+                                            <a
+                                                href="<?php echo e(route('repairs.show', $repair)); ?>"
+                                                class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="font-medium"><?php echo e($repair->summary); ?></span>
+                                                <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                    <?php echo e($repair->asset?->name ?? 'Unknown asset'); ?>
+
+                                                    — <?php echo e($repair->status?->label()); ?>
+
+                                                </span>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </ul>
+                            <?php endif; ?>
                         </div>
                         <?php break; ?>
 

@@ -679,6 +679,71 @@ function focusDropdownSearch(input) {
     }
 }
 
+// #region agent log
+function debugSearchableViewport(reason, rootEl, panelEl, triggerEl, panelStyle) {
+    const doc = document.documentElement;
+    let transformed = null;
+    let node = panelEl?.parentElement ?? null;
+    while (node && node !== document.documentElement) {
+        const style = window.getComputedStyle(node);
+        if (style.transform && style.transform !== 'none') {
+            transformed = {
+                tag: node.tagName,
+                className: String(node.className || '').slice(0, 180),
+                transform: String(style.transform).slice(0, 140),
+                overflowX: style.overflowX,
+                overflowY: style.overflowY,
+            };
+            break;
+        }
+        node = node.parentElement;
+    }
+    const scrollHost = panelEl?.closest('[class*="overflow-"]') ?? null;
+    const hostStyle = scrollHost ? window.getComputedStyle(scrollHost) : null;
+    const panelRect = panelEl?.getBoundingClientRect?.() ?? null;
+    const triggerRect = triggerEl?.getBoundingClientRect?.() ?? null;
+    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4dcd19' },
+        body: JSON.stringify({
+            sessionId: '4dcd19',
+            runId: 'pre-fix',
+            hypothesisId: 'A',
+            location: 'resources/js/app.js:debugSearchableViewport',
+            message: reason,
+            timestamp: Date.now(),
+            data: {
+                field: rootEl?.querySelector('input[type="hidden"]')?.id || '',
+                queryLength: rootEl?.querySelector('input[type="search"]')?.value?.length ?? 0,
+                compact: window.matchMedia(COMPACT_VIEWPORT_MQ).matches,
+                viewport: { w: window.innerWidth, h: window.innerHeight },
+                panelStyle: panelStyle || null,
+                computedPosition: panelEl ? window.getComputedStyle(panelEl).position : null,
+                trigger: triggerRect ? { top: Math.round(triggerRect.top), left: Math.round(triggerRect.left), w: Math.round(triggerRect.width), h: Math.round(triggerRect.height) } : null,
+                panel: panelRect ? { top: Math.round(panelRect.top), left: Math.round(panelRect.left), w: Math.round(panelRect.width), h: Math.round(panelRect.height), bottom: Math.round(panelRect.bottom), right: Math.round(panelRect.right) } : null,
+                transformed,
+                scrollHost: scrollHost ? {
+                    className: String(scrollHost.className || '').slice(0, 180),
+                    overflowX: hostStyle.overflowX,
+                    overflowY: hostStyle.overflowY,
+                    clientW: scrollHost.clientWidth,
+                    scrollW: scrollHost.scrollWidth,
+                    clientH: scrollHost.clientHeight,
+                    scrollH: scrollHost.scrollHeight,
+                } : null,
+                doc: {
+                    clientW: doc.clientWidth,
+                    scrollW: doc.scrollWidth,
+                    clientH: doc.clientHeight,
+                    scrollH: doc.scrollHeight,
+                    bodyOverflow: document.body.className,
+                },
+            },
+        }),
+    }).catch(() => {});
+}
+// #endregion
+
 function normalizeSearchableOption(option) {
     return {
         value: String(option?.value ?? option?.id ?? ''),
@@ -780,7 +845,27 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
                 this._searchTimer = setTimeout(() => this.fetchRemote(q), 200);
             });
         }
+
+        // #region agent log
+        this.$watch('query', () => {
+            if (!this.open) {
+                return;
+            }
+            this.$nextTick(() => this.logSearchableViewport('query'));
+        });
+        // #endregion
     },
+
+    // #region agent log
+    logSearchableViewport(reason) {
+        const now = Date.now();
+        if (reason === 'position' && now - (this._debugAt || 0) < 400) {
+            return;
+        }
+        this._debugAt = now;
+        debugSearchableViewport(reason, this.rootEl, this.$refs.panel, this.$refs.trigger, this.panelStyle);
+    },
+    // #endregion
 
     get emptyMessage() {
         if (this.searchUrl && !this.query.trim()) {
@@ -905,6 +990,9 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             width: `${width}px`,
             zIndex: '60',
         };
+        // #region agent log
+        this.$nextTick(() => this.logSearchableViewport('position'));
+        // #endregion
     },
 
     bindPanelListeners() {
@@ -928,7 +1016,12 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
             pinDropdownFieldToViewportTop(this.$refs.trigger || this.rootEl);
             this.updatePanelPosition();
             focusDropdownSearch(this.$refs.search);
-            requestAnimationFrame(() => this.updatePanelPosition());
+            requestAnimationFrame(() => {
+                this.updatePanelPosition();
+                // #region agent log
+                this.logSearchableViewport('open');
+                // #endregion
+            });
         });
         if (this.searchUrl) {
             this.fetchRemote(this.query);
@@ -2381,6 +2474,11 @@ Alpine.data('ruVisualiser', (config = {}) => ({
     prepareSubmit(event) {
         if (this.form.kind === 'asset' && this.form.full_depth) {
             this.form.face = 'front';
+            const hiddenFace = event?.target?.querySelector('input[type="hidden"][name="face"]');
+            if (hiddenFace) {
+                hiddenFace.disabled = false;
+                hiddenFace.value = 'front';
+            }
         }
 
         if (this.form.confirm_parent_change) {

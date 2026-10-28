@@ -46,6 +46,12 @@ class DashboardModules
 
     public const MAINTENANCE_ACTIVITIES = 'maintenance_activities';
 
+    public const UNREPAIRED_FAULTS = 'unrepaired_faults';
+
+    public const DAMAGED_ASSETS = 'damaged_assets';
+
+    public const ACTIVE_REPAIRS = 'active_repairs';
+
     public const SPARES_STATS = 'spares_stats';
 
     /**
@@ -58,6 +64,9 @@ class DashboardModules
             self::STOCKTAKE_PULSE => 'Stocktake pulse',
             self::ASSETS_NEEDING_ATTENTION => 'Assets needing attention',
             self::MAINTENANCE_ACTIVITIES => 'Maintenance activities',
+            self::UNREPAIRED_FAULTS => 'Faults without repair',
+            self::DAMAGED_ASSETS => 'Damaged assets',
+            self::ACTIVE_REPAIRS => 'Active repairs',
             self::MY_REPAIRS => 'My repairs',
             self::SPARES_STATS => 'Spares statistics',
             self::SPARE_MOVEMENTS_RECENT => 'Recent spare usage',
@@ -89,6 +98,9 @@ class DashboardModules
             self::STOCKTAKE_PULSE,
             self::ASSETS_NEEDING_ATTENTION,
             self::MAINTENANCE_ACTIVITIES,
+            self::UNREPAIRED_FAULTS,
+            self::DAMAGED_ASSETS,
+            self::ACTIVE_REPAIRS,
             self::MY_REPAIRS,
             self::SPARES_STATS,
             self::SPARE_MOVEMENTS_RECENT,
@@ -120,6 +132,9 @@ class DashboardModules
             self::STOCKTAKE_PULSE,
             self::ASSETS_NEEDING_ATTENTION,
             self::MAINTENANCE_ACTIVITIES,
+            self::UNREPAIRED_FAULTS,
+            self::DAMAGED_ASSETS,
+            self::ACTIVE_REPAIRS,
             self::SPARES_STATS,
             self::CONSUMABLES_STATS,
             self::ASSETS_BY_STATUS,

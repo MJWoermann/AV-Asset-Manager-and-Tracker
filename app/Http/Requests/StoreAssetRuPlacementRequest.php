@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\RuPlacementFace;
 use App\Enums\RuPlacementKind;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -30,6 +31,53 @@ class StoreAssetRuPlacementRequest extends FormRequest
         if ($merge !== []) {
             $this->merge($merge);
         }
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-ca5636.log'), json_encode([
+                'sessionId' => 'ca5636',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'H1-H3',
+                'location' => 'StoreAssetRuPlacementRequest.php:prepareForValidation',
+                'message' => 'store ru placement input',
+                'data' => [
+                    'has_face' => $this->has('face'),
+                    'face' => $this->input('face'),
+                    'full_depth' => $this->input('full_depth'),
+                    'kind' => $this->input('kind'),
+                    'keys' => array_values(array_diff(array_keys($this->all()), ['_token'])),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable) {
+        }
+        // #endregion
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-ca5636.log'), json_encode([
+                'sessionId' => 'ca5636',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'H1-H3',
+                'location' => 'StoreAssetRuPlacementRequest.php:failedValidation',
+                'message' => 'store ru placement validation failed',
+                'data' => [
+                    'error_keys' => array_keys($validator->errors()->toArray()),
+                    'face_errors' => $validator->errors()->get('face'),
+                    'has_face' => $this->has('face'),
+                    'face' => $this->input('face'),
+                    'full_depth' => $this->input('full_depth'),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable) {
+        }
+        // #endregion
+
+        parent::failedValidation($validator);
     }
 
     /**

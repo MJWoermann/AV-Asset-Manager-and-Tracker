@@ -30,6 +30,27 @@ class UpdateAssetRuPlacementRequest extends FormRequest
         if ($merge !== []) {
             $this->merge($merge);
         }
+
+        // #region agent log
+        try {
+            file_put_contents(base_path('debug-ca5636.log'), json_encode([
+                'sessionId' => 'ca5636',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'H5',
+                'location' => 'UpdateAssetRuPlacementRequest.php:prepareForValidation',
+                'message' => 'update ru placement input',
+                'data' => [
+                    'has_face' => $this->has('face'),
+                    'face' => $this->input('face'),
+                    'full_depth' => $this->input('full_depth'),
+                    'kind' => $this->input('kind'),
+                    'keys' => array_values(array_diff(array_keys($this->all()), ['_token'])),
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable) {
+        }
+        // #endregion
     }
 
     /**

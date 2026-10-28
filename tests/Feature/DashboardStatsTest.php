@@ -384,9 +384,9 @@ class DashboardStatsTest extends TestCase
         $this->assertSame([], $response->viewData('warrantyExpiry'));
         $this->assertSame([], $response->viewData('testTagExpiry'));
         $this->assertSame([], $response->viewData('maintenanceActivities')['buckets']);
-        $this->assertTrue($response->viewData('maintenanceActivities')['recent']->isEmpty());
-        $this->assertTrue($response->viewData('maintenanceActivities')['unrepairedFaults']->isEmpty());
-        $this->assertTrue($response->viewData('maintenanceActivities')['damagedAssets']->isEmpty());
+        $this->assertTrue($response->viewData('unrepairedFaults')->isEmpty());
+        $this->assertTrue($response->viewData('damagedAssets')->isEmpty());
+        $this->assertTrue($response->viewData('activeRepairs')->isEmpty());
         $this->assertSame([], $response->viewData('sparesStats'));
         $response->assertSee('Scan to event');
         $response->assertDontSee('Within 30 days', false);
@@ -432,8 +432,9 @@ class DashboardStatsTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Assets in maintenance');
-        $response->assertSee('Open fan repair');
-        $response->assertSee('In progress board');
+        $response->assertSee('Open repairs');
+        $response->assertDontSee('Open fan repair', false);
+        $response->assertDontSee('In progress board', false);
         $response->assertDontSee('Recent complete', false);
 
         $buckets = collect($response->viewData('maintenanceActivities')['buckets'])->keyBy('key');
@@ -441,12 +442,13 @@ class DashboardStatsTest extends TestCase
         $this->assertSame(1, $buckets['open']['count']);
         $this->assertSame(1, $buckets['in_progress']['count']);
         $this->assertSame(1, $buckets['completed_30']['count']);
+        $this->assertArrayNotHasKey('recent', $response->viewData('maintenanceActivities'));
 
         $response->assertSee(
             route('repairs.index', ['status' => RepairStatus::Open->value], absolute: false),
             false
         );
-        $response->assertSee(
+        $response->assertDontSee(
             route('repairs.show', $open, absolute: false),
             false
         );
@@ -457,6 +459,9 @@ class DashboardStatsTest extends TestCase
     {
         $user = $this->withDashboardModules($this->scanner(), [
             DashboardModules::MAINTENANCE_ACTIVITIES,
+            DashboardModules::UNREPAIRED_FAULTS,
+            DashboardModules::DAMAGED_ASSETS,
+            DashboardModules::ACTIVE_REPAIRS,
         ]);
         $type = ItemType::create(['name' => 'Audio', 'slug' => 'audio-faults']);
 
@@ -524,14 +529,17 @@ class DashboardStatsTest extends TestCase
         $response->assertSee('Cracked lens');
         $response->assertDontSee('Healthy desk', false);
 
-        $activities = $response->viewData('maintenanceActivities');
         $this->assertSame(
             ['Finished repair mic', 'Waiting fault mic'],
-            $activities['unrepairedFaults']->pluck('name')->all(),
+            $response->viewData('unrepairedFaults')->pluck('name')->all(),
         );
-        $this->assertSame(['Cracked lens'], $activities['damagedAssets']->pluck('name')->all());
+        $this->assertSame(['Cracked lens'], $response->viewData('damagedAssets')->pluck('name')->all());
+        $this->assertSame(
+            ['Open crackle repair'],
+            $response->viewData('activeRepairs')->pluck('summary')->all(),
+        );
 
-        $buckets = collect($activities['buckets'])->keyBy('key');
+        $buckets = collect($response->viewData('maintenanceActivities')['buckets'])->keyBy('key');
         $this->assertSame(2, $buckets['unrepaired_faults']['count']);
         $this->assertSame(1, $buckets['damaged']['count']);
 
@@ -753,6 +761,9 @@ class DashboardStatsTest extends TestCase
             DashboardModules::STOCKTAKE_PULSE,
             DashboardModules::ASSETS_NEEDING_ATTENTION,
             DashboardModules::MAINTENANCE_ACTIVITIES,
+            DashboardModules::UNREPAIRED_FAULTS,
+            DashboardModules::DAMAGED_ASSETS,
+            DashboardModules::ACTIVE_REPAIRS,
             DashboardModules::SPARES_STATS,
             DashboardModules::ASSETS_BY_STATUS,
             DashboardModules::ASSETS_BY_LOCATION,

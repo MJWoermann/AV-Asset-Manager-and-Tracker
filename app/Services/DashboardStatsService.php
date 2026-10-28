@@ -110,12 +110,16 @@ class DashboardStatsService
                 : [],
             'maintenanceActivities' => in_array(DashboardModules::MAINTENANCE_ACTIVITIES, $enabled, true)
                 ? $this->maintenanceActivities()
-                : [
-                    'buckets' => [],
-                    'recent' => collect(),
-                    'unrepairedFaults' => collect(),
-                    'damagedAssets' => collect(),
-                ],
+                : ['buckets' => []],
+            'unrepairedFaults' => in_array(DashboardModules::UNREPAIRED_FAULTS, $enabled, true)
+                ? $this->unrepairedFaults()
+                : collect(),
+            'damagedAssets' => in_array(DashboardModules::DAMAGED_ASSETS, $enabled, true)
+                ? $this->damagedAssets()
+                : collect(),
+            'activeRepairs' => in_array(DashboardModules::ACTIVE_REPAIRS, $enabled, true)
+                ? $this->activeRepairs()
+                : collect(),
             'sparesStats' => in_array(DashboardModules::SPARES_STATS, $enabled, true)
                 ? $this->sparesStats()
                 : [],
@@ -229,12 +233,7 @@ class DashboardStatsService
     }
 
     /**
-     * @return array{
-     *     buckets: list<array{key: string, label: string, count: int, url: string}>,
-     *     recent: Collection<int, Repair>,
-     *     unrepairedFaults: Collection<int, Asset>,
-     *     damagedAssets: Collection<int, Asset>
-     * }
+     * @return array{buckets: list<array{key: string, label: string, count: int, url: string}>}
      */
     public function maintenanceActivities(): array
     {
@@ -244,65 +243,88 @@ class DashboardStatsService
             ->pluck('aggregate', 'status');
 
         $completedSince = Carbon::now()->subDays(30);
-        $unrepairedFaults = Asset::query()->withUnrepairedFault()->orderBy('name');
-        $damagedAssets = Asset::query()->where('status', AssetStatus::Damaged)->orderBy('name');
 
-        $buckets = [
-            [
-                'key' => 'assets_maintenance',
-                'label' => 'Assets in maintenance',
-                'count' => Asset::query()->whereNull('parent_id')->where('status', AssetStatus::Maintenance)->count(),
-                'url' => route('assets.index', ['status' => AssetStatus::Maintenance->value]),
-            ],
-            [
-                'key' => 'unrepaired_faults',
-                'label' => 'Faults without repair',
-                'count' => (clone $unrepairedFaults)->count(),
-                'url' => route('assets.index', ['unrepaired_fault' => 1]),
-            ],
-            [
-                'key' => 'damaged',
-                'label' => 'Damaged',
-                'count' => (clone $damagedAssets)->count(),
-                'url' => route('assets.index', ['status' => AssetStatus::Damaged->value]),
-            ],
-            [
-                'key' => 'open',
-                'label' => 'Open repairs',
-                'count' => (int) ($repairCounts[RepairStatus::Open->value] ?? 0),
-                'url' => route('repairs.index', ['status' => RepairStatus::Open->value]),
-            ],
-            [
-                'key' => 'in_progress',
-                'label' => 'In progress',
-                'count' => (int) ($repairCounts[RepairStatus::InProgress->value] ?? 0),
-                'url' => route('repairs.index', ['status' => RepairStatus::InProgress->value]),
-            ],
-            [
-                'key' => 'completed_30',
-                'label' => 'Completed (30 days)',
-                'count' => Repair::query()
-                    ->where('status', RepairStatus::Completed)
-                    ->where('completed_at', '>=', $completedSince)
-                    ->count(),
-                'url' => route('repairs.index', ['status' => RepairStatus::Completed->value]),
+        return [
+            'buckets' => [
+                [
+                    'key' => 'assets_maintenance',
+                    'label' => 'Assets in maintenance',
+                    'count' => Asset::query()->whereNull('parent_id')->where('status', AssetStatus::Maintenance)->count(),
+                    'url' => route('assets.index', ['status' => AssetStatus::Maintenance->value]),
+                ],
+                [
+                    'key' => 'unrepaired_faults',
+                    'label' => 'Faults without repair',
+                    'count' => Asset::query()->withUnrepairedFault()->count(),
+                    'url' => route('assets.index', ['unrepaired_fault' => 1]),
+                ],
+                [
+                    'key' => 'damaged',
+                    'label' => 'Damaged',
+                    'count' => Asset::query()->where('status', AssetStatus::Damaged)->count(),
+                    'url' => route('assets.index', ['status' => AssetStatus::Damaged->value]),
+                ],
+                [
+                    'key' => 'open',
+                    'label' => 'Open repairs',
+                    'count' => (int) ($repairCounts[RepairStatus::Open->value] ?? 0),
+                    'url' => route('repairs.index', ['status' => RepairStatus::Open->value]),
+                ],
+                [
+                    'key' => 'in_progress',
+                    'label' => 'In progress',
+                    'count' => (int) ($repairCounts[RepairStatus::InProgress->value] ?? 0),
+                    'url' => route('repairs.index', ['status' => RepairStatus::InProgress->value]),
+                ],
+                [
+                    'key' => 'completed_30',
+                    'label' => 'Completed (30 days)',
+                    'count' => Repair::query()
+                        ->where('status', RepairStatus::Completed)
+                        ->where('completed_at', '>=', $completedSince)
+                        ->count(),
+                    'url' => route('repairs.index', ['status' => RepairStatus::Completed->value]),
+                ],
             ],
         ];
+    }
 
-        $recent = Repair::query()
+    /**
+     * @return Collection<int, Asset>
+     */
+    public function unrepairedFaults(): Collection
+    {
+        return Asset::query()
+            ->withUnrepairedFault()
+            ->orderBy('name')
+            ->limit(5)
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * @return Collection<int, Asset>
+     */
+    public function damagedAssets(): Collection
+    {
+        return Asset::query()
+            ->where('status', AssetStatus::Damaged)
+            ->orderBy('name')
+            ->limit(5)
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * @return Collection<int, Repair>
+     */
+    public function activeRepairs(): Collection
+    {
+        return Repair::query()
             ->active()
             ->with(['asset:id,name'])
             ->latest('started_at')
             ->latest('id')
             ->limit(5)
             ->get();
-
-        return [
-            'buckets' => $buckets,
-            'recent' => $recent,
-            'unrepairedFaults' => (clone $unrepairedFaults)->limit(5)->get(['id', 'name']),
-            'damagedAssets' => (clone $damagedAssets)->limit(5)->get(['id', 'name']),
-        ];
     }
 
     /**

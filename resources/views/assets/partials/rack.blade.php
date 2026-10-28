@@ -119,11 +119,46 @@
                         <button type="button" class="text-sm text-brand-charcoal dark:text-brand-silver" @click="closePanel()">Close</button>
                     </div>
 
+                    {{-- #region agent log --}}
+                    <script>
+                        window.__dbgRuPlace = function (event, form) {
+                            try {
+                                const faceEl = event.target.querySelector('[name="face"]');
+                                const entries = {};
+                                new FormData(event.target).forEach((value, key) => {
+                                    if (key !== '_token' && key !== 'note') {
+                                        entries[key] = String(value);
+                                    }
+                                });
+                                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca5636' },
+                                    body: JSON.stringify({
+                                        sessionId: 'ca5636',
+                                        runId: 'pre-fix',
+                                        hypothesisId: 'H1-H2',
+                                        location: 'rack.blade.php:submit',
+                                        message: 'ru placement form submit',
+                                        data: {
+                                            alpineFace: form?.face ?? null,
+                                            fullDepth: Boolean(form?.full_depth),
+                                            kind: form?.kind ?? null,
+                                            faceDisabled: Boolean(faceEl?.disabled),
+                                            faceDomValue: faceEl?.value ?? null,
+                                            entries,
+                                        },
+                                        timestamp: Date.now(),
+                                    }),
+                                }).catch(() => {});
+                            } catch (_) {}
+                        };
+                    </script>
+                    {{-- #endregion --}}
                     <form
                         method="POST"
                         x-ref="placementForm"
                         :action="panel === 'edit' && editingPlacement() ? editingPlacement().update_url : storeUrl"
-                        @submit="prepareSubmit($event)"
+                        @submit="prepareSubmit($event); window.__dbgRuPlace?.($event, form)"
                         class="space-y-3"
                     >
                         @csrf
@@ -133,6 +168,15 @@
 
                         <div>
                             <x-input-label value="Face" />
+                            {{-- Disabled selects are omitted from POST; this field carries face while full depth locks the dropdown. --}}
+                            <input
+                                type="hidden"
+                                name="face"
+                                value="front"
+                                disabled
+                                :value="form.face"
+                                :disabled="!(form.full_depth && form.kind === 'asset')"
+                            >
                             <select
                                 name="face"
                                 class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"

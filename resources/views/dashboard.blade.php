@@ -581,67 +581,85 @@
                                     </li>
                                 @endforeach
                             </ul>
-                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
-                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Faults without an open repair</p>
-                                @if ($maintenanceActivities['unrepairedFaults']->isEmpty())
-                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No faults waiting for a repair.</p>
-                                @else
-                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
-                                        @foreach ($maintenanceActivities['unrepairedFaults'] as $faultAsset)
-                                            <li>
-                                                <a
-                                                    href="{{ route('assets.show', [$faultAsset, 'tab' => 'maintenance']) }}"
-                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
-                                                >
-                                                    <span class="font-medium">{{ $faultAsset->name }}</span>
-                                                </a>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                @endif
+                        </div>
+                        @break
+
+                    @case('unrepaired_faults')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Faults without repair</h3>
+                                <a href="{{ route('assets.index', ['unrepaired_fault' => 1]) }}" class="text-xs text-brand hover:underline">View all</a>
                             </div>
-                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
-                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Damaged</p>
-                                @if ($maintenanceActivities['damagedAssets']->isEmpty())
-                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No damaged assets.</p>
-                                @else
-                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
-                                        @foreach ($maintenanceActivities['damagedAssets'] as $damagedAsset)
-                                            <li>
-                                                <a
-                                                    href="{{ route('assets.show', $damagedAsset) }}"
-                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
-                                                >
-                                                    <span class="font-medium">{{ $damagedAsset->name }}</span>
-                                                </a>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                @endif
+                            @if ($unrepairedFaults->isEmpty())
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No faults waiting for a repair.</p>
+                            @else
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    @foreach ($unrepairedFaults as $faultAsset)
+                                        <li>
+                                            <a
+                                                href="{{ route('assets.show', [$faultAsset, 'tab' => 'maintenance']) }}"
+                                                class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="font-medium">{{ $faultAsset->name }}</span>
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                        @break
+
+                    @case('damaged_assets')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Damaged assets</h3>
+                                <a href="{{ route('assets.index', ['status' => \App\Enums\AssetStatus::Damaged->value]) }}" class="text-xs text-brand hover:underline">View all</a>
                             </div>
-                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
-                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Active repairs</p>
-                                @if ($maintenanceActivities['recent']->isEmpty())
-                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No open repairs.</p>
-                                @else
-                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
-                                        @foreach ($maintenanceActivities['recent'] as $repair)
-                                            <li>
-                                                <a
-                                                    href="{{ route('repairs.show', $repair) }}"
-                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
-                                                >
-                                                    <span class="font-medium">{{ $repair->summary }}</span>
-                                                    <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
-                                                        {{ $repair->asset?->name ?? 'Unknown asset' }}
-                                                        — {{ $repair->status?->label() }}
-                                                    </span>
-                                                </a>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                @endif
+                            @if ($damagedAssets->isEmpty())
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No damaged assets.</p>
+                            @else
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    @foreach ($damagedAssets as $damagedAsset)
+                                        <li>
+                                            <a
+                                                href="{{ route('assets.show', $damagedAsset) }}"
+                                                class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="font-medium">{{ $damagedAsset->name }}</span>
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                        @break
+
+                    @case('active_repairs')
+                        <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
+                            <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Active repairs</h3>
+                                <a href="{{ route('repairs.index') }}" class="text-xs text-brand hover:underline">View all</a>
                             </div>
+                            @if ($activeRepairs->isEmpty())
+                                <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No open repairs.</p>
+                            @else
+                                <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                    @foreach ($activeRepairs as $repair)
+                                        <li>
+                                            <a
+                                                href="{{ route('repairs.show', $repair) }}"
+                                                class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                            >
+                                                <span class="font-medium">{{ $repair->summary }}</span>
+                                                <span class="mt-0.5 block text-xs text-brand-charcoal dark:text-brand-silver">
+                                                    {{ $repair->asset?->name ?? 'Unknown asset' }}
+                                                    — {{ $repair->status?->label() }}
+                                                </span>
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
                         </div>
                         @break
 
