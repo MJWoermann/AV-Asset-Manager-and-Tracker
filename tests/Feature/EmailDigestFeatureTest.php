@@ -35,14 +35,7 @@ class EmailDigestFeatureTest extends TestCase
 
     protected function withEmailFeature(User $user): User
     {
-        $user->preferences = [
-            'features' => [
-                'email_integration' => true,
-            ],
-        ];
-        $user->save();
-
-        return $user->fresh();
+        return $this->enableFeature($user, 'email_integration');
     }
 
     protected function admin(): User

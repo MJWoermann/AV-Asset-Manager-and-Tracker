@@ -9,7 +9,7 @@
 ])
 
 @php
-    $canDelete = $canDelete || auth()->user()?->hasAnyRole(['admin', 'inventory_manager']);
+    $canDelete = $canDelete || (auth()->user()?->can('assets:delete') ?? false);
     $canChangeDepartment = auth()->user()?->hasRole('admin') ?? false;
     $departments = collect($departments ?? []);
 @endphp
@@ -28,7 +28,7 @@
         <div class="flex flex-wrap gap-2">
             <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="panelOpen = !panelOpen" x-text="panelOpen ? 'Hide bulk edit' : 'Bulk edit'"></button>
             @feature('shelf_tag_generator')
-                @role('admin|inventory_manager')
+                @can('labels:read')
                     @if($currentList)
                         <form method="GET" action="{{ route('labels.index') }}" class="inline">
                             <input type="hidden" name="asset_list_id" value="{{ $currentList->id }}">
@@ -38,7 +38,7 @@
                             <button type="submit" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver">Labels</button>
                         </form>
                     @endif
-                @endrole
+                @endcan
             @endfeature
             <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="clearSelection()">Clear</button>
             @if($canDelete)

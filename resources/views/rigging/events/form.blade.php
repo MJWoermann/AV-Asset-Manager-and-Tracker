@@ -292,13 +292,13 @@
                 </form>
             </section>
 
-            @role('admin|inventory_manager')
+            @can('rigging:write')
                 <form method="POST" action="{{ route('rigging.events.destroy', $event) }}" onsubmit="return confirm('Delete this Rig Event?')">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="text-sm text-red-600">Delete Rig Event</button>
                 </form>
-            @endrole
+            @endcan
         @endif
     </div>
 </x-app-layout>

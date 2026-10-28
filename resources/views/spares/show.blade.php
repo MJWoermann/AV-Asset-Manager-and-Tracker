@@ -6,12 +6,14 @@
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">{{ $spare->component }}</p>
             </div>
             <div class="flex flex-wrap gap-2 text-sm">
-                @role('admin|inventory_manager')
+                @can('spares:manage')
                     <a href="{{ route('spares.edit', $spare) }}" class="px-3 py-2 border">Edit</a>
+                @endcan
+                @can('labels:read')
                     @feature('shelf_tag_generator')
                         <a href="{{ route('spares.label', $spare) }}" class="px-3 py-2 border">Print label</a>
                     @endfeature
-                @endrole
+                @endcan
                 <a href="{{ route('spares.index') }}" class="px-3 py-2 border">Back</a>
             </div>
         </div>
@@ -154,11 +156,11 @@
                 linkable-type="spare_part"
                 :linkable-id="$spare->id"
                 :rows="$fileRows"
-                :can-mutate="auth()->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false"
+                :can-mutate="auth()->user()?->can('files:write') ?? false"
             />
         </div>
 
-        @role('admin|inventory_manager')
+        @can('spares:manage')
             <div class="border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
                 <h3 class="font-semibold">Mark superseded</h3>
                 <form method="post" action="{{ route('spares.supersede', $spare) }}" class="mt-2 flex flex-wrap gap-2 items-end">
@@ -175,6 +177,6 @@
                     <button type="submit" class="px-3 py-2 bg-black text-white">Record supersession</button>
                 </form>
             </div>
-        @endrole
+        @endcan
     </div>
 </x-app-layout>

@@ -35,17 +35,17 @@
                         </x-slot>
                         <x-slot name="content">
                             <x-dropdown-link :href="route('reports.compare')">Compare</x-dropdown-link>
-                            @role('admin|inventory_manager')
+                            @can('reports:export')
                                 <x-dropdown-link :href="route('reports.checkouts')">Checkout holdings</x-dropdown-link>
-                            @endrole
+                            @endcan
                             <x-dropdown-link :href="route('reports.unknown-scans')">Unknown scans</x-dropdown-link>
                             @feature('asset_connections')
                                 <x-dropdown-link :href="route('reports.connection-map')">Connection map</x-dropdown-link>
                             @endfeature
                             @feature('shelf_tag_generator')
-                                @role('admin|inventory_manager')
+                                @can('labels:read')
                                     <x-dropdown-link :href="route('labels.index')">Labels</x-dropdown-link>
-                                @endrole
+                                @endcan
                             @endfeature
                         </x-slot>
                     </x-dropdown>
@@ -63,9 +63,9 @@
                         </x-slot>
                         <x-slot name="content">
                             <x-dropdown-link :href="route('repairs.index')">Repairs</x-dropdown-link>
-                            @role('admin|inventory_manager')
+                            @can('repairs:procedures')
                                 <x-dropdown-link :href="route('repair-procedures.index')">Repair procedures</x-dropdown-link>
-                            @endrole
+                            @endcan
                             <x-dropdown-link :href="route('spares.index')">Spares</x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
@@ -84,14 +84,18 @@
                         <x-slot name="content">
                             <x-dropdown-link :href="route('locations.index')">Locations</x-dropdown-link>
                             <x-dropdown-link :href="route('manufacturers.index')">Manufacturers</x-dropdown-link>
-                            @role('admin|inventory_manager')
+                            @can('catalog:update')
                                 <x-dropdown-link :href="route('item-types.index')">Item Types</x-dropdown-link>
                                 <x-dropdown-link :href="route('custom-field-sets.index')">Field sets</x-dropdown-link>
-                                <x-dropdown-link :href="route('files.index')">Files</x-dropdown-link>
+                                @can('files:manage')
+                                    <x-dropdown-link :href="route('files.index')">Files</x-dropdown-link>
+                                @endcan
                                 @feature('asset_connections')
-                                    <x-dropdown-link :href="route('connection-types.index')">Connection types</x-dropdown-link>
+                                    @can('connections:write')
+                                        <x-dropdown-link :href="route('connection-types.index')">Connection types</x-dropdown-link>
+                                    @endcan
                                 @endfeature
-                            @endrole
+                            @endcan
                         </x-slot>
                     </x-dropdown>
 
@@ -134,26 +138,35 @@
                             rel="noopener noreferrer"
                         >Help</x-dropdown-link>
 
-                        @role('admin')
+                        @if (auth()->user()->canManageAdminArea())
                             <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
                             <div class="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-brand-silver/70">Admin</div>
-                            <x-dropdown-link :href="route('admin.users.index')">Manage users</x-dropdown-link>
-                            <x-dropdown-link :href="route('admin.departments.index')">Departments</x-dropdown-link>
-                            <x-dropdown-link :href="route('admin.export-columns.edit')">Export columns</x-dropdown-link>
-                            <x-dropdown-link :href="route('admin.storage.edit')">Storage</x-dropdown-link>
-                            <x-dropdown-link :href="route('admin.sso.edit')">SSO</x-dropdown-link>
+                            @can('admin:read')
+                                <x-dropdown-link :href="route('admin.users.index')">Manage users</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.departments.index')">Departments</x-dropdown-link>
+                            @endcan
+                            @can('admin:write')
+                                <x-dropdown-link :href="route('admin.roles.index')">Roles</x-dropdown-link>
+                            @endcan
+                            @can('admin:settings')
+                                <x-dropdown-link :href="route('admin.export-columns.edit')">Export columns</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.storage.edit')">Storage</x-dropdown-link>
+                                <x-dropdown-link :href="route('admin.sso.edit')">SSO</x-dropdown-link>
+                            @endcan
                             @feature('email_integration')
-                                <x-dropdown-link :href="route('admin.email.edit')">Email</x-dropdown-link>
+                                @can('admin:settings')
+                                    <x-dropdown-link :href="route('admin.email.edit')">Email</x-dropdown-link>
+                                @endcan
                             @endfeature
-                        @endrole
+                        @endif
 
                         @feature('email_integration')
-                            @role('inventory_manager')
-                                @unlessrole('admin')
+                            @can('email:ops')
+                                @cannot('admin:settings')
                                     <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
                                     <x-dropdown-link :href="route('admin.email.inbound.index')">Email</x-dropdown-link>
-                                @endunlessrole
-                            @endrole
+                                @endcannot
+                            @endcan
                         @endfeature
                         @endunlessrole
 
@@ -213,16 +226,16 @@
                 rel="noopener noreferrer"
             >Help</x-responsive-nav-link>
 
-            @role('admin')
+            @if (auth()->user()->canManageAdminArea())
                 <x-responsive-nav-link :href="route('admin.index')" :active="request()->routeIs('admin.*')">Admin</x-responsive-nav-link>
-            @endrole
+            @endif
 
             @feature('email_integration')
-                @role('inventory_manager')
-                    @unlessrole('admin')
+                @can('email:ops')
+                    @cannot('admin:settings')
                         <x-responsive-nav-link :href="route('admin.email.inbound.index')" :active="request()->routeIs('admin.email.*')">Email</x-responsive-nav-link>
-                    @endunlessrole
-                @endrole
+                    @endcannot
+                @endcan
             @endfeature
             @endunlessrole
 

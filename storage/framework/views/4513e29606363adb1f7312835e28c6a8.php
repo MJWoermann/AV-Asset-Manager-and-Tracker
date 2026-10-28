@@ -276,7 +276,7 @@
 <?php endif; ?>
                 <select id="role" name="role" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
                     <?php $__currentLoopData = $roles; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $role): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($role->name); ?>" <?php if(old('role', $user->roles->first()?->name) === $role->name): echo 'selected'; endif; ?>><?php echo e($role->name); ?></option>
+                        <option value="<?php echo e($role->name); ?>" <?php if(old('role', $user->roles->first()?->name) === $role->name): echo 'selected'; endif; ?>><?php echo e(\App\Support\AccessPermissions::roleLabel($role->name)); ?></option>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </select>
                 <?php if (isset($component)) { $__componentOriginalf94ed9c5393ef72725d159fe01139746 = $component; } ?>

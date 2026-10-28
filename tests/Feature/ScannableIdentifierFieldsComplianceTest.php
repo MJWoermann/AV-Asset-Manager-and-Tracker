@@ -36,12 +36,7 @@ class ScannableIdentifierFieldsComplianceTest extends TestCase
      */
     protected function withFeatures(User $user, array $features): User
     {
-        $preferences = $user->preferences ?? [];
-        $preferences['features'] = array_merge($preferences['features'] ?? [], $features);
-        $user->preferences = $preferences;
-        $user->save();
-
-        return $user->fresh();
+        return $this->enableFeature($user, $features);
     }
 
     /**

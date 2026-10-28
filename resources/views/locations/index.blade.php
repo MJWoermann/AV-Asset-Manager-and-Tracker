@@ -2,9 +2,9 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Locations</h2>
-            @role('admin|inventory_manager|scanner')
+            @can('locations:write')
                 <a href="{{ route('locations.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add</a>
-            @endrole
+            @endcan
         </div>
     </x-slot>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkSelection(@js([
@@ -31,7 +31,7 @@
             </div>
         @endif
 
-        @role('admin|inventory_manager')
+        @can('locations:update')
             @if (count($duplicateNames) > 0)
                 <div class="mb-4 border border-brand-charcoal/30 dark:border-brand-charcoal bg-white dark:bg-brand-slate p-3 text-sm space-y-2">
                     <p>
@@ -56,13 +56,13 @@
             </p>
 
             <x-bulk-location-actions :parents="$parentOptions" :locations="$locationOptions" />
-        @endrole
+        @endcan
 
         @if ($locations->isEmpty())
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">No locations yet.</p>
         @else
             <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                @role('admin|inventory_manager')
+                @can('locations:update')
                     <label class="inline-flex items-center gap-2 mr-2">
                         <input
                             type="checkbox"
@@ -73,7 +73,7 @@
                         >
                         <span>Select all</span>
                     </label>
-                @endrole
+                @endcan
                 <button
                     type="button"
                     class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver"
@@ -112,7 +112,7 @@
             </ul>
         @endif
 
-        @role('admin|inventory_manager')
+        @can('locations:update')
             <x-modal name="delete-location" :show="$errors->has('replacement_location_id')" focusable maxWidth="md">
                 <form
                     method="POST"
@@ -155,6 +155,6 @@
                     </div>
                 </form>
             </x-modal>
-        @endrole
+        @endcan
     </div>
 </x-app-layout>

@@ -25,14 +25,8 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
     {
         $user = User::factory()->create(['theme' => 'light']);
         $user->assignRole('inventory_manager');
-        $user->preferences = [
-            'features' => [
-                'shelf_tag_generator' => true,
-            ],
-        ];
-        $user->save();
 
-        return $user->fresh();
+        return $this->enableFeature($user, 'shelf_tag_generator');
     }
 
     public function test_editor_grid_settings_persist_on_create_and_reload(): void

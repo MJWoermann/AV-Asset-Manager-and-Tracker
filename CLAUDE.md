@@ -10,7 +10,7 @@ Self-hosted LEMP Progressive Web App for AV equipment stocktake and asset manage
 - Blade + Alpine.js + Tailwind CSS (TP brand tokens in `tailwind.config.js`)
 - MariaDB in production; SQLite acceptable for local/dev
 - Laravel Sanctum Bearer tokens for `/api/*`
-- Spatie Laravel Permission roles: `admin`, `inventory_manager`, `scanner`, `external_repairer`
+- Spatie roles are permission sets: `admin` (full operational access), `inventory_manager`, `scanner`, `external_repairer`, plus custom roles from Admin → Roles. New routes use permission middleware.
 - Maatwebsite Excel for CSV/XLSX
 - `html5-qrcode` for mobile barcode scanning
 - `vite-plugin-pwa` — installable shell only; **no offline data sync**
@@ -75,10 +75,10 @@ php artisan serve
 
 | Role | Access |
 |------|--------|
-| admin | Full, including user management, departments, email/SSO/storage |
-| inventory_manager | Lists, import/export, reports, CRUD assets/types, repairs/spares/procedures |
+| admin | Full operational access, including user management, roles, departments, email/SSO/storage. Developer features stay on the admin profile |
+| inventory_manager | Lists, import/export, reports, CRUD assets/types, repairs/spares/procedures. Permissions are editable; purge and stock-movement edits start off |
 | scanner | Scan, view inventory, edit asset details, checkout/return |
-| external_repairer | Maintenance hub + assigned repairs only; asset show for those assets; no scan/lists/import/catalogue/admin/hire checkout |
+| external_repairer | Maintenance hub + assigned repairs only; asset show for those assets; no scan/lists/import/catalogue/admin/hire checkout. Stays out of the staff route group |
 
 ## Testing mindset
 

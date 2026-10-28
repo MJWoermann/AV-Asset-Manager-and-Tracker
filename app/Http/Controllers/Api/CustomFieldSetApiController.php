@@ -33,7 +33,7 @@ class CustomFieldSetApiController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('catalog:update'), 403);
 
         $data = $this->validated($request);
 
@@ -54,7 +54,7 @@ class CustomFieldSetApiController extends Controller
 
     public function update(Request $request, CustomFieldSet $customFieldSet): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('catalog:update'), 403);
 
         $data = $this->validated($request, $customFieldSet);
 
@@ -73,7 +73,7 @@ class CustomFieldSetApiController extends Controller
 
     public function destroy(Request $request, CustomFieldSet $customFieldSet): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('catalog:update'), 403);
         $customFieldSet->delete();
 
         return response()->json(['message' => 'Custom field set deleted.']);

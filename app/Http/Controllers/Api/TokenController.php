@@ -31,7 +31,7 @@ class TokenController extends Controller
             ]);
         }
 
-        if (! $user->hasAnyRole(['admin', 'inventory_manager', 'scanner'])) {
+        if (! $user->hasStaffAccess()) {
             abort(403, 'You do not have permission to perform this action.');
         }
 

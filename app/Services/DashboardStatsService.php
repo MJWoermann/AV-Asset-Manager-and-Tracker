@@ -848,7 +848,7 @@ class DashboardStatsService
     {
         if ($user === null
             || ! $user->hasFeature('email_integration')
-            || ! $user->hasAnyRole(['admin', 'inventory_manager'])) {
+            || ! $user->can('email:ops')) {
             return null;
         }
 

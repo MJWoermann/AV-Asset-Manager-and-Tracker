@@ -2,9 +2,9 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Manufacturers / Models</h2>
-            @role('admin|inventory_manager|scanner')
+            @can('catalog:write')
                 <a href="{{ route('manufacturers.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add manufacturer</a>
-            @endrole
+            @endcan
         </div>
     </x-slot>
 
@@ -56,7 +56,7 @@
             </ul>
         @endif
 
-        @role('admin|inventory_manager')
+        @can('catalog:update')
             <x-modal name="delete-manufacturer" :show="$errors->has('replacement_manufacturer_id')" focusable maxWidth="md">
                 <form
                     method="POST"
@@ -140,6 +140,6 @@
                     </div>
                 </form>
             </x-modal>
-        @endrole
+        @endcan
     </div>
 </x-app-layout>

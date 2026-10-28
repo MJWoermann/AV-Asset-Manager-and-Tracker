@@ -26,7 +26,7 @@ class AssetListApiController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('lists:write'), 403);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -41,7 +41,7 @@ class AssetListApiController extends Controller
 
     public function update(Request $request, AssetList $list): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('lists:write'), 403);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -55,7 +55,7 @@ class AssetListApiController extends Controller
 
     public function destroy(Request $request, AssetList $list): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('lists:write'), 403);
         $list->delete();
 
         return response()->json(['message' => 'List deleted.']);
@@ -78,7 +78,7 @@ class AssetListApiController extends Controller
 
     public function scan(Request $request, ScanService $scanService): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager', 'scanner']), 403);
+        abort_unless($request->user()->can('scan'), 403);
 
         $data = $request->validate([
             'scan_session_id' => ['required', 'exists:scan_sessions,id'],

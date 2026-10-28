@@ -24,7 +24,7 @@ Related docs: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md), [hardware-sizing
 
 The app already has useful controls: Spatie roles on many admin routes, Sanctum + throttles on API token issuance, login lockout, CSRF on web forms, UUID attachment paths, hashed guest stock tokens, SSO domain allow-lists, and append-only audit-log design.
 
-**P0/P1 hardening is implemented in code:** public registration defaults off (`ALLOW_REGISTRATION=false`), authenticated web/API access requires a Spatie app role (`admin`, `inventory_manager`, or `scanner`), API tokens are refused without a role, developer feature flags are admin-only, connection/RU writes are manager-gated, URL file downloads allow only `http`/`https`, and guest stock QR can be disabled with `STOCK_GUEST_ENABLED=false`.
+**P0/P1 hardening is implemented in code:** public registration defaults off (`ALLOW_REGISTRATION=false`), authenticated web/API access requires an operational role permission (roleless accounts get 403), API tokens cannot exceed that role, developer features for non-admins come from the role, connection/RU writes require `connections:write` plus the feature grant, URL file downloads allow only `http`/`https`, and guest stock QR can be disabled with `STOCK_GUEST_ENABLED=false`.
 
 **Email verification is intentionally not used** for access control. Isolated LEMP installs often have no outbound mail; `User` does not implement `MustVerifyEmail`. Admins create users (or run `app:install`) with `email_verified_at` set and a role assigned — no mail required.
 
@@ -42,18 +42,18 @@ Severity reflects impact if the host is reachable by untrusted users (or a compr
 |----|------|--------|
 | C1 | Public registration | **Mitigated** — `ALLOW_REGISTRATION` defaults false; register UI hidden; controller returns 404 when off |
 | C2 | Email verification not enforced | **By design** — no `MustVerifyEmail`; access is role-gated, not mail-gated |
-| C3 | Roleless authenticated access | **Mitigated** — web app group uses `role:admin,inventory_manager,scanner`; roleless users get 403 |
+| C3 | Roleless authenticated access | **Mitigated** — staff routes require at least one operational permission; roleless users get 403 |
 
 ### High (P1 — mitigated / residual)
 
 | ID | Area | Status |
 |----|------|--------|
-| H1 | API authorization incomplete | **Mitigated** — Sanctum group + token issuance require app roles |
-| H2 | File download / search IDOR | **Pragmatic** — any app role may search/download/thumbnail; no per-file ownership (acceptable for this sensitivity) |
+| H1 | API authorization incomplete | **Mitigated** — Sanctum routes require a role permission and a token ability; `*` on a token does not override a missing permission |
+| H2 | File download / search IDOR | **Pragmatic** — `files:read` may search/download/thumbnail; no per-file ownership (acceptable for this sensitivity) |
 | H3 | External URL redirect | **Mitigated** — `download()` allows only `http`/`https` schemes before `redirect()->away()` |
-| H4 | Self-service developer features | **Mitigated** — only admins may merge `features.*` on profile |
-| H5 | Feature-gated writes without roles | **Mitigated** — connection/interface + RU placement writes require `admin` or `inventory_manager` |
-| H6 | Web asset/file/scan mutations under-authorized | **Partially mitigated** — roleless users blocked by app-group role middleware; finer per-action role split remains product policy |
+| H4 | Self-service developer features | **Mitigated** — only admins toggle their own flags; other users receive developer features from a role, which they cannot edit |
+| H5 | Feature-gated writes without permission | **Mitigated** — feature-gated writes require the feature grant and the operational permission (for example `connections:write`) |
+| H6 | Web asset/file/scan mutations under-authorized | **Mitigated** — route `permission:` checks follow `AccessPermissions`; roleless users still get 403 |
 
 ### Medium
 
@@ -457,7 +457,7 @@ Prefer an egress allow-list or corporate proxy over “any:443” when IT can su
 ### Guest QR and Sanctum on WiFi
 
 - Guest Kanban QR URLs are absolute links based on `APP_URL`. Scanners and phones on staff WiFi must resolve and reach that host; if guest QR is unused, set `STOCK_GUEST_ENABLED=false`.
-- Sanctum Bearer clients (mobile/scripts) must use the same reachable base URL and a user with an app role (`admin`, `inventory_manager`, or `scanner`).
+- Sanctum Bearer clients (mobile/scripts) must use the same reachable base URL and a user whose role includes the route permission. A token ability cannot widen that role.
 - Printed QR tokens remain bearer credentials for that asset’s stock — rotate/revoke when labels are lost; network restriction does not replace token hygiene.
 
 ### Quick checklist (corporate WiFi)
@@ -478,15 +478,15 @@ These are the highest-value code/config changes relative to the findings above. 
 ### P0 — Close the open door (done)
 
 1. **Disable public registration in production** — `ALLOW_REGISTRATION=false` (default); register returns 404; Register link hidden when disabled. Create users via Admin → Users or `app:install`.
-2. **Deny users with zero roles** — Web dashboard/app group uses `role:admin,inventory_manager,scanner`. Logout remains under plain `auth`.
-3. **Stop using `verified` for access** — Replaced with role middleware. No `MustVerifyEmail` by design (no mail dependency on isolated LAN).
+2. **Deny users with zero roles** — Staff routes require at least one operational permission (`admin` passes all of those). A role with no permissions, and a user with no role, cannot open the staff app. Logout remains under plain `auth`. External repairers stay on their assignment-scoped routes.
+3. **Stop using `verified` for access** — Replaced with permission middleware. No `MustVerifyEmail` by design (no mail dependency on isolated LAN).
 
 ### P1 — Authorize every data path (done for scoped items)
 
-4. **API** — Sanctum group + `TokenController` require app roles.
-5. **Web mutations** — Roleless users blocked at the app group; connection/RU writes manager-gated.
-6. **Files** — App-role gate for search/download/thumbnail; URL redirects scheme-checked (`http`/`https` only).
-7. **Feature flags** — Admins only may toggle developer features on profile.
+4. **API** — Sanctum group requires staff access. Each route also checks a permission and a token ability.
+5. **Web mutations** — Permission middleware on mutating routes. Connection and RU writes need `connections:write` and the feature grant.
+6. **Files** — `files:read` for search/download/thumbnail; `files:manage` for the library. URL redirects are scheme-checked (`http`/`https` only).
+7. **Feature flags** — Only admins toggle their own flags. Other users receive developer features from a role. Feature-gated writes need that grant and the operational permission.
 
 ### P2 — Abuse resistance and SSO
 
@@ -550,7 +550,7 @@ Use alongside the checklist in the deploy guide.
 - [ ] `scripts/update.sh` or equivalent (`migrate --force`, caches, asset build)
 - [ ] Re-apply audit_logs privilege revoke if DB grants were reset
 - [ ] Confirm registration still disabled and `APP_DEBUG` still false
-- [ ] Spot-check role middleware on new routes
+- [ ] Spot-check permission middleware on new routes
 - [ ] Spot-check that heavy new routes have throttle and/or size caps (import, export, compare, upload, backup)
 
 ---
@@ -561,7 +561,9 @@ Use alongside the checklist in the deploy guide.
 |------------|:-----:|:-----------------:|:-------:|:-------:|
 | View assets / lists | ✓ | ✓ | ✓ | ✗ |
 | Create / update assets | ✓ | ✓ | ✓* | ✗ |
-| Delete assets / manage users / SSO / storage | ✓ | — | — | ✗ |
+| Delete assets | ✓ | ✓ | — | ✗ |
+| Manage users / roles / departments | ✓ | — | — | ✗ |
+| SSO / storage / export columns | ✓ | — | — | ✗ |
 | Create locations / manufacturers / models | ✓ | ✓ | ✓ | ✗ |
 | Edit / delete / bulk locations & catalogue | ✓ | ✓ | — | ✗ |
 | Import / export | ✓ | ✓ | — | ✗ |
@@ -571,6 +573,8 @@ Use alongside the checklist in the deploy guide.
 | Guest stock QR (unauthenticated) | token | token | token | token‡ |
 | API Bearer token | ✓ | ✓ | ✓ | ✗ |
 
+Custom roles are an explicit permission set chosen under Admin → Roles. A user with no role still has no access. The four columns above are the seeded system roles. Administrators can change inventory manager, scanner, and external repairer without a code change. `reports:purge` and `stock:adjust` start off for inventory manager.
+
 \* Product today allows scanners to edit asset details; keep or tighten deliberately.  
 † Prefer scoping downloads to assets the user can already see.  
 ‡ By design when a valid token is presented; control via revoke + network + kill-switch.
@@ -579,11 +583,11 @@ Use alongside the checklist in the deploy guide.
 
 ## Ongoing practices
 
-1. **Least privilege** — Prefer `scanner` over `inventory_manager` over `admin`.
+1. **Least privilege** — Prefer a narrow custom role or `scanner` over `admin`.
 2. **Dependency hygiene** — `composer update` / `npm update` on a cadence; watch Laravel security releases.
 3. **Secret rotation** — DB password, `APP_KEY` (planned), OAuth secrets, Sanctum tokens on offboarding.
 4. **Backup drills** — Quarterly restore test; treat dumps as production data.
-5. **Change review** — New routes must declare `auth` + role/policy; never add public mutating endpoints without throttle + token/CSRF design. Also ask: can this load unbounded rows, hold a long DB transaction, or fill disk?
+5. **Change review** — New routes must declare `auth` + permission middleware; never add public mutating endpoints without throttle + token/CSRF design. Also ask: can this load unbounded rows, hold a long DB transaction, or fill disk?
 6. **Do not weaken audit immutability** — No update/delete APIs for `AuditLog`; keep DB grants aligned.
 7. **No production debug sinks** — Do not leave agent/session file appenders under the app root or on authenticated routes.
 

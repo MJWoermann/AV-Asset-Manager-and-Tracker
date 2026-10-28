@@ -28,7 +28,7 @@ class ManufacturerController extends Controller
             ])
             ->values();
 
-        $canManageCatalogue = $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+        $canManageCatalogue = $request->user()?->can('catalog:update') ?? false;
 
         $initialDeleteManufacturer = null;
         $deletingManufacturerId = (int) old('deleting_manufacturer_id');

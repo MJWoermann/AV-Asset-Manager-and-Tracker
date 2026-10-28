@@ -18,7 +18,7 @@ class StoreStockMovementRequest extends FormRequest
             return false;
         }
 
-        return $user?->hasAnyRole(['admin', 'inventory_manager', 'scanner']) ?? false;
+        return $user?->can('stock:write') ?? false;
     }
 
     /**

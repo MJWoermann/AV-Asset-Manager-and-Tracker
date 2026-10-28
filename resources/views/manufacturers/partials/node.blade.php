@@ -44,11 +44,11 @@
                 href="{{ route('assets.index', ['manufacturer_id' => $manufacturer->id]) }}"
                 class="text-sm text-brand"
             >Assets</a>
-            @role('admin|inventory_manager|scanner')
+            @can('catalog:write')
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="{{ route('manufacturers.models.create', $manufacturer) }}" class="text-sm text-brand">Add model</a>
-            @endrole
-            @role('admin|inventory_manager')
+            @endcan
+            @can('catalog:update')
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="{{ route('manufacturers.edit', $manufacturer) }}" class="text-sm text-brand">Edit</a>
                 <template x-if="canDeleteManufacturer({{ $manufacturer->id }})">
@@ -65,7 +65,7 @@
                         >Delete</button>
                     </span>
                 </template>
-            @endrole
+            @endcan
         </div>
     </div>
 

@@ -4,11 +4,15 @@
             <h2 class="font-semibold text-xl">Assets</h2>
             <div class="flex gap-2 items-center">
                 <x-asset-column-picker :available-columns="$availableColumns" :selected-columns="$selectedColumns" />
-                @role('admin|inventory_manager')
+                @can('assets:delete')
                     <a href="{{ route('assets.duplicates.index') }}" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Duplicates</a>
+                @endcan
+                @can('import:run')
                     <a href="{{ route('import.create') }}" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Import</a>
+                @endcan
+                @can('reports:export')
                     <a href="{{ route('export.assets', ['format' => 'xlsx']) }}" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Export</a>
-                @endrole
+                @endcan
                 <a href="{{ route('assets.create') }}" class="text-sm px-3 py-2 bg-brand text-white">Add asset</a>
             </div>
         </div>

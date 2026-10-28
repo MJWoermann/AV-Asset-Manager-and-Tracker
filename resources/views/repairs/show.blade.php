@@ -44,11 +44,11 @@
                     <div class="sm:col-span-2">
                         <dt class="text-brand-charcoal">Procedure</dt>
                         <dd>
-                            @role('admin|inventory_manager')
+                            @can('repairs:procedures')
                                 <a href="{{ route('repair-procedures.show', $repair->procedure) }}" class="text-brand">{{ $repair->procedure->title }}</a>
                             @else
                                 {{ $repair->procedure->title }}
-                            @endrole
+                            @endcan
                         </dd>
                     </div>
                 @endif

@@ -3,8 +3,8 @@
     $tokens = $stockTokens ?? collect();
     $reorder = $stockReorderMeta ?? [];
     $initialAction = old('type', $stockAction ?? 'count');
-    $canManageTags = auth()->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
-    $canReviseMovements = auth()->user()?->hasAnyRole(['admin']) ?? false;
+    $canManageTags = auth()->user()?->can('stock:manage') ?? false;
+    $canReviseMovements = auth()->user()?->can('stock:adjust') ?? false;
     $reviseOld = ($canReviseMovements && old('movement_id') && $errors->any()) ? [
         'id' => old('movement_id'),
         'type' => old('type'),

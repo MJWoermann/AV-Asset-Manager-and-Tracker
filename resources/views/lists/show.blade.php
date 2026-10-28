@@ -7,7 +7,7 @@
             </div>
             <div class="flex gap-2 items-center">
                 <x-asset-column-picker :available-columns="$availableColumns" :selected-columns="$selectedColumns" />
-                @role('admin|inventory_manager')
+                @can('labels:read')
                     @feature('shelf_tag_generator')
                         <a href="{{ route('labels.index', ['asset_list_id' => $list->id]) }}" class="px-3 py-2 border text-sm">Labels</a>
                     @endfeature
@@ -23,7 +23,7 @@
                         @method('DELETE')
                         <button type="submit" class="px-3 py-2 border text-sm text-red-700">Delete</button>
                     </form>
-                @endrole
+                @endcan
             </div>
         </div>
     </x-slot>

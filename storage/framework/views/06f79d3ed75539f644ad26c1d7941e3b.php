@@ -705,7 +705,7 @@
 
                     <?php case ('inbound_emails'): ?>
                         <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'email_integration')): ?>
-                            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('email:ops')): ?>
                                 <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
                                     <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
                                         <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Inbound emails</h3>

@@ -3,8 +3,8 @@
     $tokens = $stockTokens ?? collect();
     $reorder = $stockReorderMeta ?? [];
     $initialAction = old('type', $stockAction ?? 'count');
-    $canManageTags = auth()->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
-    $canReviseMovements = auth()->user()?->hasAnyRole(['admin']) ?? false;
+    $canManageTags = auth()->user()?->can('stock:manage') ?? false;
+    $canReviseMovements = auth()->user()?->can('stock:adjust') ?? false;
     $reviseOld = ($canReviseMovements && old('movement_id') && $errors->any()) ? [
         'id' => old('movement_id'),
         'type' => old('type'),
@@ -87,7 +87,15 @@
             <div class="relative w-full overflow-hidden" style="height: 240px;">
                 <canvas x-ref="chart"></canvas>
             </div>
-            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-3 pt-1">Click a point or an event below for movement details.</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-xs text-brand-charcoal dark:text-brand-silver">
+                <template x-for="item in movementLegend" :key="item.type">
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full" :style="`background-color: ${item.color}`"></span>
+                        <span x-text="item.label"></span>
+                    </span>
+                </template>
+            </div>
+            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-2">Click a point or an event below for movement details.</p>
             <ul class="mt-2 max-h-40 overflow-y-auto text-sm divide-y divide-brand-silver dark:divide-brand-charcoal">
                 <template x-for="point in (chartPayload.points || [])" :key="point.id">
                     <li>
@@ -97,6 +105,7 @@
                             :class="selected && String(selected.id) === String(point.id) ? 'text-brand' : ''"
                             @click="selected = point; cancelEdit()"
                         >
+                            <span class="inline-block w-2.5 h-2.5 rounded-full align-middle" :style="`background-color: ${pointColor(point.type)}`"></span>
                             <span x-text="point.recorded_at"></span>
                             · <span x-text="point.type_label"></span>
                             · <span x-text="point.quantity_before + ' → ' + point.quantity_after"></span>

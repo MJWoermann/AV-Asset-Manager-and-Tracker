@@ -87,7 +87,7 @@
                 <x-input-label for="role" value="Role" required />
                 <select id="role" name="role" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
                     @foreach($roles as $role)
-                        <option value="{{ $role->name }}" @selected(old('role', $user->roles->first()?->name) === $role->name)>{{ $role->name }}</option>
+                        <option value="{{ $role->name }}" @selected(old('role', $user->roles->first()?->name) === $role->name)>{{ \App\Support\AccessPermissions::roleLabel($role->name) }}</option>
                     @endforeach
                 </select>
                 <x-input-error :messages="$errors->get('role')" class="mt-1" />

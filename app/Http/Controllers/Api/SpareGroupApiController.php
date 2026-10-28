@@ -44,7 +44,7 @@ class SpareGroupApiController extends Controller
 
     public function destroy(Request $request, SpareGroup $group): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('spares:manage'), 403);
         $group->delete();
 
         return response()->json(['message' => 'Spare group deleted.']);

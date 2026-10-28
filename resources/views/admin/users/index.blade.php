@@ -13,7 +13,7 @@
                     <tr class="border-t border-brand-silver dark:border-brand-charcoal">
                         <td class="px-3 py-2">{{ $user->name }}</td>
                         <td class="px-3 py-2">{{ $user->email }}</td>
-                        <td class="px-3 py-2">{{ $user->roles->pluck('name')->join(', ') }}</td>
+                        <td class="px-3 py-2">{{ $user->roles->pluck('name')->map(fn (string $name): string => \App\Support\AccessPermissions::roleLabel($name))->join(', ') }}</td>
                         <td class="px-3 py-2">{{ $user->departments->pluck('name')->join(', ') ?: '—' }}</td>
                         <td class="px-3 py-2 space-x-3 whitespace-nowrap">
                             <a class="text-brand" href="{{ route('admin.users.edit', $user) }}">Edit</a>

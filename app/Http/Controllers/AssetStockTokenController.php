@@ -17,7 +17,7 @@ class AssetStockTokenController extends Controller
         KanbanTagService $kanban,
     ): RedirectResponse {
         abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
-        abort_unless($request->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()?->can('stock:manage'), 403);
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:64'],
@@ -40,7 +40,7 @@ class AssetStockTokenController extends Controller
         KanbanTagService $kanban,
     ): RedirectResponse {
         abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
-        abort_unless($request->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()?->can('stock:manage'), 403);
         abort_unless((int) $stockToken->asset_id === (int) $asset->id, 404);
 
         $kanban->revoke($stockToken);

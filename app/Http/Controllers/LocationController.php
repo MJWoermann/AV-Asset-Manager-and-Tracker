@@ -29,7 +29,7 @@ class LocationController extends Controller
             ->orderByHierarchy()
             ->get();
         $duplicateNames = $this->duplicateNormalizedNames($flatLocations);
-        $canManageLocations = $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+        $canManageLocations = $request->user()?->can('locations:update') ?? false;
 
         $initialDeleteLocation = null;
         $deletingLocationId = (int) old('deleting_location_id');

@@ -18,7 +18,7 @@ class BulkUpdateAssetsRequest extends FormRequest
         }
 
         if (in_array($this->input('action'), ['delete', 'merge'], true)) {
-            return $user->hasAnyRole(['admin', 'inventory_manager']);
+            return $user->can('assets:delete');
         }
 
         return true;

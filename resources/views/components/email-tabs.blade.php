@@ -1,9 +1,10 @@
 @php
-    $isAdmin = auth()->user()?->hasRole('admin');
+    $canSettings = auth()->user()?->can('admin:settings') ?? false;
+    $canOps = auth()->user()?->can('email:ops') ?? false;
 
     $tabs = [];
 
-    if ($isAdmin) {
+    if ($canSettings) {
         $tabs[] = [
             'label' => 'Settings',
             'href' => route('admin.email.edit'),
@@ -26,16 +27,18 @@
         ];
     }
 
-    $tabs[] = [
-        'label' => 'Inbound',
-        'href' => route('admin.email.inbound.index'),
-        'active' => request()->routeIs('admin.email.inbound.*'),
-    ];
-    $tabs[] = [
-        'label' => 'Outbound',
-        'href' => route('admin.email.outbound.index'),
-        'active' => request()->routeIs('admin.email.outbound.*'),
-    ];
+    if ($canOps) {
+        $tabs[] = [
+            'label' => 'Inbound',
+            'href' => route('admin.email.inbound.index'),
+            'active' => request()->routeIs('admin.email.inbound.*'),
+        ];
+        $tabs[] = [
+            'label' => 'Outbound',
+            'href' => route('admin.email.outbound.index'),
+            'active' => request()->routeIs('admin.email.outbound.*'),
+        ];
+    }
 @endphp
 
 <div class="overflow-x-auto">

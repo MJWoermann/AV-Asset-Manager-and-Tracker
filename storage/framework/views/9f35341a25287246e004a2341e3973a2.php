@@ -227,10 +227,10 @@
             </div>
         </form>
 
-        <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin')): ?>
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('reports:purge')): ?>
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                    Admin: remove duplicate codes (keep the latest scan of each) or clear the entire unknown scans table.
+                    Remove duplicate codes (keep the latest scan of each) or clear the entire unknown scans table.
                 </p>
                 <div class="flex flex-wrap items-center gap-2">
                     <form

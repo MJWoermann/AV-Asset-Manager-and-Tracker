@@ -19,7 +19,7 @@ The Maintenance tab itself is always available and does **not** require this fea
 
 ## 1. Shared prerequisites
 
-1. Enable the per-user developer feature **Email integration** on Profile → Developer features (`email_integration`).
+1. Enable **Email integration**. Administrators turn it on under Profile → Developer features. Other users need `features:email_integration` on their role, plus `email:ops` (inbound/outbound) or `admin:settings` (Email settings).
 2. As admin, open **Email** (nav) → enable integration, choose driver (`gmail` | `outlook` | `smtp`), set from overrides / mailbox / poll interval.
 3. Configure recipients and templates (seeded defaults exist after `php artisan db:seed` / `app:install`).
 4. Set `APP_URL` to the public site URL (used in `{{asset.url}}` placeholders).
@@ -221,7 +221,7 @@ Asset resolution fallbacks for non-thread mail: exact match on `fmi_ast`, `tp_ba
 
 | Symptom | Checks |
 |---------|--------|
-| Email admin links missing / 404 | Profile → enable **Email integration** |
+| Email admin links missing / 404 | Enable **Email integration** (admin profile, or the role for anyone else) and the matching permission (`admin:settings` or `email:ops`) |
 | Digests section missing | Integration enabled **and** credentials present for the driver (mail `.env` or Graph keys) |
 | Digests not arriving | Toggle on; template + recipients for the digest event key; cron running `schedule:run`; check `email:send-digests` |
 | Checkbox missing on create | Feature on, mail enabled in Admin → Email, and a MAC value typed |

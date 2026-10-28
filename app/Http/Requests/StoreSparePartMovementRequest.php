@@ -11,7 +11,7 @@ class StoreSparePartMovementRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['admin', 'inventory_manager', 'scanner']) ?? false;
+        return $this->user()?->can('spares:write') ?? false;
     }
 
     /**

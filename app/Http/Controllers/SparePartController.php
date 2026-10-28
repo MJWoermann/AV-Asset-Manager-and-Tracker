@@ -240,7 +240,7 @@ class SparePartController extends Controller
 
     public function destroy(SparePart $spare): RedirectResponse
     {
-        abort_unless(auth()->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless(auth()->user()?->can('spares:manage'), 403);
 
         if ($spare->movements()->exists()) {
             return back()->withErrors(['spare' => 'Cannot delete a spare with movement history. Mark it obsolete instead.']);

@@ -10,7 +10,7 @@ class BulkUpdateAssetListsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasRole('admin') ?? false;
+        return $this->user()?->can('lists:bulk') ?? false;
     }
 
     protected function prepareForValidation(): void

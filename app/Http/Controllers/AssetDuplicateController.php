@@ -203,7 +203,7 @@ class AssetDuplicateController extends Controller
      */
     public function startFromSelection(Request $request): RedirectResponse
     {
-        abort_unless($request->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()?->can('assets:delete'), 403);
 
         $ids = collect($request->input('asset_ids', []))
             ->map(fn ($id) => (int) $id)

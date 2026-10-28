@@ -2,9 +2,9 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">{{ $group->name }}</h2>
-            @role('admin|inventory_manager')
+            @can('spares:manage')
                 <a href="{{ route('spares.groups.edit', $group) }}" class="px-3 py-2 border text-sm">Edit</a>
-            @endrole
+            @endcan
         </div>
     </x-slot>
 

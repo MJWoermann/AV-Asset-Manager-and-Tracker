@@ -102,7 +102,7 @@ class RepairProcedureController extends Controller
 
     public function destroy(RepairProcedure $repairProcedure, RepairProcedureService $service): RedirectResponse
     {
-        abort_unless(auth()->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless(auth()->user()?->can('repairs:procedures'), 403);
         $service->delete($repairProcedure);
 
         return redirect()

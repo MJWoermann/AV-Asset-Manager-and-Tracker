@@ -22,7 +22,7 @@ class StoreAssetCheckoutRequest extends FormRequest
             return false;
         }
 
-        return $user->hasAnyRole(['admin', 'inventory_manager', 'scanner']);
+        return $user->can('assets:write');
     }
 
     /**

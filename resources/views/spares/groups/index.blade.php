@@ -4,9 +4,9 @@
             <h2 class="font-semibold text-xl">Spare groups / kits</h2>
             <div class="flex gap-2 text-sm">
                 <a href="{{ route('spares.index') }}" class="px-3 py-2 border">Spares</a>
-                @role('admin|inventory_manager')
+                @can('spares:manage')
                     <a href="{{ route('spares.groups.create') }}" class="px-3 py-2 bg-brand text-white">Add group</a>
-                @endrole
+                @endcan
             </div>
         </div>
     </x-slot>
@@ -20,9 +20,9 @@
                         <a href="{{ route('spares.groups.show', $group) }}" class="font-medium text-brand">{{ $group->name }}</a>
                         <p class="text-xs text-brand-charcoal dark:text-brand-silver">{{ $group->items_count }} line(s) @if($group->linkedSystem)— {{ $group->linkedSystem->name }}@endif</p>
                     </div>
-                    @role('admin|inventory_manager')
+                    @can('spares:manage')
                         <a href="{{ route('spares.groups.edit', $group) }}" class="text-xs border px-2 py-1">Edit</a>
-                    @endrole
+                    @endcan
                 </li>
             @empty
                 <li class="p-4 text-brand-charcoal">No groups yet.</li>

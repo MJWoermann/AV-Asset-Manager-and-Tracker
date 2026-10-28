@@ -163,7 +163,7 @@ class DashboardModules
 
         if ($user === null
             || ! $user->hasFeature('email_integration')
-            || ! $user->hasAnyRole(['admin', 'inventory_manager'])) {
+            || ! $user->can('email:ops')) {
             $keys = array_values(array_filter(
                 $keys,
                 fn (string $key): bool => $key !== self::INBOUND_EMAILS

@@ -10,7 +10,7 @@ class StoreConnectionTypeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+        return $this->user()?->can('connections:write') ?? false;
     }
 
     /** @return array<string, mixed> */

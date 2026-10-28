@@ -156,7 +156,7 @@ class AssetListController extends Controller
 
     public function destroy(AssetList $list): RedirectResponse
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless(auth()->user()->can('lists:write'), 403);
         $list->delete();
 
         return redirect()->route('lists.index')->with('status', 'List deleted.');

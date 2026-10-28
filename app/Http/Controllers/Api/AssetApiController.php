@@ -52,7 +52,7 @@ class AssetApiController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager', 'scanner']), 403);
+        abort_unless($request->user()->can('assets:write'), 403);
 
         $data = $this->validatedAsset($request);
 
@@ -64,7 +64,7 @@ class AssetApiController extends Controller
 
     public function update(Request $request, Asset $asset): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager', 'scanner']), 403);
+        abort_unless($request->user()->can('assets:write'), 403);
 
         $data = $this->validatedAsset($request, partial: true);
 
@@ -76,7 +76,7 @@ class AssetApiController extends Controller
 
     public function destroy(Request $request, Asset $asset): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('assets:delete'), 403);
         $asset->delete();
 
         return response()->json(['message' => 'Asset deleted.']);

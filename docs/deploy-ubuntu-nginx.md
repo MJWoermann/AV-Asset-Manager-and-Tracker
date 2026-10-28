@@ -97,7 +97,7 @@ SSO signs in **existing** users only; password login remains available.
 
 ### Optional: Email integration (Gmail / Outlook Graph / SMTP)
 
-Outbound notifications and inbound helpdesk reply polling are gated by the per-user developer feature `email_integration`. Secrets stay in `.env`; driver toggles and mailbox settings live under **Admin → Email**.
+Outbound notifications and inbound helpdesk reply polling need the `email_integration` feature. Administrators enable it on their profile. Other users need it on their role, plus `email:ops` or `admin:settings` for the screen they use. Secrets stay in `.env`; driver toggles and mailbox settings live under **Admin → Email**.
 
 Full host-specific setup (Gmail app passwords, Entra Graph `Mail.Send`/`Mail.Read`, manual SMTP/IMAP): **[docs/email-setup.md](email-setup.md)**.
 
@@ -347,7 +347,7 @@ Full evaluation, threat model, prioritized application hardening, and **corporat
 - [ ] `APP_DEBUG=false`
 - [ ] `ALLOW_REGISTRATION=false` (default; create users via Admin → Users or `app:install`)
 - [ ] Optional: `STOCK_GUEST_ENABLED=false` if guest Kanban QR should be off
-- [ ] Confirm every user has an app role (`admin`, `inventory_manager`, or `scanner`)
+- [ ] Confirm every user has a role (a system role or a custom role from Admin → Roles)
 - [ ] Strong DB password; MariaDB on localhost only
 - [ ] Dedicated DB user (not root)
 - [ ] Firewall: HTTP(S) from staff WiFi/LAN subnets only; SSH from admin/jump only; no MariaDB on WiFi

@@ -2,7 +2,10 @@
 
 use App\Http\Middleware\ApplyScannerSessionLifetime;
 use App\Http\Middleware\EnsureDeveloperFeature;
+use App\Http\Middleware\EnsureOperatorAccess;
+use App\Http\Middleware\EnsureStaffAccess;
 use App\Http\Middleware\EnsureUserHasFeature;
+use App\Http\Middleware\EnsureUserHasPermission;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\SyncScannerSessionLifetimeHint;
 use Illuminate\Auth\AuthenticationException;
@@ -39,6 +42,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'permission' => EnsureUserHasPermission::class,
+            'staff' => EnsureStaffAccess::class,
+            'operator' => EnsureOperatorAccess::class,
             'feature' => EnsureUserHasFeature::class,
             'developer_feature' => EnsureDeveloperFeature::class,
             'abilities' => CheckAbilities::class,

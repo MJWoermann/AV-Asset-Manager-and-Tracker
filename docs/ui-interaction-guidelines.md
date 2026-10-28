@@ -190,7 +190,7 @@ Short do/don’t checklist (defensive; no exploit recipes). Deeper host hardenin
 
 | Do | Don’t |
 |----|--------|
-| Authorize every mutating route (roles/policies) | Rely on “hidden UI” alone |
+| Authorize every mutating route (permissions/roles/policies) | Rely on “hidden UI” alone |
 | Validate and authorize IDs; prevent IDOR on downloads/search | Trust client-supplied ownership |
 | Escape output by default | Use raw HTML / `v-html` except when sanitized and exceptional |
 | Keep secrets in env/secret stores | Commit secrets, fixtures with real credentials, or copy-pasteable prod examples |
@@ -200,7 +200,7 @@ Short do/don’t checklist (defensive; no exploit recipes). Deeper host hardenin
 | Explicit mass-assignment / validated arrays only | Blind `$request->all()` into models |
 | Keep auth strict in committed code | Weaken auth “for local testing” in shared paths |
 
-*In this project:* see [security-hardening.md](security-hardening.md) for ops depth; Spatie roles + middleware/policies on mutating routes; upload allow-list (xlsx/csv/jpg/png/pdf/docx, 25MB).
+*In this project:* see [security-hardening.md](security-hardening.md) for ops depth; Spatie roles are permission sets, and mutating routes use permission middleware; upload allow-list (xlsx/csv/jpg/png/pdf/docx, 25MB).
 
 ---
 

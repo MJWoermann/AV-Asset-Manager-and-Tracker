@@ -7,7 +7,7 @@ Statuses:
 | Status | Meaning |
 |--------|---------|
 | **Shipped (core)** | Always on for entitled roles |
-| **Preview** | Shipped; opt-in per user under Profile → Developer features |
+| **Preview** | Shipped. Administrators opt in on Profile → Developer features. Other users receive a feature when it is ticked on their role |
 | **Planned** | Agreed direction; not implemented yet |
 | **Deferred** | Explicitly out of scope until requested |
 
@@ -15,7 +15,7 @@ Statuses:
 
 ## Preview / developer features
 
-These capabilities ship in the product but stay hidden until each user enables them under **Profile → Developer features**. Related menu items and asset tabs stay hidden (and those URLs return “not found”) until enabled. See [features-and-usage.md — Preview features](features-and-usage.md#preview-features-optional).
+These capabilities ship in the product but stay hidden until an administrator enables them on their own profile, or ticks `features:{key}` on another user's role. The feature and the matching operational permission are both required. Related menu items and asset tabs stay hidden (and those URLs return “not found”) until both are on. See [features-and-usage.md — Preview features](features-and-usage.md#preview-features-optional).
 
 Always-on areas (catalogue, scan, compare, files/manuals, maintenance logs, repairs, spares, departments, checkout, SSO, email *settings* when the email flag is on) do **not** need these toggles.
 

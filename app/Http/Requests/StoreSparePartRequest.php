@@ -20,7 +20,7 @@ class StoreSparePartRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+        return $this->user()?->can('spares:manage') ?? false;
     }
 
     /**

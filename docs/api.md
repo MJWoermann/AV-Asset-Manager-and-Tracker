@@ -1,12 +1,12 @@
 # REST API
 
-> **For AI assistants:** Paste or share this repo-relative path as the source of truth for the REST API: **`docs/api.md`**. It documents Sanctum Bearer auth, token obtain/revoke, Spatie role gates, token abilities (scopes), endpoints, status codes, and curl examples for the AV Asset Manager stocktake/integrations API.
+> **For AI assistants:** Paste or share this repo-relative path as the source of truth for the REST API: **`docs/api.md`**. It documents Sanctum Bearer auth, token obtain/revoke, role permissions, token abilities (scopes), endpoints, status codes, and curl examples for the AV Asset Manager stocktake/integrations API.
 
 ## AI context (quick model)
 
 - **Auth scheme:** `Authorization: Bearer {token}` (Laravel Sanctum personal access tokens). Unauthenticated API responses are **401** with `WWW-Authenticate: Bearer`.
-- **Who may use the API:** Spatie roles `admin`, `inventory_manager`, or `scanner` (roleless accounts get **403** on token issue and authenticated routes).
-- **What a token may call:** Sanctum **abilities** (scopes) such as `assets:read`, `scan`, or `*` for full access. Missing ability → **403** (authenticated but token lacks ability).
+- **Who may use the API:** a role permission and a Sanctum token ability. Staff routes need at least one operational permission. Roleless accounts get **403** on token issue and authenticated routes. The catalogue is `App\Support\AccessPermissions`; token scopes are `App\Support\ApiTokenAbilities`.
+- **What a token may call:** Sanctum **abilities** (scopes) such as `assets:read`, `scan`, or `*` for every ability. A `*` token does not override a missing role permission. **403** can mean the role lacks the permission or the token lacks the ability.
 - **Not on this API:** Web-only preferences, audit History mutation, guest stock QR, and most admin UI settings.
 
 Base URL: `/api`
@@ -117,11 +117,11 @@ Allow-list is defined in `app/Support/ApiTokenAbilities.php`. Profile → API to
 - JSON create endpoints return **201** with the created resource (includes `id` for chaining).
 - **Role gates** on mutating routes match the web UI (`routes/web.php`); abilities are an additional token scope.
 - **Department context:** `PATCH /api/me/active-department` sets the active department in session (when present) and in `users.preferences.active_department_id` for stateless tokens. Creates on department-scoped models use that value.
-- **Feature flags:** Routes under connections, stock, shelf tags, rigging, and inbound email return **404** when the user does not have the same feature enabled as on the web.
+- **Feature flags:** Routes under connections, stock, shelf tags, rigging, and inbound email return **404** unless the user has the feature (an administrator’s profile toggle, or `features:{key}` on any other role) and the matching operational permission.
 
 ## Endpoints (summary)
 
-Authenticated routes require `admin`, `inventory_manager`, or `scanner`. See `routes/api.php` for the canonical list.
+Authenticated routes require the matching role permission (for example `import:run`, `reports:write`, `reports:purge`) as well as the token ability. See `routes/api.php` for the canonical list.
 
 | Area | Examples |
 |------|----------|
@@ -132,10 +132,10 @@ Authenticated routes require `admin`, `inventory_manager`, or `scanner`. See `ro
 | Catalogue | `/api/manufacturers`, nested models, `/api/item-types`, `/api/custom-field-sets` |
 | Spares | `/api/spares`, `/api/spares/groups`, movements, supersede, chart |
 | Repairs | `/api/repairs`, workflow actions, `/api/repair-procedures` |
-| Reports | `/api/unknown-scans`, export, note update, `POST /api/unknown-scans/{id}/link`, admin clear/dedupe; `GET /api/dashboard/stats`, `GET /api/export/assets` |
+| Reports | `/api/unknown-scans`, export, note update, `POST /api/unknown-scans/{id}/link`, purge/dedupe (`reports:purge` plus token ability `reports:write`); `GET /api/dashboard/stats`, `GET /api/export/assets` (`reports:export`) |
 | Files | `/api/files/search`, upload, link, download (manager index/show/destroy) |
-| Import | `GET/POST /api/import/status|upload|prepare|process` (inventory_manager+) |
-| Admin | `/api/admin/users`, `/api/admin/departments` (admin only) |
+| Import | `GET/POST /api/import/status|upload|prepare|process` (`import:run`, and `assets:write` on the token) |
+| Admin | `/api/admin/users`, `/api/admin/departments` (`admin:read` or `admin:write`) |
 | Email ops | `/api/email/inbound` when feature on |
 | Connections | `/api/reports/connection-map`, asset interfaces/connections/buses, `/api/connection-types` |
 | Stock | `/api/assets/{id}/stock-movements`, stock levels, token rotate/revoke |
@@ -157,7 +157,7 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-Ability: `reports:write`. Roles: `admin`, `inventory_manager`, or `scanner`.
+Permission: `reports:write`. Ability: `reports:write`.
 
 ```json
 {

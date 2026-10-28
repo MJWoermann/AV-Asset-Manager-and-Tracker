@@ -8,7 +8,7 @@ Symptom → checks → fix. Deeper setup lives in the linked guides; this page i
 |---------|--------|-----|
 | Cannot sign in with password | Caps lock; account exists; role assigned | Admin creates/resets user under Manage users. Password must meet complexity rules. |
 | SSO button does nothing / errors | Provider enabled in Admin → SSO; redirect URI matches; client secrets in `.env` only | See [sso-setup.md](sso-setup.md). SSO signs in **existing** users only — admin must create the account first. |
-| 403 after login | User role; developer feature flags on Profile | Inventory-only routes need `inventory_manager` or `admin`. Admin hubs need `admin`. |
+| 403 after login | Role permissions; developer feature on the role or, for admins, on Profile | The role is missing the permission for that page. Admin hubs need `admin:read`, `admin:write`, or `admin:settings`. |
 | Locked out / too many attempts | Throttle on login/reset | Wait, then retry; admin can reset password. |
 
 ## Scan / camera

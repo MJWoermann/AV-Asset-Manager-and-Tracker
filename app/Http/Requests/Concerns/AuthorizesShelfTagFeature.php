@@ -10,6 +10,6 @@ trait AuthorizesShelfTagFeature
 
         return $user !== null
             && $user->hasFeature('shelf_tag_generator')
-            && $user->hasAnyRole(['admin', 'inventory_manager']);
+            && $user->can('labels:read');
     }
 }

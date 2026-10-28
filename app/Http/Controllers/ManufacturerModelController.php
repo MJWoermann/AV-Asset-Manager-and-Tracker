@@ -19,7 +19,7 @@ class ManufacturerModelController extends Controller
 {
     public function index(Request $request, Manufacturer $manufacturer): JsonResponse
     {
-        $canManageCatalogue = $request->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+        $canManageCatalogue = $request->user()?->can('catalog:update') ?? false;
 
         $models = $manufacturer->models()
             ->select(['id', 'manufacturer_id', 'name'])

@@ -18,7 +18,7 @@ class UpdateStockMovementRequest extends FormRequest
             return false;
         }
 
-        return $user?->hasAnyRole(['admin']) ?? false;
+        return $user?->can('stock:adjust') ?? false;
     }
 
     /**

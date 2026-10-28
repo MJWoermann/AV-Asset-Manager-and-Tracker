@@ -414,7 +414,7 @@
 
                 </p>
                 <p class="text-sm text-gray-600 dark:text-brand-silver">
-                    <?php echo e(__('Feature flags on your account can only be changed by an administrator.')); ?>
+                    <?php echo e(__('These features are granted by your role. Only an administrator can change them.')); ?>
 
                 </p>
                 <ul class="list-disc list-inside text-sm text-gray-800 dark:text-brand-silver">

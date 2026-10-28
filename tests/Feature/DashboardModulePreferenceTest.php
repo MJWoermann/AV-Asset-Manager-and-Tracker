@@ -150,12 +150,7 @@ class DashboardModulePreferenceTest extends TestCase
 
         $this->assertNotContains(DashboardModules::CONSUMABLES_STATS, $available);
 
-        $user->preferences = [
-            'features' => [
-                'stock_consumables' => true,
-            ],
-        ];
-        $user->save();
+        $this->enableFeature($user, 'stock_consumables');
 
         $availableWithFeature = DashboardModules::availableFor($user->fresh());
         $this->assertContains(DashboardModules::CONSUMABLES_STATS, $availableWithFeature);

@@ -43,7 +43,7 @@ trait AuthorizesFileAttachments
         /** @var User|null $user */
         $user = auth()->user();
 
-        if ($user?->hasAnyRole(['admin', 'inventory_manager'])) {
+        if ($user?->can('files:manage')) {
             return;
         }
 
@@ -54,6 +54,6 @@ trait AuthorizesFileAttachments
     {
         /** @var User|null $user */
         $user = auth()->user();
-        abort_unless($user?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($user?->can('files:manage'), 403);
     }
 }

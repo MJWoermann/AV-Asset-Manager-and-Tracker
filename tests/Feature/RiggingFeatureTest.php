@@ -24,14 +24,7 @@ class RiggingFeatureTest extends TestCase
 
     protected function withFeature(User $user): User
     {
-        $user->preferences = [
-            'features' => [
-                'rigging' => true,
-            ],
-        ];
-        $user->save();
-
-        return $user->fresh();
+        return $this->enableFeature($user, 'rigging');
     }
 
     protected function user(bool $feature = true, string $role = 'inventory_manager'): User

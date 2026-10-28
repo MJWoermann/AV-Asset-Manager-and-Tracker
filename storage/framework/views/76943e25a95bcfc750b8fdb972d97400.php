@@ -20,7 +20,7 @@
                 <h3 class="font-semibold">Compare</h3>
                 <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Matched, inventory-only, and scanned-only between lists.</p>
             </a>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('reports:export')): ?>
                 <a href="<?php echo e(route('reports.checkouts')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                     <h3 class="font-semibold">Checkout holdings</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Checked-out and available stock, and who currently holds each item.</p>
@@ -37,7 +37,7 @@
                 </a>
             <?php endif; ?>
             <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
-                <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('labels:read')): ?>
                     <a href="<?php echo e(route('labels.index')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                         <h3 class="font-semibold">Labels</h3>
                         <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Shelf tag layouts and printing.</p>

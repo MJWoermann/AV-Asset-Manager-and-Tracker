@@ -45,7 +45,7 @@ foreach ($attributes->all() as $__key => $__value) {
 unset($__defined_vars, $__key, $__value); ?>
 
 <?php
-    $canDelete = $canDelete || auth()->user()?->hasAnyRole(['admin', 'inventory_manager']);
+    $canDelete = $canDelete || (auth()->user()?->can('assets:delete') ?? false);
     $canChangeDepartment = auth()->user()?->hasRole('admin') ?? false;
     $departments = collect($departments ?? []);
 ?>
@@ -64,7 +64,7 @@ unset($__defined_vars, $__key, $__value); ?>
         <div class="flex flex-wrap gap-2">
             <button type="button" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver" @click="panelOpen = !panelOpen" x-text="panelOpen ? 'Hide bulk edit' : 'Bulk edit'"></button>
             <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
-                <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('labels:read')): ?>
                     <?php if($currentList): ?>
                         <form method="GET" action="<?php echo e(route('labels.index')); ?>" class="inline">
                             <input type="hidden" name="asset_list_id" value="<?php echo e($currentList->id); ?>">

@@ -172,7 +172,7 @@
                     {{ __('Developer features') }}
                 </p>
                 <p class="text-sm text-gray-600 dark:text-brand-silver">
-                    {{ __('Feature flags on your account can only be changed by an administrator.') }}
+                    {{ __('These features are granted by your role. Only an administrator can change them.') }}
                 </p>
                 <ul class="list-disc list-inside text-sm text-gray-800 dark:text-brand-silver">
                     @foreach (\App\Support\DeveloperFeatures::definitions() as $featureKey => $featureLabel)

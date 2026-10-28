@@ -50,7 +50,7 @@ The app can be **installed on a phone or tablet** like a Progressive Web App (PW
 
 ## Who can do what (roles)
 
-Access is controlled by four roles. Your administrator assigns these when creating your account.
+Access is controlled by roles. Four system roles are the defaults. Administrators can change the permissions on inventory manager, scanner, and external repairer, and can create further roles under **Admin → Roles**. Each person still has one role. The table is what those system roles are seeded with.
 
 | Capability | Admin | Inventory manager | Scanner | External repairer |
 |------------|:-----:|:-----------------:|:-------:|:-----------------:|
@@ -71,10 +71,15 @@ Access is controlled by four roles. Your administrator assigns these when creati
 | Repair procedures (templates) | ✓ | ✓ | | |
 | Spares catalogue & movements | ✓ | ✓ | ✓† | |
 | Asset checkout / return (hire, repair, other) | ✓ | ✓ | ✓ | |
-| Manage users, departments, SSO, storage/backup, export columns, email | ✓ | | | |
+| Purge or dedupe unknown scans | ✓ | | | |
+| Edit or delete a stock movement | ✓ | | | |
+| Manage users, roles, and departments | ✓ | | | |
+| SSO, storage/backup, export columns, email settings | ✓ | | | |
 
-\* External repairers only see **repairs assigned to them** (and those assets’ show pages), not the full catalogue or all repairs.  
+\* External repairers only see **repairs assigned to them** (and those assets’ show pages), not the full catalogue or all repairs. A developer-feature checkbox on that role does not open staff modules.  
 † Scanners can view and move spares; managers create/edit spare records and groups.
+
+Unknown-scan purge (`reports:purge`) and stock-movement edits (`stock:adjust`) are ordinary permissions. They start off for inventory manager. An administrator can tick them on that role, or on a custom role. They are not limited to the administrator role.
 
 **Signing in**
 
@@ -107,8 +112,8 @@ Main navigation (desktop and phone menu):
 | **Maintenance** | Hub for repairs, repair procedures (managers), and spares |
 | **Data** | Locations, item types, field sets, files, plus optional tools (connection types) |
 | **Import** | Spreadsheet import (managers) |
-| **Admin links** | Users, Departments, Export columns, Storage, SSO, Email (admins only — under profile) |
-| **Profile** | Your name/email, theme, active department, and optional preview features |
+| **Admin links** | Users, Roles, Departments, Export columns, Storage, SSO, Email (under profile, for accounts that can open Admin) |
+| **Profile** | Your name/email, theme, and active department. Administrators opt in to preview features here. Other users see the features granted on their role. |
 
 **External repairers** see a slim nav: **Repairs** and **Maintenance** only (plus Profile). They cannot open Scan, Lists, Import, the full Assets index, or Admin.
 
@@ -323,7 +328,7 @@ These live under the **Maintenance** menu (and related asset tabs). They are **n
 | **Repair procedures** | Reusable step templates (managers/admins) applied when running repairs |
 | **Spares** | Catalogue of spare parts / part SKUs, groups, movements, and low-stock style tracking under Maintenance → Spares |
 
-**Spares vs Stock preview:** **Spares** is the always-on parts store for repairs and warehouse spare bins. The optional asset **Stock** tab (Profile → Developer features) is for quantity tracking on an *asset* itself (cables, consumable packs) and optional guest QR — different product surface.
+**Spares vs Stock preview:** **Spares** is the always-on parts store for repairs and warehouse spare bins. The optional asset **Stock** tab (a developer feature on the role, or on an administrator’s profile) is for quantity tracking on an *asset* itself (cables, consumable packs) and optional guest QR — different product surface.
 
 ### 8. Departments (always on)
 
@@ -353,7 +358,7 @@ The unknown scan is marked resolved. The same action is available via API (`POST
 
 ## Preview features (optional)
 
-Some capabilities are shipped but turned on **per user** under **Profile → Developer features**. Until you enable them, related menu items and asset tabs stay hidden (and those URLs return “not found”). **Always-on** areas (catalogue, scan, compare, files/manuals, maintenance logs, repairs, spares, departments, checkout, email settings when flagged, SSO) do **not** need these toggles.
+Administrators opt in under **Profile → Developer features**. Other users receive a feature when an administrator ticks it on their role (**Admin → Roles**). The feature flag and the matching operational permission are both required. Granting only the feature does not open the screens. Until both are on, related menu items and asset tabs stay hidden (and those URLs return “not found”). **Always-on** areas (catalogue, scan, compare, files/manuals, maintenance logs, repairs, spares, departments, checkout, email settings when flagged, SSO) do **not** need these toggles.
 
 | Feature | What it adds | Good for |
 |---------|--------------|----------|
@@ -381,7 +386,8 @@ These items matter for evaluation and operations; day-to-day scanners rarely nee
 
 | Topic | Summary |
 |-------|---------|
-| **Users** | Admins create accounts and assign roles (including `external_repairer`); new passwords must meet the complexity rules above |
+| **Users** | Admins create accounts and assign one role (including `external_repairer` and any custom role); new passwords must meet the complexity rules above |
+| **Roles** | Admin → Roles. Edit permissions on the system roles (except the administrator’s full operational access) and create custom roles. Developer features for non-admins are ticked here |
 | **Departments** | Admin → Departments; assign users on the user form; staff pick active department in Profile |
 | **SSO** | Optional Google Workspace / Microsoft Entra sign-in for existing users; see [sso-setup.md](sso-setup.md). Accounts are not auto-created from SSO |
 | **Email** | Optional (developer feature + Admin → Email). When integration is enabled with credentials, configure **Common notifications / Digests** (warranty, test & tag, low stock); scheduler runs `email:send-digests` daily. See [email-setup.md](email-setup.md) |

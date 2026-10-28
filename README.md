@@ -79,16 +79,18 @@ Full assumptions, minimum/comfortable tiers, and PHP/MariaDB tuning notes: [docs
 
 ## Roles
 
-| Role | Capabilities |
+System roles are the defaults. Administrators edit their permissions (except the administrator role, which keeps full operational access) and create custom roles under **Admin → Roles** (profile menu and the admin hub). Each user has one role. Developer features for non-admins are granted on the role. Administrators still opt in on Profile → Developer features.
+
+| Role | Seeded access |
 |------|----------------|
-| `admin` | Full access, users, departments, email/SSO/storage settings |
-| `inventory_manager` | Assets, lists, import/export, reports, repairs/spares/procedures |
+| `admin` | Full operational access, users, roles, departments, email/SSO/storage settings |
+| `inventory_manager` | Assets (including delete), lists, import/export, reports, repairs/spares/procedures. Unknown-scan purge and stock-movement edits stay off until granted |
 | `scanner` | Scan sessions, view inventory, edit asset details, checkout/return |
 | `external_repairer` | Maintenance hub + repairs assigned to them (and those assets’ show pages only) |
 
 ## REST API
 
-Bearer tokens via Sanctum (Spatie app roles + optional token abilities/scopes). Full reference: [docs/api.md](docs/api.md).
+Bearer tokens via Sanctum. Each call needs the role permission and a token ability. A `*` token does not override a missing role permission. Full reference: [docs/api.md](docs/api.md).
 
 > **For AI assistants:** Share **`docs/api.md`** as the source of truth for this app’s REST API (auth, obtain/revoke tokens, abilities, endpoints, status codes, curl). It covers the stocktake/integrations surface under `/api`.
 

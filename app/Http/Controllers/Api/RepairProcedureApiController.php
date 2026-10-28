@@ -59,7 +59,7 @@ class RepairProcedureApiController extends Controller
 
     public function destroy(Request $request, RepairProcedure $repairProcedure, RepairProcedureService $service): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('repairs:procedures'), 403);
         $service->delete($repairProcedure);
 
         return response()->json(['message' => 'Repair procedure deleted.']);

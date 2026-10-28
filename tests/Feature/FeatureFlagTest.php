@@ -134,12 +134,7 @@ class FeatureFlagTest extends TestCase
     public function test_feature_middleware_allows_access_when_flag_is_on(): void
     {
         $user = $this->scanner();
-        $user->preferences = [
-            'features' => [
-                'asset_connections' => true,
-            ],
-        ];
-        $user->save();
+        $this->enableFeature($user, 'asset_connections');
 
         $this->actingAs($user)
             ->get('/__test/feature/asset-connections')

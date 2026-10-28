@@ -10,12 +10,14 @@ use App\Models\AssetListItem;
 use App\Models\Location;
 use App\Models\User;
 use App\Observers\AuditableObserver;
+use App\Support\AccessPermissions;
 use App\Support\PerformanceLimits;
 use Closure;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -31,6 +33,18 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::before(function (User $user, string $ability): ?bool {
+            if (! $user->hasRole('admin') || AccessPermissions::isFeature($ability)) {
+                return null;
+            }
+
+            if (AccessPermissions::isOperational($ability)) {
+                return true;
+            }
+
+            return null;
+        });
+
         Password::defaults(function () {
             return Password::min(8)->rules([
                 function (string $attribute, mixed $value, Closure $fail): void {

@@ -52,7 +52,7 @@ class LocationApiController extends Controller
 
     public function update(Request $request, Location $location): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('locations:update'), 403);
 
         $location->update($this->validated($request));
 

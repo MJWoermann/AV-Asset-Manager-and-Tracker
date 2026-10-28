@@ -32,7 +32,7 @@ class ManufacturerModelApiController extends Controller
         ManufacturerModel $manufacturerModel,
         AssetInterfaceService $interfaces,
     ): JsonResponse {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('catalog:update'), 403);
         abort_unless($manufacturerModel->manufacturer_id === $manufacturer->id, 404);
 
         $data = $this->validated($request, $manufacturer, $manufacturerModel);

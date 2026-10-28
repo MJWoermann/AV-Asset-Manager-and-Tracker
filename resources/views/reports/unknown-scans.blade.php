@@ -118,10 +118,10 @@
             </div>
         </form>
 
-        @role('admin')
+        @can('reports:purge')
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4">
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                    Admin: remove duplicate codes (keep the latest scan of each) or clear the entire unknown scans table.
+                    Remove duplicate codes (keep the latest scan of each) or clear the entire unknown scans table.
                 </p>
                 <div class="flex flex-wrap items-center gap-2">
                     <form
@@ -143,7 +143,7 @@
                     </form>
                 </div>
             </div>
-        @endrole
+        @endcan
 
         <div data-debug-unknown-scans class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
             <table class="min-w-full text-sm">

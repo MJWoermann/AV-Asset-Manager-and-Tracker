@@ -86,7 +86,7 @@ class SparePartApiController extends Controller
 
     public function destroy(Request $request, SparePart $spare): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('spares:manage'), 403);
 
         if ($spare->movements()->exists()) {
             return response()->json(['message' => 'Cannot delete a spare with movement history.'], 422);

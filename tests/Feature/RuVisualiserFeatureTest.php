@@ -27,14 +27,7 @@ class RuVisualiserFeatureTest extends TestCase
 
     protected function withFeature(User $user): User
     {
-        $user->preferences = [
-            'features' => [
-                'ru_visualiser' => true,
-            ],
-        ];
-        $user->save();
-
-        return $user->fresh();
+        return $this->enableFeature($user, 'ru_visualiser');
     }
 
     protected function manager(bool $feature = true): User

@@ -40,7 +40,7 @@
                         @csrf
                         <button type="submit" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Scan children</button>
                     </form>
-                    @role('admin|inventory_manager')
+                    @can('spares:manage')
                         @if($listedSpare ?? null)
                             <a href="{{ route('spares.show', $listedSpare) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">In spares register</a>
                         @else
@@ -49,13 +49,13 @@
                                 <button type="submit" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">List in spares</button>
                             </form>
                         @endif
-                    @endrole
+                    @endcan
                     <a href="{{ route('assets.edit', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
-                    @role('admin|inventory_manager')
+                    @can('labels:read')
                         @feature('shelf_tag_generator')
                             <a href="{{ route('assets.label', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
                         @endfeature
-                    @endrole
+                    @endcan
                 @endunless
             </div>
         </div>

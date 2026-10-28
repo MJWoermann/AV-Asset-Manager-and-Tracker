@@ -30,14 +30,8 @@ class ShelfTagLandscapePrintTest extends TestCase
     {
         $user = User::factory()->create(['theme' => 'light']);
         $user->assignRole('inventory_manager');
-        $user->preferences = [
-            'features' => [
-                'shelf_tag_generator' => true,
-            ],
-        ];
-        $user->save();
 
-        return $user->fresh();
+        return $this->enableFeature($user, 'shelf_tag_generator');
     }
 
     public function test_landscape_layout_uses_swapped_display_dimensions(): void

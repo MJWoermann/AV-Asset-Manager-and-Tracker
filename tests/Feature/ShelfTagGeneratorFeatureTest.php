@@ -36,14 +36,7 @@ class ShelfTagGeneratorFeatureTest extends TestCase
 
     protected function withFeature(User $user): User
     {
-        $user->preferences = [
-            'features' => [
-                'shelf_tag_generator' => true,
-            ],
-        ];
-        $user->save();
-
-        return $user->fresh();
+        return $this->enableFeature($user, 'shelf_tag_generator');
     }
 
     protected function manager(bool $feature = true): User

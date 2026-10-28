@@ -170,7 +170,7 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
-                            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('reports:export')): ?>
                                 <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('reports.checkouts')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -232,7 +232,7 @@
 <?php endif; ?>
                             <?php endif; ?>
                             <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
-                                <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('labels:read')): ?>
                                     <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('labels.index')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -306,7 +306,7 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
-                            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('repairs:procedures')): ?>
                                 <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('repair-procedures.index')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -417,7 +417,7 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
-                            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:update')): ?>
                                 <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('item-types.index')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -456,7 +456,8 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
-                                <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('files:manage')): ?>
+                                    <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('files.index')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('dropdown-link'); ?>
@@ -475,8 +476,10 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
+                                <?php endif; ?>
                                 <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'asset_connections')): ?>
-                                    <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+                                    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('connections:write')): ?>
+                                        <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('connection-types.index')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('dropdown-link'); ?>
@@ -495,6 +498,7 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             <?php endif; ?>
                          <?php $__env->endSlot(); ?>
@@ -644,10 +648,11 @@
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
 
-                        <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin')): ?>
+                        <?php if(auth()->user()->canManageAdminArea()): ?>
                             <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
                             <div class="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-brand-silver/70">Admin</div>
-                            <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('admin:read')): ?>
+                                <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('admin.users.index')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('dropdown-link'); ?>
@@ -666,7 +671,7 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
-                            <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+                                <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('admin.departments.index')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('dropdown-link'); ?>
@@ -685,7 +690,30 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
-                            <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+                            <?php endif; ?>
+                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('admin:write')): ?>
+                                <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('admin.roles.index')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('dropdown-link'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['href' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(route('admin.roles.index'))]); ?>Roles <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal68cb1971a2b92c9735f83359058f7108)): ?>
+<?php $attributes = $__attributesOriginal68cb1971a2b92c9735f83359058f7108; ?>
+<?php unset($__attributesOriginal68cb1971a2b92c9735f83359058f7108); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal68cb1971a2b92c9735f83359058f7108)): ?>
+<?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
+<?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
+<?php endif; ?>
+                            <?php endif; ?>
+                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('admin:settings')): ?>
+                                <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('admin.export-columns.edit')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('dropdown-link'); ?>
@@ -704,7 +732,7 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
-                            <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+                                <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('admin.storage.edit')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('dropdown-link'); ?>
@@ -723,7 +751,7 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
-                            <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+                                <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('admin.sso.edit')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('dropdown-link'); ?>
@@ -742,8 +770,10 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
+                            <?php endif; ?>
                             <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'email_integration')): ?>
-                                <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
+                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('admin:settings')): ?>
+                                    <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dropdown-link','data' => ['href' => route('admin.email.edit')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('dropdown-link'); ?>
@@ -762,12 +792,13 @@
 <?php $component = $__componentOriginal68cb1971a2b92c9735f83359058f7108; ?>
 <?php unset($__componentOriginal68cb1971a2b92c9735f83359058f7108); ?>
 <?php endif; ?>
+                                <?php endif; ?>
                             <?php endif; ?>
                         <?php endif; ?>
 
                         <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'email_integration')): ?>
-                            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'inventory_manager')): ?>
-                                <?php if (! \Illuminate\Support\Facades\Blade::check('role', 'admin')): ?>
+                            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('email:ops')): ?>
+                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->denies('admin:settings')): ?>
                                     <div class="border-t border-gray-100 dark:border-brand-charcoal my-1"></div>
                                     <?php if (isset($component)) { $__componentOriginal68cb1971a2b92c9735f83359058f7108 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal68cb1971a2b92c9735f83359058f7108 = $attributes; } ?>
@@ -1079,7 +1110,7 @@
 <?php unset($__componentOriginald69b52d99510f1e7cd3d80070b28ca18); ?>
 <?php endif; ?>
 
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin')): ?>
+            <?php if(auth()->user()->canManageAdminArea()): ?>
                 <?php if (isset($component)) { $__componentOriginald69b52d99510f1e7cd3d80070b28ca18 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginald69b52d99510f1e7cd3d80070b28ca18 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.responsive-nav-link','data' => ['href' => route('admin.index'),'active' => request()->routeIs('admin.*')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -1102,8 +1133,8 @@
             <?php endif; ?>
 
             <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'email_integration')): ?>
-                <?php if (\Illuminate\Support\Facades\Blade::check('role', 'inventory_manager')): ?>
-                    <?php if (! \Illuminate\Support\Facades\Blade::check('role', 'admin')): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('email:ops')): ?>
+                    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->denies('admin:settings')): ?>
                         <?php if (isset($component)) { $__componentOriginald69b52d99510f1e7cd3d80070b28ca18 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginald69b52d99510f1e7cd3d80070b28ca18 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.responsive-nav-link','data' => ['href' => route('admin.email.inbound.index'),'active' => request()->routeIs('admin.email.*')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>

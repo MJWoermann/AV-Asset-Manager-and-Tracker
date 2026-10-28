@@ -20,7 +20,7 @@ class SyncScannerSessionLifetimeHint
         $user = $request->user();
         $cookieName = ApplyScannerSessionLifetime::COOKIE;
 
-        if ($user && $user->hasAnyRole(['scanner', 'inventory_manager'])) {
+        if ($user && $user->can('scan')) {
             $minutes = (int) config('session.lifetime_scanner', 720);
             config(['session.lifetime' => $minutes]);
 

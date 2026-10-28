@@ -71,10 +71,7 @@ class UnloadableApiControllersTest extends TestCase
         $user->departments()->sync([$this->generalDepartment()->id]);
 
         if ($features !== []) {
-            $user->preferences = array_replace_recursive($user->preferences ?? [], [
-                'features' => $features,
-            ]);
-            $user->save();
+            $user = $this->enableFeature($user, $features);
         }
 
         Sanctum::actingAs($user, $abilities);

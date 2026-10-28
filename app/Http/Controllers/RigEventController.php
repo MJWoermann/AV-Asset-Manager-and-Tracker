@@ -128,7 +128,7 @@ class RigEventController extends Controller
 
     public function destroy(RigEvent $event): RedirectResponse
     {
-        abort_unless(auth()->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless(auth()->user()?->can('rigging:write'), 403);
 
         $event->delete();
 

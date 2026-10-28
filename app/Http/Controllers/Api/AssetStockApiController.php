@@ -72,7 +72,7 @@ class AssetStockApiController extends Controller
     public function rotateToken(Request $request, Asset $asset, KanbanTagService $kanban): JsonResponse
     {
         abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('stock:manage'), 403);
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:64'],

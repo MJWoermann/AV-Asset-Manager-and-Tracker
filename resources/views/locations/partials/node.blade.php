@@ -50,7 +50,7 @@
             @else
                 <span class="mt-0.5 inline-block w-5 shrink-0" aria-hidden="true"></span>
             @endif
-            @role('admin|inventory_manager')
+            @can('locations:update')
                 <input
                     type="checkbox"
                     class="mt-1 rounded border-brand-charcoal/40 shrink-0"
@@ -61,7 +61,7 @@
                     @change="setSelected({{ $location->id }}, $event.target.checked)"
                     aria-label="Select {{ $location->name }}"
                 >
-            @endrole
+            @endcan
             <div>
                 <span class="font-medium">{{ $location->name }}</span>
                 @if ($location->room_code)
@@ -77,7 +77,7 @@
                 href="{{ route('assets.index', ['location_id' => $location->id]) }}"
                 class="text-sm text-brand"
             >Assets</a>
-            @role('admin|inventory_manager')
+            @can('locations:update')
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
                 <a href="{{ route('locations.edit', $location) }}" class="text-sm text-brand">Edit</a>
                 @if ((int) ($location->assets_count ?? 0) > 0)
@@ -97,7 +97,7 @@
                         </span>
                     </template>
                 @endif
-            @endrole
+            @endcan
         </div>
     </div>
     @if ($hasChildren)

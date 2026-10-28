@@ -31,7 +31,7 @@ class ItemTypeApiController extends Controller
 
     public function store(Request $request, AssetInterfaceService $interfaces): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('catalog:update'), 403);
 
         $data = $this->validatedItemType($request);
 
@@ -52,7 +52,7 @@ class ItemTypeApiController extends Controller
 
     public function update(Request $request, ItemType $itemType, AssetInterfaceService $interfaces): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('catalog:update'), 403);
 
         $data = $this->validatedItemType($request, $itemType);
 
@@ -91,7 +91,7 @@ class ItemTypeApiController extends Controller
 
     public function syncInterfaces(ItemType $itemType, AssetInterfaceService $interfaces): JsonResponse
     {
-        abort_unless(auth()->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless(auth()->user()?->can('catalog:update'), 403);
 
         $created = $interfaces->syncMissingForItemType($itemType);
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AccessPermissions;
 use App\Support\AssetTableColumns;
 use App\Support\CameraBatteryOptimisation;
 use App\Support\DashboardModules;
@@ -60,11 +61,48 @@ class User extends Authenticatable
     }
 
     /**
-     * Whether the user has opted into a developer feature via preferences.features.{feature}.
+     * Admins opt in via preferences. Everyone else receives the feature from their role.
      */
     public function hasFeature(string $feature): bool
     {
-        return DeveloperFeatures::enabled($this->preferences, $feature);
+        if (! DeveloperFeatures::isValid($feature)) {
+            return false;
+        }
+
+        if ($this->hasRole('admin')) {
+            return DeveloperFeatures::enabled($this->preferences, $feature);
+        }
+
+        return $this->can(AccessPermissions::featureName($feature));
+    }
+
+    /**
+     * Operational app access. External repairers are excluded even if their role has permissions.
+     */
+    public function hasStaffAccess(): bool
+    {
+        if ($this->isExternalRepairer()) {
+            return false;
+        }
+
+        if ($this->hasRole('admin')) {
+            return true;
+        }
+
+        foreach (AccessPermissions::operational() as $permission) {
+            if ($this->can($permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function canManageAdminArea(): bool
+    {
+        return $this->can('admin:read')
+            || $this->can('admin:write')
+            || $this->can('admin:settings');
     }
 
     /**

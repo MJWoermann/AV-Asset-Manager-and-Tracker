@@ -35,14 +35,7 @@ class AssetConnectionFeatureTest extends TestCase
 
     protected function withFeature(User $user): User
     {
-        $user->preferences = [
-            'features' => [
-                'asset_connections' => true,
-            ],
-        ];
-        $user->save();
-
-        return $user->fresh();
+        return $this->enableFeature($user, 'asset_connections');
     }
 
     protected function manager(bool $feature = true): User

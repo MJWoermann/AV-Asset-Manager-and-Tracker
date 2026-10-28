@@ -115,7 +115,7 @@ class UnknownScanApiController extends Controller
 
     public function destroyAll(Request $request): JsonResponse
     {
-        abort_unless($request->user()->hasRole('admin'), 403);
+        abort_unless($request->user()->can('reports:purge'), 403);
 
         $deleted = UnknownScan::clearAll();
 
@@ -124,7 +124,7 @@ class UnknownScanApiController extends Controller
 
     public function deduplicate(Request $request): JsonResponse
     {
-        abort_unless($request->user()->hasRole('admin'), 403);
+        abort_unless($request->user()->can('reports:purge'), 403);
 
         $removed = UnknownScan::deleteDuplicatesKeepingLatest();
 

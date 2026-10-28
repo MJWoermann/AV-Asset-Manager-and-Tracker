@@ -27,7 +27,7 @@
                 </p>
             </a>
             <?php if (! \Illuminate\Support\Facades\Blade::check('role', 'external_repairer')): ?>
-                <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('repairs:procedures')): ?>
                     <a href="<?php echo e(route('repair-procedures.index')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                         <h3 class="font-semibold">Repair procedures</h3>
                         <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Reusable SOP checklists scoped to models, types, or spares.</p>

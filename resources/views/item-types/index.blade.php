@@ -5,14 +5,14 @@
     </x-slot>
     <div
         class="max-w-7xl mx-auto px-4 space-y-3"
-        @role('admin')
+        @can('catalog:bulk')
             x-data="bulkSelection(@js([
                 'idAttribute' => 'data-bulk-item-type-id',
                 'fields' => [
                     'update_department' => false,
                 ],
             ]))"
-        @endrole
+        @endcan
     >
         @if (session('status'))
             <p class="text-sm text-brand">{{ session('status') }}</p>
@@ -26,14 +26,14 @@
             </div>
         @endif
 
-        @role('admin')
+        @can('catalog:bulk')
             <x-bulk-item-type-actions :departments="$departments" />
-        @endrole
+        @endcan
 
         @foreach($itemTypes as $type)
             <div class="bg-white dark:bg-brand-slate border p-4 flex justify-between gap-3">
                 <div class="flex items-start gap-3 min-w-0">
-                    @role('admin')
+                    @can('catalog:bulk')
                         <input
                             type="checkbox"
                             class="rounded border-brand-charcoal/40 mt-1"
@@ -42,7 +42,7 @@
                             @change="setSelected({{ $type->id }}, $event.target.checked)"
                             aria-label="Select {{ $type->name }}"
                         >
-                    @endrole
+                    @endcan
                     <div class="min-w-0">
                         <div class="font-medium">{{ $type->name }}</div>
                         <div class="text-sm text-brand-charcoal dark:text-brand-silver">{{ $type->fieldSets->pluck('name')->join(', ') ?: 'No field sets' }}</div>

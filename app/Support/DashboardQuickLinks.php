@@ -40,7 +40,7 @@ class DashboardQuickLinks
      */
     private static function orderedLinkIds(User $user): array
     {
-        if ($user->hasAnyRole(['admin', 'inventory_manager'])) {
+        if ($user->can('import:run') || $user->can('lists:write')) {
             $ids = [
                 'scan',
                 'assets',
@@ -118,7 +118,7 @@ class DashboardQuickLinks
                 'description' => 'Matched / missing / extras',
                 'primary' => false,
             ],
-            'import' => $user->hasAnyRole(['admin', 'inventory_manager']) ? [
+            'import' => $user->can('import:run') ? [
                 'id' => $id,
                 'label' => 'Import',
                 'url' => route('import.create'),
@@ -126,7 +126,7 @@ class DashboardQuickLinks
                 'description' => 'Spreadsheet import wizard',
                 'primary' => false,
             ] : null,
-            'maintenance' => $user->hasAnyRole(['admin', 'inventory_manager']) ? [
+            'maintenance' => $user->can('repairs:read') ? [
                 'id' => $id,
                 'label' => 'Maintenance',
                 'url' => route('maintenance.index'),
@@ -134,7 +134,7 @@ class DashboardQuickLinks
                 'description' => 'Repairs, spares, and procedures',
                 'primary' => false,
             ] : null,
-            'spares' => $user->hasAnyRole(['admin', 'inventory_manager']) ? [
+            'spares' => $user->can('spares:read') ? [
                 'id' => $id,
                 'label' => 'Spares',
                 'url' => route('spares.index'),
@@ -142,7 +142,7 @@ class DashboardQuickLinks
                 'description' => 'Spare parts stock levels',
                 'primary' => false,
             ] : null,
-            'data_hub' => $user->hasAnyRole(['admin', 'inventory_manager']) ? [
+            'data_hub' => $user->can('locations:read') ? [
                 'id' => $id,
                 'label' => 'Data hub',
                 'url' => route('data.index'),
@@ -167,7 +167,7 @@ class DashboardQuickLinks
                 'primary' => false,
             ] : null,
             'inbound_email' => $user->hasFeature('email_integration')
-                && $user->hasAnyRole(['admin', 'inventory_manager']) ? [
+                && $user->can('email:ops') ? [
                     'id' => $id,
                     'label' => 'Inbound email',
                     'url' => route('admin.email.inbound.index'),
@@ -176,7 +176,7 @@ class DashboardQuickLinks
                     'primary' => false,
                 ] : null,
             'labels' => $user->hasFeature('shelf_tag_generator')
-                && $user->hasAnyRole(['admin', 'inventory_manager']) ? [
+                && $user->can('labels:read') ? [
                     'id' => $id,
                     'label' => 'Labels',
                     'url' => route('labels.index'),
@@ -192,7 +192,7 @@ class DashboardQuickLinks
                 'description' => 'Rig events and sign-off',
                 'primary' => false,
             ] : null,
-            'admin' => $user->hasRole('admin') ? [
+            'admin' => $user->canManageAdminArea() ? [
                 'id' => $id,
                 'label' => 'Admin',
                 'url' => route('admin.index'),

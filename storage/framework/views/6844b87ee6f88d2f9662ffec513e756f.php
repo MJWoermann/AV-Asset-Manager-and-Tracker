@@ -49,7 +49,7 @@
                         <?php echo csrf_field(); ?>
                         <button type="submit" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Scan children</button>
                     </form>
-                    <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('spares:manage')): ?>
                         <?php if($listedSpare ?? null): ?>
                             <a href="<?php echo e(route('spares.show', $listedSpare)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">In spares register</a>
                         <?php else: ?>
@@ -60,7 +60,7 @@
                         <?php endif; ?>
                     <?php endif; ?>
                     <a href="<?php echo e(route('assets.edit', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
-                    <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('labels:read')): ?>
                         <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
                             <a href="<?php echo e(route('assets.label', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Print</a>
                         <?php endif; ?>

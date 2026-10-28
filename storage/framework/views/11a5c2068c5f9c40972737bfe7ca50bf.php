@@ -32,9 +32,13 @@
 <?php $component = $__componentOriginale38ded69f40ce1c2c90acaee9ee96445; ?>
 <?php unset($__componentOriginale38ded69f40ce1c2c90acaee9ee96445); ?>
 <?php endif; ?>
-                <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('assets:delete')): ?>
                     <a href="<?php echo e(route('assets.duplicates.index')); ?>" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Duplicates</a>
+                <?php endif; ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('import:run')): ?>
                     <a href="<?php echo e(route('import.create')); ?>" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Import</a>
+                <?php endif; ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('reports:export')): ?>
                     <a href="<?php echo e(route('export.assets', ['format' => 'xlsx'])); ?>" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Export</a>
                 <?php endif; ?>
                 <a href="<?php echo e(route('assets.create')); ?>" class="text-sm px-3 py-2 bg-brand text-white">Add asset</a>

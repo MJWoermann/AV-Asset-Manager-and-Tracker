@@ -43,7 +43,7 @@ class ShelfTagLayoutApiController extends Controller
 
     public function destroy(Request $request, ShelfTagLayout $layout): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('labels:write'), 403);
         $layout->delete();
 
         return response()->json(['message' => 'Layout deleted.']);

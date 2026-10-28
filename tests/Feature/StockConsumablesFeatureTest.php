@@ -35,14 +35,7 @@ class StockConsumablesFeatureTest extends TestCase
 
     protected function withFeature(User $user): User
     {
-        $user->preferences = [
-            'features' => [
-                StockTracking::FEATURE_KEY => true,
-            ],
-        ];
-        $user->save();
-
-        return $user->fresh();
+        return $this->enableFeature($user, StockTracking::FEATURE_KEY);
     }
 
     protected function manager(bool $feature = true): User

@@ -50,7 +50,7 @@ class FileApiController extends Controller
         $term = trim((string) $request->string('q'));
         /** @var User|null $user */
         $user = $request->user();
-        $manager = $user?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+        $manager = $user?->can('files:manage') ?? false;
 
         $files = File::query()
             ->when(! $manager, function ($query): void {

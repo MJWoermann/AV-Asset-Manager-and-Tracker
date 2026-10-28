@@ -38,7 +38,7 @@ AV Asset Manager replaces spreadsheet drift and “ask the person who last moved
 
 | Criterion | What “done” looks like |
 |-----------|------------------------|
-| Roles assigned | Every active user has `admin`, `inventory_manager`, `scanner`, or (workshop vendors) `external_repairer` (see [roles](features-and-usage.md#who-can-do-what-roles)) |
+| Roles assigned | Every active user has one role: a system role (`admin`, `inventory_manager`, `scanner`, or `external_repairer`) or a custom role from Admin → Roles (see [roles](features-and-usage.md#who-can-do-what-roles)) |
 | Champions named | At least one peer coach per site or shift who can unblock scanners |
 | Master data ready | Locations, item types, and identifier/barcode fields populated for the pilot scope |
 | First real stocktake | Scan session → event list → [Reports → Compare](features-and-usage.md#1-stocktake-scan--compare) on live kit |

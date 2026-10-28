@@ -24,11 +24,13 @@
                 <h3 class="font-semibold">Manufacturers</h3>
                 <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Manufacturer catalogue and models.</p>
             </a>
-            <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('assets:delete')): ?>
                 <a href="<?php echo e(route('assets.duplicates.index')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                     <h3 class="font-semibold">Duplicate check</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Find assets sharing barcodes, serials, or tags and merge them side-by-side.</p>
                 </a>
+            <?php endif; ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:update')): ?>
                 <a href="<?php echo e(route('item-types.index')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                     <h3 class="font-semibold">Item Types</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Templates that define asset fields and behaviour.</p>
@@ -37,11 +39,15 @@
                     <h3 class="font-semibold">Field sets</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Reusable custom fields for item types.</p>
                 </a>
+            <?php endif; ?>
+            <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('files:manage')): ?>
                 <a href="<?php echo e(route('files.index')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                     <h3 class="font-semibold">Files</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Uploaded attachments and linked documents.</p>
                 </a>
-                <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'asset_connections')): ?>
+            <?php endif; ?>
+            <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'asset_connections')): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('connections:write')): ?>
                     <a href="<?php echo e(route('connection-types.index')); ?>" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                         <h3 class="font-semibold">Connection types</h3>
                         <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Cable and interface connection categories.</p>

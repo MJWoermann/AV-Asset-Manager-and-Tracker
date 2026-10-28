@@ -10,7 +10,7 @@ class UpdateEmailSettingsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasRole('admin') ?? false;
+        return $this->user()?->can('admin:settings') ?? false;
     }
 
     protected function prepareForValidation(): void

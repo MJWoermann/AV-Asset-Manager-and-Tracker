@@ -11,7 +11,7 @@ class LinkUnknownScanRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['admin', 'inventory_manager', 'scanner']) ?? false;
+        return $this->user()?->can('reports:write') ?? false;
     }
 
     /**

@@ -75,7 +75,7 @@ class AssetStockController extends Controller
         StockMovementService $movements,
     ): RedirectResponse {
         abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
-        abort_unless($request->user()?->hasAnyRole(['admin']), 403);
+        abort_unless($request->user()?->can('stock:adjust'), 403);
         abort_unless((int) $stockMovement->asset_id === (int) $asset->id, 404);
 
         $movements->delete($stockMovement, $request->user());
@@ -88,7 +88,7 @@ class AssetStockController extends Controller
     public function updateLevels(Request $request, Asset $asset): RedirectResponse
     {
         abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
-        abort_unless($request->user()?->hasAnyRole(['admin', 'inventory_manager', 'scanner']), 403);
+        abort_unless($request->user()?->can('stock:write'), 403);
 
         $data = $request->validate([
             'min_stock_level' => ['nullable', 'integer', 'min:0'],
@@ -121,7 +121,7 @@ class AssetStockController extends Controller
         StockMovementService $movements,
     ): View {
         abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
-        abort_unless($request->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()?->can('stock:manage'), 403);
 
         $movements->ensureBaseline($asset, $request->user());
         $plainById = $kanban->ensureDefaultTags($asset);

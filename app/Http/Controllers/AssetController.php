@@ -559,7 +559,7 @@ class AssetController extends Controller
         $checkoutAssigneeOptions = collect();
         $checkoutOpenRepairs = collect();
         $canManageCheckouts = ! $isExternalRepairer
-            && ($user?->hasAnyRole(['admin', 'inventory_manager', 'scanner']) ?? false);
+            && ($user?->can('assets:write') ?? false);
 
         if ($tab === 'checkout') {
             $openCheckout = $asset->checkouts()
@@ -612,7 +612,7 @@ class AssetController extends Controller
             'maintenanceUserOptions' => $maintenanceUserOptions,
             'maintenanceLogTypes' => MaintenanceLogType::options(),
             'maintenanceStatuses' => AssetStatus::options(),
-            'canDeleteMaintenanceLogs' => $user?->hasAnyRole(['admin', 'inventory_manager']) ?? false,
+            'canDeleteMaintenanceLogs' => $user?->can('assets:delete') ?? false,
             'openRepairs' => $openRepairs,
             'openRepairsByFaultId' => $openRepairsByFaultId,
             'repairAssigneeOptions' => $repairAssigneeOptions,
@@ -771,7 +771,7 @@ class AssetController extends Controller
 
     public function destroy(Asset $asset): RedirectResponse
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless(auth()->user()->can('assets:delete'), 403);
         $asset->delete();
 
         return redirect()->route('assets.index')->with('status', 'Asset deleted.');

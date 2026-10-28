@@ -39,7 +39,7 @@ class ManufacturerApiController extends Controller
 
     public function update(Request $request, Manufacturer $manufacturer): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('catalog:update'), 403);
         $manufacturer->update($this->validated($request, $manufacturer));
 
         return response()->json($manufacturer->fresh());

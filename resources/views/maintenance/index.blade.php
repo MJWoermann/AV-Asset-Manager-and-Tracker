@@ -18,12 +18,12 @@
                 </p>
             </a>
             @unlessrole('external_repairer')
-                @role('admin|inventory_manager')
+                @can('repairs:procedures')
                     <a href="{{ route('repair-procedures.index') }}" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                         <h3 class="font-semibold">Repair procedures</h3>
                         <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Reusable SOP checklists scoped to models, types, or spares.</p>
                     </a>
-                @endrole
+                @endcan
                 <a href="{{ route('spares.index') }}" class="block border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate p-4 hover:border-brand">
                     <h3 class="font-semibold">Spares</h3>
                     <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">Critical spares register, kits, and usage history.</p>

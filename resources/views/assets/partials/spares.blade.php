@@ -13,12 +13,12 @@
                 Open {{ $listedSpare->code }}
             </a>
         @else
-            @role('admin|inventory_manager')
+            @can('spares:manage')
                 <form method="POST" action="{{ route('assets.spares.store', $asset) }}" class="self-start sm:self-auto">
                     @csrf
                     <button type="submit" class="px-3 py-2 bg-brand text-white text-sm">List in spares</button>
                 </form>
-            @endrole
+            @endcan
         @endif
     </div>
 </div>

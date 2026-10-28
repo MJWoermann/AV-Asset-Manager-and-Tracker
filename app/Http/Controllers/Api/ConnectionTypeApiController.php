@@ -57,7 +57,7 @@ class ConnectionTypeApiController extends Controller
 
     public function destroy(Request $request, ConnectionType $connectionType): JsonResponse
     {
-        abort_unless($request->user()->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()->can('connections:write'), 403);
         $connectionType->delete();
 
         return response()->json(['message' => 'Connection type deleted.']);

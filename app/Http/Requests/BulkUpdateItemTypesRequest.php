@@ -10,7 +10,7 @@ class BulkUpdateItemTypesRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasRole('admin') ?? false;
+        return $this->user()?->can('catalog:bulk') ?? false;
     }
 
     protected function prepareForValidation(): void

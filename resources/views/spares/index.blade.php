@@ -4,9 +4,9 @@
             <h2 class="font-semibold text-xl">Spares register</h2>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('spares.groups.index') }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Groups</a>
-                @role('admin|inventory_manager')
+                @can('spares:manage')
                     <a href="{{ route('spares.create') }}" class="px-3 py-2 bg-brand text-white text-sm">Add spare</a>
-                @endrole
+                @endcan
             </div>
         </div>
     </x-slot>
@@ -91,7 +91,7 @@
             <x-clear-filters :href="route('spares.index')" :active="$sparesFiltersActive" class="!px-3 !py-1" />
         </form>
 
-        @role('admin|inventory_manager')
+        @can('labels:read')
             @feature('shelf_tag_generator')
                 <form id="batch-print-form" method="post" action="{{ route('spares.labels.print') }}" class="text-sm border border-brand-silver dark:border-brand-charcoal p-3 space-y-2">
                     @csrf
@@ -110,17 +110,17 @@
                     </div>
                 </form>
             @endfeature
-        @endrole
+        @endcan
 
         <div class="overflow-x-auto border border-brand-silver dark:border-brand-charcoal bg-white dark:bg-brand-slate text-sm">
             <table class="min-w-full">
                 <thead class="bg-brand-charcoal/5 dark:bg-brand-charcoal text-left">
                     <tr>
-                        @role('admin|inventory_manager')
+                        @can('labels:read')
                             @feature('shelf_tag_generator')
                                 <th class="p-2 w-8"></th>
                             @endfeature
-                        @endrole
+                        @endcan
                         <th class="p-2">Code</th>
                         <th class="p-2">Component</th>
                         <th class="p-2">Kind</th>
@@ -133,13 +133,13 @@
                 <tbody>
                     @forelse($parts as $part)
                         <tr class="border-t border-brand-silver dark:border-brand-charcoal hover:bg-brand/5">
-                            @role('admin|inventory_manager')
+                            @can('labels:read')
                                 @feature('shelf_tag_generator')
                                     <td class="p-2">
                                         <input type="checkbox" name="spare_ids[]" value="{{ $part->id }}" form="batch-print-form">
                                     </td>
                                 @endfeature
-                            @endrole
+                            @endcan
                             <td class="p-2 font-mono">
                                 <a href="{{ route('spares.show', $part) }}" class="text-brand hover:underline">{{ $part->code }}</a>
                             </td>

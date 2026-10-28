@@ -62,7 +62,7 @@ class SpareGroupController extends Controller
 
     public function destroy(SpareGroup $group): RedirectResponse
     {
-        abort_unless(auth()->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless(auth()->user()?->can('spares:manage'), 403);
         $group->delete();
 
         return redirect()->route('spares.groups.index')->with('status', 'Spare group deleted.');

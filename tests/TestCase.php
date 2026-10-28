@@ -4,6 +4,7 @@ namespace Tests;
 
 use App\Models\Department;
 use App\Models\User;
+use App\Support\AccessPermissions;
 use App\Support\DepartmentVisibility;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -43,5 +44,43 @@ abstract class TestCase extends BaseTestCase
     protected function generalDepartment(): Department
     {
         return Department::query()->where('slug', 'general')->firstOrFail();
+    }
+
+    /**
+     * Keep the preference (admins) and grant the role permission (everyone else).
+     *
+     * @param  array<string, bool>|string  $features
+     */
+    protected function enableFeature(User $user, array|string $features): User
+    {
+        if (is_string($features)) {
+            $features = [$features => true];
+        }
+
+        $normalized = [];
+
+        foreach ($features as $key => $enabled) {
+            if (is_int($key)) {
+                $normalized[$enabled] = true;
+
+                continue;
+            }
+
+            $normalized[(string) $key] = (bool) $enabled;
+        }
+
+        $preferences = $user->preferences ?? [];
+        $preferences['features'] = array_merge($preferences['features'] ?? [], $normalized);
+        $user->preferences = $preferences;
+
+        foreach ($normalized as $key => $enabled) {
+            if ($enabled) {
+                $user->givePermissionTo(AccessPermissions::featureName($key));
+            }
+        }
+
+        $user->save();
+
+        return $user->fresh();
     }
 }

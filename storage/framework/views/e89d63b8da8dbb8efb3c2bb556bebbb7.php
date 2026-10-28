@@ -35,7 +35,7 @@
 <?php $component = $__componentOriginale38ded69f40ce1c2c90acaee9ee96445; ?>
 <?php unset($__componentOriginale38ded69f40ce1c2c90acaee9ee96445); ?>
 <?php endif; ?>
-                <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('labels:read')): ?>
                     <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>
                         <a href="<?php echo e(route('labels.index', ['asset_list_id' => $list->id])); ?>" class="px-3 py-2 border text-sm">Labels</a>
                     <?php endif; ?>

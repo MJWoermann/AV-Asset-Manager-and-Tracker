@@ -34,7 +34,7 @@ class SparePartShelfTagPrintController extends Controller
 
     public function batch(Request $request, SpareTagRenderService $renderer): View|RedirectResponse|SymfonyResponse
     {
-        abort_unless($request->user()?->hasAnyRole(['admin', 'inventory_manager']), 403);
+        abort_unless($request->user()?->can('labels:read'), 403);
 
         $data = $request->validate([
             'shelf_tag_layout_id' => ['required', 'integer', 'exists:shelf_tag_layouts,id'],

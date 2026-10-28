@@ -678,7 +678,7 @@
 
                     @case('inbound_emails')
                         @feature('email_integration')
-                            @role('admin|inventory_manager')
+                            @can('email:ops')
                                 <div class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
                                     <div class="px-4 py-3 border-b border-brand-silver dark:border-brand-charcoal">
                                         <h3 class="text-sm font-semibold uppercase tracking-wide text-brand">Inbound emails</h3>
@@ -695,7 +695,7 @@
                                         </li>
                                     </ul>
                                 </div>
-                            @endrole
+                            @endcan
                         @endfeature
                         @break
 
