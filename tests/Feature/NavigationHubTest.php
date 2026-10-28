@@ -112,6 +112,7 @@ class NavigationHubTest extends TestCase
         $response->assertSee(route('data.index'), false);
         $response->assertSee(route('maintenance.index'), false);
         $response->assertSee(route('reports.index'), false);
+        $response->assertSee(route('reports.checkouts'), false);
         $response->assertSee(route('admin.index'), false);
 
         // Desktop dropdowns still list sub-pages; the mobile drawer should only link hubs.
@@ -132,6 +133,7 @@ class NavigationHubTest extends TestCase
         $this->assertStringNotContainsString(route('repairs.index'), $mobileNav);
         $this->assertStringNotContainsString(route('spares.index'), $mobileNav);
         $this->assertStringNotContainsString(route('reports.compare'), $mobileNav);
+        $this->assertStringNotContainsString(route('reports.checkouts'), $mobileNav);
         $this->assertStringNotContainsString(route('admin.users.index'), $mobileNav);
     }
 

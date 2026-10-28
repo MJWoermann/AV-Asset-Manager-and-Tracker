@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\AssetStatus;
+use App\Enums\MaintenanceLogType;
+use App\Enums\RepairStatus;
 use App\Models\Concerns\BelongsToDepartment;
 use App\Services\FileAttachmentService;
 use App\Services\ManufacturerCatalogueService;
@@ -262,6 +264,27 @@ class Asset extends Model
         return $this->hasMany(SparePartMovement::class, 'against_asset_id')
             ->orderByDesc('recorded_at')
             ->orderByDesc('id');
+    }
+
+    public function spareListings(): HasMany
+    {
+        return $this->hasMany(SparePart::class, 'asset_id');
+    }
+
+    /**
+     * Assets with a fault that has no open or in-progress repair.
+     *
+     * @param  Builder<Asset>  $query
+     * @return Builder<Asset>
+     */
+    public function scopeWithUnrepairedFault(Builder $query): Builder
+    {
+        return $query->whereHas('maintenanceLogs', function (Builder $logs): void {
+            $logs->where('type', MaintenanceLogType::Fault)
+                ->whereDoesntHave('repairs', function (Builder $repairs): void {
+                    $repairs->whereIn('status', RepairStatus::activeValues());
+                });
+        });
     }
 
     public function files(): MorphToMany

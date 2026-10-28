@@ -12,6 +12,7 @@ use App\Enums\SparePartStockStatus;
 use App\Enums\StockMovementType;
 use App\Models\Asset;
 use App\Models\AssetList;
+use App\Models\AssetMaintenanceLog;
 use App\Models\InboundEmailAction;
 use App\Models\ItemType;
 use App\Models\Location;
@@ -398,6 +399,8 @@ class DashboardStatsTest extends TestCase
         $this->assertSame([], $response->viewData('testTagExpiry'));
         $this->assertSame([], $response->viewData('maintenanceActivities')['buckets']);
         $this->assertTrue($response->viewData('maintenanceActivities')['recent']->isEmpty());
+        $this->assertTrue($response->viewData('maintenanceActivities')['unrepairedFaults']->isEmpty());
+        $this->assertTrue($response->viewData('maintenanceActivities')['damagedAssets']->isEmpty());
         $this->assertSame([], $response->viewData('sparesStats'));
         $response->assertSee('Scan to event');
         $response->assertDontSee('Within 30 days', false);
@@ -462,6 +465,104 @@ class DashboardStatsTest extends TestCase
             false
         );
         $response->assertSee(route('maintenance.index', absolute: false), false);
+    }
+
+    public function test_dashboard_lists_faults_without_an_open_repair_and_damaged_assets(): void
+    {
+        $user = $this->withDashboardModules($this->scanner(), [
+            DashboardModules::MAINTENANCE_ACTIVITIES,
+        ]);
+        $type = ItemType::create(['name' => 'Audio', 'slug' => 'audio-faults']);
+
+        $waiting = Asset::create([
+            'name' => 'Waiting fault mic',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Available,
+        ]);
+        AssetMaintenanceLog::factory()->fault()->create([
+            'asset_id' => $waiting->id,
+            'user_id' => $user->id,
+            'summary' => 'Dead channel',
+        ]);
+
+        $finished = Asset::create([
+            'name' => 'Finished repair mic',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Available,
+        ]);
+        $finishedFault = AssetMaintenanceLog::factory()->fault()->create([
+            'asset_id' => $finished->id,
+            'user_id' => $user->id,
+            'summary' => 'Old crackle',
+        ]);
+        Repair::factory()->completed()->create([
+            'asset_id' => $finished->id,
+            'maintenance_log_id' => $finishedFault->id,
+            'summary' => 'Closed crackle repair',
+        ]);
+
+        $openAsset = Asset::create([
+            'name' => 'Open repair mic',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Maintenance,
+        ]);
+        $openFault = AssetMaintenanceLog::factory()->fault()->create([
+            'asset_id' => $openAsset->id,
+            'user_id' => $user->id,
+            'summary' => 'Open fault',
+        ]);
+        Repair::factory()->create([
+            'asset_id' => $openAsset->id,
+            'maintenance_log_id' => $openFault->id,
+            'status' => RepairStatus::Open,
+            'summary' => 'Open crackle repair',
+        ]);
+
+        Asset::create([
+            'name' => 'Cracked lens',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Damaged,
+        ]);
+        Asset::create([
+            'name' => 'Healthy desk',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Available,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('Faults without repair');
+        $response->assertSee('Waiting fault mic');
+        $response->assertSee('Finished repair mic');
+        $response->assertSee('Cracked lens');
+        $response->assertDontSee('Healthy desk', false);
+
+        $activities = $response->viewData('maintenanceActivities');
+        $this->assertSame(
+            ['Finished repair mic', 'Waiting fault mic'],
+            $activities['unrepairedFaults']->pluck('name')->all(),
+        );
+        $this->assertSame(['Cracked lens'], $activities['damagedAssets']->pluck('name')->all());
+
+        $buckets = collect($activities['buckets'])->keyBy('key');
+        $this->assertSame(2, $buckets['unrepaired_faults']['count']);
+        $this->assertSame(1, $buckets['damaged']['count']);
+
+        $this->actingAs($user)
+            ->get(route('assets.index', ['unrepaired_fault' => 1]))
+            ->assertOk()
+            ->assertSee('Waiting fault mic')
+            ->assertSee('Finished repair mic')
+            ->assertSee('Showing assets with a fault and no open repair.')
+            ->assertDontSee('Open repair mic', false)
+            ->assertDontSee('Cracked lens', false);
+
+        $this->actingAs($user)
+            ->get(route('assets.index', ['status' => AssetStatus::Damaged->value]))
+            ->assertOk()
+            ->assertSee('Cracked lens')
+            ->assertDontSee('Waiting fault mic', false);
     }
 
     public function test_dashboard_shows_spares_statistics_module(): void

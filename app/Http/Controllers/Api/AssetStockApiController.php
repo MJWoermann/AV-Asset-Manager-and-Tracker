@@ -12,6 +12,7 @@ use App\Services\StockMovementService;
 use App\Support\StockTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class AssetStockApiController extends Controller
 {
@@ -23,8 +24,15 @@ class AssetStockApiController extends Controller
         abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
 
         $data = $request->validated();
-        $movements->ensureBaseline($asset, $request->user());
-        $asset->refresh();
+        $recordedAt = $data['recorded_at'] ?? null;
+        $backdatedFirstEvent = ! $asset->stockMovements()->exists()
+            && is_string($recordedAt)
+            && $recordedAt !== ''
+            && Carbon::parse($recordedAt)->startOfDay()->lt(now()->startOfDay());
+        if (! $backdatedFirstEvent) {
+            $movements->ensureBaseline($asset, $request->user());
+            $asset->refresh();
+        }
 
         $movement = $movements->record(
             $asset,

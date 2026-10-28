@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Asset;
+use App\Models\CustomFieldDefinition;
+use App\Models\CustomFieldSet;
 use App\Models\ItemType;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -117,5 +119,54 @@ class AssetFormTest extends TestCase
         $response->assertSee('id="field-qr-mac_address"', false);
         $response->assertDontSee("fieldBarcodeScanner('fmi_ast'", false);
         $response->assertDontSee("fieldBarcodeScanner('rig_tag'", false);
+    }
+
+    public function test_edit_form_offers_scan_for_flagged_and_mac_custom_fields(): void
+    {
+        $user = $this->manager();
+        $itemType = ItemType::create([
+            'name' => 'LX Fixture',
+            'slug' => 'lx-fixture',
+        ]);
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Labels',
+            'slug' => 'labels',
+        ]);
+        $itemType->fieldSets()->attach($fieldSet->id);
+        $scannable = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Shelf code',
+            'slug' => 'shelf-code',
+            'type' => 'text',
+            'is_scannable' => true,
+            'sort_order' => 0,
+        ]);
+        $plain = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Notes label',
+            'slug' => 'notes-label',
+            'type' => 'text',
+            'is_scannable' => false,
+            'sort_order' => 1,
+        ]);
+        $mac = CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'MAC Address',
+            'slug' => 'mac-address',
+            'type' => 'text',
+            'is_scannable' => false,
+            'sort_order' => 2,
+        ]);
+        $asset = Asset::factory()->create([
+            'item_type_id' => $itemType->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('assets.edit', $asset));
+
+        $response->assertOk();
+        $response->assertSee("fieldBarcodeScanner('cf_{$scannable->id}'", false);
+        $response->assertSee('Scan barcode into Shelf code', false);
+        $response->assertDontSee("fieldBarcodeScanner('cf_{$plain->id}'", false);
+        $response->assertSee("fieldBarcodeScanner('cf_{$mac->id}'", false);
     }
 }

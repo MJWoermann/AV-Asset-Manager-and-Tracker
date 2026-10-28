@@ -110,7 +110,12 @@ class DashboardStatsService
                 : [],
             'maintenanceActivities' => in_array(DashboardModules::MAINTENANCE_ACTIVITIES, $enabled, true)
                 ? $this->maintenanceActivities()
-                : ['buckets' => [], 'recent' => collect()],
+                : [
+                    'buckets' => [],
+                    'recent' => collect(),
+                    'unrepairedFaults' => collect(),
+                    'damagedAssets' => collect(),
+                ],
             'sparesStats' => in_array(DashboardModules::SPARES_STATS, $enabled, true)
                 ? $this->sparesStats()
                 : [],
@@ -226,7 +231,9 @@ class DashboardStatsService
     /**
      * @return array{
      *     buckets: list<array{key: string, label: string, count: int, url: string}>,
-     *     recent: Collection<int, Repair>
+     *     recent: Collection<int, Repair>,
+     *     unrepairedFaults: Collection<int, Asset>,
+     *     damagedAssets: Collection<int, Asset>
      * }
      */
     public function maintenanceActivities(): array
@@ -237,6 +244,8 @@ class DashboardStatsService
             ->pluck('aggregate', 'status');
 
         $completedSince = Carbon::now()->subDays(30);
+        $unrepairedFaults = Asset::query()->withUnrepairedFault()->orderBy('name');
+        $damagedAssets = Asset::query()->where('status', AssetStatus::Damaged)->orderBy('name');
 
         $buckets = [
             [
@@ -244,6 +253,18 @@ class DashboardStatsService
                 'label' => 'Assets in maintenance',
                 'count' => Asset::query()->whereNull('parent_id')->where('status', AssetStatus::Maintenance)->count(),
                 'url' => route('assets.index', ['status' => AssetStatus::Maintenance->value]),
+            ],
+            [
+                'key' => 'unrepaired_faults',
+                'label' => 'Faults without repair',
+                'count' => (clone $unrepairedFaults)->count(),
+                'url' => route('assets.index', ['unrepaired_fault' => 1]),
+            ],
+            [
+                'key' => 'damaged',
+                'label' => 'Damaged',
+                'count' => (clone $damagedAssets)->count(),
+                'url' => route('assets.index', ['status' => AssetStatus::Damaged->value]),
             ],
             [
                 'key' => 'open',
@@ -279,6 +300,8 @@ class DashboardStatsService
         return [
             'buckets' => $buckets,
             'recent' => $recent,
+            'unrepairedFaults' => (clone $unrepairedFaults)->limit(5)->get(['id', 'name']),
+            'damagedAssets' => (clone $damagedAssets)->limit(5)->get(['id', 'name']),
         ];
     }
 

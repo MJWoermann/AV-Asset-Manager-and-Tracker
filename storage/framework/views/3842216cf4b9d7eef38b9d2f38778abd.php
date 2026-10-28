@@ -523,15 +523,41 @@
                 </div>
             <?php endif; ?>
 
-            <div class="flex items-end">
+            <div class="flex flex-wrap items-end gap-4 sm:col-span-2 lg:col-span-3">
                 <label class="inline-flex items-center gap-2 text-sm">
                     <input type="checkbox" name="overdue" value="1" <?php if($filters['overdue']): echo 'checked'; endif; ?> onchange="this.form.requestSubmit()">
                     Overdue only
                 </label>
+                <?php if($filters['view'] === 'models'): ?>
+                    <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="hidden" name="checked_out_only" value="0">
+                        <input type="checkbox" name="checked_out_only" value="1" <?php if($filters['checked_out_only']): echo 'checked'; endif; ?> onchange="this.form.requestSubmit()">
+                        Only models with items checked out
+                    </label>
+                <?php endif; ?>
             </div>
 
-            <div class="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2">
+                    <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('primary-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>Search <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginald411d1792bd6cc877d687758b753742c)): ?>
+<?php $attributes = $__attributesOriginald411d1792bd6cc877d687758b753742c; ?>
+<?php unset($__attributesOriginald411d1792bd6cc877d687758b753742c); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginald411d1792bd6cc877d687758b753742c)): ?>
+<?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
+<?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
+<?php endif; ?>
                     <?php if (isset($component)) { $__componentOriginal3713bcf4ead06ff5169b19e8fd8f7113 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3713bcf4ead06ff5169b19e8fd8f7113 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.clear-filters','data' => ['href' => route('reports.checkouts', $filters['view'] === 'holders' ? ['view' => 'holders'] : []),'active' => $filtersActive]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -552,28 +578,13 @@
 <?php $component = $__componentOriginal3713bcf4ead06ff5169b19e8fd8f7113; ?>
 <?php unset($__componentOriginal3713bcf4ead06ff5169b19e8fd8f7113); ?>
 <?php endif; ?>
-                    <a href="<?php echo e(route('reports.checkouts.export', array_merge($query, ['format' => 'xlsx']))); ?>" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Export XLSX</a>
-                    <a href="<?php echo e(route('reports.checkouts.export', array_merge($query, ['format' => 'csv']))); ?>" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Export CSV</a>
                 </div>
-                <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('primary-button'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes([]); ?>Search <?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginald411d1792bd6cc877d687758b753742c)): ?>
-<?php $attributes = $__attributesOriginald411d1792bd6cc877d687758b753742c; ?>
-<?php unset($__attributesOriginald411d1792bd6cc877d687758b753742c); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginald411d1792bd6cc877d687758b753742c)): ?>
-<?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
-<?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
-<?php endif; ?>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-medium text-brand-charcoal dark:text-brand-silver">Export</span>
+                    <a href="<?php echo e(route('reports.checkouts.export', array_merge($query, ['format' => 'xlsx']))); ?>" class="px-4 py-2 border text-sm">XLSX</a>
+                    <a href="<?php echo e(route('reports.checkouts.export', array_merge($query, ['format' => 'csv']))); ?>" class="px-4 py-2 border text-sm">CSV</a>
+                    <a href="<?php echo e(route('reports.checkouts.export', array_merge($query, ['format' => 'pdf']))); ?>" class="px-4 py-2 border text-sm">PDF</a>
+                </div>
             </div>
         </form>
 
@@ -588,36 +599,101 @@
         <?php if($filters['view'] === 'models'): ?>
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                 Available and in register ignore purpose, holder, dates, and overdue. Those filters change the checked-out count. Disposed and lost assets are left out.
+                <?php if($filters['checked_out_only']): ?>
+                    Manufacturers with nothing checked out are hidden.
+                <?php endif; ?>
             </p>
 
-            <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-brand-silver/40 dark:bg-brand-charcoal/40 text-left">
-                        <tr>
-                            <th class="px-3 py-2 font-medium">Manufacturer</th>
-                            <th class="px-3 py-2 font-medium">Model</th>
-                            <th class="px-3 py-2 font-medium">Available</th>
-                            <th class="px-3 py-2 font-medium">Checked out</th>
-                            <th class="px-3 py-2 font-medium">In register</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-brand-silver dark:divide-brand-charcoal">
-                        <?php $__empty_1 = true; $__currentLoopData = $modelRows; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                            <tr>
-                                <td class="px-3 py-2"><?php echo e($row['manufacturer']); ?></td>
-                                <td class="px-3 py-2"><?php echo e($row['model']); ?></td>
-                                <td class="px-3 py-2"><?php echo e($row['available']); ?></td>
-                                <td class="px-3 py-2"><?php echo e($row['checked_out']); ?></td>
-                                <td class="px-3 py-2"><?php echo e($row['in_register']); ?></td>
-                            </tr>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                            <tr>
-                                <td colspan="5" class="px-3 py-6 text-center text-brand-charcoal dark:text-brand-silver">No assets match these filters.</td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+            <?php if($modelGroups === []): ?>
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    <?php echo e($filters['checked_out_only'] && $modelRows !== [] ? 'No models have items checked out.' : 'No assets match these filters.'); ?>
+
+                </p>
+            <?php else: ?>
+                <div
+                    x-data="{
+                        expanded: {},
+                        isOpen(id) { return Boolean(this.expanded[id]); },
+                        toggle(id) { this.expanded = { ...this.expanded, [id]: ! this.isOpen(id) }; },
+                        expandAll() {
+                            const next = {};
+                            this.groupIds().forEach((id) => { next[id] = true; });
+                            this.expanded = next;
+                        },
+                        collapseAll() { this.expanded = {}; },
+                        groupIds() {
+                            return [...this.$root.querySelectorAll('[data-report-group]')].map((el) => el.getAttribute('data-report-group'));
+                        },
+                    }"
+                >
+                    <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                        <button type="button" class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver" @click="expandAll()">Expand all</button>
+                        <button type="button" class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver" @click="collapseAll()">Collapse all</button>
+                    </div>
+                    <ul class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal text-sm overflow-hidden">
+                        <?php $__currentLoopData = $modelGroups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $group): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <?php
+                                $alternate = $index % 2 === 1;
+                                $rowClasses = $alternate
+                                    ? 'bg-[#dcdcdc] dark:bg-[#3d4043] border-l-[3px] border-l-brand-charcoal'
+                                    : 'bg-brand-silver dark:bg-brand-slate border-l-[3px] border-l-brand-charcoal';
+                            ?>
+                            <li
+                                class="border-b border-brand-charcoal/25 dark:border-brand-charcoal last:border-b-0"
+                                data-report-group="<?php echo e($group['id']); ?>"
+                            >
+                                <div class="<?php echo e($rowClasses); ?> px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+                                    <div class="flex items-start gap-3 min-w-0">
+                                        <button
+                                            type="button"
+                                            class="mt-0.5 shrink-0 p-0.5 text-brand-charcoal dark:text-brand-silver"
+                                            @click="toggle(<?php echo \Illuminate\Support\Js::from($group['id'])->toHtml() ?>)"
+                                            :aria-expanded="isOpen(<?php echo \Illuminate\Support\Js::from($group['id'])->toHtml() ?>) ? 'true' : 'false'"
+                                            aria-label="Toggle <?php echo e($group['name']); ?> models"
+                                        >
+                                            <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-90': isOpen(<?php echo \Illuminate\Support\Js::from($group['id'])->toHtml() ?>) }" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                            </svg>
+                                        </button>
+                                        <div class="min-w-0">
+                                            <span class="font-medium"><?php echo e($group['name']); ?></span>
+                                            <span class="text-brand-charcoal dark:text-brand-silver">
+                                                — Manufacturer
+                                                (<?php echo e($group['models_count']); ?> <?php echo e($group['models_count'] === 1 ? 'model' : 'models'); ?>,
+                                                <?php echo e($group['checked_out']); ?> checked out,
+                                                <?php echo e($group['available']); ?> available)
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <ul
+                                    class="ml-4 border-l border-brand-charcoal/30 dark:border-brand-charcoal"
+                                    x-show="isOpen(<?php echo \Illuminate\Support\Js::from($group['id'])->toHtml() ?>)"
+                                    x-cloak
+                                >
+                                    <?php $__currentLoopData = $group['models']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $modelIndex => $model): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <li class="border-b border-brand-charcoal/25 dark:border-brand-charcoal last:border-b-0">
+                                            <div class="<?php echo \Illuminate\Support\Arr::toCssClasses([
+                                                'px-4 py-2.5 border-l-[3px] border-l-brand',
+                                                'bg-[#cce8eb] dark:bg-[#33494c]' => $modelIndex % 2 === 1,
+                                                'bg-[#e5f5f6] dark:bg-[#2b3c3e]' => $modelIndex % 2 === 0,
+                                            ]); ?>">
+                                                <span class="font-medium"><?php echo e($model['model']); ?></span>
+                                                <span class="text-brand-charcoal dark:text-brand-silver">
+                                                    — Model
+                                                    (<?php echo e($model['checked_out']); ?> checked out,
+                                                    <?php echo e($model['available']); ?> available,
+                                                    <?php echo e($model['in_register']); ?> in register)
+                                                </span>
+                                            </div>
+                                        </li>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </ul>
+                            </li>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
         <?php else: ?>
             <div class="space-y-4">
                 <?php $__empty_1 = true; $__currentLoopData = $holderGroups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $group): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>

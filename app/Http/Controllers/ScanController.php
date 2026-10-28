@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Enums\AssetStatus;
 use App\Enums\LocationType;
+use App\Models\Asset;
 use App\Models\AssetList;
 use App\Models\AssetListItem;
 use App\Models\Location;
 use App\Models\ScanSession;
 use App\Models\UnknownScan;
 use App\Services\ScanService;
+use App\Support\AssetSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,7 +26,7 @@ class ScanController extends Controller
         $active = ScanSession::query()
             ->where('user_id', $request->user()->id)
             ->where('status', 'active')
-            ->with(['eventList', 'inventoryList', 'location'])
+            ->with(['eventList', 'inventoryList', 'location', 'parentAsset'])
             ->latest()
             ->first();
 
@@ -47,6 +49,14 @@ class ScanController extends Controller
                 ->get();
         }
 
+        $selectedParentId = old(
+            'parent_asset_id',
+            $active?->parent_asset_id ?? $request->query('parent_asset_id')
+        );
+        $replaceExistingParent = $request->session()->hasOldInput()
+            ? $request->session()->getOldInput('replace_existing_parent')
+            : ($active?->replace_existing_parent ?? false);
+
         return view('scan.index', [
             'session' => $active,
             'eventListItems' => $eventListItems,
@@ -55,7 +65,34 @@ class ScanController extends Controller
             'eventLists' => AssetList::where('type', 'event')->orderBy('name')->get(),
             'inventoryLists' => AssetList::where('type', 'inventory')->orderBy('name')->get(),
             'locations' => Location::orderBy('name')->get(),
+            'parentOption' => $this->parentPickerOption($selectedParentId),
+            'replaceExistingParent' => filter_var($replaceExistingParent, FILTER_VALIDATE_BOOLEAN),
         ]);
+    }
+
+    public function prepareParent(Request $request, Asset $asset): RedirectResponse
+    {
+        $active = ScanSession::query()
+            ->where('user_id', $request->user()->id)
+            ->where('status', 'active')
+            ->latest()
+            ->first();
+
+        if ($active === null) {
+            return redirect()->route('scan.index', ['parent_asset_id' => $asset->id]);
+        }
+
+        if ((int) $asset->department_id !== (int) $active->department_id) {
+            return redirect()->route('scan.index')->withErrors([
+                'parent_asset_id' => 'Parent asset must belong to the same department as this scan session.',
+            ]);
+        }
+
+        $active->update(['parent_asset_id' => $asset->id]);
+
+        return redirect()
+            ->route('scan.index')
+            ->with('status', 'Next scans will be assigned as children of '.$asset->name.'.');
     }
 
     public function start(Request $request): RedirectResponse
@@ -117,10 +154,16 @@ class ScanController extends Controller
         $data = $request->validate([
             'code' => ['required', 'string', 'max:255'],
             'quantity' => ['nullable', 'integer', 'min:1'],
+            'confirm_parent_change' => ['sometimes', 'boolean'],
         ]);
 
         try {
-            $result = $scanService->scanCode($scan, $data['code'], $data['quantity'] ?? 1);
+            $result = $scanService->scanCode(
+                $scan,
+                $data['code'],
+                $data['quantity'] ?? 1,
+                $request->boolean('confirm_parent_change'),
+            );
         } catch (ValidationException $e) {
             if ($request->expectsJson()) {
                 return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
@@ -155,7 +198,7 @@ class ScanController extends Controller
     }
 
     /**
-     * @return array{event_list_id: int|null, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, department_id: int}
+     * @return array{event_list_id: int|null, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, parent_asset_id: int|null, replace_existing_parent: bool, department_id: int}
      */
     protected function validatedSessionLists(Request $request): array
     {
@@ -189,6 +232,8 @@ class ScanController extends Controller
                 Rule::exists('locations', 'id')->whereNot('type', LocationType::Rack->value),
             ],
             'asset_status' => ['nullable', Rule::enum(AssetStatus::class)],
+            'parent_asset_id' => ['nullable', 'integer', 'exists:assets,id'],
+            'replace_existing_parent' => ['sometimes', 'boolean'],
         ], [
             'new_location.parent_id.exists' => 'Racks cannot be a parent for another location.',
         ]);
@@ -223,6 +268,9 @@ class ScanController extends Controller
         $data['inventory_list_id'] = $data['inventory_list_id'] ?? null;
         $data['asset_status'] = $data['asset_status'] ?? null;
         $data['department_id'] = $this->resolveSessionDepartmentId($request, $eventList, $inventoryList);
+        $data['parent_asset_id'] = isset($data['parent_asset_id']) ? (int) $data['parent_asset_id'] : null;
+        $data['replace_existing_parent'] = $request->boolean('replace_existing_parent');
+        $this->assertParentAssetForDepartment($data['parent_asset_id'], $data['department_id']);
 
         if ($creatingLocation) {
             $location = Location::create([
@@ -261,5 +309,49 @@ class ScanController extends Controller
         }
 
         return $departmentId;
+    }
+
+    protected function assertParentAssetForDepartment(?int $parentAssetId, int $departmentId): void
+    {
+        if ($parentAssetId === null) {
+            return;
+        }
+
+        $parent = Asset::query()->find($parentAssetId);
+
+        if ($parent === null || (int) $parent->department_id !== $departmentId) {
+            throw ValidationException::withMessages([
+                'parent_asset_id' => 'Parent asset must belong to the same department as this scan session.',
+            ]);
+        }
+    }
+
+    /**
+     * @return array{value: int, label: string}|null
+     */
+    protected function parentPickerOption(mixed $selectedParentId): ?array
+    {
+        if ($selectedParentId === null || $selectedParentId === '') {
+            return null;
+        }
+
+        $parentId = (int) $selectedParentId;
+
+        if ($parentId < 1) {
+            return null;
+        }
+
+        $parent = Asset::query()
+            ->whereKey($parentId)
+            ->first(['id', 'name', 'tp_barcode', 'fmi_ast', 'rig_tag', 'serial_number']);
+
+        if ($parent === null) {
+            return null;
+        }
+
+        return [
+            'value' => $parent->id,
+            'label' => AssetSearch::optionLabel($parent),
+        ];
     }
 }

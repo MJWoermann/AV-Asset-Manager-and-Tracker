@@ -35,6 +35,9 @@
                         </x-slot>
                         <x-slot name="content">
                             <x-dropdown-link :href="route('reports.compare')">Compare</x-dropdown-link>
+                            @role('admin|inventory_manager')
+                                <x-dropdown-link :href="route('reports.checkouts')">Checkout holdings</x-dropdown-link>
+                            @endrole
                             <x-dropdown-link :href="route('reports.unknown-scans')">Unknown scans</x-dropdown-link>
                             @feature('asset_connections')
                                 <x-dropdown-link :href="route('reports.connection-map')">Connection map</x-dropdown-link>

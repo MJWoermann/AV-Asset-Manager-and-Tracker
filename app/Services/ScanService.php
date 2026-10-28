@@ -29,10 +29,14 @@ class ScanService
      *     warning: string|null,
      *     message: string,
      *     asset: array<string, mixed>|null,
-     *     unknown_scan: array<string, mixed>|null
+     *     unknown_scan: array<string, mixed>|null,
+     *     parent_assignment: 'assigned'|'already'|'needs_confirm'|'rejected'|null,
+     *     parent_message: string|null,
+     *     current_parent: array{id: int, name: string}|null,
+     *     session_parent: array{id: int, name: string}|null
      * }
      */
-    public function scanCode(ScanSession $session, string $code, int $quantity = 1): array
+    public function scanCode(ScanSession $session, string $code, int $quantity = 1, bool $confirmParentChange = false): array
     {
         if (! $session->isActive()) {
             throw ValidationException::withMessages(['code' => 'Scan session is closed.']);
@@ -74,13 +78,12 @@ class ScanService
             return $this->logUnknownScan($session, $code, $quantity);
         }
 
-        return DB::transaction(function () use ($session, $asset, $quantity) {
+        return DB::transaction(function () use ($session, $asset, $quantity, $confirmParentChange) {
             $inventoryStatus = $this->inventoryStatus($session, $asset);
             $warning = $this->inventoryWarning($inventoryStatus, $asset, (bool) $session->event_list_id);
+            $assignment = $this->applySessionAssetUpdates($session, $asset, $confirmParentChange);
 
             if (! $session->event_list_id) {
-                $this->applySessionAssetUpdates($session, $asset);
-
                 $added = [
                     $this->syntheticItemSummary($asset, $quantity, false),
                 ];
@@ -100,7 +103,7 @@ class ScanService
                     $message .= ' Status updated to '.$session->asset_status->label().'.';
                 }
 
-                return [
+                return $this->withParentAssignment([
                     'items' => $added,
                     'duplicate' => false,
                     'unknown' => false,
@@ -109,7 +112,7 @@ class ScanService
                     'message' => $message,
                     'asset' => $this->assetSummary($asset->fresh(['itemType'])),
                     'unknown_scan' => null,
-                ];
+                ], $assignment);
             }
 
             $added = [];
@@ -142,15 +145,13 @@ class ScanService
                 }
             }
 
-            $this->applySessionAssetUpdates($session, $asset);
-
             if ($duplicate) {
                 $message = "{$asset->name} is already on this event list.";
                 if ($session->asset_status instanceof AssetStatus) {
                     $message .= ' Status updated to '.$session->asset_status->label().'.';
                 }
 
-                return [
+                return $this->withParentAssignment([
                     'items' => [],
                     'duplicate' => true,
                     'unknown' => false,
@@ -159,10 +160,10 @@ class ScanService
                     'message' => $message,
                     'asset' => $this->assetSummary($asset->fresh(['itemType'])),
                     'unknown_scan' => null,
-                ];
+                ], $assignment);
             }
 
-            return [
+            return $this->withParentAssignment([
                 'items' => $added,
                 'duplicate' => false,
                 'unknown' => false,
@@ -173,7 +174,7 @@ class ScanService
                     : "Added {$asset->name}.",
                 'asset' => $this->assetSummary($asset->fresh(['itemType'])),
                 'unknown_scan' => null,
-            ];
+            ], $assignment);
         });
     }
 
@@ -239,7 +240,7 @@ class ScanService
      */
     public function unknownScanSummary(UnknownScan $unknown): array
     {
-        $unknown->loadMissing('location');
+        $unknown->loadMissing(['location', 'scanSession']);
 
         return [
             'id' => $unknown->id,
@@ -250,13 +251,14 @@ class ScanService
             'has_event_list' => (bool) $unknown->event_list_id,
             'has_location' => (bool) $unknown->location_id,
             'resolved' => $unknown->isResolved(),
-            'create_url' => route('assets.create', [
+            'create_url' => route('assets.create', array_filter([
                 'tp_barcode' => $unknown->scanned_code,
                 'location_id' => $unknown->location_id,
                 'unknown_scan_id' => $unknown->id,
                 'status' => $unknown->asset_status?->value,
+                'parent_id' => $unknown->scanSession?->parent_asset_id,
                 'return_to' => route('scan.index', absolute: false),
-            ]),
+            ], fn ($value) => $value !== null && $value !== '')),
         ];
     }
 
@@ -272,17 +274,28 @@ class ScanService
     }
 
     /**
-     * Apply scan-session location/status to the scanned asset (and child statuses when set).
+     * Apply scan-session location/status/parent to the scanned asset (and child statuses when set).
+     *
+     * @return array{
+     *     status: 'assigned'|'already'|'needs_confirm'|'rejected'|null,
+     *     message: string|null,
+     *     current_parent: array{id: int, name: string}|null,
+     *     session_parent: array{id: int, name: string}|null
+     * }
      */
-    protected function applySessionAssetUpdates(ScanSession $session, Asset $asset): void
+    protected function applySessionAssetUpdates(ScanSession $session, Asset $asset, bool $confirmParentChange): array
     {
+        $assignment = $this->parentAssignment($session, $asset, $confirmParentChange);
         $attributes = [];
 
         if ($session->asset_status instanceof AssetStatus) {
             $attributes['status'] = $session->asset_status;
         }
 
-        if ($session->location_id && ! $asset->parent_id) {
+        if ($assignment['assign']) {
+            $asset->unsetRelation('parent');
+            $attributes['parent_id'] = $session->parent_asset_id;
+        } elseif ($session->location_id && ! $asset->parent_id) {
             $attributes['location_id'] = $session->location_id;
         }
 
@@ -291,7 +304,7 @@ class ScanService
         }
 
         if (! ($session->asset_status instanceof AssetStatus)) {
-            return;
+            return $this->parentAssignmentResult($assignment);
         }
 
         if (! $asset->relationLoaded('children')) {
@@ -301,6 +314,175 @@ class ScanService
         foreach ($asset->children as $child) {
             $child->update(['status' => $session->asset_status]);
         }
+
+        return $this->parentAssignmentResult($assignment);
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     * @param  array{
+     *     status: 'assigned'|'already'|'needs_confirm'|'rejected'|null,
+     *     message: string|null,
+     *     current_parent: array{id: int, name: string}|null,
+     *     session_parent: array{id: int, name: string}|null
+     * }  $assignment
+     * @return array<string, mixed>
+     */
+    protected function withParentAssignment(array $result, array $assignment): array
+    {
+        if ($assignment['message']) {
+            $result['message'] = rtrim((string) $result['message']).' '.$assignment['message'];
+        }
+
+        $result['parent_assignment'] = $assignment['status'];
+        $result['parent_message'] = $assignment['message'];
+        $result['current_parent'] = $assignment['current_parent'];
+        $result['session_parent'] = $assignment['session_parent'];
+
+        return $result;
+    }
+
+    /**
+     * @param  array{
+     *     status: 'assigned'|'already'|'needs_confirm'|'rejected'|null,
+     *     message: string|null,
+     *     current_parent: array{id: int, name: string}|null,
+     *     session_parent: array{id: int, name: string}|null,
+     *     assign: bool
+     * }  $assignment
+     * @return array{
+     *     status: 'assigned'|'already'|'needs_confirm'|'rejected'|null,
+     *     message: string|null,
+     *     current_parent: array{id: int, name: string}|null,
+     *     session_parent: array{id: int, name: string}|null
+     * }
+     */
+    protected function parentAssignmentResult(array $assignment): array
+    {
+        unset($assignment['assign']);
+
+        return $assignment;
+    }
+
+    /**
+     * @return array{
+     *     status: 'assigned'|'already'|'needs_confirm'|'rejected'|null,
+     *     message: string|null,
+     *     current_parent: array{id: int, name: string}|null,
+     *     session_parent: array{id: int, name: string}|null,
+     *     assign: bool
+     * }
+     */
+    protected function parentAssignment(ScanSession $session, Asset $asset, bool $confirmParentChange): array
+    {
+        $empty = [
+            'status' => null,
+            'message' => null,
+            'current_parent' => null,
+            'session_parent' => null,
+            'assign' => false,
+        ];
+
+        if (! $session->parent_asset_id) {
+            return $empty;
+        }
+
+        $parent = Asset::query()->find($session->parent_asset_id);
+
+        if ($parent === null) {
+            return $empty;
+        }
+
+        $asset->loadMissing('parent');
+        $sessionParent = [
+            'id' => $parent->id,
+            'name' => $parent->name,
+        ];
+        $currentParent = $asset->parent === null
+            ? null
+            : [
+                'id' => $asset->parent->id,
+                'name' => $asset->parent->name,
+            ];
+        $base = [
+            'current_parent' => $currentParent,
+            'session_parent' => $sessionParent,
+            'assign' => false,
+        ];
+
+        if ((int) $asset->id === (int) $parent->id) {
+            return $base + [
+                'status' => 'rejected',
+                'message' => "Cannot assign {$asset->name} as a child of itself.",
+            ];
+        }
+
+        if ($this->childIsAncestorOfParent($parent, $asset)) {
+            return $base + [
+                'status' => 'rejected',
+                'message' => "Cannot assign {$asset->name} under {$parent->name} — that would create a cycle.",
+            ];
+        }
+
+        if (
+            $asset->department_id !== null
+            && $parent->department_id !== null
+            && (int) $asset->department_id !== (int) $parent->department_id
+        ) {
+            return $base + [
+                'status' => 'rejected',
+                'message' => "{$asset->name} belongs to another department and was not assigned as a child of {$parent->name}.",
+            ];
+        }
+
+        if ((int) ($asset->parent_id ?? 0) === (int) $parent->id) {
+            return $base + [
+                'status' => 'already',
+                'message' => "Already a child of {$parent->name}.",
+            ];
+        }
+
+        if (
+            $asset->parent_id
+            && (int) $asset->parent_id !== (int) $parent->id
+            && ! $session->replace_existing_parent
+            && ! $confirmParentChange
+        ) {
+            $currentName = $currentParent['name'] ?? 'another asset';
+
+            return $base + [
+                'status' => 'needs_confirm',
+                'message' => "{$asset->name} already belongs to {$currentName}. Confirm to assign it under {$parent->name}.",
+            ];
+        }
+
+        $message = $asset->parent_id
+            ? "Moved {$asset->name} from ".($currentParent['name'] ?? 'its previous parent')." to {$parent->name}."
+            : "Assigned {$asset->name} as a child of {$parent->name}.";
+
+        return [
+            ...$base,
+            'status' => 'assigned',
+            'message' => $message,
+            'assign' => true,
+        ];
+    }
+
+    protected function childIsAncestorOfParent(Asset $parent, Asset $child): bool
+    {
+        $ancestorId = $parent->parent_id;
+        $guard = 0;
+
+        while ($ancestorId !== null && $guard < 1000) {
+            if ((int) $ancestorId === (int) $child->id) {
+                return true;
+            }
+
+            $ancestorId = Asset::withoutDepartmentScope()->whereKey($ancestorId)->value('parent_id');
+            $guard++;
+        }
+
+        return false;
     }
 
     protected function inventoryStatus(ScanSession $session, Asset $asset): string

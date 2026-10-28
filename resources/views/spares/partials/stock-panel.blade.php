@@ -37,7 +37,15 @@
             <div class="relative w-full overflow-hidden" style="height: 240px;">
                 <canvas x-ref="chart"></canvas>
             </div>
-            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-3 pt-1">Click a point for movement details.</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-xs text-brand-charcoal dark:text-brand-silver">
+                <template x-for="item in movementLegend" :key="item.type">
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full" :style="`background-color: ${item.color}`"></span>
+                        <span x-text="item.label"></span>
+                    </span>
+                </template>
+            </div>
+            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-2">Click a point for movement details.</p>
         </div>
         <div class="border border-brand-silver dark:border-brand-charcoal p-3 text-sm space-y-2 min-h-[12rem]">
             <h3 class="font-semibold">Movement detail</h3>

@@ -573,7 +573,7 @@
                                             href="{{ $row['url'] }}"
                                             class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
                                         >
-                                            <span @class(['text-red-700 dark:text-red-400' => in_array($row['key'], ['open', 'in_progress', 'assets_maintenance'], true) && $row['count'] > 0])>
+                                            <span @class(['text-red-700 dark:text-red-400' => in_array($row['key'], ['open', 'in_progress', 'assets_maintenance', 'unrepaired_faults', 'damaged'], true) && $row['count'] > 0])>
                                                 {{ $row['label'] }}
                                             </span>
                                             <span class="font-mono tabular-nums">{{ $row['count'] }}</span>
@@ -581,6 +581,44 @@
                                     </li>
                                 @endforeach
                             </ul>
+                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
+                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Faults without an open repair</p>
+                                @if ($maintenanceActivities['unrepairedFaults']->isEmpty())
+                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No faults waiting for a repair.</p>
+                                @else
+                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                        @foreach ($maintenanceActivities['unrepairedFaults'] as $faultAsset)
+                                            <li>
+                                                <a
+                                                    href="{{ route('assets.show', [$faultAsset, 'tab' => 'maintenance']) }}"
+                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                                >
+                                                    <span class="font-medium">{{ $faultAsset->name }}</span>
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                            <div class="border-t border-brand-silver dark:border-brand-charcoal">
+                                <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Damaged</p>
+                                @if ($maintenanceActivities['damagedAssets']->isEmpty())
+                                    <p class="px-4 py-3 text-sm text-brand-charcoal dark:text-brand-silver">No damaged assets.</p>
+                                @else
+                                    <ul class="divide-y divide-brand-silver dark:divide-brand-charcoal text-sm">
+                                        @foreach ($maintenanceActivities['damagedAssets'] as $damagedAsset)
+                                            <li>
+                                                <a
+                                                    href="{{ route('assets.show', $damagedAsset) }}"
+                                                    class="block px-4 py-2.5 hover:bg-brand-silver/40 dark:hover:bg-brand-charcoal transition"
+                                                >
+                                                    <span class="font-medium">{{ $damagedAsset->name }}</span>
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
                             <div class="border-t border-brand-silver dark:border-brand-charcoal">
                                 <p class="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-brand-charcoal dark:text-brand-silver">Active repairs</p>
                                 @if ($maintenanceActivities['recent']->isEmpty())

@@ -4,6 +4,16 @@
     $reorder = $stockReorderMeta ?? [];
     $initialAction = old('type', $stockAction ?? 'count');
     $canManageTags = auth()->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+    $canReviseMovements = auth()->user()?->hasAnyRole(['admin']) ?? false;
+    $reviseOld = ($canReviseMovements && old('movement_id') && $errors->any()) ? [
+        'id' => old('movement_id'),
+        'type' => old('type'),
+        'quantity' => old('quantity', old('quantity_delta')),
+        'recorded_at' => old('recorded_at'),
+        'notes' => old('notes'),
+        'external_po_number' => old('external_po_number'),
+        'external_po_url' => old('external_po_url'),
+    ] : null;
 @endphp
 
 <div
@@ -19,6 +29,12 @@
             'restock' => 'Units added from a restock / PO',
             'breakage' => 'Units removed due to breakage',
         ],
+        'revise' => $canReviseMovements ? [
+            'enabled' => true,
+            'updateUrl' => route('assets.stock-movements.update', [$asset, 0]),
+            'deleteUrl' => route('assets.stock-movements.destroy', [$asset, 0]),
+            'old' => $reviseOld,
+        ] : null,
     ]))"
 >
     @if (session('status'))
@@ -71,7 +87,32 @@
             <div class="relative w-full overflow-hidden" style="height: 240px;">
                 <canvas x-ref="chart"></canvas>
             </div>
-            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-3 pt-1">Click a point for movement details.</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-xs text-brand-charcoal dark:text-brand-silver">
+                <template x-for="item in movementLegend" :key="item.type">
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full" :style="`background-color: ${item.color}`"></span>
+                        <span x-text="item.label"></span>
+                    </span>
+                </template>
+            </div>
+            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-2">Click a point or an event below for movement details.</p>
+            <ul class="mt-2 max-h-40 overflow-y-auto text-sm divide-y divide-brand-silver dark:divide-brand-charcoal">
+                <template x-for="point in (chartPayload.points || [])" :key="point.id">
+                    <li>
+                        <button
+                            type="button"
+                            class="w-full text-left py-1.5"
+                            :class="selected && String(selected.id) === String(point.id) ? 'text-brand' : ''"
+                            @click="selected = point; cancelEdit()"
+                        >
+                            <span class="inline-block w-2.5 h-2.5 rounded-full align-middle" :style="`background-color: ${pointColor(point.type)}`"></span>
+                            <span x-text="point.recorded_at"></span>
+                            · <span x-text="point.type_label"></span>
+                            · <span x-text="point.quantity_before + ' → ' + point.quantity_after"></span>
+                        </button>
+                    </li>
+                </template>
+            </ul>
         </div>
 
         <div class="border border-brand-silver dark:border-brand-charcoal p-3 bg-white dark:bg-brand-slate text-sm space-y-2 min-h-[12rem]">
@@ -108,6 +149,68 @@
                             </template>
                         </ul>
                     </div>
+                    <template x-if="revise && revise.enabled && !editing">
+                        <div class="flex items-center justify-between gap-2 pt-2">
+                            <form method="POST" :action="movementUrl('deleteUrl')" onsubmit="return confirm('Delete this stock event?')">
+                                @csrf
+                                @method('DELETE')
+                                <x-danger-button>Delete</x-danger-button>
+                            </form>
+                            <x-secondary-button type="button" @click="beginEdit()">Update</x-secondary-button>
+                        </div>
+                    </template>
+                    <template x-if="editing && revise && revise.enabled">
+                        <form method="POST" :action="movementUrl('updateUrl')" class="space-y-3 border-t border-brand-silver dark:border-brand-charcoal pt-3">
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="movement_id" :value="selected.id">
+                            @if($errors->any() && old('movement_id'))
+                                <div class="text-sm text-red-600 space-y-1">
+                                    @foreach($errors->all() as $error)
+                                        <p>{{ $error }}</p>
+                                    @endforeach
+                                </div>
+                            @endif
+                            <div>
+                                <label class="text-xs text-brand-charcoal dark:text-brand-silver" for="edit_stock_type">Type</label>
+                                <select id="edit_stock_type" name="type" x-model="editForm.type" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                                    <option value="count">Count</option>
+                                    <option value="restock">Restock</option>
+                                    <option value="breakage">Breakage</option>
+                                    <option value="adjustment">Adjustment</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-brand-charcoal dark:text-brand-silver" for="edit_stock_quantity">Quantity</label>
+                                <input
+                                    id="edit_stock_quantity"
+                                    :name="editForm.type === 'adjustment' ? 'quantity_delta' : 'quantity'"
+                                    type="number"
+                                    x-model="editForm.quantity"
+                                    :min="editForm.type === 'adjustment' ? null : 0"
+                                    class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                    required
+                                >
+                                <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-1" x-text="editForm.type === 'count' ? 'Absolute on-hand quantity' : (editForm.type === 'restock' ? 'Units added to the previous on-hand quantity' : (editForm.type === 'breakage' ? 'Units removed' : 'Signed change from the previous quantity'))"></p>
+                            </div>
+                            <div>
+                                <label class="text-xs text-brand-charcoal dark:text-brand-silver" for="edit_stock_recorded_at">Date</label>
+                                <input id="edit_stock_recorded_at" name="recorded_at" type="date" x-model="editForm.recorded_at" max="{{ now()->format('Y-m-d') }}" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
+                            </div>
+                            <div x-show="editForm.type === 'restock'" x-cloak class="space-y-2">
+                                <input name="external_po_number" x-model="editForm.external_po_number" placeholder="PO number" class="block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                                <input name="external_po_url" type="url" x-model="editForm.external_po_url" placeholder="PO URL" class="block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                            </div>
+                            <div>
+                                <label class="text-xs text-brand-charcoal dark:text-brand-silver" for="edit_stock_notes">Notes</label>
+                                <textarea id="edit_stock_notes" name="notes" rows="2" x-model="editForm.notes" :required="editForm.type === 'breakage'" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"></textarea>
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <x-secondary-button type="button" @click="cancelEdit()">Cancel</x-secondary-button>
+                                <x-primary-button>Save event</x-primary-button>
+                            </div>
+                        </form>
+                    </template>
                 </div>
             </template>
         </div>

@@ -231,7 +231,11 @@ class CheckoutReportTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('reports.checkouts'));
 
-        $response->assertOk()->assertSee('Widget-X')->assertDontSee('Secret projector');
+        $response->assertOk()
+            ->assertSee('Widget-X')
+            ->assertSee('Export', false)
+            ->assertSee('PDF', false)
+            ->assertDontSee('Secret projector');
         $response->assertViewHas('modelRows', function (array $rows): bool {
             $widget = collect($rows)->firstWhere('model', 'Widget-X');
             $uncatalogued = collect($rows)->firstWhere('manufacturer', 'Uncatalogued');
@@ -243,6 +247,64 @@ class CheckoutReportTest extends TestCase
                 && $uncatalogued !== null
                 && $uncatalogued['available'] === 1
                 && $uncatalogued['checked_out'] === 1;
+        });
+    }
+
+    public function test_model_view_hides_models_with_nothing_checked_out(): void
+    {
+        $user = $this->manager();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'Acme']);
+        $idle = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'Shelf-Idle',
+        ]);
+        $out = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'Shelf-Out',
+        ]);
+
+        Asset::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $idle->id,
+            'status' => AssetStatus::Available,
+        ]);
+        $checkedOut = Asset::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $out->id,
+            'status' => AssetStatus::OnEvent,
+        ]);
+        $this->openCheckout($checkedOut, $user, 'hire');
+
+        $hidden = $this->actingAs($user)->get(route('reports.checkouts'));
+
+        $hidden->assertOk()
+            ->assertSee('Expand all')
+            ->assertSee('Collapse all')
+            ->assertSee('>Shelf-Out</span>', false)
+            ->assertDontSee('>Shelf-Idle</span>', false);
+        $hidden->assertViewHas('modelGroups', function (array $groups): bool {
+            $models = collect($groups)
+                ->flatMap(fn (array $group): array => array_column($group['models'], 'model'))
+                ->all();
+
+            return $models === ['Shelf-Out'];
+        });
+
+        $shown = $this->actingAs($user)->get(route('reports.checkouts', ['checked_out_only' => '0']));
+
+        $shown->assertOk()
+            ->assertSee('>Shelf-Idle</span>', false)
+            ->assertSee('>Shelf-Out</span>', false);
+        $shown->assertViewHas('modelGroups', function (array $groups): bool {
+            $models = collect($groups)
+                ->flatMap(fn (array $group): array => array_column($group['models'], 'model'))
+                ->sort()
+                ->values()
+                ->all();
+
+            return count($groups) === 1
+                && $groups[0]['name'] === 'Acme'
+                && $models === ['Shelf-Idle', 'Shelf-Out'];
         });
     }
 
@@ -405,6 +467,35 @@ class CheckoutReportTest extends TestCase
             (string) $response->headers->get('content-disposition')
         );
         $this->assertStringContainsString('Widget-Z', $response->streamedContent());
+    }
+
+    public function test_manager_can_export_the_model_summary_as_pdf(): void
+    {
+        $user = $this->manager();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'Acme']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'Widget-Pdf',
+        ]);
+        Asset::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+            'status' => AssetStatus::Available,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('reports.checkouts.export', [
+            'format' => 'pdf',
+            'view' => 'models',
+        ]));
+
+        $response->assertOk();
+        $response->assertDownload();
+        $this->assertStringContainsString(
+            'checkouts-by-models',
+            (string) $response->headers->get('content-disposition')
+        );
+        $this->assertStringContainsString('.pdf', (string) $response->headers->get('content-disposition'));
+        $this->assertStringStartsWith('%PDF', $response->getContent());
     }
 
     protected function manager(): User

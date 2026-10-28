@@ -53,6 +53,14 @@ class StockConsumablesFeatureTest extends TestCase
         return $feature ? $this->withFeature($user) : $user;
     }
 
+    protected function admin(bool $feature = true): User
+    {
+        $user = User::factory()->create(['theme' => 'light']);
+        $user->assignRole('admin');
+
+        return $feature ? $this->withFeature($user) : $user;
+    }
+
     protected function scanner(bool $feature = true): User
     {
         $user = User::factory()->create(['theme' => 'light']);
@@ -249,6 +257,13 @@ class StockConsumablesFeatureTest extends TestCase
             'recorded_at' => now()->subDay(),
         ], $user);
 
+        $service->record($asset->fresh(), [
+            'type' => StockMovementType::Breakage,
+            'quantity' => 4,
+            'notes' => 'Used after restock',
+            'recorded_at' => now()->subHours(12),
+        ], $user);
+
         $payload = app(StockChartService::class)->build($asset->fresh());
 
         $this->assertSame(5, $payload['min_line']);
@@ -256,6 +271,10 @@ class StockConsumablesFeatureTest extends TestCase
         $this->assertNotEmpty($payload['points']);
         $this->assertNotEmpty($payload['restock_markers']);
         $this->assertNotNull($payload['trend']);
+        $projection = $payload['trend']['projection'];
+        $this->assertSame($restock->recorded_at?->toIso8601String(), $projection[0]['x']);
+        $this->assertGreaterThanOrEqual(0, $projection[0]['y']);
+        $this->assertSame(0.0, (float) $projection[array_key_last($projection)]['y']);
 
         $detail = app(StockChartService::class)->pointPayload($restock);
         $this->assertSame('PO-TREND', $detail['external_po_number']);
@@ -404,6 +423,137 @@ class StockConsumablesFeatureTest extends TestCase
         $this->assertNotNull($bulk);
         $this->assertTrue((bool) $bulk->supports_stock_tracking);
         $this->assertTrue($bulk->fieldSets()->where('slug', 'restocking')->exists());
+    }
+
+    public function test_backdated_restock_adds_to_the_previous_event_not_later_on_hand(): void
+    {
+        $user = $this->scanner();
+        $asset = $this->stockAsset(quantity: 10);
+        $service = app(StockMovementService::class);
+
+        $service->record($asset->fresh(), [
+            'type' => StockMovementType::Count,
+            'quantity' => 20,
+            'recorded_at' => now()->subDays(10),
+        ], $user);
+
+        $service->record($asset->fresh(), [
+            'type' => StockMovementType::Breakage,
+            'quantity' => 5,
+            'notes' => 'Later use',
+            'recorded_at' => now()->subDay(),
+        ], $user);
+
+        $this->assertSame(15, (int) $asset->fresh()->quantity);
+
+        $restock = $service->record($asset->fresh(), [
+            'type' => StockMovementType::Restock,
+            'quantity' => 10,
+            'recorded_at' => now()->subDays(5),
+        ], $user);
+
+        $restock->refresh();
+        $breakage = StockMovement::query()
+            ->where('asset_id', $asset->id)
+            ->where('type', StockMovementType::Breakage)
+            ->first();
+
+        $this->assertSame(20, (int) $restock->quantity_before);
+        $this->assertSame(30, (int) $restock->quantity_after);
+        $this->assertNotNull($breakage);
+        $this->assertSame(30, (int) $breakage->quantity_before);
+        $this->assertSame(25, (int) $breakage->quantity_after);
+        $this->assertSame(25, (int) $asset->fresh()->quantity);
+    }
+
+    public function test_admin_can_update_and_delete_every_stock_event(): void
+    {
+        $admin = $this->admin();
+        $asset = $this->stockAsset(quantity: 10);
+        $service = app(StockMovementService::class);
+
+        $count = $service->record($asset->fresh(), [
+            'type' => StockMovementType::Count,
+            'quantity' => 12,
+            'recorded_at' => now()->subDays(4),
+        ], $admin);
+
+        $restock = $service->record($asset->fresh(), [
+            'type' => StockMovementType::Restock,
+            'quantity' => 3,
+            'recorded_at' => now()->subDays(2),
+        ], $admin);
+
+        $breakage = $service->record($asset->fresh(), [
+            'type' => StockMovementType::Breakage,
+            'quantity' => 2,
+            'notes' => 'Dropped',
+            'recorded_at' => now()->subDay(),
+        ], $admin);
+
+        $this->actingAs($admin)
+            ->patch(route('assets.stock-movements.update', [$asset, $restock]), [
+                'movement_id' => $restock->id,
+                'type' => 'restock',
+                'quantity' => 8,
+                'recorded_at' => $restock->recorded_at?->toDateString(),
+                'notes' => 'Corrected delivery',
+            ])
+            ->assertRedirect(route('assets.show', [$asset, 'tab' => 'stock']));
+
+        $this->assertSame(20, (int) $restock->fresh()->quantity_after);
+        $this->assertSame(18, (int) $breakage->fresh()->quantity_after);
+        $this->assertSame(18, (int) $asset->fresh()->quantity);
+
+        $this->actingAs($admin)
+            ->delete(route('assets.stock-movements.destroy', [$asset, $count]))
+            ->assertRedirect(route('assets.show', [$asset, 'tab' => 'stock']));
+
+        $this->assertDatabaseMissing('stock_movements', ['id' => $count->id]);
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_id' => $asset->id,
+            'action' => 'stock_movement_deleted',
+        ]);
+        $this->assertNotNull($restock->fresh());
+    }
+
+    public function test_scanner_cannot_update_or_delete_stock_events(): void
+    {
+        $scanner = $this->scanner();
+        $asset = $this->stockAsset(quantity: 10);
+        $movement = app(StockMovementService::class)->record($asset, [
+            'type' => StockMovementType::Count,
+            'quantity' => 9,
+        ], $scanner);
+
+        $this->actingAs($scanner)
+            ->patch(route('assets.stock-movements.update', [$asset, $movement]), [
+                'type' => 'count',
+                'quantity' => 4,
+                'recorded_at' => now()->toDateString(),
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($scanner)
+            ->delete(route('assets.stock-movements.destroy', [$asset, $movement]))
+            ->assertForbidden();
+
+        $this->assertNotNull($movement->fresh());
+        $this->assertSame(9, (int) $asset->fresh()->quantity);
+    }
+
+    public function test_guest_cannot_delete_a_stock_event(): void
+    {
+        $asset = $this->stockAsset(quantity: 10);
+        $movement = StockMovement::factory()->create([
+            'asset_id' => $asset->id,
+            'quantity_before' => 10,
+            'quantity_after' => 10,
+            'quantity_delta' => 0,
+        ]);
+
+        $this->delete(route('assets.stock-movements.destroy', [$asset, $movement]))
+            ->assertRedirect(route('login'));
     }
 
     public function test_stock_tracking_gate_helper_uses_developer_feature(): void

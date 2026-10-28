@@ -225,7 +225,7 @@ class AssetColumnFilterTest extends TestCase
         );
     }
 
-    public function test_hidden_column_status_filter_does_not_apply(): void
+    public function test_hidden_column_status_filter_still_applies_on_assets_index(): void
     {
         $user = $this->user();
         $user->preferences = [
@@ -246,19 +246,20 @@ class AssetColumnFilterTest extends TestCase
             'tp_barcode' => 'TP-SVC',
         ]);
 
-        // Stale status filter in the URL is stripped because the status column is hidden.
         $response = $this->actingAs($user)->get(route('assets.index', [
             'status' => AssetStatus::Available->value,
         ]));
 
-        $response->assertRedirect(route('assets.index'));
-
-        $cleared = $this->actingAs($user)->get(route('assets.index'));
-        $cleared->assertOk();
+        $response->assertOk();
         $this->assertSame(
-            ['Available Fixture', 'Service Fixture'],
-            $cleared->viewData('assets')->pluck('name')->sort()->values()->all()
+            ['Available Fixture'],
+            $response->viewData('assets')->pluck('name')->all()
         );
-        $cleared->assertDontSee('Filter by status', false);
+        $response->assertDontSee('Filter by status', false);
+        $response->assertSee('name="status"', false);
+        $response->assertSee('value="'.AssetStatus::Available->value.'"', false);
+        $response->assertSee('Clear all filters', false);
+        $response->assertSee('href="'.route('assets.index').'"', false);
+        $response->assertSee('A filter is applied to a hidden column: Status.', false);
     }
 }

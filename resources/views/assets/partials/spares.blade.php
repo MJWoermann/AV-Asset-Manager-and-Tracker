@@ -1,4 +1,29 @@
 <div class="border border-brand-silver dark:border-brand-charcoal p-4 text-sm space-y-3">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h3 class="font-semibold">Spares register</h3>
+            @if($listedSpare ?? null)
+                <p class="text-xs text-brand-charcoal dark:text-brand-silver">This asset is listed in the spares register.</p>
+            @else
+                <p class="text-xs text-brand-charcoal dark:text-brand-silver">List this asset as a replacement unit in the spares register.</p>
+            @endif
+        </div>
+        @if($listedSpare ?? null)
+            <a href="{{ route('spares.show', $listedSpare) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm self-start sm:self-auto">
+                Open {{ $listedSpare->code }}
+            </a>
+        @else
+            @role('admin|inventory_manager')
+                <form method="POST" action="{{ route('assets.spares.store', $asset) }}" class="self-start sm:self-auto">
+                    @csrf
+                    <button type="submit" class="px-3 py-2 bg-brand text-white text-sm">List in spares</button>
+                </form>
+            @endrole
+        @endif
+    </div>
+</div>
+
+<div class="border border-brand-silver dark:border-brand-charcoal p-4 text-sm space-y-3">
     <h3 class="font-semibold">Spares used / replacements</h3>
     <p class="text-xs text-brand-charcoal dark:text-brand-silver">Parts consumed on this asset and replacement units logged against it.</p>
 

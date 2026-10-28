@@ -151,7 +151,7 @@ class AssetColumnPreferenceTest extends TestCase
         );
     }
 
-    public function test_hiding_a_column_clears_its_filter_from_redirect(): void
+    public function test_hiding_a_column_on_assets_keeps_its_filter(): void
     {
         $user = $this->scanner();
 
@@ -164,14 +164,42 @@ class AssetColumnPreferenceTest extends TestCase
                 'columns' => ['name', 'location', 'tp_barcode'],
             ]);
 
-        $response->assertRedirect(route('assets.index', ['q' => 'mixer']));
+        $response->assertRedirect(route('assets.index', [
+            'status' => AssetStatus::Available->value,
+            'q' => 'mixer',
+        ]));
         $this->assertSame(
             ['name', 'location', 'tp_barcode'],
             $user->fresh()->assetTableColumns()
         );
     }
 
-    public function test_assets_index_redirects_to_drop_filters_for_hidden_columns(): void
+    public function test_hiding_a_column_on_a_list_clears_its_filter(): void
+    {
+        $user = $this->scanner();
+        $list = AssetList::create([
+            'name' => 'Tour inventory',
+            'type' => 'inventory',
+            'created_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from(route('lists.show', [
+                'list' => $list,
+                'status' => AssetStatus::Available->value,
+                'q' => 'mixer',
+            ]))
+            ->patch(route('preferences.asset-columns'), [
+                'columns' => ['name', 'location', 'tp_barcode'],
+            ]);
+
+        $response->assertRedirect(route('lists.show', [
+            'list' => $list,
+            'q' => 'mixer',
+        ]));
+    }
+
+    public function test_assets_index_applies_url_filters_for_hidden_columns(): void
     {
         $user = $this->scanner();
         $user->preferences = [
@@ -179,11 +207,32 @@ class AssetColumnPreferenceTest extends TestCase
         ];
         $user->save();
 
+        $type = ItemType::create(['name' => 'Audio', 'slug' => 'audio']);
+        Asset::create([
+            'name' => 'Road Case',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::InService,
+            'tp_barcode' => 'TP-ROAD',
+        ]);
+        Asset::create([
+            'name' => 'Road Spare',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Available,
+            'tp_barcode' => 'TP-SPARE',
+        ]);
+
         $response = $this->actingAs($user)->get(route('assets.index', [
             'status' => AssetStatus::InService->value,
-            'q' => 'road',
+            'q' => 'Road',
         ]));
 
-        $response->assertRedirect(route('assets.index', ['q' => 'road']));
+        $response->assertOk();
+        $this->assertSame(
+            ['Road Case'],
+            $response->viewData('assets')->pluck('name')->all()
+        );
+        $response->assertSee('Clear all filters', false);
+        $response->assertSee('href="'.route('assets.index').'"', false);
+        $response->assertSee('name="status"', false);
     }
 }

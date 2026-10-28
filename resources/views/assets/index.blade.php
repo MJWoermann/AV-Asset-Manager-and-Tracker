@@ -47,6 +47,12 @@
             @if (request()->filled(\App\Support\PageSize::PARAM))
                 <input type="hidden" name="{{ \App\Support\PageSize::PARAM }}" value="{{ request(\App\Support\PageSize::PARAM) }}">
             @endif
+            @foreach ($hiddenColumnFilters as $param => $value)
+                <input type="hidden" name="{{ $param }}" value="{{ $value }}">
+            @endforeach
+            @if (request()->boolean('unrepaired_fault'))
+                <input type="hidden" name="unrepaired_fault" value="1">
+            @endif
             <x-scannable-search
                 id="asset-search-q"
                 name="q"
@@ -59,9 +65,21 @@
             <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand shrink-0">Search</button>
             <x-clear-filters
                 :href="route('assets.index')"
-                :active="\App\Support\AssetBrowseFilters::hasActiveFilters(request(), $selectedColumns)"
+                :active="\App\Support\AssetBrowseFilters::hasActiveFilters(request())"
             />
         </form>
+        @if ($hiddenColumnFilters !== [])
+            @php
+                $hiddenFilterLabels = \App\Support\AssetBrowseFilters::columnLabelsForParams(array_keys($hiddenColumnFilters));
+            @endphp
+            <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">
+                A filter is applied to {{ count($hiddenFilterLabels) === 1 ? 'a hidden column' : 'hidden columns' }}: {{ implode(', ', $hiddenFilterLabels) }}.
+                Clear all filters removes {{ count($hiddenFilterLabels) === 1 ? 'it' : 'them' }}.
+            </p>
+        @endif
+        @if (request()->boolean('unrepaired_fault'))
+            <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">Showing assets with a fault and no open repair.</p>
+        @endif
 
         <x-bulk-asset-actions
             :statuses="$statuses"

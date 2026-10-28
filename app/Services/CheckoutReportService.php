@@ -27,6 +27,7 @@ class CheckoutReportService
      *     checked_out_from: string,
      *     checked_out_to: string,
      *     overdue: bool,
+     *     checked_out_only: bool,
      *     q: string,
      *     status: string
      * }
@@ -52,6 +53,9 @@ class CheckoutReportService
             'checked_out_from' => (string) ($validated['checked_out_from'] ?? ''),
             'checked_out_to' => (string) ($validated['checked_out_to'] ?? ''),
             'overdue' => (bool) ($validated['overdue'] ?? false),
+            'checked_out_only' => array_key_exists('checked_out_only', $validated)
+                ? (bool) $validated['checked_out_only']
+                : true,
             'q' => trim((string) ($validated['q'] ?? '')),
             'status' => $status,
         ];
@@ -89,6 +93,7 @@ class CheckoutReportService
             'checked_out_from' => $filters['checked_out_from'] !== '' ? $filters['checked_out_from'] : null,
             'checked_out_to' => $filters['checked_out_to'] !== '' ? $filters['checked_out_to'] : null,
             'overdue' => $filters['overdue'] ? '1' : null,
+            'checked_out_only' => ($filters['checked_out_only'] ?? true) ? null : '0',
             'q' => $filters['q'] !== '' ? $filters['q'] : null,
             'status' => $filters['status'] !== 'open' ? $filters['status'] : null,
         ];
@@ -155,6 +160,7 @@ class CheckoutReportService
             $model = $key === 'none' ? null : $models->get((int) $key);
 
             $rows[] = [
+                'manufacturer_id' => $key === 'none' ? null : $model?->manufacturer_id,
                 'manufacturer' => $key === 'none' ? 'Uncatalogued' : ($model?->manufacturer?->name ?? '—'),
                 'model' => $key === 'none' ? '—' : ($model?->name ?? '—'),
                 'available' => (int) ($available[$key] ?? 0),
@@ -173,6 +179,48 @@ class CheckoutReportService
 
             return $row;
         }, $rows);
+    }
+
+    /**
+     * Group model rows under their manufacturer for the expandable report.
+     *
+     * @param  list<array{manufacturer_id: int|null, manufacturer: string, model: string, available: int, checked_out: int, in_register: int}>  $rows
+     * @return list<array{id: string, name: string, models_count: int, available: int, checked_out: int, in_register: int, models: list<array{manufacturer_id: int|null, manufacturer: string, model: string, available: int, checked_out: int, in_register: int}>}>
+     */
+    public function modelGroups(array $rows, bool $checkedOutOnly = true): array
+    {
+        if ($checkedOutOnly) {
+            $rows = array_values(array_filter(
+                $rows,
+                fn (array $row): bool => $row['checked_out'] > 0,
+            ));
+        }
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $id = $row['manufacturer_id'] !== null ? 'm-'.$row['manufacturer_id'] : 'none';
+
+            if (! isset($groups[$id])) {
+                $groups[$id] = [
+                    'id' => $id,
+                    'name' => $row['manufacturer'],
+                    'models_count' => 0,
+                    'available' => 0,
+                    'checked_out' => 0,
+                    'in_register' => 0,
+                    'models' => [],
+                ];
+            }
+
+            $groups[$id]['models'][] = $row;
+            $groups[$id]['models_count']++;
+            $groups[$id]['available'] += $row['available'];
+            $groups[$id]['checked_out'] += $row['checked_out'];
+            $groups[$id]['in_register'] += $row['in_register'];
+        }
+
+        return array_values($groups);
     }
 
     /**

@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AssetStatus;
+use App\Enums\SparePartKind;
 use App\Enums\SparePartMovementType;
 use App\Enums\SparePartStockStatus;
 use App\Models\Asset;
+use App\Models\Department;
+use App\Models\ItemType;
 use App\Models\Manufacturer;
 use App\Models\ManufacturerModel;
 use App\Models\SpareGroup;
@@ -269,6 +273,103 @@ class SparePartRegisterTest extends TestCase
         $chart = app(SparePartChartService::class)->build($spare->fresh());
         $this->assertSame(4, $chart['current_quantity']);
         $this->assertNotEmpty($chart['points']);
+    }
+
+    public function test_manager_can_list_an_asset_in_the_spares_register(): void
+    {
+        $manager = $this->manager();
+        $manufacturer = Manufacturer::factory()->create(['name' => 'LensCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $manufacturer->id,
+            'name' => 'Lens-200',
+        ]);
+        $asset = Asset::factory()->create([
+            'name' => 'Spare lens',
+            'manufacturer_id' => $manufacturer->id,
+            'manufacturer_model_id' => $model->id,
+            'serial_number' => 'SN-100',
+            'tp_barcode' => 'TP-100',
+            'replacement_cost' => 42.50,
+            'status' => AssetStatus::Available,
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('assets.show', $asset))
+            ->assertOk()
+            ->assertSee('List in spares');
+
+        $response = $this->actingAs($manager)
+            ->post(route('assets.spares.store', $asset));
+
+        $spare = SparePart::query()->where('asset_id', $asset->id)->first();
+        $this->assertNotNull($spare);
+
+        $response->assertRedirect(route('spares.show', $spare));
+
+        $spare->refresh();
+        $this->assertSame(SparePartKind::ReplacementAsset, $spare->kind);
+        $this->assertSame('Spare lens', $spare->component);
+        $this->assertSame('SN-100', $spare->product_code);
+        $this->assertSame('42.50', $spare->unit_cost);
+        $this->assertSame(1, $spare->quantity_on_hand);
+        $this->assertSame($asset->department_id, $spare->department_id);
+        $this->assertSame($manufacturer->id, $spare->manufacturer_id);
+        $this->assertTrue($spare->compatibleModels->contains('id', $model->id));
+
+        $this->actingAs($manager)
+            ->get(route('spares.show', $spare))
+            ->assertOk()
+            ->assertSee('Asset listed in the spares register.')
+            ->assertSee('Spare lens');
+
+        $this->actingAs($manager)
+            ->post(route('assets.spares.store', $asset))
+            ->assertRedirect(route('spares.show', $spare));
+
+        $this->assertSame(1, SparePart::query()->where('asset_id', $asset->id)->count());
+
+        $this->actingAs($manager)
+            ->get(route('assets.show', [$asset, 'tab' => 'spares']))
+            ->assertOk()
+            ->assertSee($spare->code)
+            ->assertDontSee('>List in spares<', false);
+    }
+
+    public function test_scanner_cannot_list_an_asset_in_the_spares_register(): void
+    {
+        $asset = Asset::factory()->create(['name' => 'Scanner lens']);
+
+        $this->actingAs($this->scanner())
+            ->get(route('assets.show', $asset))
+            ->assertOk()
+            ->assertDontSee('List in spares', false);
+
+        $this->actingAs($this->scanner())
+            ->post(route('assets.spares.store', $asset))
+            ->assertForbidden();
+
+        $this->assertSame(0, SparePart::query()->count());
+    }
+
+    public function test_manager_cannot_list_an_asset_from_another_department(): void
+    {
+        $alpha = Department::factory()->create(['name' => 'Alpha', 'slug' => 'alpha']);
+        $bravo = Department::factory()->create(['name' => 'Bravo', 'slug' => 'bravo']);
+        $manager = $this->manager();
+        $manager->departments()->sync([$alpha->id]);
+        $type = ItemType::factory()->create();
+        $asset = Asset::withoutDepartmentScope()->create([
+            'department_id' => $bravo->id,
+            'name' => 'Hidden spare candidate',
+            'item_type_id' => $type->id,
+            'status' => AssetStatus::Available,
+        ]);
+
+        $this->actingAs($manager)
+            ->post(route('assets.spares.store', $asset))
+            ->assertNotFound();
+
+        $this->assertSame(0, SparePart::withoutDepartmentScope()->count());
     }
 
     public function test_asset_spares_tab_lists_movements(): void

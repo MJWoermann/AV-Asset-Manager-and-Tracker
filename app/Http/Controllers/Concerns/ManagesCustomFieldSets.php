@@ -39,6 +39,7 @@ trait ManagesCustomFieldSets
             'fields.*.type' => ['required', Rule::in(self::FIELD_TYPES)],
             'fields.*.options' => ['nullable', 'string', 'max:2000'],
             'fields.*.is_required' => ['sometimes', 'boolean'],
+            'fields.*.is_scannable' => ['sometimes', 'boolean'],
         ]);
 
         $errors = [];
@@ -77,6 +78,8 @@ trait ManagesCustomFieldSets
             }
             $options = $isLayout ? null : $this->parseOptions($type, $field['options'] ?? null);
             $isRequired = $isLayout ? false : filter_var($field['is_required'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $isScannable = in_array($type, CustomFieldDefinition::SCANNABLE_TYPES, true)
+                && filter_var($field['is_scannable'] ?? false, FILTER_VALIDATE_BOOLEAN);
             $definitionId = isset($field['id']) ? (int) $field['id'] : null;
 
             if ($definitionId) {
@@ -90,6 +93,7 @@ trait ManagesCustomFieldSets
                     'type' => $type,
                     'options' => $options,
                     'is_required' => $isRequired,
+                    'is_scannable' => $isScannable,
                     'sort_order' => $index,
                 ]);
             } else {
@@ -100,6 +104,7 @@ trait ManagesCustomFieldSets
                     'type' => $type,
                     'options' => $options,
                     'is_required' => $isRequired,
+                    'is_scannable' => $isScannable,
                     'sort_order' => $index,
                 ]);
             }

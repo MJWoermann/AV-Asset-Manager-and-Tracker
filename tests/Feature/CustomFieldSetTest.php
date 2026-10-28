@@ -294,6 +294,101 @@ class CustomFieldSetTest extends TestCase
         $this->assertNull($definitions[2]->options);
     }
 
+    public function test_manager_can_save_scannable_text_number_and_url_fields(): void
+    {
+        $this->actingAs($this->manager())->post(route('custom-field-sets.store'), [
+            'name' => 'Scan Labels',
+            'fields' => [
+                [
+                    'name' => 'Shelf code',
+                    'type' => 'text',
+                    'is_required' => '0',
+                    'is_scannable' => '1',
+                ],
+                [
+                    'name' => 'Bin number',
+                    'type' => 'number',
+                    'is_required' => '0',
+                    'is_scannable' => '1',
+                ],
+                [
+                    'name' => 'Manual link',
+                    'type' => 'url',
+                    'is_required' => '0',
+                    'is_scannable' => '0',
+                ],
+            ],
+        ])->assertRedirect(route('custom-field-sets.index'));
+
+        $fieldSet = CustomFieldSet::query()->where('name', 'Scan Labels')->first();
+        $this->assertNotNull($fieldSet);
+
+        $definitions = $fieldSet->definitions->keyBy('name');
+        $this->assertTrue($definitions['Shelf code']->is_scannable);
+        $this->assertTrue($definitions['Shelf code']->allowsBarcodeScan());
+        $this->assertTrue($definitions['Bin number']->is_scannable);
+        $this->assertFalse($definitions['Manual link']->is_scannable);
+        $this->assertFalse($definitions['Manual link']->allowsBarcodeScan());
+    }
+
+    public function test_checkbox_select_and_layout_fields_stay_not_scannable(): void
+    {
+        $this->actingAs($this->manager())->post(route('custom-field-sets.store'), [
+            'name' => 'Mixed Controls',
+            'fields' => [
+                [
+                    'name' => 'Portable',
+                    'type' => 'checkbox',
+                    'is_scannable' => '1',
+                ],
+                [
+                    'name' => 'Connector',
+                    'type' => 'select',
+                    'options' => 'XLR, etherCON',
+                    'is_scannable' => '1',
+                ],
+                [
+                    'name' => 'Spacer',
+                    'type' => 'spacer',
+                    'is_scannable' => '1',
+                ],
+                [
+                    'name' => 'Section',
+                    'type' => 'divider',
+                    'is_scannable' => '1',
+                ],
+            ],
+        ])->assertRedirect(route('custom-field-sets.index'));
+
+        $definitions = CustomFieldSet::query()->where('name', 'Mixed Controls')->firstOrFail()->definitions;
+
+        $this->assertCount(4, $definitions);
+        $this->assertTrue($definitions->every(fn (CustomFieldDefinition $definition): bool => $definition->is_scannable === false));
+        $this->assertTrue($definitions->every(fn (CustomFieldDefinition $definition): bool => $definition->allowsBarcodeScan() === false));
+    }
+
+    public function test_edit_form_includes_saved_scannable_flag(): void
+    {
+        $fieldSet = CustomFieldSet::create([
+            'name' => 'Scan Labels',
+            'slug' => 'scan-labels',
+        ]);
+        CustomFieldDefinition::create([
+            'custom_field_set_id' => $fieldSet->id,
+            'name' => 'Shelf code',
+            'slug' => 'shelf-code',
+            'type' => 'text',
+            'is_scannable' => true,
+            'sort_order' => 0,
+        ]);
+
+        $response = $this->actingAs($this->manager())->get(route('custom-field-sets.edit', $fieldSet));
+
+        $response->assertOk();
+        $response->assertSee('Scannable', false);
+        $response->assertSee('\u0022is_scannable\u0022:true', false);
+    }
+
     public function test_data_field_still_requires_name(): void
     {
         $this->actingAs($this->manager())

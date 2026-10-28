@@ -8,6 +8,7 @@
                 'type' => $definition->type,
                 'options' => is_array($definition->options) ? implode(', ', $definition->options) : '',
                 'is_required' => (bool) $definition->is_required,
+                'is_scannable' => (bool) $definition->is_scannable,
             ])->values()->all()
             : [];
     } else {
@@ -17,6 +18,7 @@
             'type' => $field['type'] ?? 'text',
             'options' => $field['options'] ?? '',
             'is_required' => filter_var($field['is_required'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'is_scannable' => filter_var($field['is_scannable'] ?? false, FILTER_VALIDATE_BOOLEAN),
         ])->values()->all();
     }
 
@@ -66,7 +68,7 @@
                         <button type="button" class="text-brand" @click="addDivider()">Add divider</button>
                     </div>
                 </div>
-                <p class="text-xs text-brand-charcoal dark:text-brand-silver">Drag the handle or use arrows to reorder. Spacers and dividers control layout on asset forms.</p>
+                <p class="text-xs text-brand-charcoal dark:text-brand-silver">Drag the handle or use arrows to reorder. Spacers and dividers control layout on asset forms. Mark a text, number, or URL field as scannable to fill it from a barcode.</p>
                 <x-input-error :messages="$errors->get('fields')" class="mt-1" />
 
                 <template x-if="fields.length === 0">
@@ -177,14 +179,29 @@
                                         </select>
                                     </div>
                                     <template x-if="!isLayoutType(field.type)">
-                                        <label class="inline-flex items-center gap-2 text-sm mt-6">
-                                            <input type="hidden" :name="`fields[${index}][is_required]`" value="0">
-                                            <input type="checkbox" :name="`fields[${index}][is_required]`" value="1" class="rounded text-brand" x-model="field.is_required">
-                                            Required
-                                        </label>
+                                        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-6">
+                                            <label class="inline-flex items-center gap-2 text-sm">
+                                                <input type="hidden" :name="`fields[${index}][is_required]`" value="0">
+                                                <input type="checkbox" :name="`fields[${index}][is_required]`" value="1" class="rounded text-brand" x-model="field.is_required">
+                                                Required
+                                            </label>
+                                            <template x-if="canBeScannable(field.type)">
+                                                <label class="inline-flex items-center gap-2 text-sm" title="Show a Scan button on asset forms so this value can be filled from a barcode.">
+                                                    <input type="hidden" :name="`fields[${index}][is_scannable]`" value="0">
+                                                    <input type="checkbox" :name="`fields[${index}][is_scannable]`" value="1" class="rounded text-brand" x-model="field.is_scannable">
+                                                    Scannable
+                                                </label>
+                                            </template>
+                                            <template x-if="!canBeScannable(field.type)">
+                                                <input type="hidden" :name="`fields[${index}][is_scannable]`" value="0">
+                                            </template>
+                                        </div>
                                     </template>
                                     <template x-if="isLayoutType(field.type)">
-                                        <input type="hidden" :name="`fields[${index}][is_required]`" value="0">
+                                        <div>
+                                            <input type="hidden" :name="`fields[${index}][is_required]`" value="0">
+                                            <input type="hidden" :name="`fields[${index}][is_scannable]`" value="0">
+                                        </div>
                                     </template>
                                 </div>
 

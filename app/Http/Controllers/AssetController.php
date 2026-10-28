@@ -50,22 +50,16 @@ use Illuminate\View\View;
 
 class AssetController extends Controller
 {
-    public function index(Request $request): View|RedirectResponse
+    public function index(Request $request): View
     {
         $selectedColumns = $request->user()->assetTableColumns();
-
-        if (AssetBrowseFilters::hasFilledHiddenColumnFilters($request, $selectedColumns)) {
-            return redirect()->to(
-                AssetBrowseFilters::urlWithoutHiddenColumnFilters($request->fullUrl(), $selectedColumns)
-            );
-        }
-
         $term = AssetBrowseFilters::term($request);
 
         $assets = Asset::query()
             ->with(['itemType', 'location', 'parent', 'manufacturer', 'manufacturerModel', 'customFieldValues']);
 
-        AssetBrowseFilters::applyToAssetQuery($assets, $request, selectedColumns: $selectedColumns);
+        // URL filters apply even when that column is hidden. Clear all filters removes them.
+        AssetBrowseFilters::applyToAssetQuery($assets, $request);
 
         $assets = PageSize::paginate(
             $assets->orderBySearchRelevance($term),
@@ -78,6 +72,7 @@ class AssetController extends Controller
             'q' => $term ?? '',
             'availableColumns' => AssetTableColumns::definitions(),
             'selectedColumns' => $selectedColumns,
+            'hiddenColumnFilters' => AssetBrowseFilters::filledHiddenColumnFilters($request, $selectedColumns),
             'locations' => Location::with('parent.parent.parent.parent')->orderBy('name')->get(),
             'itemTypes' => ItemType::orderBy('name')->get(),
             'manufacturers' => Manufacturer::query()->orderBy('name')->get(['id', 'name']),
@@ -203,6 +198,7 @@ class AssetController extends Controller
             'rig_tag' => $request->string('rig_tag')->toString() ?: null,
             'serial_number' => $request->string('serial_number')->toString() ?: null,
             'location_id' => $request->integer('location_id') ?: null,
+            'parent_id' => $request->integer('parent_id') ?: null,
         ]);
 
         return view('assets.form', $this->assetFormData($asset, [
@@ -550,6 +546,7 @@ class AssetController extends Controller
         }
 
         $spareMovements = collect();
+        $listedSpare = $asset->spareListings()->activeLifecycle()->first();
         if ($tab === 'spares') {
             $spareMovements = $asset->sparePartMovements()
                 ->with(['sparePart', 'user'])
@@ -620,6 +617,7 @@ class AssetController extends Controller
             'openRepairsByFaultId' => $openRepairsByFaultId,
             'repairAssigneeOptions' => $repairAssigneeOptions,
             'spareMovements' => $spareMovements,
+            'listedSpare' => $listedSpare,
             'isExternalRepairer' => $isExternalRepairer,
             'openCheckout' => $openCheckout,
             'checkoutHistory' => $checkoutHistory,

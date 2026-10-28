@@ -45,6 +45,20 @@
                             class="px-3 py-2 bg-brand text-white text-sm"
                         >Open URL</a>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    <form method="POST" action="<?php echo e(route('scan.prepare-parent', $asset)); ?>" class="inline">
+                        <?php echo csrf_field(); ?>
+                        <button type="submit" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Scan children</button>
+                    </form>
+                    <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
+                        <?php if($listedSpare ?? null): ?>
+                            <a href="<?php echo e(route('spares.show', $listedSpare)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">In spares register</a>
+                        <?php else: ?>
+                            <form method="POST" action="<?php echo e(route('assets.spares.store', $asset)); ?>" class="inline">
+                                <?php echo csrf_field(); ?>
+                                <button type="submit" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">List in spares</button>
+                            </form>
+                        <?php endif; ?>
+                    <?php endif; ?>
                     <a href="<?php echo e(route('assets.edit', $asset)); ?>" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
                     <?php if (\Illuminate\Support\Facades\Blade::check('role', 'admin|inventory_manager')): ?>
                         <?php if (\Illuminate\Support\Facades\Blade::check('feature', 'shelf_tag_generator')): ?>

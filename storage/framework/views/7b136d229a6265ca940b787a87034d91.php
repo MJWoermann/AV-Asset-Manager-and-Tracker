@@ -1218,10 +1218,11 @@
                                 <?php else: ?>
                                     <?php
                                         $cfId = 'cf_'.$def->id;
-                                        $cfIsMac = $def->type !== 'checkbox'
-                                            && $macFieldCatalog->looksLikeMac('custom.'.$def->slug, $def->name);
+                                        $cfUseScanner = $def->allowsBarcodeScan()
+                                            || ($def->type !== 'checkbox'
+                                                && $macFieldCatalog->looksLikeMac('custom.'.$def->slug, $def->name));
                                     ?>
-                                    <?php if($cfIsMac): ?>
+                                    <?php if($cfUseScanner): ?>
                                         <?php if (isset($component)) { $__componentOriginal13aff8a133007eb71af771461a335f74 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal13aff8a133007eb71af771461a335f74 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.scannable-text-input','data' => ['id' => $cfId,'name' => 'custom_fields['.$def->id.']','label' => $def->name,'value' => old('custom_fields.'.$def->id, $values[$def->id]->value ?? ''),'scanAriaLabel' => 'Scan barcode into '.$def->name]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>

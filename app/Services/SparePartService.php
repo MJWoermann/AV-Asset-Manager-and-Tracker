@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\FileCategory;
+use App\Enums\SparePartKind;
 use App\Enums\SparePartLifecycleStatus;
 use App\Enums\SparePartMovementType;
 use App\Enums\SparePartSeverity;
@@ -88,6 +89,50 @@ class SparePartService
                 'supersededBy',
                 'supersedes',
             ]);
+        });
+    }
+
+    /**
+     * List a tracked asset in the spares register as a replacement unit.
+     *
+     * An active listing for the same asset is returned unchanged.
+     *
+     * @return array{spare: SparePart, created: bool}
+     */
+    public function listAsset(Asset $asset): array
+    {
+        return DB::transaction(function () use ($asset): array {
+            $existing = SparePart::query()
+                ->where('asset_id', $asset->id)
+                ->activeLifecycle()
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing !== null) {
+                return ['spare' => $existing, 'created' => false];
+            }
+
+            $notes = $this->listingNotes($asset);
+            $compatibleModelIds = $asset->manufacturer_model_id
+                ? [(int) $asset->manufacturer_model_id]
+                : [];
+
+            $spare = $this->create([
+                'department_id' => $asset->department_id,
+                'kind' => SparePartKind::ReplacementAsset,
+                'component' => $asset->name,
+                'manufacturer_id' => $asset->manufacturer_id,
+                'manufacturer_model_id' => $asset->manufacturer_model_id,
+                'product_code' => $asset->serial_number ?: $asset->tp_barcode,
+                'location_id' => $asset->location_id,
+                'supplier' => $asset->supplier,
+                'unit_cost' => $asset->replacement_cost,
+                'asset_id' => $asset->id,
+                'quantity_on_hand' => 1,
+                'notes' => $notes,
+            ], $compatibleModelIds);
+
+            return ['spare' => $spare, 'created' => true];
         });
     }
 
@@ -298,6 +343,7 @@ class SparePartService
             ?? SparePartSeverity::Moderate;
 
         $attrs = [
+            'department_id' => $data['department_id'] ?? $existing?->department_id,
             'code' => $code,
             'kind' => $data['kind'] ?? $existing?->kind,
             'manufacturer_id' => $data['manufacturer_id'] ?? $existing?->manufacturer_id,
@@ -368,6 +414,24 @@ class SparePartService
         }
 
         return $normalized;
+    }
+
+    protected function listingNotes(Asset $asset): string
+    {
+        $lines = ['Listed from the asset register.'];
+
+        foreach ([
+            'TP barcode' => $asset->tp_barcode,
+            'FMI AST' => $asset->fmi_ast,
+            'Serial' => $asset->serial_number,
+            'Rig tag' => $asset->rig_tag,
+        ] as $label => $value) {
+            if (filled($value)) {
+                $lines[] = $label.': '.$value;
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     protected function wouldCreateCycle(SparePart $part, SparePart $successor): bool

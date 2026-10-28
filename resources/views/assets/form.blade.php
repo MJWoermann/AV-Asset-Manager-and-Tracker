@@ -360,10 +360,11 @@
                                 @else
                                     @php
                                         $cfId = 'cf_'.$def->id;
-                                        $cfIsMac = $def->type !== 'checkbox'
-                                            && $macFieldCatalog->looksLikeMac('custom.'.$def->slug, $def->name);
+                                        $cfUseScanner = $def->allowsBarcodeScan()
+                                            || ($def->type !== 'checkbox'
+                                                && $macFieldCatalog->looksLikeMac('custom.'.$def->slug, $def->name));
                                     @endphp
-                                    @if($cfIsMac)
+                                    @if($cfUseScanner)
                                         <x-scannable-text-input
                                             :id="$cfId"
                                             :name="'custom_fields['.$def->id.']'"

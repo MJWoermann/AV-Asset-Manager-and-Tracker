@@ -116,6 +116,26 @@
 <?php $component = $__componentOriginal62cf2f378266570595baa55e0afc4388; ?>
 <?php unset($__componentOriginal62cf2f378266570595baa55e0afc4388); ?>
 <?php endif; ?>
+                    <?php if (isset($component)) { $__componentOriginal8b1f5e6dd9566fac732a70272e1c0306 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal8b1f5e6dd9566fac732a70272e1c0306 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.scan.parent-asset-field','data' => ['option' => $parentOption,'replaceExisting' => $replaceExistingParent]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('scan.parent-asset-field'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['option' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($parentOption),'replace-existing' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($replaceExistingParent)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal8b1f5e6dd9566fac732a70272e1c0306)): ?>
+<?php $attributes = $__attributesOriginal8b1f5e6dd9566fac732a70272e1c0306; ?>
+<?php unset($__attributesOriginal8b1f5e6dd9566fac732a70272e1c0306); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal8b1f5e6dd9566fac732a70272e1c0306)): ?>
+<?php $component = $__componentOriginal8b1f5e6dd9566fac732a70272e1c0306; ?>
+<?php unset($__componentOriginal8b1f5e6dd9566fac732a70272e1c0306); ?>
+<?php endif; ?>
                 </div>
                 <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
@@ -238,6 +258,26 @@
 <?php $component = $__componentOriginal62cf2f378266570595baa55e0afc4388; ?>
 <?php unset($__componentOriginal62cf2f378266570595baa55e0afc4388); ?>
 <?php endif; ?>
+                    <?php if (isset($component)) { $__componentOriginal8b1f5e6dd9566fac732a70272e1c0306 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal8b1f5e6dd9566fac732a70272e1c0306 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.scan.parent-asset-field','data' => ['option' => $parentOption,'replaceExisting' => $replaceExistingParent,'id' => 'active_parent_asset_id']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('scan.parent-asset-field'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['option' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($parentOption),'replace-existing' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($replaceExistingParent),'id' => 'active_parent_asset_id']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal8b1f5e6dd9566fac732a70272e1c0306)): ?>
+<?php $attributes = $__attributesOriginal8b1f5e6dd9566fac732a70272e1c0306; ?>
+<?php unset($__attributesOriginal8b1f5e6dd9566fac732a70272e1c0306); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal8b1f5e6dd9566fac732a70272e1c0306)): ?>
+<?php $component = $__componentOriginal8b1f5e6dd9566fac732a70272e1c0306; ?>
+<?php unset($__componentOriginal8b1f5e6dd9566fac732a70272e1c0306); ?>
+<?php endif; ?>
                 </div>
                 <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
@@ -286,13 +326,14 @@
                     'has_event_list' => (bool) $scan->event_list_id,
                     'has_location' => (bool) $scan->location_id,
                     'resolved' => $scan->isResolved(),
-                    'create_url' => route('assets.create', [
+                    'create_url' => route('assets.create', array_filter([
                         'tp_barcode' => $scan->scanned_code,
                         'location_id' => $scan->location_id,
                         'unknown_scan_id' => $scan->id,
                         'status' => $scan->asset_status?->value,
+                        'parent_id' => $session->parent_asset_id,
                         'return_to' => route('scan.index', absolute: false),
-                    ]),
+                    ], fn ($value) => $value !== null && $value !== '')),
                     'time' => $scan->created_at?->timezone(config('app.timezone'))->format('g:i:s A'),
                 ])->values();
             ?>
@@ -301,6 +342,13 @@
                 x-data="barcodeScanner(<?php echo \Illuminate\Support\Js::from(route('scan.scan', $session))->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($session->event_list_id)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($initialEventItems)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(route('unknown-scans.update', ['unknownScan' => '__ID__']))->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($initialUnknownScans)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($clearScanRecent ?? false)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(auth()->user()?->wantsScanNoise() ?? false)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(auth()->user()?->wantsScanVibrate() ?? false)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(route('unknown-scans.link', ['unknownScan' => '__ID__']))->toHtml() ?>, <?php echo \Illuminate\Support\Js::from(route('assets.search'))->toHtml() ?>)"
                 class="space-y-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4"
             >
+                <?php if($session->parentAsset): ?>
+                    <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                        Scanned assets will be assigned as children of
+                        <a href="<?php echo e(route('assets.show', $session->parentAsset)); ?>" class="text-brand"><?php echo e($session->parentAsset->name); ?></a>
+                        and will take that parent's location.
+                    </p>
+                <?php endif; ?>
                 <div
                     x-show="cameraNeedsSecureOrigin"
                     x-cloak
@@ -445,9 +493,20 @@
                                     <span x-show="!entry.unknown && entry.duplicate" class="text-amber-700 dark:text-amber-300">Already on list</span>
                                     <span x-show="!entry.unknown && entry.inventory_status === 'not_on_inventory'" class="text-amber-700 dark:text-amber-300">Not on inventory</span>
                                     <span x-show="!entry.unknown && entry.inventory_status === 'matched'" class="text-brand">On inventory</span>
+                                    <span x-show="entry.parent_message" class="text-amber-700 dark:text-amber-300" x-text="entry.parent_message"></span>
                                     <span x-show="entry.unknown" class="text-red-700 dark:text-red-300">Missing asset</span>
                                     <span x-show="entry.unknown && entry.unknown_scan?.location" x-text="'Location: ' + entry.unknown_scan.location"></span>
                                     <span x-show="entry.unknown && entry.unknown_scan?.note" class="truncate max-w-[14rem]" x-text="'Note: ' + entry.unknown_scan.note"></span>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2" x-show="entry.parent_assignment === 'needs_confirm'" x-cloak>
+                                    <button
+                                        type="button"
+                                        class="px-2 py-1 border border-brand-charcoal dark:border-brand-silver text-xs"
+                                        @click="confirmParentAssignment(entry)"
+                                        :disabled="entry.confirmingParent"
+                                    >
+                                        Assign under <span x-text="entry.session_parent?.name || 'parent'"></span>
+                                    </button>
                                 </div>
                                 <div class="flex items-center gap-2" x-show="entry.unknown && entry.unknown_scan" x-cloak>
                                     <button

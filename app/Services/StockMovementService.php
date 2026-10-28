@@ -16,6 +16,7 @@ use Carbon\CarbonInterface;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -87,15 +88,6 @@ class StockMovementService
                 : StockMovementSource::from((string) $input['source']))
             : StockMovementSource::Web;
 
-        $before = max(0, (int) ($asset->quantity ?? 0));
-        $after = $this->resolveQuantityAfter($type, $before, $input);
-
-        if ($after < 0) {
-            throw ValidationException::withMessages([
-                'quantity' => 'Stock quantity cannot go below zero.',
-            ]);
-        }
-
         if ($type === StockMovementType::Breakage) {
             $notes = trim((string) ($input['notes'] ?? ''));
             if ($notes === '') {
@@ -119,6 +111,19 @@ class StockMovementService
         }
 
         $recordedAt = $this->resolveRecordedAt($input['recorded_at'] ?? null);
+        $existing = $this->orderedMovements($asset);
+        $opening = $existing->isEmpty()
+            ? max(0, (int) ($asset->quantity ?? 0))
+            : (int) $existing->first()->quantity_before;
+        $previous = $existing->last(fn (StockMovement $movement): bool => $movement->recorded_at !== null && $movement->recorded_at->lessThanOrEqualTo($recordedAt));
+        $before = $previous instanceof StockMovement ? (int) $previous->quantity_after : $opening;
+        $after = $this->resolveQuantityAfter($type, $before, $input);
+
+        if ($after < 0) {
+            throw ValidationException::withMessages([
+                'quantity' => 'Stock quantity cannot go below zero.',
+            ]);
+        }
 
         // #region agent log
         $chronologicalPrevious = StockMovement::query()
@@ -155,7 +160,7 @@ class StockMovementService
         ]).PHP_EOL, FILE_APPEND);
         // #endregion
 
-        return DB::transaction(function () use ($asset, $type, $source, $before, $after, $input, $user, $uploads, $recordedAt): StockMovement {
+        return DB::transaction(function () use ($asset, $type, $source, $before, $after, $input, $user, $uploads, $recordedAt, $opening): StockMovement {
             $movement = StockMovement::query()->create([
                 'asset_id' => $asset->id,
                 'type' => $type,
@@ -170,7 +175,7 @@ class StockMovementService
                 'recorded_at' => $recordedAt,
             ]);
 
-            $asset->update(['quantity' => $after]);
+            $this->replayLedger($asset, $opening);
 
             foreach ($uploads as $upload) {
                 $title = $movement->external_po_number
@@ -206,6 +211,132 @@ class StockMovementService
             ]);
 
             return $movement->fresh(['files', 'user']);
+        });
+    }
+
+    /**
+     * @param  array{
+     *     type: StockMovementType|string,
+     *     quantity?: int|null,
+     *     quantity_delta?: int|null,
+     *     notes?: string|null,
+     *     external_po_number?: string|null,
+     *     external_po_url?: string|null,
+     *     recorded_at?: DateTimeInterface|string|null,
+     * }  $input
+     */
+    public function update(StockMovement $movement, array $input, ?User $user = null): StockMovement
+    {
+        $movement->loadMissing('asset.itemType');
+        $asset = $movement->asset;
+        if ($asset === null) {
+            throw ValidationException::withMessages([
+                'asset' => 'This stock event is not attached to an asset.',
+            ]);
+        }
+
+        $this->assertStockTracked($asset);
+
+        $type = $input['type'] instanceof StockMovementType
+            ? $input['type']
+            : StockMovementType::from((string) $input['type']);
+
+        if ($type === StockMovementType::Breakage) {
+            $notes = trim((string) ($input['notes'] ?? ''));
+            if ($notes === '') {
+                throw ValidationException::withMessages([
+                    'notes' => 'Notes are required when logging breakage.',
+                ]);
+            }
+        }
+
+        $recordedAt = $this->resolveRecordedAt($input['recorded_at'] ?? null);
+        $absolute = $type === StockMovementType::Count
+            ? $this->requireNonNegativeInt($input['quantity'] ?? null, 'quantity')
+            : null;
+        $delta = $type === StockMovementType::Count
+            ? 0
+            : $this->intendedDelta($type, $input);
+
+        return DB::transaction(function () use ($movement, $asset, $type, $input, $user, $recordedAt, $absolute, $delta): StockMovement {
+            $beforeQuantity = (int) $asset->quantity;
+            $opening = $this->openingBalance($asset);
+            $movement->fill([
+                'type' => $type,
+                'quantity_after' => $absolute ?? $movement->quantity_after,
+                'quantity_delta' => $delta,
+                'external_po_number' => NullableString::from($input['external_po_number'] ?? null),
+                'external_po_url' => NullableString::from($input['external_po_url'] ?? null),
+                'notes' => NullableString::from($input['notes'] ?? null),
+                'recorded_at' => $recordedAt,
+            ]);
+            $movement->save();
+
+            $this->replayLedger($asset, $opening);
+            $asset->refresh();
+
+            AuditLog::create([
+                'user_id' => $user?->id,
+                'auditable_type' => Asset::class,
+                'auditable_id' => $asset->id,
+                'action' => 'stock_movement_updated',
+                'old_values' => [
+                    'quantity' => $beforeQuantity,
+                    'stock_movement_id' => $movement->id,
+                ],
+                'new_values' => [
+                    'quantity' => (int) $asset->quantity,
+                    'stock_movement_id' => $movement->id,
+                    'type' => $type->value,
+                    'recorded_at' => $recordedAt->toIso8601String(),
+                    'notes' => $movement->notes,
+                    'external_po_number' => $movement->external_po_number,
+                    'external_po_url' => $movement->external_po_url,
+                ],
+                'created_at' => now(),
+            ]);
+
+            return $movement->fresh(['files', 'user']);
+        });
+    }
+
+    public function delete(StockMovement $movement, ?User $user = null): void
+    {
+        $movement->loadMissing('asset');
+        $asset = $movement->asset;
+        if ($asset === null) {
+            throw ValidationException::withMessages([
+                'asset' => 'This stock event is not attached to an asset.',
+            ]);
+        }
+
+        $this->assertStockTracked($asset);
+
+        DB::transaction(function () use ($movement, $asset, $user): void {
+            $beforeQuantity = (int) $asset->quantity;
+            $opening = $this->openingBalance($asset);
+            $movementId = $movement->id;
+            $type = $movement->type->value;
+            $movement->delete();
+            $this->replayLedger($asset, $opening);
+            $asset->refresh();
+
+            AuditLog::create([
+                'user_id' => $user?->id,
+                'auditable_type' => Asset::class,
+                'auditable_id' => $asset->id,
+                'action' => 'stock_movement_deleted',
+                'old_values' => [
+                    'quantity' => $beforeQuantity,
+                    'stock_movement_id' => $movementId,
+                    'type' => $type,
+                ],
+                'new_values' => [
+                    'quantity' => (int) $asset->quantity,
+                    'stock_movement_id' => $movementId,
+                ],
+                'created_at' => now(),
+            ]);
         });
     }
 
@@ -289,5 +420,77 @@ class StockMovementService
         }
 
         return (int) $value;
+    }
+
+    /**
+     * @return Collection<int, StockMovement>
+     */
+    protected function orderedMovements(Asset $asset): Collection
+    {
+        return StockMovement::query()
+            ->where('asset_id', $asset->id)
+            ->orderBy('recorded_at')
+            ->orderBy('id')
+            ->get();
+    }
+
+    protected function openingBalance(Asset $asset): int
+    {
+        $first = $this->orderedMovements($asset)->first();
+
+        return $first instanceof StockMovement
+            ? (int) $first->quantity_before
+            : max(0, (int) ($asset->quantity ?? 0));
+    }
+
+    /**
+     * Rebuild before/after from each event's own delta. Counts stay absolute.
+     * A restock therefore adds to the previous on-hand value, including when it is entered out of order.
+     */
+    public function replayLedger(Asset $asset, int $opening): void
+    {
+        $movements = $this->orderedMovements($asset);
+
+        if ($movements->isEmpty()) {
+            $asset->update(['quantity' => max(0, $opening)]);
+
+            return;
+        }
+
+        $running = $opening;
+
+        foreach ($movements as $movement) {
+            $after = $movement->type === StockMovementType::Count
+                ? (int) $movement->quantity_after
+                : $running + (int) $movement->quantity_delta;
+
+            if ($after < 0) {
+                throw ValidationException::withMessages([
+                    'quantity' => 'That change would take stock below zero.',
+                ]);
+            }
+
+            $movement->update([
+                'quantity_before' => $running,
+                'quantity_after' => $after,
+                'quantity_delta' => $after - $running,
+            ]);
+            $running = $after;
+        }
+
+        $asset->update(['quantity' => $running]);
+    }
+
+    /**
+     * @param  array{quantity?: int|null, quantity_delta?: int|null}  $input
+     */
+    protected function intendedDelta(StockMovementType $type, array $input): int
+    {
+        return match ($type) {
+            StockMovementType::Count => 0,
+            StockMovementType::Restock => $this->requirePositiveInt($input['quantity'] ?? $input['quantity_delta'] ?? null, 'quantity'),
+            StockMovementType::Breakage => -$this->requirePositiveInt($input['quantity'] ?? $input['quantity_delta'] ?? null, 'quantity'),
+            StockMovementType::Adjustment => $this->requireInt($input['quantity_delta'] ?? null, 'quantity_delta'),
+        };
     }
 }

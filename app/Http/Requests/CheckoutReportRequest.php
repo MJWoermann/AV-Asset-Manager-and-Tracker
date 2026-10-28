@@ -19,6 +19,10 @@ class CheckoutReportRequest extends FormRequest
             'overdue' => $this->boolean('overdue'),
         ];
 
+        if ($this->exists('checked_out_only')) {
+            $merge['checked_out_only'] = $this->boolean('checked_out_only');
+        }
+
         foreach ([
             'manufacturer_id',
             'manufacturer_model_id',
@@ -56,9 +60,10 @@ class CheckoutReportRequest extends FormRequest
             'checked_out_from' => ['nullable', 'date'],
             'checked_out_to' => ['nullable', 'date'],
             'overdue' => ['nullable', 'boolean'],
+            'checked_out_only' => ['nullable', 'boolean'],
             'q' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'in:open,returned,all'],
-            'format' => ['nullable', 'in:xlsx,csv'],
+            'format' => ['nullable', 'in:xlsx,csv,pdf'],
         ];
     }
 }

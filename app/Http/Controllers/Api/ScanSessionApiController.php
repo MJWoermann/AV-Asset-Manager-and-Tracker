@@ -6,6 +6,7 @@ use App\Enums\AssetStatus;
 use App\Enums\LocationType;
 use App\Http\Controllers\Api\Concerns\AuthorizesScanSession;
 use App\Http\Controllers\Controller;
+use App\Models\Asset;
 use App\Models\AssetList;
 use App\Models\Location;
 use App\Models\ScanSession;
@@ -92,7 +93,7 @@ class ScanSessionApiController extends Controller
     }
 
     /**
-     * @return array{event_list_id: int|null, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, department_id: int}
+     * @return array{event_list_id: int|null, inventory_list_id: int|null, location_id: int|null, asset_status: string|null, parent_asset_id: int|null, replace_existing_parent: bool, department_id: int}
      */
     protected function validatedSessionLists(Request $request): array
     {
@@ -126,6 +127,8 @@ class ScanSessionApiController extends Controller
                 Rule::exists('locations', 'id')->whereNot('type', LocationType::Rack->value),
             ],
             'asset_status' => ['nullable', Rule::enum(AssetStatus::class)],
+            'parent_asset_id' => ['nullable', 'integer', 'exists:assets,id'],
+            'replace_existing_parent' => ['sometimes', 'boolean'],
         ], [
             'new_location.parent_id.exists' => 'Racks cannot be a parent for another location.',
         ]);
@@ -162,6 +165,9 @@ class ScanSessionApiController extends Controller
             ? $data['asset_status']->value
             : ($data['asset_status'] ?? null);
         $data['department_id'] = $this->resolveSessionDepartmentId($request, $eventList, $inventoryList);
+        $data['parent_asset_id'] = isset($data['parent_asset_id']) ? (int) $data['parent_asset_id'] : null;
+        $data['replace_existing_parent'] = $request->boolean('replace_existing_parent');
+        $this->assertParentAssetForDepartment($data['parent_asset_id'], $data['department_id']);
 
         if ($creatingLocation) {
             $location = Location::create([
@@ -200,5 +206,20 @@ class ScanSessionApiController extends Controller
         }
 
         return $departmentId;
+    }
+
+    protected function assertParentAssetForDepartment(?int $parentAssetId, int $departmentId): void
+    {
+        if ($parentAssetId === null) {
+            return;
+        }
+
+        $parent = Asset::query()->find($parentAssetId);
+
+        if ($parent === null || (int) $parent->department_id !== $departmentId) {
+            throw ValidationException::withMessages([
+                'parent_asset_id' => 'Parent asset must belong to the same department as this scan session.',
+            ]);
+        }
     }
 }

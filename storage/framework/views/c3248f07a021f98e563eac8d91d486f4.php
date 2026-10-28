@@ -4,6 +4,16 @@
     $reorder = $stockReorderMeta ?? [];
     $initialAction = old('type', $stockAction ?? 'count');
     $canManageTags = auth()->user()?->hasAnyRole(['admin', 'inventory_manager']) ?? false;
+    $canReviseMovements = auth()->user()?->hasAnyRole(['admin']) ?? false;
+    $reviseOld = ($canReviseMovements && old('movement_id') && $errors->any()) ? [
+        'id' => old('movement_id'),
+        'type' => old('type'),
+        'quantity' => old('quantity', old('quantity_delta')),
+        'recorded_at' => old('recorded_at'),
+        'notes' => old('notes'),
+        'external_po_number' => old('external_po_number'),
+        'external_po_url' => old('external_po_url'),
+    ] : null;
 ?>
 
 <div
@@ -19,6 +29,12 @@
             'restock' => 'Units added from a restock / PO',
             'breakage' => 'Units removed due to breakage',
         ],
+        'revise' => $canReviseMovements ? [
+            'enabled' => true,
+            'updateUrl' => route('assets.stock-movements.update', [$asset, 0]),
+            'deleteUrl' => route('assets.stock-movements.destroy', [$asset, 0]),
+            'old' => $reviseOld,
+        ] : null,
     ])->toHtml() ?>)"
 >
     <?php if(session('status')): ?>
@@ -71,7 +87,23 @@
             <div class="relative w-full overflow-hidden" style="height: 240px;">
                 <canvas x-ref="chart"></canvas>
             </div>
-            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-3 pt-1">Click a point for movement details.</p>
+            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-3 pt-1">Click a point or an event below for movement details.</p>
+            <ul class="mt-2 max-h-40 overflow-y-auto text-sm divide-y divide-brand-silver dark:divide-brand-charcoal">
+                <template x-for="point in (chartPayload.points || [])" :key="point.id">
+                    <li>
+                        <button
+                            type="button"
+                            class="w-full text-left py-1.5"
+                            :class="selected && String(selected.id) === String(point.id) ? 'text-brand' : ''"
+                            @click="selected = point; cancelEdit()"
+                        >
+                            <span x-text="point.recorded_at"></span>
+                            · <span x-text="point.type_label"></span>
+                            · <span x-text="point.quantity_before + ' → ' + point.quantity_after"></span>
+                        </button>
+                    </li>
+                </template>
+            </ul>
         </div>
 
         <div class="border border-brand-silver dark:border-brand-charcoal p-3 bg-white dark:bg-brand-slate text-sm space-y-2 min-h-[12rem]">
@@ -108,6 +140,140 @@
                             </template>
                         </ul>
                     </div>
+                    <template x-if="revise && revise.enabled && !editing">
+                        <div class="flex items-center justify-between gap-2 pt-2">
+                            <form method="POST" :action="movementUrl('deleteUrl')" onsubmit="return confirm('Delete this stock event?')">
+                                <?php echo csrf_field(); ?>
+                                <?php echo method_field('DELETE'); ?>
+                                <?php if (isset($component)) { $__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.danger-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('danger-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>Delete <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11)): ?>
+<?php $attributes = $__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11; ?>
+<?php unset($__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11)): ?>
+<?php $component = $__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11; ?>
+<?php unset($__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11); ?>
+<?php endif; ?>
+                            </form>
+                            <?php if (isset($component)) { $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.secondary-button','data' => ['type' => 'button','@click' => 'beginEdit()']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('secondary-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','@click' => 'beginEdit()']); ?>Update <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af)): ?>
+<?php $attributes = $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
+<?php unset($__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af)): ?>
+<?php $component = $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
+<?php unset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
+<?php endif; ?>
+                        </div>
+                    </template>
+                    <template x-if="editing && revise && revise.enabled">
+                        <form method="POST" :action="movementUrl('updateUrl')" class="space-y-3 border-t border-brand-silver dark:border-brand-charcoal pt-3">
+                            <?php echo csrf_field(); ?>
+                            <?php echo method_field('PATCH'); ?>
+                            <input type="hidden" name="movement_id" :value="selected.id">
+                            <?php if($errors->any() && old('movement_id')): ?>
+                                <div class="text-sm text-red-600 space-y-1">
+                                    <?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <p><?php echo e($error); ?></p>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </div>
+                            <?php endif; ?>
+                            <div>
+                                <label class="text-xs text-brand-charcoal dark:text-brand-silver" for="edit_stock_type">Type</label>
+                                <select id="edit_stock_type" name="type" x-model="editForm.type" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                                    <option value="count">Count</option>
+                                    <option value="restock">Restock</option>
+                                    <option value="breakage">Breakage</option>
+                                    <option value="adjustment">Adjustment</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-brand-charcoal dark:text-brand-silver" for="edit_stock_quantity">Quantity</label>
+                                <input
+                                    id="edit_stock_quantity"
+                                    :name="editForm.type === 'adjustment' ? 'quantity_delta' : 'quantity'"
+                                    type="number"
+                                    x-model="editForm.quantity"
+                                    :min="editForm.type === 'adjustment' ? null : 0"
+                                    class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
+                                    required
+                                >
+                                <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-1" x-text="editForm.type === 'count' ? 'Absolute on-hand quantity' : (editForm.type === 'restock' ? 'Units added to the previous on-hand quantity' : (editForm.type === 'breakage' ? 'Units removed' : 'Signed change from the previous quantity'))"></p>
+                            </div>
+                            <div>
+                                <label class="text-xs text-brand-charcoal dark:text-brand-silver" for="edit_stock_recorded_at">Date</label>
+                                <input id="edit_stock_recorded_at" name="recorded_at" type="date" x-model="editForm.recorded_at" max="<?php echo e(now()->format('Y-m-d')); ?>" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white" required>
+                            </div>
+                            <div x-show="editForm.type === 'restock'" x-cloak class="space-y-2">
+                                <input name="external_po_number" x-model="editForm.external_po_number" placeholder="PO number" class="block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                                <input name="external_po_url" type="url" x-model="editForm.external_po_url" placeholder="PO URL" class="block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                            </div>
+                            <div>
+                                <label class="text-xs text-brand-charcoal dark:text-brand-silver" for="edit_stock_notes">Notes</label>
+                                <textarea id="edit_stock_notes" name="notes" rows="2" x-model="editForm.notes" :required="editForm.type === 'breakage'" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"></textarea>
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <?php if (isset($component)) { $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.secondary-button','data' => ['type' => 'button','@click' => 'cancelEdit()']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('secondary-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','@click' => 'cancelEdit()']); ?>Cancel <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af)): ?>
+<?php $attributes = $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
+<?php unset($__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af)): ?>
+<?php $component = $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
+<?php unset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
+<?php endif; ?>
+                                <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('primary-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>Save event <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginald411d1792bd6cc877d687758b753742c)): ?>
+<?php $attributes = $__attributesOriginald411d1792bd6cc877d687758b753742c; ?>
+<?php unset($__attributesOriginald411d1792bd6cc877d687758b753742c); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginald411d1792bd6cc877d687758b753742c)): ?>
+<?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
+<?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
+<?php endif; ?>
+                            </div>
+                        </form>
+                    </template>
                 </div>
             </template>
         </div>

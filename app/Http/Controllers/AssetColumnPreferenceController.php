@@ -24,7 +24,16 @@ class AssetColumnPreferenceController extends Controller
         $user->save();
 
         $previous = url()->previous();
-        $target = AssetBrowseFilters::urlWithoutHiddenColumnFilters($previous, $columns);
+        $assetsIndexPath = parse_url(route('assets.index'), PHP_URL_PATH);
+        $previousPath = parse_url($previous, PHP_URL_PATH);
+        $returningToAssets = is_string($assetsIndexPath)
+            && is_string($previousPath)
+            && rtrim($previousPath, '/') === rtrim($assetsIndexPath, '/');
+
+        // Assets keeps URL filters for hidden columns. Other browse pages drop them.
+        $target = $returningToAssets
+            ? $previous
+            : AssetBrowseFilters::urlWithoutHiddenColumnFilters($previous, $columns);
 
         return redirect()->to($target)->with('status', 'Column preferences saved.');
     }

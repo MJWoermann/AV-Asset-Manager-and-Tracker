@@ -46,6 +46,12 @@
         <div class="grid md:grid-cols-2 gap-4 text-sm">
             <dl class="space-y-2 border border-brand-silver dark:border-brand-charcoal p-4">
                 <div><dt class="text-xs text-brand-charcoal dark:text-brand-silver">Kind</dt><dd>{{ $spare->kind?->label() }}</dd></div>
+                @if($spare->linkedAsset)
+                    <div>
+                        <dt class="text-xs text-brand-charcoal dark:text-brand-silver">Listed asset</dt>
+                        <dd><a href="{{ route('assets.show', $spare->linkedAsset) }}" class="text-brand hover:underline">{{ $spare->linkedAsset->name }}</a></dd>
+                    </div>
+                @endif
                 <div><dt class="text-xs">Brand / model</dt><dd>{{ $spare->manufacturer?->name }} {{ $spare->manufacturerModel?->name }}</dd></div>
                 <div><dt class="text-xs">Product code</dt><dd>{{ $spare->product_code ?: '—' }}</dd></div>
                 <div><dt class="text-xs">Severity</dt><dd>{{ $spare->severity?->label() }}</dd></div>

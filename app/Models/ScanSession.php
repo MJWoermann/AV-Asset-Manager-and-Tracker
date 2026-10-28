@@ -19,6 +19,8 @@ class ScanSession extends Model
         'inventory_list_id',
         'location_id',
         'asset_status',
+        'parent_asset_id',
+        'replace_existing_parent',
         'status',
     ];
 
@@ -26,6 +28,7 @@ class ScanSession extends Model
     {
         return [
             'asset_status' => AssetStatus::class,
+            'replace_existing_parent' => 'boolean',
         ];
     }
 
@@ -47,6 +50,11 @@ class ScanSession extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    public function parentAsset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class, 'parent_asset_id');
     }
 
     public function unknownScans(): HasMany

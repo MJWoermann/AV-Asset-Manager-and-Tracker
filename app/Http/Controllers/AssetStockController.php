@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Enums\StockMovementSource;
 use App\Http\Requests\StoreStockMovementRequest;
+use App\Http\Requests\UpdateStockMovementRequest;
 use App\Models\Asset;
+use App\Models\StockMovement;
+use App\Models\User;
 use App\Services\KanbanTagService;
 use App\Services\StockMovementService;
 use App\Support\StockTracking;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class AssetStockController extends Controller
@@ -22,7 +26,7 @@ class AssetStockController extends Controller
         abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
 
         $data = $request->validated();
-        $movements->ensureBaseline($asset, $request->user());
+        $this->ensureBaselineUnlessBackdated($asset, $data['recorded_at'] ?? null, $request->user(), $movements);
         $asset->refresh();
 
         $movements->record(
@@ -45,6 +49,40 @@ class AssetStockController extends Controller
         return redirect()
             ->route('assets.show', [$asset, 'tab' => 'stock', 'action' => $data['type']])
             ->with('status', 'Stock movement recorded.');
+    }
+
+    public function update(
+        UpdateStockMovementRequest $request,
+        Asset $asset,
+        StockMovement $stockMovement,
+        StockMovementService $movements,
+    ): RedirectResponse {
+        abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
+        abort_unless((int) $stockMovement->asset_id === (int) $asset->id, 404);
+
+        $data = $request->validated();
+        $movements->update($stockMovement, $data, $request->user());
+
+        return redirect()
+            ->route('assets.show', [$asset, 'tab' => 'stock'])
+            ->with('status', 'Stock event updated.');
+    }
+
+    public function destroy(
+        Request $request,
+        Asset $asset,
+        StockMovement $stockMovement,
+        StockMovementService $movements,
+    ): RedirectResponse {
+        abort_unless(StockTracking::availableForAsset($request->user(), $asset), 404);
+        abort_unless($request->user()?->hasAnyRole(['admin']), 403);
+        abort_unless((int) $stockMovement->asset_id === (int) $asset->id, 404);
+
+        $movements->delete($stockMovement, $request->user());
+
+        return redirect()
+            ->route('assets.show', [$asset, 'tab' => 'stock'])
+            ->with('status', 'Stock event deleted.');
     }
 
     public function updateLevels(Request $request, Asset $asset): RedirectResponse
@@ -95,5 +133,28 @@ class AssetStockController extends Controller
             'sku' => $kanban->restockingField($asset, 'sku'),
             'supplier' => $kanban->restockingField($asset, 'supplier') ?: $asset->supplier,
         ]);
+    }
+
+    /**
+     * A first backdated event is the opening movement. Do not also insert a count dated today,
+     * or the restock would be applied against that later count.
+     */
+    protected function ensureBaselineUnlessBackdated(
+        Asset $asset,
+        mixed $recordedAt,
+        ?User $user,
+        StockMovementService $movements,
+    ): void {
+        if ($asset->stockMovements()->exists()) {
+            $movements->ensureBaseline($asset, $user);
+
+            return;
+        }
+
+        if (is_string($recordedAt) && $recordedAt !== '' && Carbon::parse($recordedAt)->startOfDay()->lt(now()->startOfDay())) {
+            return;
+        }
+
+        $movements->ensureBaseline($asset, $user);
     }
 }

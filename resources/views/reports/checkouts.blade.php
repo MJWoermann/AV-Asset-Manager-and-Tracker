@@ -160,23 +160,34 @@
                 </div>
             @endif
 
-            <div class="flex items-end">
+            <div class="flex flex-wrap items-end gap-4 sm:col-span-2 lg:col-span-3">
                 <label class="inline-flex items-center gap-2 text-sm">
                     <input type="checkbox" name="overdue" value="1" @checked($filters['overdue']) onchange="this.form.requestSubmit()">
                     Overdue only
                 </label>
+                @if ($filters['view'] === 'models')
+                    <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="hidden" name="checked_out_only" value="0">
+                        <input type="checkbox" name="checked_out_only" value="1" @checked($filters['checked_out_only']) onchange="this.form.requestSubmit()">
+                        Only models with items checked out
+                    </label>
+                @endif
             </div>
 
-            <div class="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2">
+                    <x-primary-button>Search</x-primary-button>
                     <x-clear-filters
                         :href="route('reports.checkouts', $filters['view'] === 'holders' ? ['view' => 'holders'] : [])"
                         :active="$filtersActive"
                     />
-                    <a href="{{ route('reports.checkouts.export', array_merge($query, ['format' => 'xlsx'])) }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Export XLSX</a>
-                    <a href="{{ route('reports.checkouts.export', array_merge($query, ['format' => 'csv'])) }}" class="px-4 py-2 border border-brand-charcoal dark:border-white text-sm">Export CSV</a>
                 </div>
-                <x-primary-button>Search</x-primary-button>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-medium text-brand-charcoal dark:text-brand-silver">Export</span>
+                    <a href="{{ route('reports.checkouts.export', array_merge($query, ['format' => 'xlsx'])) }}" class="px-4 py-2 border text-sm">XLSX</a>
+                    <a href="{{ route('reports.checkouts.export', array_merge($query, ['format' => 'csv'])) }}" class="px-4 py-2 border text-sm">CSV</a>
+                    <a href="{{ route('reports.checkouts.export', array_merge($query, ['format' => 'pdf'])) }}" class="px-4 py-2 border text-sm">PDF</a>
+                </div>
             </div>
         </form>
 
@@ -191,36 +202,100 @@
         @if ($filters['view'] === 'models')
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">
                 Available and in register ignore purpose, holder, dates, and overdue. Those filters change the checked-out count. Disposed and lost assets are left out.
+                @if ($filters['checked_out_only'])
+                    Manufacturers with nothing checked out are hidden.
+                @endif
             </p>
 
-            <div class="overflow-x-auto bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-brand-silver/40 dark:bg-brand-charcoal/40 text-left">
-                        <tr>
-                            <th class="px-3 py-2 font-medium">Manufacturer</th>
-                            <th class="px-3 py-2 font-medium">Model</th>
-                            <th class="px-3 py-2 font-medium">Available</th>
-                            <th class="px-3 py-2 font-medium">Checked out</th>
-                            <th class="px-3 py-2 font-medium">In register</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-brand-silver dark:divide-brand-charcoal">
-                        @forelse ($modelRows as $row)
-                            <tr>
-                                <td class="px-3 py-2">{{ $row['manufacturer'] }}</td>
-                                <td class="px-3 py-2">{{ $row['model'] }}</td>
-                                <td class="px-3 py-2">{{ $row['available'] }}</td>
-                                <td class="px-3 py-2">{{ $row['checked_out'] }}</td>
-                                <td class="px-3 py-2">{{ $row['in_register'] }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="px-3 py-6 text-center text-brand-charcoal dark:text-brand-silver">No assets match these filters.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+            @if ($modelGroups === [])
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    {{ $filters['checked_out_only'] && $modelRows !== [] ? 'No models have items checked out.' : 'No assets match these filters.' }}
+                </p>
+            @else
+                <div
+                    x-data="{
+                        expanded: {},
+                        isOpen(id) { return Boolean(this.expanded[id]); },
+                        toggle(id) { this.expanded = { ...this.expanded, [id]: ! this.isOpen(id) }; },
+                        expandAll() {
+                            const next = {};
+                            this.groupIds().forEach((id) => { next[id] = true; });
+                            this.expanded = next;
+                        },
+                        collapseAll() { this.expanded = {}; },
+                        groupIds() {
+                            return [...this.$root.querySelectorAll('[data-report-group]')].map((el) => el.getAttribute('data-report-group'));
+                        },
+                    }"
+                >
+                    <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                        <button type="button" class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver" @click="expandAll()">Expand all</button>
+                        <button type="button" class="px-3 py-1.5 border border-brand-charcoal dark:border-brand-silver" @click="collapseAll()">Collapse all</button>
+                    </div>
+                    <ul class="bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal text-sm overflow-hidden">
+                        @foreach ($modelGroups as $index => $group)
+                            @php
+                                $alternate = $index % 2 === 1;
+                                $rowClasses = $alternate
+                                    ? 'bg-[#dcdcdc] dark:bg-[#3d4043] border-l-[3px] border-l-brand-charcoal'
+                                    : 'bg-brand-silver dark:bg-brand-slate border-l-[3px] border-l-brand-charcoal';
+                            @endphp
+                            <li
+                                class="border-b border-brand-charcoal/25 dark:border-brand-charcoal last:border-b-0"
+                                data-report-group="{{ $group['id'] }}"
+                            >
+                                <div class="{{ $rowClasses }} px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+                                    <div class="flex items-start gap-3 min-w-0">
+                                        <button
+                                            type="button"
+                                            class="mt-0.5 shrink-0 p-0.5 text-brand-charcoal dark:text-brand-silver"
+                                            @click="toggle(@js($group['id']))"
+                                            :aria-expanded="isOpen(@js($group['id'])) ? 'true' : 'false'"
+                                            aria-label="Toggle {{ $group['name'] }} models"
+                                        >
+                                            <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-90': isOpen(@js($group['id'])) }" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                            </svg>
+                                        </button>
+                                        <div class="min-w-0">
+                                            <span class="font-medium">{{ $group['name'] }}</span>
+                                            <span class="text-brand-charcoal dark:text-brand-silver">
+                                                — Manufacturer
+                                                ({{ $group['models_count'] }} {{ $group['models_count'] === 1 ? 'model' : 'models' }},
+                                                {{ $group['checked_out'] }} checked out,
+                                                {{ $group['available'] }} available)
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <ul
+                                    class="ml-4 border-l border-brand-charcoal/30 dark:border-brand-charcoal"
+                                    x-show="isOpen(@js($group['id']))"
+                                    x-cloak
+                                >
+                                    @foreach ($group['models'] as $modelIndex => $model)
+                                        <li class="border-b border-brand-charcoal/25 dark:border-brand-charcoal last:border-b-0">
+                                            <div @class([
+                                                'px-4 py-2.5 border-l-[3px] border-l-brand',
+                                                'bg-[#cce8eb] dark:bg-[#33494c]' => $modelIndex % 2 === 1,
+                                                'bg-[#e5f5f6] dark:bg-[#2b3c3e]' => $modelIndex % 2 === 0,
+                                            ])>
+                                                <span class="font-medium">{{ $model['model'] }}</span>
+                                                <span class="text-brand-charcoal dark:text-brand-silver">
+                                                    — Model
+                                                    ({{ $model['checked_out'] }} checked out,
+                                                    {{ $model['available'] }} available,
+                                                    {{ $model['in_register'] }} in register)
+                                                </span>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         @else
             <div class="space-y-4">
                 @forelse ($holderGroups as $group)

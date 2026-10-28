@@ -1693,15 +1693,89 @@ function createInventoryChartPanel(config = {}) {
         action: config.initialAction || 'count',
         selected: null,
         chart: null,
+        editing: false,
+        revise: config.revise || null,
+        editForm: {
+            type: 'count',
+            quantity: '',
+            recorded_at: '',
+            notes: '',
+            external_po_number: '',
+            external_po_url: '',
+        },
 
         get quantityHint() {
             return actionHints[this.action] || '';
+        },
+
+        pointColor(type) {
+            return movementPointColor(type);
+        },
+
+        get movementLegend() {
+            const seen = new Map();
+            (this.chartPayload.points || []).forEach((point) => {
+                if (point?.type && !seen.has(point.type)) {
+                    seen.set(point.type, point.type_label || point.type);
+                }
+            });
+
+            return [...seen.entries()].map(([type, label]) => ({
+                type,
+                label,
+                color: movementPointColor(type),
+            }));
+        },
+
+        movementUrl(kind) {
+            const template = this.revise?.[kind] || '';
+            return String(template).replace(/\/0$/, `/${this.selected?.id ?? ''}`);
+        },
+
+        beginEdit() {
+            if (!this.selected) {
+                return;
+            }
+            const point = this.selected;
+            const type = point.type || 'count';
+            let quantity = point.quantity_after;
+            if (type === 'restock' || type === 'breakage') {
+                quantity = Math.abs(Number(point.quantity_delta) || 0);
+            } else if (type === 'adjustment') {
+                quantity = point.quantity_delta;
+            }
+            this.editForm = {
+                type,
+                quantity,
+                recorded_at: String(point.recorded_at || point.x || '').slice(0, 10),
+                notes: point.notes || '',
+                external_po_number: point.external_po_number || '',
+                external_po_url: point.external_po_url || '',
+            };
+            this.editing = true;
+        },
+
+        cancelEdit() {
+            this.editing = false;
         },
 
         init() {
             const points = this.chartPayload.points || [];
             if (config.openDetailId) {
                 this.selected = points.find((point) => String(point.id) === String(config.openDetailId)) || null;
+            }
+            const oldEdit = this.revise?.old;
+            if (oldEdit?.id) {
+                this.selected = points.find((point) => String(point.id) === String(oldEdit.id)) || this.selected;
+                this.editForm = {
+                    type: oldEdit.type || 'count',
+                    quantity: oldEdit.quantity ?? '',
+                    recorded_at: oldEdit.recorded_at || '',
+                    notes: oldEdit.notes || '',
+                    external_po_number: oldEdit.external_po_number || '',
+                    external_po_url: oldEdit.external_po_url || '',
+                };
+                this.editing = true;
             }
             this.$nextTick(() => this.mountChart());
         },
@@ -1773,6 +1847,29 @@ function createInventoryChartPanel(config = {}) {
             const restocks = this.chartPayload.restock_markers || [];
             const trend = this.chartPayload.trend?.projection || [];
             const annotations = {};
+            const eventTimes = points
+                .map((point) => new Date(point.x).getTime())
+                .filter((value) => Number.isFinite(value));
+            const countYs = [
+                ...points.map((point) => Number(point.y)),
+                Number(this.chartPayload.min_line),
+                Number(this.chartPayload.max_line),
+            ].filter((value) => Number.isFinite(value));
+            let xMin;
+            let xMax;
+            let yMax;
+            if (eventTimes.length) {
+                const minT = Math.min(...eventTimes);
+                const maxT = Math.max(...eventTimes);
+                const span = Math.max(maxT - minT, 24 * 60 * 60 * 1000);
+                const pad = span * 0.06;
+                xMin = minT - pad;
+                xMax = maxT + pad;
+            }
+            if (countYs.length) {
+                const peak = Math.max(...countYs, 0);
+                yMax = peak + Math.max(1, Math.ceil(peak * 0.08));
+            }
 
             if (this.chartPayload.min_line !== null && this.chartPayload.min_line !== undefined) {
                 annotations.minLine = {
@@ -1823,19 +1920,17 @@ function createInventoryChartPanel(config = {}) {
                             data: points.map((point) => ({ x: point.x, y: point.y, meta: point })),
                             borderColor: '#111827',
                             backgroundColor: 'transparent',
-                            stepped: true,
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
+                            stepped: false,
+                            pointStyle: 'circle',
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            pointBorderWidth: 0,
+                            pointHoverBorderWidth: 0,
+                            pointBackgroundColor: (context) => movementPointColor(context.raw?.meta?.type),
+                            pointBorderColor: (context) => movementPointColor(context.raw?.meta?.type),
+                            pointHoverBackgroundColor: (context) => movementPointColor(context.raw?.meta?.type),
+                            pointHoverBorderColor: (context) => movementPointColor(context.raw?.meta?.type),
                             tension: 0,
-                        },
-                        {
-                            label: 'Restock',
-                            data: restocks.map((point) => ({ x: point.x, y: point.y, meta: point })),
-                            borderColor: '#00adb7',
-                            backgroundColor: '#00adb7',
-                            showLine: false,
-                            pointRadius: 7,
-                            pointStyle: 'triangle',
                         },
                         {
                             label: 'Trend',
@@ -1857,11 +1952,13 @@ function createInventoryChartPanel(config = {}) {
                     scales: {
                         x: {
                             type: 'time',
+                            ...(xMin !== undefined ? { min: xMin, max: xMax } : {}),
                             time: { tooltipFormat: 'yyyy-MM-dd HH:mm' },
                             ticks: { maxRotation: 0, padding: 6 },
                         },
                         y: {
                             beginAtZero: true,
+                            ...(yMax !== undefined ? { max: yMax } : {}),
                             ticks: { precision: 0, padding: 6 },
                         },
                     },
@@ -1929,6 +2026,57 @@ function createInventoryChartPanel(config = {}) {
             // #endregion
 
             // #region agent log
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ff4d0e' },
+                body: JSON.stringify({
+                    sessionId: 'ff4d0e',
+                    runId: 'post-fix',
+                    hypothesisId: 'H1-H4',
+                    location: 'app.js:mountChart',
+                    message: 'post-fix chart scale and straight segments',
+                    data: {
+                        stepped: this.chart.data.datasets[0]?.stepped ?? null,
+                        tension: this.chart.data.datasets[0]?.tension ?? null,
+                        yScaleMin: this.chart.scales?.y?.min ?? null,
+                        yScaleMax: this.chart.scales?.y?.max ?? null,
+                        xScaleMin: this.chart.scales?.x?.min ?? null,
+                        xScaleMax: this.chart.scales?.x?.max ?? null,
+                        trendX: trend.map((point) => point.x),
+                        trendY: trend.map((point) => point.y),
+                        pointYMin: pointYs.length ? Math.min(...pointYs) : null,
+                        pointYMax: pointYs.length ? Math.max(...pointYs) : null,
+                        eventTimeMin: eventTimes.length ? Math.min(...eventTimes) : null,
+                        eventTimeMax: eventTimes.length ? Math.max(...eventTimes) : null,
+                    },
+                    timestamp: Date.now(),
+                }),
+            }).catch(() => {});
+            const pointColors = points.map((point) => ({
+                type: point.type,
+                color: movementPointColor(point.type),
+            }));
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ff4d0e' },
+                body: JSON.stringify({
+                    sessionId: 'ff4d0e',
+                    runId: 'post-fix',
+                    hypothesisId: 'H6',
+                    location: 'app.js:mountChart',
+                    message: 'solid movement point colors',
+                    data: {
+                        pointBorderWidth: this.chart.data.datasets[0]?.pointBorderWidth ?? null,
+                        datasetCount: this.chart.data.datasets.length,
+                        datasetLabels: this.chart.data.datasets.map((dataset) => dataset.label),
+                        pointColors,
+                    },
+                    timestamp: Date.now(),
+                }),
+            }).catch(() => {});
+            // #endregion
+
+            // #region agent log
             dbgLog('B', 'post-mount canvas metrics', {
                 canvasClientH: canvas.clientHeight,
                 canvasOffsetH: canvas.offsetHeight,
@@ -1972,6 +2120,17 @@ function createInventoryChartPanel(config = {}) {
         },
     };
 }
+
+const MOVEMENT_POINT_COLORS = {
+    count: '#1d4ed8',
+    restock: '#00adb7',
+    breakage: '#dc2626',
+    adjustment: '#c2410c',
+    use: '#6d28d9',
+    replace: '#be185d',
+};
+
+const movementPointColor = (type) => MOVEMENT_POINT_COLORS[type] || '#111827';
 
 const ASSET_STOCK_ACTION_HINTS = {
     count: 'Absolute on-hand quantity after counting',
@@ -2628,8 +2787,8 @@ Alpine.data('connectionMap', (graph = { nodes: [], edges: [], focus_asset_id: nu
                     let links = 0;
 
                     child.connectedEdges().forEach((edge) => {
-                        const other = edge.otherEnd(child);
-                        if (other.same(parent) || other.parent().same(parent)) {
+                        const other = edge.source().same(child) ? edge.target() : edge.source();
+                        if (other.empty() || other.same(parent) || other.parent().same(parent)) {
                             return;
                         }
 
@@ -3218,10 +3377,15 @@ Alpine.data('customFieldSetForm', (initialFields = []) => ({
         type: field.type || 'text',
         options: field.options || '',
         is_required: !!field.is_required,
+        is_scannable: !!field.is_scannable,
     })),
 
     isLayoutType(type) {
         return type === 'spacer' || type === 'divider';
+    },
+
+    canBeScannable(type) {
+        return type === 'text' || type === 'number' || type === 'url';
     },
 
     newFieldKey() {
@@ -3236,6 +3400,7 @@ Alpine.data('customFieldSetForm', (initialFields = []) => ({
             type: 'text',
             options: '',
             is_required: false,
+            is_scannable: false,
         });
     },
 
@@ -3247,6 +3412,7 @@ Alpine.data('customFieldSetForm', (initialFields = []) => ({
             type: 'spacer',
             options: '',
             is_required: false,
+            is_scannable: false,
         });
     },
 
@@ -3258,6 +3424,7 @@ Alpine.data('customFieldSetForm', (initialFields = []) => ({
             type: 'divider',
             options: '',
             is_required: false,
+            is_scannable: false,
         });
     },
 
@@ -3284,6 +3451,10 @@ Alpine.data('customFieldSetForm', (initialFields = []) => ({
             if (!field.name || field.name.trim() === '') {
                 field.name = field.type === 'spacer' ? 'Spacer' : 'Divider';
             }
+        }
+
+        if (!this.canBeScannable(field.type)) {
+            field.is_scannable = false;
         }
     },
 
@@ -5278,6 +5449,12 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
             noteDraft: unknownScan?.note || '',
             editingNote: false,
             savingNote: false,
+            code: entry.code || null,
+            parent_assignment: entry.parent_assignment || null,
+            parent_message: entry.parent_message || null,
+            current_parent: entry.current_parent || null,
+            session_parent: entry.session_parent || null,
+            confirmingParent: false,
             time: entry.time ?? new Date().toLocaleTimeString(),
         };
     },
@@ -5577,7 +5754,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
 
         while (this.queue.length > 0) {
             const job = this.queue.shift();
-            await this.sendScan(job.code, job.quantity);
+            await this.sendScan(job.code, job.quantity, Boolean(job.confirmParentChange));
             this.$nextTick(() => this.focusInput());
         }
 
@@ -5596,7 +5773,51 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
         }
     },
 
-    async sendScan(code, quantity) {
+    async confirmParentAssignment(entry) {
+        const code = String(entry?.code || '').trim();
+        if (!code || entry.confirmingParent) {
+            return;
+        }
+
+        entry.confirmingParent = true;
+        const quantity = Number(entry.quantity) > 0 ? Number(entry.quantity) : 1;
+        this.queue.push({ code, quantity, confirmParentChange: true });
+        await this.processQueue();
+        entry.confirmingParent = false;
+    },
+
+    parentAssignmentFields(data, code, quantity, include) {
+        if (!include) {
+            return {
+                code: null,
+                parent_assignment: null,
+                parent_message: null,
+                current_parent: null,
+                session_parent: null,
+            };
+        }
+
+        return {
+            code,
+            quantity,
+            parent_assignment: data.parent_assignment || null,
+            parent_message: data.parent_message || null,
+            current_parent: data.current_parent || null,
+            session_parent: data.session_parent || null,
+        };
+    },
+
+    playParentAwareFeedback(data) {
+        const outcome = data?.parent_assignment;
+        if (outcome === 'needs_confirm' || outcome === 'rejected') {
+            this.playScanFeedback('fail');
+            return;
+        }
+
+        this.playScanFeedback('match');
+    },
+
+    async sendScan(code, quantity, confirmParentChange = false) {
         const token = document.querySelector('meta[name="csrf-token"]')?.content;
         try {
             const res = await fetch(scanUrl, {
@@ -5606,7 +5827,11 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                     Accept: 'application/json',
                     'X-CSRF-TOKEN': token,
                 },
-                body: JSON.stringify({ code, quantity }),
+                body: JSON.stringify({
+                    code,
+                    quantity,
+                    confirm_parent_change: confirmParentChange,
+                }),
             });
             const data = await res.json().catch(() => ({}));
 
@@ -5650,6 +5875,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                         this.normalizeEntry(
                             {
                                 ...item,
+                                ...this.parentAssignmentFields(data, code, quantity, index === 0),
                                 duplicate: false,
                                 inventory_status: index === 0 ? data.inventory_status : 'unknown',
                                 warning: index === 0 ? data.warning : null,
@@ -5659,13 +5885,13 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                         )
                     );
                 });
-                this.playScanFeedback('match');
+                this.playParentAwareFeedback(data);
             } else if (data.asset) {
                 entries.push(
                     this.normalizeEntry(
                         {
                             id: `dup-${data.asset.id}-${Date.now()}`,
-                            quantity,
+                            ...this.parentAssignmentFields(data, code, quantity, true),
                             is_child_expand: false,
                             duplicate: Boolean(data.duplicate),
                             inventory_status: data.inventory_status,
@@ -5676,7 +5902,7 @@ Alpine.data('barcodeScanner', (scanUrl, eventListId = null, initialEventItems = 
                         0
                     )
                 );
-                this.playScanFeedback('match');
+                this.playParentAwareFeedback(data);
             }
 
             if (entries.length) {

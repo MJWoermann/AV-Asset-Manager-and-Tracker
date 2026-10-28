@@ -94,6 +94,17 @@ class SparePartController extends Controller
         return redirect()->route('spares.show', $part)->with('status', 'Spare part created.');
     }
 
+    public function storeFromAsset(Asset $asset, SparePartService $service): RedirectResponse
+    {
+        $result = $service->listAsset($asset);
+
+        return redirect()
+            ->route('spares.show', $result['spare'])
+            ->with('status', $result['created']
+                ? 'Asset listed in the spares register.'
+                : 'This asset is already listed in the spares register.');
+    }
+
     public function show(
         Request $request,
         SparePart $spare,

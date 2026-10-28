@@ -75,6 +75,12 @@
             <?php if(request()->filled(\App\Support\PageSize::PARAM)): ?>
                 <input type="hidden" name="<?php echo e(\App\Support\PageSize::PARAM); ?>" value="<?php echo e(request(\App\Support\PageSize::PARAM)); ?>">
             <?php endif; ?>
+            <?php $__currentLoopData = $hiddenColumnFilters; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $param => $value): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <input type="hidden" name="<?php echo e($param); ?>" value="<?php echo e($value); ?>">
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            <?php if(request()->boolean('unrepaired_fault')): ?>
+                <input type="hidden" name="unrepaired_fault" value="1">
+            <?php endif; ?>
             <?php if (isset($component)) { $__componentOriginal6ba2bee0210b38146ba04d5bb3b73030 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal6ba2bee0210b38146ba04d5bb3b73030 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.scannable-search','data' => ['id' => 'asset-search-q','name' => 'q','value' => $q,'placeholder' => 'Search name, location, FMI, barcode, SN…','class' => 'flex-1','ariaLabel' => 'Search assets','scanAriaLabel' => 'Scan barcode into asset search']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -98,14 +104,14 @@
             <button type="submit" class="px-4 py-2 bg-black text-white dark:bg-brand shrink-0">Search</button>
             <?php if (isset($component)) { $__componentOriginal3713bcf4ead06ff5169b19e8fd8f7113 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3713bcf4ead06ff5169b19e8fd8f7113 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.clear-filters','data' => ['href' => route('assets.index'),'active' => \App\Support\AssetBrowseFilters::hasActiveFilters(request(), $selectedColumns)]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.clear-filters','data' => ['href' => route('assets.index'),'active' => \App\Support\AssetBrowseFilters::hasActiveFilters(request())]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('clear-filters'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['href' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(route('assets.index')),'active' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(\App\Support\AssetBrowseFilters::hasActiveFilters(request(), $selectedColumns))]); ?>
+<?php $component->withAttributes(['href' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(route('assets.index')),'active' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(\App\Support\AssetBrowseFilters::hasActiveFilters(request()))]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal3713bcf4ead06ff5169b19e8fd8f7113)): ?>
@@ -117,6 +123,18 @@
 <?php unset($__componentOriginal3713bcf4ead06ff5169b19e8fd8f7113); ?>
 <?php endif; ?>
         </form>
+        <?php if($hiddenColumnFilters !== []): ?>
+            <?php
+                $hiddenFilterLabels = \App\Support\AssetBrowseFilters::columnLabelsForParams(array_keys($hiddenColumnFilters));
+            ?>
+            <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">
+                A filter is applied to <?php echo e(count($hiddenFilterLabels) === 1 ? 'a hidden column' : 'hidden columns'); ?>: <?php echo e(implode(', ', $hiddenFilterLabels)); ?>.
+                Clear all filters removes <?php echo e(count($hiddenFilterLabels) === 1 ? 'it' : 'them'); ?>.
+            </p>
+        <?php endif; ?>
+        <?php if(request()->boolean('unrepaired_fault')): ?>
+            <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver">Showing assets with a fault and no open repair.</p>
+        <?php endif; ?>
 
         <?php if (isset($component)) { $__componentOriginal9ffcf2017585465c912ad277f9f14b73 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal9ffcf2017585465c912ad277f9f14b73 = $attributes; } ?>

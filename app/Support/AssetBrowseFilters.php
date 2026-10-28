@@ -137,6 +137,10 @@ class AssetBrowseFilters
             $query->whereNull('location_id');
         }
 
+        if ($request->boolean('unrepaired_fault')) {
+            $query->withUnrepairedFault();
+        }
+
         if ($request->boolean('stock_tracked')) {
             $query->whereHas('itemType', fn (Builder $builder) => $builder->where('supports_stock_tracking', true));
         }
@@ -280,6 +284,7 @@ class AssetBrowseFilters
         return [
             'missing_identifiers',
             'missing_location',
+            'unrepaired_fault',
             'stock_tracked',
             'stock_below_min',
             'stock_at_max',
@@ -357,19 +362,66 @@ class AssetBrowseFilters
     }
 
     /**
+     * Column labels for column-filter query parameter names.
+     *
+     * @param  list<string>  $params
+     * @return list<string>
+     */
+    public static function columnLabelsForParams(array $params): array
+    {
+        $columnsByParam = array_flip(self::columnParams());
+        $labels = [];
+
+        foreach ($params as $param) {
+            $column = $columnsByParam[$param] ?? null;
+
+            if (! is_string($column)) {
+                continue;
+            }
+
+            $labels[] = AssetTableColumns::label($column);
+        }
+
+        return $labels;
+    }
+
+    /**
+     * Filled column-filter query values for columns that are not shown.
+     *
+     * @param  list<string>  $selectedColumns
+     * @return array<string, string>
+     */
+    public static function filledHiddenColumnFilters(Request $request, array $selectedColumns): array
+    {
+        $filters = [];
+
+        foreach (self::hiddenColumnFilterParams($selectedColumns) as $param) {
+            $value = $request->input($param);
+
+            if (! is_scalar($value)) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+
+            if ($value === '') {
+                continue;
+            }
+
+            $filters[$param] = $value;
+        }
+
+        return $filters;
+    }
+
+    /**
      * Whether the request carries a filled filter for a column that is not shown.
      *
      * @param  list<string>  $selectedColumns
      */
     public static function hasFilledHiddenColumnFilters(Request $request, array $selectedColumns): bool
     {
-        foreach (self::hiddenColumnFilterParams($selectedColumns) as $param) {
-            if (filled($request->input($param))) {
-                return true;
-            }
-        }
-
-        return false;
+        return self::filledHiddenColumnFilters($request, $selectedColumns) !== [];
     }
 
     /**

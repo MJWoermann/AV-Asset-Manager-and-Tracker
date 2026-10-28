@@ -84,12 +84,18 @@ class AssetListApiController extends Controller
             'scan_session_id' => ['required', 'exists:scan_sessions,id'],
             'code' => ['required', 'string'],
             'quantity' => ['nullable', 'integer', 'min:1'],
+            'confirm_parent_change' => ['sometimes', 'boolean'],
         ]);
 
         $session = ScanSession::findOrFail($data['scan_session_id']);
         abort_unless($session->user_id === $request->user()->id || $request->user()->hasRole('admin'), 403);
 
-        $result = $scanService->scanCode($session, $data['code'], $data['quantity'] ?? 1);
+        $result = $scanService->scanCode(
+            $session,
+            $data['code'],
+            $data['quantity'] ?? 1,
+            $request->boolean('confirm_parent_change'),
+        );
 
         return response()->json($result);
     }

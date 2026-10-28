@@ -27,7 +27,7 @@ Keep navigation short so operators reach core work without hunting through setti
 Dense browse surfaces should be filterable and, where users spend real time, customizable per person.
 
 - Prefer **per-user preferences** for view layout (columns, widget order/visibility) over one global layout for everyone.
-- Data tables that users browse often should support **search and/or per-column filters**. When a column is hidden, clear that column’s filter (do not keep filtering on an invisible field).
+- Data tables that users browse often should support **search and/or per-column filters**. On Assets, a URL filter applies even when that column is hidden, and **Clear all filters** removes filters for every column, shown or not. On other browse tables, hiding a column still clears that column’s filter.
 - List/dropdown filters use **searchable** option lists. Choosing (or clearing) a list value **applies immediately** — do not require a separate Apply/Filter click for dropdowns. Keep an explicit Search submit for free-text fields. Provide a **Clear all filters** control whenever any filter is active.
 - On **narrow viewports** (`max-width: 639px`), opening a searchable dropdown scrolls the **field top to the top of the viewport** so the option list stays visible (above the on-screen keyboard). Focus the search input with `preventScroll` so the browser does not undo that pin.
 - **Site-wide** export/report column defaults may be admin-owned; day-to-day browse layout stays per-user.

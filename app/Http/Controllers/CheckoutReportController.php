@@ -14,7 +14,9 @@ use App\Models\ManufacturerModel;
 use App\Models\User;
 use App\Services\CheckoutPurposeService;
 use App\Services\CheckoutReportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -24,30 +26,46 @@ class CheckoutReportController extends Controller
     public function index(CheckoutReportRequest $request, CheckoutReportService $reports): View
     {
         $filters = $reports->filters($request->validated());
+        $modelRows = $filters['view'] === 'models' ? $reports->modelSummary($filters) : [];
 
         return view('reports.checkouts', [
             'filters' => $filters,
             'query' => $reports->queryParameters($filters),
             'filtersActive' => $reports->filtersActive($filters),
-            'modelRows' => $filters['view'] === 'models' ? $reports->modelSummary($filters) : [],
+            'modelRows' => $modelRows,
+            'modelGroups' => $reports->modelGroups($modelRows, $filters['checked_out_only']),
             'holderGroups' => $filters['view'] === 'holders' ? $reports->holderGroups($filters) : [],
             'purposes' => CheckoutPurpose::query()->orderBy('sort_order')->orderBy('name')->get(),
             ...$this->filterOptions(),
         ]);
     }
 
-    public function export(CheckoutReportRequest $request, CheckoutReportService $reports): BinaryFileResponse
+    public function export(CheckoutReportRequest $request, CheckoutReportService $reports): BinaryFileResponse|Response
     {
         $filters = $reports->filters($request->validated());
         $format = $request->string('format')->toString();
 
-        if (! in_array($format, ['xlsx', 'csv'], true)) {
+        if (! in_array($format, ['xlsx', 'csv', 'pdf'], true)) {
             $format = 'xlsx';
         }
 
         $modelRows = $filters['view'] === 'models' ? $reports->modelSummary($filters) : [];
         $holderGroups = $filters['view'] === 'holders' ? $reports->holderGroups($filters, true) : [];
         $filename = 'checkouts-by-'.$filters['view'].'-'.now()->format('Ymd-His').'.'.$format;
+
+        if ($format === 'pdf') {
+            $pdf = Pdf::loadView('reports.checkouts-pdf', [
+                'filters' => $filters,
+                'modelRows' => $modelRows,
+                'holderGroups' => $holderGroups,
+            ]);
+
+            if ($filters['view'] === 'holders') {
+                $pdf->setPaper('a4', 'landscape');
+            }
+
+            return $pdf->download($filename);
+        }
 
         return Excel::download(
             new CheckoutReportExport($filters['view'], $modelRows, $holderGroups),

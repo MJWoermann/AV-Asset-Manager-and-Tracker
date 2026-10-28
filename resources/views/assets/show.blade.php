@@ -36,6 +36,20 @@
                             class="px-3 py-2 bg-brand text-white text-sm"
                         >Open URL</a>
                     @endforeach
+                    <form method="POST" action="{{ route('scan.prepare-parent', $asset) }}" class="inline">
+                        @csrf
+                        <button type="submit" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Scan children</button>
+                    </form>
+                    @role('admin|inventory_manager')
+                        @if($listedSpare ?? null)
+                            <a href="{{ route('spares.show', $listedSpare) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">In spares register</a>
+                        @else
+                            <form method="POST" action="{{ route('assets.spares.store', $asset) }}" class="inline">
+                                @csrf
+                                <button type="submit" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">List in spares</button>
+                            </form>
+                        @endif
+                    @endrole
                     <a href="{{ route('assets.edit', $asset) }}" class="px-3 py-2 border border-brand-charcoal dark:border-white text-sm">Edit</a>
                     @role('admin|inventory_manager')
                         @feature('shelf_tag_generator')

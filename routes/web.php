@@ -161,6 +161,10 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
     Route::post('/assets/{asset}/checkouts/{checkout}/return', [AssetCheckoutController::class, 'returnCheckout'])
         ->name('assets.checkouts.return');
 
+    Route::post('/assets/{asset}/spares', [SparePartController::class, 'storeFromAsset'])
+        ->middleware('role:admin,inventory_manager')
+        ->name('assets.spares.store');
+
     Route::post('/assets/{asset}/maintenance-logs', [AssetMaintenanceLogController::class, 'store'])
         ->name('assets.maintenance-logs.store');
     Route::delete('/assets/{asset}/maintenance-logs/{maintenanceLog}', [AssetMaintenanceLogController::class, 'destroy'])
@@ -275,6 +279,7 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
 
     Route::get('/scan', [ScanController::class, 'index'])->name('scan.index');
     Route::post('/scan/start', [ScanController::class, 'start'])->name('scan.start');
+    Route::post('/scan/parent/{asset}', [ScanController::class, 'prepareParent'])->name('scan.prepare-parent');
     Route::patch('/scan/{scan}/lists', [ScanController::class, 'updateLists'])->name('scan.lists');
     Route::patch('/scan/{scan}/location', [ScanController::class, 'updateLocation'])->name('scan.location');
     Route::post('/scan/{scan}', [ScanController::class, 'scan'])->name('scan.scan');
@@ -426,6 +431,15 @@ Route::middleware(['auth', 'role:admin,inventory_manager,scanner'])->group(funct
             ->name('assets.stock-movements.store');
         Route::patch('/assets/{asset}/stock-levels', [AssetStockController::class, 'updateLevels'])
             ->name('assets.stock-levels.update');
+    });
+
+    Route::middleware(['feature:stock_consumables', 'role:admin'])->group(function () {
+        Route::patch('/assets/{asset}/stock-movements/{stockMovement}', [AssetStockController::class, 'update'])
+            ->name('assets.stock-movements.update')
+            ->scopeBindings();
+        Route::delete('/assets/{asset}/stock-movements/{stockMovement}', [AssetStockController::class, 'destroy'])
+            ->name('assets.stock-movements.destroy')
+            ->scopeBindings();
     });
 
     Route::middleware(['feature:stock_consumables', 'role:admin,inventory_manager'])->group(function () {

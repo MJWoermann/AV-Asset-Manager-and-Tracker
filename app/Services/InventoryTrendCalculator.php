@@ -17,6 +17,8 @@ class InventoryTrendCalculator
      */
     public function compute(Collection $movements, ?int $minLevel): array
     {
+        $movements = $this->sinceLastRestock($movements);
+
         if ($movements->count() < 2 || $minLevel === null) {
             return ['series' => null, 'eta' => null, 'eta_label' => null];
         }
@@ -158,19 +160,75 @@ class InventoryTrendCalculator
             return [];
         }
 
-        $end = $eta && $eta->greaterThan($last) ? $eta : $last->copy()->addDays(7);
         $startDays = $origin->diffInSeconds($first, false) / 86400;
-        $endDays = $origin->diffInSeconds($end, false) / 86400;
+        $startY = max(0, $intercept + ($slope * $startDays));
 
-        return [
+        if ($slope < -0.0001) {
+            $daysToZero = (0 - $intercept) / $slope;
+            $end = $daysToZero > $startDays
+                ? $origin->copy()->addSeconds((int) round($daysToZero * 86400))
+                : $first->copy();
+            $endY = 0.0;
+        } else {
+            $end = $last->copy();
+            $endDays = $origin->diffInSeconds($end, false) / 86400;
+            $endY = max(0, $intercept + ($slope * $endDays));
+        }
+
+        $points = [
             [
                 'x' => $first->toIso8601String(),
-                'y' => round($intercept + ($slope * $startDays), 2),
+                'y' => round($startY, 2),
             ],
             [
                 'x' => $end->toIso8601String(),
-                'y' => round(max(0, $intercept + ($slope * $endDays)), 2),
+                'y' => round($endY, 2),
             ],
         ];
+
+        // #region agent log
+        file_put_contents(base_path('debug-ff4d0e.log'), json_encode([
+            'sessionId' => 'ff4d0e',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'H3-H4',
+            'location' => 'InventoryTrendCalculator.php:projectionPoints',
+            'message' => 'trend segment ends at zero without extending past restock',
+            'data' => [
+                'segmentStart' => $first->toIso8601String(),
+                'segmentLastEvent' => $last->toIso8601String(),
+                'projectionEnd' => $end->toIso8601String(),
+                'projectionEndY' => round($endY, 2),
+                'slopePerDay' => $slope,
+                'ignoredEta' => $eta?->toIso8601String(),
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ]).PHP_EOL, FILE_APPEND);
+        // #endregion
+
+        return $points;
+    }
+
+    /**
+     * Fit usage only after the latest restock so a delivery does not bend the previous decline.
+     *
+     * @param  Collection<int, object>  $movements
+     * @return Collection<int, object>
+     */
+    protected function sinceLastRestock(Collection $movements): Collection
+    {
+        $lastRestockIndex = null;
+
+        foreach ($movements->values() as $index => $movement) {
+            $type = $movement->type->value ?? null;
+            if ($type === 'restock') {
+                $lastRestockIndex = $index;
+            }
+        }
+
+        if ($lastRestockIndex === null) {
+            return $movements->values();
+        }
+
+        return $movements->values()->slice($lastRestockIndex)->values();
     }
 }

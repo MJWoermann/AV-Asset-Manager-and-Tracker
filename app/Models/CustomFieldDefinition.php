@@ -11,6 +11,9 @@ class CustomFieldDefinition extends Model
     /** @var list<string> */
     public const LAYOUT_TYPES = ['spacer', 'divider'];
 
+    /** @var list<string> */
+    public const SCANNABLE_TYPES = ['text', 'number', 'url'];
+
     protected $fillable = [
         'custom_field_set_id',
         'name',
@@ -18,7 +21,12 @@ class CustomFieldDefinition extends Model
         'type',
         'options',
         'is_required',
+        'is_scannable',
         'sort_order',
+    ];
+
+    protected $attributes = [
+        'is_scannable' => false,
     ];
 
     protected function casts(): array
@@ -26,7 +34,13 @@ class CustomFieldDefinition extends Model
         return [
             'options' => 'array',
             'is_required' => 'boolean',
+            'is_scannable' => 'boolean',
         ];
+    }
+
+    public function allowsBarcodeScan(): bool
+    {
+        return $this->is_scannable && in_array($this->type, self::SCANNABLE_TYPES, true);
     }
 
     public function isLayoutElement(): bool
