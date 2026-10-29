@@ -26,7 +26,7 @@
         x-data="shelfTagPrintPreview(@js($labels), @js($layout->displayWidthMm()), @js($layout->displayHeightMm()), @js($layout->logoUrl()))"
         x-init="renderAll()"
     >
-        <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver print:hidden">
+        <p class="no-print mb-4 text-sm text-brand-charcoal dark:text-brand-silver print:hidden">
             Showing first {{ count($previewLabels) }} of {{ $count }} on screen. Print/PDF includes the full batch.
             Select the matching Brother DK size, Actual size, Cut every for continuous.
             @if($layout->isLandscape())
@@ -58,26 +58,16 @@
                 size: {{ $layout->displayWidthMm() }}mm {{ $layout->displayHeightMm() }}mm;
                 margin: 0;
             }
-            html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                background: #fff !important;
-            }
-            body > div {
+            html, body, body > div, main, .max-w-7xl, .label-print-root {
+                width: {{ $layout->displayWidthMm() }}mm !important;
+                max-width: {{ $layout->displayWidthMm() }}mm !important;
                 min-height: 0 !important;
-                background: #fff !important;
-            }
-            nav,
-            header,
-            [data-flash-banner],
-            .print\\:hidden,
-            .fixed {
-                display: none !important;
-            }
-            main,
-            .label-print-root {
                 margin: 0 !important;
                 padding: 0 !important;
+                background: #fff !important;
+            }
+            .no-print {
+                display: none !important;
             }
             .label-sheet {
                 position: relative;

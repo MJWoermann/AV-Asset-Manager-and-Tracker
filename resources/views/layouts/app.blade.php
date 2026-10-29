@@ -253,7 +253,7 @@
             @include('layouts.navigation')
 
             @isset($header)
-                <header class="bg-white dark:bg-brand-slate border-b border-brand-silver dark:border-brand-charcoal">
+                <header class="no-print bg-white dark:bg-brand-slate border-b border-brand-silver dark:border-brand-charcoal">
                     <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
                         {{ $header }}
                     </div>
@@ -261,14 +261,14 @@
             @endisset
 
             @if (session('status'))
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4" data-flash-banner="status">
+                <div class="no-print max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4" data-flash-banner="status">
                     <div class="rounded border border-brand bg-white dark:bg-brand-slate px-4 py-3 text-sm text-brand-teal dark:text-brand-teal-bright">
                         {{ session('status') }}
                     </div>
                 </div>
             @endif
             @if (session('warning'))
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4" data-flash-banner="warning">
+                <div class="no-print max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4" data-flash-banner="warning">
                     <div class="rounded border border-brand-gold bg-white dark:bg-brand-slate px-4 py-3 text-sm text-brand-charcoal dark:text-brand-gold">
                         {{ session('warning') }}
                     </div>
@@ -283,7 +283,7 @@
         </div>
 
         @if ($gitVersion = \App\Support\GitVersion::short())
-            <div class="fixed bottom-2 left-2 z-10 pointer-events-none select-none text-xs font-mono text-brand-charcoal dark:text-brand-grey-blue" title="Deployed commit">
+            <div class="no-print fixed bottom-2 left-2 z-10 pointer-events-none select-none text-xs font-mono text-brand-charcoal dark:text-brand-grey-blue" title="Deployed commit">
                 {{ $gitVersion }}
             </div>
         @endif

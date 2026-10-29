@@ -23,7 +23,7 @@ Always-on areas (catalogue, scan, compare, files/manuals, maintenance logs, repa
 |---------|--------|--------------|------------------------|
 | **Asset connections** | Preview | Ports/interfaces on assets, cable/signal paths, Connection types under Data, Connection map report | Document rack/device wiring; feature-gated API under `/api` when enabled |
 | **RU visualiser** | Preview | **Rack** tab: place child gear in rack-unit slots (front/rear) | Visual elevation for touring racks; web UI only today |
-| **Label generator** | Preview | Layout editor + print/PDF from Assets, lists, or Reports → Labels | Warehouse shelf labels and bag tags; partial API (asset label PDF / layouts) |
+| **Label generator** | Preview | Layout editor + print/PDF from Assets, lists, or Reports → Labels | Warehouse shelf labels and bag tags; partial API (asset label PDF / layouts). Phone-to-kiosk QL-1100 printing is planned below |
 | **Stock / consumables** | Preview | **Stock** tab on an asset: quantities, movements, min/max, charts; Kanban/QR | Counts consumables *on that asset* — distinct from Maintenance → Spares. Guest stock token URLs are rate-limited; use only where physical QR is trusted |
 | **Email integration** | Preview | Admin → Email: outbound notifications, inbound helpdesk replies, optional digests | Requires credentials + scheduler; see [email-setup.md](email-setup.md) |
 
@@ -112,6 +112,46 @@ Always-on areas (catalogue, scan, compare, files/manuals, maintenance logs, repa
 
 - Preview: Asset connections (this file) and [features-and-usage.md](features-and-usage.md)
 - Corporate LAN context: [security-hardening.md](security-hardening.md)
+
+---
+
+### Mobile printing to a printer kiosk (QL-1100)
+
+| Field | Detail |
+|-------|--------|
+| **Status** | Planned |
+| **Why** | Print shelf labels from a phone (or any browser) onto the warehouse Brother QL-1100 without setting paper size and cut in Printer Properties on every job |
+| **Audience** | Anyone who can print labels today (Label generator preview plus `labels:read`). Pairing and revoking the kiosk is for people who manage layouts (`labels:write`) |
+
+**Direction**
+
+- The QL-1100 stays attached to a Windows kiosk PC. A phone queues a label job; an always-on helper on that PC claims it and prints it. The helper runs in the logged-on Windows user session (the Brother driver and b-PAC client live there).
+- Paper size comes from the label template saved for that DK roll. Cut travels with the job: cut each label on continuous tape (default), one cut at the end of the batch, or no cut on die-cut stock. Operators do not open the Windows print dialog for those settings.
+- The helper uses the Brother b-PAC client (the same cut and media behaviour as [bpac-js](https://github.com/yeasir01/bpac-js)). The phone does not run b-PAC or the browser extension.
+- Two artwork choices on a layout:
+  - **Image (default):** keep designing the label in this app. The job is rendered at the layout size and placed in a one-time full-page image template per DK preset.
+  - **P-touch template:** upload an `.lbx` made on a PC that has the QL-1100 driver. The helper fills named text, barcode, and QR objects from the asset or spare. A missing object name fails the job with a clear message.
+- Continuous lengths vary (about 29–300 mm). Image jobs must send that length with the job. If b-PAC cannot change template length, continuous image jobs use the QL-1100 raster commands (width, length, and cut) so the size still does not depend on Printer Properties. Die-cut image jobs stay on b-PAC.
+- Jobs are department-scoped. One helper claim per job. The phone shows queued, printing, printed, or failed, including a waiting message when the kiosk is offline. Browser print and PDF download stay available.
+- The Labels page shows each kiosk as online or offline, with the last error. The printer token is shown once when the kiosk is added.
+
+**Out of scope for the first kiosk release**
+
+- Running [bpac-js](https://github.com/yeasir01/bpac-js) in the phone browser, or printing while nobody is logged on at the kiosk PC.
+- A per-job Printer Properties step for DK size or cut.
+- Offline queueing on the phone. The PWA stays online-only.
+- Replacing the on-screen layout editor or the existing PDF download.
+
+**Dependencies (when implemented)**
+
+- Label generator (Preview).
+- Kiosk PC: QL-1100 driver, Brother b-PAC client, helper started with that Windows user, and one `.lbx` per DK preset for image mode (or an uploaded template for template mode).
+- Queue, claim, and heartbeat API; feature tests for permission, department, single claim, and cut choice. Real output is checked on the QL-1100.
+
+**Related**
+
+- Preview: Label generator (this file) and [features-and-usage.md](features-and-usage.md)
+- b-PAC in the browser (reference only; the kiosk helper calls the client directly): [yeasir01/bpac-js](https://github.com/yeasir01/bpac-js)
 
 ---
 
