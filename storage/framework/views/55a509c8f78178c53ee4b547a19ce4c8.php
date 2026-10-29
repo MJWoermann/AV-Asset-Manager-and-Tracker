@@ -12,7 +12,7 @@
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl">Manufacturers / Models</h2>
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:write')): ?>
-                <a href="<?php echo e(route('manufacturers.create')); ?>" class="px-3 py-2 bg-brand text-white text-sm">Add manufacturer</a>
+                <a href="<?php echo e(route('manufacturers.create')); ?>" data-history-roundtrip class="px-3 py-2 bg-brand text-white text-sm">Add manufacturer</a>
             <?php endif; ?>
         </div>
      <?php $__env->endSlot(); ?>
@@ -26,6 +26,7 @@
             replacementModelsUrl: <?php echo \Illuminate\Support\Js::from($replacementModelsUrl)->toHtml() ?>,
             initialDeleteManufacturer: <?php echo \Illuminate\Support\Js::from($initialDeleteManufacturer)->toHtml() ?>,
             initialDeleteModel: <?php echo \Illuminate\Support\Js::from($initialDeleteModel)->toHtml() ?>,
+            restoreManufacturerId: <?php echo \Illuminate\Support\Js::from($restoreManufacturerId)->toHtml() ?>,
         })"
     >
         <?php if(session('status')): ?>

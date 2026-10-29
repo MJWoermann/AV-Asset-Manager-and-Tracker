@@ -29,6 +29,37 @@
         >
             @csrf
             @if($manufacturerModel->exists) @method('PUT') @endif
+            @if($manufacturerModel->exists && $manufacturer->isUnspecified())
+                <div
+                    x-data="{ manufacturerId: @js((string) old('manufacturer_id', '')) }"
+                    @searchable-select-changed="if ($event.detail.name === 'manufacturer_id') manufacturerId = $event.detail.value || ''"
+                >
+                    <x-input-label for="manufacturer_id" value="Manufacturer" />
+                    <x-searchable-select
+                        name="manufacturer_id"
+                        id="manufacturer_id"
+                        placeholder="Search manufacturers…"
+                        :options="$assignmentManufacturers->map(fn ($option) => ['value' => $option->id, 'label' => $option->name])"
+                        :selected="old('manufacturer_id')"
+                        nullable
+                        :create-option="['value' => '__new__', 'label' => '+ Add new manufacturer…']"
+                    />
+                    <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">
+                        Choose an existing manufacturer or add one. Assets, spares, and procedures that use this model move with it.
+                    </p>
+                    <x-input-error :messages="$errors->get('manufacturer_id')" class="mt-1" />
+                    <div class="mt-2" x-show="manufacturerId === '__new__'" x-cloak>
+                        <x-input-label for="new_manufacturer" value="New manufacturer name" />
+                        <x-text-input
+                            id="new_manufacturer"
+                            name="new_manufacturer"
+                            class="mt-1 block w-full"
+                            :value="old('new_manufacturer')"
+                        />
+                        <x-input-error :messages="$errors->get('new_manufacturer')" class="mt-1" />
+                    </div>
+                </div>
+            @endif
             <div>
                 <x-input-label for="name" value="Model name" />
                 <x-text-input id="name" name="name" class="mt-1 block w-full" :value="old('name', $manufacturerModel->name)" required />

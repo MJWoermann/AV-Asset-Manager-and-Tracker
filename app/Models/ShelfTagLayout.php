@@ -57,6 +57,40 @@ class ShelfTagLayout extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * Copy paper, elements, editor settings, and logo references into a new layout.
+     */
+    public function duplicateFor(?User $actor): self
+    {
+        $copy = $this->replicate();
+        $copy->name = $this->nextDuplicateName();
+        $copy->created_by = $actor?->id;
+        $copy->save();
+
+        return $copy;
+    }
+
+    public function nextDuplicateName(): string
+    {
+        $base = 'Copy of '.$this->name;
+        $candidate = $this->fitDuplicateName($base);
+        $suffixNumber = 2;
+
+        while (static::query()->where('name', $candidate)->exists()) {
+            $candidate = $this->fitDuplicateName($base, ' ('.$suffixNumber.')');
+            $suffixNumber++;
+        }
+
+        return $candidate;
+    }
+
+    protected function fitDuplicateName(string $base, string $suffix = ''): string
+    {
+        $limit = 255 - mb_strlen($suffix);
+
+        return mb_substr($base, 0, max(1, $limit)).$suffix;
+    }
+
     public function logoFile(): BelongsTo
     {
         return $this->belongsTo(File::class, 'logo_file_id');

@@ -10,12 +10,19 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Manufacturer extends Model
 {
+    public const UNSPECIFIED_NAME = '(Unspecified)';
+
     /** @use HasFactory<ManufacturerFactory> */
     use HasFactory;
 
     protected $fillable = [
         'name',
     ];
+
+    public function isUnspecified(): bool
+    {
+        return $this->name === self::UNSPECIFIED_NAME;
+    }
 
     protected static function booted(): void
     {

@@ -15,6 +15,10 @@
         </div>
         <div class="flex items-center gap-3 text-sm">
             <a href="<?php echo e(route('labels.layouts.edit', $layout)); ?>" data-history-roundtrip class="text-brand">Edit</a>
+            <form method="POST" action="<?php echo e(route('labels.layouts.duplicate', $layout)); ?>">
+                <?php echo csrf_field(); ?>
+                <button type="submit" class="text-brand">Duplicate</button>
+            </form>
             <form method="POST" action="<?php echo e(route('labels.layouts.destroy', $layout)); ?>" onsubmit="return confirm('Delete this layout?')">
                 <?php echo csrf_field(); ?>
                 <?php echo method_field('DELETE'); ?>

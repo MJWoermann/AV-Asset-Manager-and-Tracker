@@ -106,7 +106,7 @@ class ManufacturerCatalogueService
         }
 
         if ($manufacturerName === null) {
-            $manufacturerName = '(Unspecified)';
+            $manufacturerName = Manufacturer::UNSPECIFIED_NAME;
         }
 
         $manufacturer = $this->resolveManufacturer($manufacturerName);
@@ -208,6 +208,186 @@ class ManufacturerCatalogueService
         });
     }
 
+    /**
+     * Turn a catalogue assignment into a manufacturer, or null when the model should stay unspecified.
+     */
+    public function manufacturerForModelAssignment(?string $manufacturerId, ?string $newName): ?Manufacturer
+    {
+        $manufacturerId = $this->nullableTrim($manufacturerId);
+
+        if ($manufacturerId === null) {
+            return null;
+        }
+
+        if ($manufacturerId === '__new__') {
+            $manufacturer = $this->resolveManufacturer($newName);
+
+            if ($manufacturer === null || $manufacturer->isUnspecified()) {
+                throw ValidationException::withMessages([
+                    'new_manufacturer' => 'Enter a manufacturer name.',
+                ]);
+            }
+
+            return $manufacturer;
+        }
+
+        $manufacturer = Manufacturer::query()->find((int) $manufacturerId);
+
+        if ($manufacturer === null || $manufacturer->isUnspecified()) {
+            throw ValidationException::withMessages([
+                'manufacturer_id' => 'Choose or add a manufacturer.',
+            ]);
+        }
+
+        return $manufacturer;
+    }
+
+    /**
+     * Move a model off (Unspecified) onto another manufacturer.
+     * A matching model name under the target is kept, and this model is merged into it.
+     */
+    public function assignManufacturer(ManufacturerModel $model, Manufacturer $target, string $name): ManufacturerModel
+    {
+        $model->loadMissing('manufacturer');
+
+        if ($model->manufacturer === null || ! $model->manufacturer->isUnspecified()) {
+            throw ValidationException::withMessages([
+                'manufacturer_id' => 'Only a model under (Unspecified) can be assigned a manufacturer.',
+            ]);
+        }
+
+        if ($target->isUnspecified()) {
+            throw ValidationException::withMessages([
+                'manufacturer_id' => 'Choose or add a manufacturer.',
+            ]);
+        }
+
+        $name = trim($name);
+        $previousManufacturerId = (int) $model->manufacturer_id;
+
+        return DB::transaction(function () use ($model, $target, $name, $previousManufacturerId): ManufacturerModel {
+            $existing = $this->findModelUnder($target, $name);
+
+            if ($existing !== null && $existing->isNot($model)) {
+                $this->repointModelRecords($model, $target, $existing);
+                ManufacturerModelAlias::recordMerge($model, $existing);
+                $model->delete();
+                $this->deleteUnspecifiedManufacturerIfEmpty($previousManufacturerId);
+
+                return $existing;
+            }
+
+            $model->update([
+                'name' => $name,
+                'manufacturer_id' => $target->id,
+            ]);
+            $this->moveModelAliases($model, $target);
+            $this->repointModelRecords($model, $target, $model);
+            $this->deleteUnspecifiedManufacturerIfEmpty($previousManufacturerId);
+
+            return $model;
+        });
+    }
+
+    protected function findModelUnder(Manufacturer $manufacturer, string $name): ?ManufacturerModel
+    {
+        return ManufacturerModel::query()
+            ->where('manufacturer_id', $manufacturer->id)
+            ->where(function ($query) use ($name): void {
+                $query->where('name', $name)
+                    ->orWhereRaw('LOWER(name) = ?', [Str::lower($name)]);
+            })
+            ->first();
+    }
+
+    protected function repointModelRecords(ManufacturerModel $from, Manufacturer $target, ManufacturerModel $to): void
+    {
+        Asset::withoutDepartmentScope()
+            ->where('manufacturer_model_id', $from->id)
+            ->update([
+                'manufacturer_id' => $target->id,
+                'manufacturer_model_id' => $to->id,
+            ]);
+
+        SparePart::withoutDepartmentScope()
+            ->where('manufacturer_model_id', $from->id)
+            ->update([
+                'manufacturer_id' => $target->id,
+                'manufacturer_model_id' => $to->id,
+            ]);
+
+        if ($from->is($to)) {
+            return;
+        }
+
+        $this->repointCompatibleSpares($from, $to);
+
+        RepairProcedure::query()
+            ->where('manufacturer_model_id', $from->id)
+            ->update([
+                'manufacturer_model_id' => $to->id,
+            ]);
+    }
+
+    protected function repointCompatibleSpares(ManufacturerModel $from, ManufacturerModel $to): void
+    {
+        $rows = DB::table('spare_part_models')
+            ->where('manufacturer_model_id', $from->id)
+            ->get();
+
+        foreach ($rows as $row) {
+            $alreadyLinked = DB::table('spare_part_models')
+                ->where('spare_part_id', $row->spare_part_id)
+                ->where('manufacturer_model_id', $to->id)
+                ->exists();
+
+            if ($alreadyLinked) {
+                DB::table('spare_part_models')->where('id', $row->id)->delete();
+
+                continue;
+            }
+
+            DB::table('spare_part_models')->where('id', $row->id)->update([
+                'manufacturer_model_id' => $to->id,
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    protected function moveModelAliases(ManufacturerModel $model, Manufacturer $target): void
+    {
+        $aliases = ManufacturerModelAlias::query()
+            ->where('manufacturer_model_id', $model->id)
+            ->get();
+
+        foreach ($aliases as $alias) {
+            $conflict = ManufacturerModelAlias::query()
+                ->where('manufacturer_id', $target->id)
+                ->where('former_name', $alias->former_name)
+                ->whereKeyNot($alias->id)
+                ->exists();
+
+            if ($conflict) {
+                $alias->delete();
+
+                continue;
+            }
+
+            $alias->update(['manufacturer_id' => $target->id]);
+        }
+    }
+
+    protected function deleteUnspecifiedManufacturerIfEmpty(int $manufacturerId): void
+    {
+        $manufacturer = Manufacturer::query()->withCount('models')->find($manufacturerId);
+
+        if ($manufacturer === null || ! $manufacturer->isUnspecified() || $manufacturer->models_count > 0) {
+            return;
+        }
+
+        $this->deleteManufacturerIfUnassigned($manufacturerId);
+    }
+
     protected function deleteModelIfUnassigned(int $modelId): void
     {
         $model = ManufacturerModel::query()->find($modelId);
@@ -282,13 +462,7 @@ class ManufacturerCatalogueService
 
     protected function findOrCreateModelUnder(Manufacturer $manufacturer, string $name): ManufacturerModel
     {
-        $existing = ManufacturerModel::query()
-            ->where('manufacturer_id', $manufacturer->id)
-            ->where(function ($query) use ($name) {
-                $query->where('name', $name)
-                    ->orWhereRaw('LOWER(name) = ?', [Str::lower($name)]);
-            })
-            ->first();
+        $existing = $this->findModelUnder($manufacturer, $name);
 
         if ($existing) {
             return $existing;

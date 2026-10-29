@@ -382,6 +382,138 @@ function formatCameraStartError(error) {
     return 'Camera unavailable: ' + raw;
 }
 
+// #region agent log
+function agentDebugLog(hypothesisId, location, message, data) {
+    const payload = {
+        sessionId: '50dff9',
+        runId: 'pre-fix',
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now(),
+    };
+    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '50dff9' },
+        body: JSON.stringify(payload),
+    }).catch(() => {});
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    fetch('/_debug/camera-log', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': token,
+        },
+        body: JSON.stringify(payload),
+    }).catch(() => {});
+}
+
+function collectCameraDebugSnapshot(elementId) {
+    const root = document.getElementById(elementId);
+    const video = root?.querySelector('video') || null;
+    const canvas = root?.querySelector('canvas') || null;
+    const shaded = document.getElementById('qr-shaded-region');
+    const track = video?.srcObject?.getVideoTracks?.()?.[0] || null;
+    const settings = track?.getSettings?.() || {};
+    const capabilities = track?.getCapabilities?.() || {};
+    const videoStyle = video ? getComputedStyle(video) : null;
+    const clientW = video?.clientWidth || 0;
+    const clientH = video?.clientHeight || 0;
+    const videoW = video?.videoWidth || 0;
+    const videoH = video?.videoHeight || 0;
+    const canvasW = canvas?.width || 0;
+    const canvasH = canvas?.height || 0;
+    const widthRatio = clientW > 0 ? videoW / clientW : null;
+    const heightRatio = clientH > 0 ? videoH / clientH : null;
+    const displayedAspect = clientH > 0 ? clientW / clientH : null;
+    const sensorAspect = videoH > 0 ? videoW / videoH : null;
+    let coverCrop = null;
+    if (displayedAspect && sensorAspect) {
+        if (sensorAspect > displayedAspect) {
+            coverCrop = { axis: 'x', visibleFraction: displayedAspect / sensorAspect };
+        } else {
+            coverCrop = { axis: 'y', visibleFraction: sensorAspect / displayedAspect };
+        }
+    }
+
+    const scaleMismatch = widthRatio && heightRatio && heightRatio !== 0 ? widthRatio / heightRatio : null;
+
+    return {
+        scaleMismatch,
+        compact: window.matchMedia('(max-width: 639px)').matches,
+        battery: wantsCameraBatteryOptimisation(),
+        barcodeDetector: typeof window.BarcodeDetector === 'function',
+        objectFit: videoStyle?.objectFit || null,
+        maxHeight: videoStyle?.maxHeight || null,
+        clientW,
+        clientH,
+        videoW,
+        videoH,
+        canvasW,
+        canvasH,
+        widthRatio,
+        heightRatio,
+        displayedAspect,
+        sensorAspect,
+        coverCrop,
+        qrboxAspect: canvasH > 0 ? canvasW / canvasH : null,
+        shadedBorderTop: shaded?.style?.borderTopWidth || null,
+        shadedBorderLeft: shaded?.style?.borderLeftWidth || null,
+        track: {
+            width: settings.width ?? null,
+            height: settings.height ?? null,
+            aspectRatio: settings.aspectRatio ?? null,
+            zoom: settings.zoom ?? null,
+            focusMode: settings.focusMode ?? null,
+            facingMode: settings.facingMode ?? null,
+        },
+        zoomRange: capabilities.zoom || null,
+    };
+}
+
+let cameraProbeInFlight = false;
+
+async function probeCameraDecoders(elementId) {
+    if (cameraProbeInFlight || typeof window.BarcodeDetector !== 'function') {
+        return { barcodeDetector: typeof window.BarcodeDetector === 'function', skipped: cameraProbeInFlight };
+    }
+    cameraProbeInFlight = true;
+    const summarize = (codes) => (codes || []).map((code) => ({
+        format: code.format || null,
+        length: String(code.rawValue || '').length,
+    }));
+    try {
+        const root = document.getElementById(elementId);
+        const video = root?.querySelector('video') || null;
+        const canvas = root?.querySelector('canvas') || null;
+        const detector = new window.BarcodeDetector({
+            formats: ['qr_code', 'code_128', 'code_39', 'data_matrix', 'aztec', 'pdf417'],
+        });
+        const read = async (source) => {
+            if (!source) {
+                return { codes: [], error: 'missing' };
+            }
+            try {
+                return { codes: summarize(await detector.detect(source)), error: null };
+            } catch (error) {
+                return { codes: [], error: String(error?.message || error).slice(0, 140) };
+            }
+        };
+        const [videoResult, canvasResult] = await Promise.all([read(video), read(canvas)]);
+
+        return {
+            barcodeDetector: true,
+            video: videoResult,
+            canvas: canvasResult,
+        };
+    } finally {
+        cameraProbeInFlight = false;
+    }
+}
+// #endregion
+
 /**
  * Start an html5-qrcode camera session with the same formats/constraints as stocktake scanning.
  *
@@ -417,6 +549,8 @@ async function startBarcodeCamera(elementId, onDecoded) {
               width: { ideal: 1920 },
               height: { ideal: 1080 },
           };
+    let decodeMisses = 0;
+    let lastMissLogAt = 0;
     await scanner.start(
         { facingMode: 'environment' },
         {
@@ -428,15 +562,69 @@ async function startBarcodeCamera(elementId, onDecoded) {
                     width: Math.floor(viewfinderWidth * 0.9),
                     height: Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35)),
                 };
+                // #region agent log
+                agentDebugLog('A', 'app.js:qrbox', 'qrbox sized', {
+                    viewfinderWidth,
+                    viewfinderHeight,
+                    boxWidth: box.width,
+                    boxHeight: box.height,
+                    boxAspect: box.height > 0 ? box.width / box.height : null,
+                    compactCamera,
+                });
+                // #endregion
                 return box;
             },
             videoConstraints: requestedVideoConstraints,
         },
         (decoded) => {
+            // #region agent log
+            const text = String(decoded || '');
+            agentDebugLog('A', 'app.js:onDecoded', 'code decoded', {
+                length: text.length,
+                looksUrl: /^https?:/i.test(text),
+                hasWhitespace: /\s/.test(text),
+            });
+            // #endregion
             void onDecoded(decoded);
         },
-        () => {}
+        (errorMessage) => {
+            // #region agent log
+            decodeMisses += 1;
+            const now = Date.now();
+            if (now - lastMissLogAt > 2000) {
+                lastMissLogAt = now;
+                const snapshot = collectCameraDebugSnapshot(elementId);
+                agentDebugLog('E', 'app.js:decodeMiss', 'frame not decoded', {
+                    decodeMisses,
+                    error: String(errorMessage || '').slice(0, 160),
+                    snapshot,
+                });
+                void probeCameraDecoders(elementId).then((probe) => {
+                    agentDebugLog('F', 'app.js:probe', 'full frame vs decode canvas', {
+                        probe,
+                        canvasW: snapshot.canvasW,
+                        canvasH: snapshot.canvasH,
+                        videoW: snapshot.videoW,
+                        videoH: snapshot.videoH,
+                        scaleMismatch: snapshot.scaleMismatch,
+                    });
+                });
+            }
+            // #endregion
+        }
     );
+
+    // #region agent log
+    const logCameraSnapshot = (message) => {
+        agentDebugLog('B', 'app.js:startBarcodeCamera', message, collectCameraDebugSnapshot(elementId));
+    };
+    logCameraSnapshot('camera started');
+    document.getElementById(elementId)?.querySelector('video')?.addEventListener(
+        'resize',
+        () => logCameraSnapshot('video resized'),
+        { once: true }
+    );
+    // #endregion
 
     if (!batteryOptimised) {
         try {
@@ -448,6 +636,10 @@ async function startBarcodeCamera(elementId, onDecoded) {
             // Zoom / focus constraints are best-effort; ignore unsupported devices.
         }
     }
+
+    // #region agent log
+    logCameraSnapshot(batteryOptimised ? 'camera ready battery mode' : 'camera ready after zoom');
+    // #endregion
 
     return scanner;
 }

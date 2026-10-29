@@ -100,6 +100,15 @@ class ShelfTagLayoutController extends Controller
             ->with('status', 'Label layout saved.');
     }
 
+    public function duplicate(Request $request, ShelfTagLayout $layout): RedirectResponse
+    {
+        $copy = $layout->duplicateFor($request->user());
+
+        return redirect()
+            ->route('labels.layouts.edit', $copy)
+            ->with('status', 'Label layout duplicated.');
+    }
+
     public function destroy(ShelfTagLayout $layout): RedirectResponse
     {
         $layout->delete();

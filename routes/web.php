@@ -63,6 +63,8 @@ use App\Http\Controllers\SparePartMovementController;
 use App\Http\Controllers\SparePartShelfTagPrintController;
 use App\Http\Controllers\TrustedExternalDomainPreferenceController;
 use App\Http\Controllers\UnknownScanController;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -126,6 +128,21 @@ Route::middleware(['auth', 'operator'])->group(function () {
 
 // Broad staff group — external_repairer is intentionally excluded.
 Route::middleware(['auth', 'staff'])->group(function () {
+    // #region agent log
+    if (app()->environment('local')) {
+        Route::post('/_debug/camera-log', function (Request $request) {
+            $payload = $request->except(['_token']);
+            $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES);
+            if (! is_string($encoded) || strlen($encoded) > 16000) {
+                return response()->noContent();
+            }
+            file_put_contents(base_path('debug-50dff9.log'), $encoded.PHP_EOL, FILE_APPEND | LOCK_EX);
+
+            return response()->noContent();
+        })->withoutMiddleware([ValidateCsrfToken::class]);
+    }
+    // #endregion
+
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/profile/api-tokens', [ProfileApiTokenController::class, 'store'])
         ->name('profile.api-tokens.store');
@@ -521,6 +538,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
             Route::post('/layouts', [ShelfTagLayoutController::class, 'store'])->middleware('permission:labels:write')->name('layouts.store');
             Route::get('/layouts/{layout}/edit', [ShelfTagLayoutController::class, 'edit'])->middleware('permission:labels:write')->name('layouts.edit');
             Route::put('/layouts/{layout}', [ShelfTagLayoutController::class, 'update'])->middleware('permission:labels:write')->name('layouts.update');
+            Route::post('/layouts/{layout}/duplicate', [ShelfTagLayoutController::class, 'duplicate'])->middleware('permission:labels:write')->name('layouts.duplicate');
             Route::delete('/layouts/{layout}', [ShelfTagLayoutController::class, 'destroy'])->middleware('permission:labels:write')->name('layouts.destroy');
 
             Route::get('/print', [ShelfTagPrintController::class, 'create'])->name('print.create');

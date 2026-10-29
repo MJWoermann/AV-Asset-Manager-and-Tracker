@@ -39,7 +39,15 @@
      <?php $__env->slot('header', null, []); ?> 
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="font-semibold text-xl"><?php echo e($layout->exists ? 'Edit label layout' : 'New label layout'); ?></h2>
-            <a href="<?php echo e(route('labels.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to labels</a>
+            <div class="flex items-center gap-3">
+                <?php if($layout->exists): ?>
+                    <form method="POST" action="<?php echo e(route('labels.layouts.duplicate', $layout)); ?>">
+                        <?php echo csrf_field(); ?>
+                        <button type="submit" class="text-sm text-brand">Duplicate</button>
+                    </form>
+                <?php endif; ?>
+                <a href="<?php echo e(route('labels.index')); ?>" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to labels</a>
+            </div>
         </div>
      <?php $__env->endSlot(); ?>
 

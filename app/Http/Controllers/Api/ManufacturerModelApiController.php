@@ -31,18 +31,27 @@ class ManufacturerModelApiController extends Controller
         Manufacturer $manufacturer,
         ManufacturerModel $manufacturerModel,
         AssetInterfaceService $interfaces,
+        ManufacturerCatalogueService $catalogue,
     ): JsonResponse {
         abort_unless($request->user()->can('catalog:update'), 403);
         abort_unless($manufacturerModel->manufacturer_id === $manufacturer->id, 404);
 
         $data = $this->validated($request, $manufacturer, $manufacturerModel);
-        $manufacturerModel->update(['name' => $data['name']]);
+        $target = $manufacturer->isUnspecified()
+            ? $catalogue->manufacturerForModelAssignment(
+                isset($data['manufacturer_id']) ? (string) $data['manufacturer_id'] : null,
+                isset($data['new_manufacturer']) ? (string) $data['new_manufacturer'] : null,
+            )
+            : null;
+        $saved = $target === null
+            ? tap($manufacturerModel, fn (ManufacturerModel $model) => $model->update(['name' => $data['name']]))
+            : $catalogue->assignManufacturer($manufacturerModel, $target, (string) $data['name']);
 
-        if ($request->user()?->hasFeature('asset_connections')) {
-            $interfaces->syncModelTemplates($manufacturerModel, $data['interface_templates'] ?? []);
+        if ($request->user()?->hasFeature('asset_connections') && $saved->is($manufacturerModel)) {
+            $interfaces->syncModelTemplates($saved, $data['interface_templates'] ?? []);
         }
 
-        return response()->json($manufacturerModel->fresh());
+        return response()->json($saved->fresh());
     }
 
     public function destroy(
@@ -99,6 +108,31 @@ class ManufacturerModelApiController extends Controller
             $rules['interface_templates.*.connection_type_id'] = ['nullable', 'integer', 'exists:connection_types,id'];
         }
 
-        return $request->validate($rules);
+        if ($manufacturerModel !== null && $manufacturer->isUnspecified()) {
+            $rules['manufacturer_id'] = [
+                'nullable',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === null || $value === '' || $value === '__new__') {
+                        return;
+                    }
+
+                    if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+                        return;
+                    }
+
+                    $fail('Choose or add a manufacturer.');
+                },
+            ];
+            $rules['new_manufacturer'] = [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::requiredIf(fn () => $request->input('manufacturer_id') === '__new__'),
+            ];
+        }
+
+        return $request->validate($rules, [
+            'new_manufacturer.required' => 'Enter a manufacturer name.',
+        ]);
     }
 }

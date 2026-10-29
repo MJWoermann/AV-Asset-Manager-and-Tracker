@@ -129,7 +129,7 @@ Authenticated routes require the matching role permission (for example `import:r
 | Assets | `GET/POST/PUT/DELETE /api/assets`, `POST /api/assets/bulk-update`, `GET /api/assets/{id}/history`, maintenance log sub-routes, `POST /api/assets/{id}/checkouts`, `POST /api/assets/{id}/checkouts/{checkout}/return` |
 | Lists & scan | `GET/POST/PUT/DELETE /api/lists`, `POST /api/lists/compare`, `POST /api/scan`, `POST /api/scan-sessions`, session patch/close |
 | Locations | `GET/POST/PUT/DELETE /api/locations`, `POST /api/locations/bulk-update`. Delete with assets requires `replacement_location_id`. Locations with no assets are deleted after confirmation. |
-| Catalogue | `/api/manufacturers`, nested models, `/api/item-types`, `/api/custom-field-sets`. Manufacturers with no assets are deleted after confirmation; manufacturers with assets require `replacement_manufacturer_id`. |
+| Catalogue | `/api/manufacturers`, nested models, `/api/item-types`, `/api/custom-field-sets`. Manufacturers with no assets are deleted after confirmation; manufacturers with assets require `replacement_manufacturer_id`. A model under `(Unspecified)` can be assigned with `manufacturer_id`, or with `manufacturer_id=__new__` and `new_manufacturer`. |
 | Spares | `/api/spares`, `/api/spares/groups`, movements, supersede, chart |
 | Repairs | `/api/repairs`, workflow actions, `/api/repair-procedures` |
 | Reports | `/api/unknown-scans`, export, note update, `POST /api/unknown-scans/{id}/link`, purge/dedupe (`reports:purge` plus token ability `reports:write`); `GET /api/dashboard/stats`, `GET /api/export/assets` (`reports:export`) |

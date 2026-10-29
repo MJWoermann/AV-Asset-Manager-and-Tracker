@@ -12,6 +12,7 @@ use App\Services\ManufacturerCatalogueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -72,6 +73,7 @@ class ManufacturerModelController extends Controller
             'interfaceTemplates' => [],
             'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
             'linkedSpares' => collect(),
+            'assignmentManufacturers' => collect(),
         ]);
     }
 
@@ -131,6 +133,7 @@ class ManufacturerModelController extends Controller
             'interfaceTemplates' => $interfaceTemplates,
             'connectionTypes' => ConnectionType::query()->orderBy('sort_order')->orderBy('name')->get(),
             'linkedSpares' => $linkedSpares,
+            'assignmentManufacturers' => $this->assignmentManufacturers($manufacturer),
         ]);
     }
 
@@ -139,18 +142,28 @@ class ManufacturerModelController extends Controller
         Manufacturer $manufacturer,
         ManufacturerModel $manufacturerModel,
         AssetInterfaceService $interfaces,
+        ManufacturerCatalogueService $catalogue,
     ): RedirectResponse {
         abort_unless($manufacturerModel->manufacturer_id === $manufacturer->id, 404);
 
         $data = $this->validated($request, $manufacturer, $manufacturerModel);
+        $saved = $this->saveModel($manufacturer, $manufacturerModel, $data, $catalogue);
 
-        $manufacturerModel->update(['name' => $data['name']]);
-
-        if ($request->user()?->hasFeature('asset_connections')) {
-            $interfaces->syncModelTemplates($manufacturerModel, $data['interface_templates'] ?? []);
+        if ($request->user()?->hasFeature('asset_connections') && $saved->is($manufacturerModel)) {
+            $interfaces->syncModelTemplates($saved, $data['interface_templates'] ?? []);
         }
 
-        return redirect()->route('manufacturers.index')->with('status', 'Model updated.');
+        $redirect = redirect()
+            ->route('manufacturers.index')
+            ->with('status', $saved->is($manufacturerModel)
+                ? ((int) $saved->manufacturer_id === (int) $manufacturer->id ? 'Model updated.' : 'Manufacturer assigned.')
+                : 'Model assigned to the existing manufacturer model.');
+
+        if ($saved->manufacturer_id !== $manufacturer->id) {
+            $redirect->with('expand_manufacturer_id', (int) $saved->manufacturer_id);
+        }
+
+        return $redirect;
     }
 
     public function syncMissingInterfaces(
@@ -214,6 +227,69 @@ class ManufacturerModelController extends Controller
             $rules['interface_templates.*.connection_type_id'] = ['nullable', 'integer', 'exists:connection_types,id'];
         }
 
-        return $request->validate($rules);
+        if ($manufacturerModel !== null && $manufacturer->isUnspecified()) {
+            $rules['manufacturer_id'] = [
+                'nullable',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === null || $value === '' || $value === '__new__') {
+                        return;
+                    }
+
+                    if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+                        return;
+                    }
+
+                    $fail('Choose or add a manufacturer.');
+                },
+            ];
+            $rules['new_manufacturer'] = [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::requiredIf(fn () => $request->input('manufacturer_id') === '__new__'),
+            ];
+        }
+
+        return $request->validate($rules, [
+            'new_manufacturer.required' => 'Enter a manufacturer name.',
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function saveModel(
+        Manufacturer $manufacturer,
+        ManufacturerModel $manufacturerModel,
+        array $data,
+        ManufacturerCatalogueService $catalogue,
+    ): ManufacturerModel {
+        $target = $manufacturer->isUnspecified()
+            ? $catalogue->manufacturerForModelAssignment(
+                isset($data['manufacturer_id']) ? (string) $data['manufacturer_id'] : null,
+                isset($data['new_manufacturer']) ? (string) $data['new_manufacturer'] : null,
+            )
+            : null;
+
+        if ($target === null) {
+            $manufacturerModel->update(['name' => $data['name']]);
+
+            return $manufacturerModel;
+        }
+
+        return $catalogue->assignManufacturer($manufacturerModel, $target, (string) $data['name']);
+    }
+
+    /** @return Collection<int, Manufacturer> */
+    protected function assignmentManufacturers(Manufacturer $manufacturer): Collection
+    {
+        if (! $manufacturer->isUnspecified()) {
+            return collect();
+        }
+
+        return Manufacturer::query()
+            ->where('name', '!=', Manufacturer::UNSPECIFIED_NAME)
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 }

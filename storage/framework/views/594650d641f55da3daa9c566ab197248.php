@@ -46,11 +46,11 @@
             >Assets</a>
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:write')): ?>
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                <a href="<?php echo e(route('manufacturers.models.create', $manufacturer)); ?>" class="text-sm text-brand">Add model</a>
+                <a href="<?php echo e(route('manufacturers.models.create', $manufacturer)); ?>" data-history-roundtrip class="text-sm text-brand">Add model</a>
             <?php endif; ?>
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('catalog:update')): ?>
                 <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                <a href="<?php echo e(route('manufacturers.edit', $manufacturer)); ?>" class="text-sm text-brand">Edit</a>
+                <a href="<?php echo e(route('manufacturers.edit', $manufacturer)); ?>" data-history-roundtrip class="text-sm text-brand">Edit</a>
                 <template x-if="canDeleteManufacturer(<?php echo e($manufacturer->id); ?>, <?php echo e((int) ($manufacturer->unscoped_assets_count ?? 0)); ?>)">
                     <span class="inline-flex items-center gap-2">
                         <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
@@ -104,7 +104,7 @@
                             <template x-if="canManageCatalogue && model.edit_url">
                                 <span class="inline-flex items-center gap-2">
                                     <span class="text-brand-charcoal dark:text-brand-silver" aria-hidden="true">|</span>
-                                    <a :href="model.edit_url" class="text-sm text-brand">Edit</a>
+                                    <a :href="model.edit_url" data-history-roundtrip class="text-sm text-brand">Edit</a>
                                 </span>
                             </template>
                             <template x-if="canManageCatalogue && model.destroy_url && canDeleteModel(model.id)">

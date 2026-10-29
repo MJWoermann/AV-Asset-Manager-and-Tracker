@@ -30,7 +30,15 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="font-semibold text-xl">{{ $layout->exists ? 'Edit label layout' : 'New label layout' }}</h2>
-            <a href="{{ route('labels.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to labels</a>
+            <div class="flex items-center gap-3">
+                @if ($layout->exists)
+                    <form method="POST" action="{{ route('labels.layouts.duplicate', $layout) }}">
+                        @csrf
+                        <button type="submit" class="text-sm text-brand">Duplicate</button>
+                    </form>
+                @endif
+                <a href="{{ route('labels.index') }}" class="text-sm text-brand-charcoal dark:text-brand-silver">Back to labels</a>
+            </div>
         </div>
     </x-slot>
 

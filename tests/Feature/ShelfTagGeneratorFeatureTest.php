@@ -212,6 +212,99 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         Storage::disk('local')->assertExists($file->path);
     }
 
+    public function test_manager_can_duplicate_a_label_layout(): void
+    {
+        $user = $this->manager();
+        $author = User::factory()->create();
+        $file = File::factory()->create([
+            'mime_type' => 'image/png',
+            'path' => 'attachments/test/mark.png',
+            'original_filename' => 'mark.png',
+        ]);
+        $layout = ShelfTagLayout::factory()->create([
+            'name' => 'Warehouse 62mm',
+            'created_by' => $author->id,
+            'logo_file_id' => $file->id,
+            'logo_path' => 'shelf-tag-logos/legacy.png',
+            'elements' => ShelfTagLayoutFactory::sampleElements(),
+            'orientation' => 'landscape',
+            'height_mm' => 90,
+        ]);
+        ShelfTagLayout::factory()->create([
+            'name' => 'Copy of Warehouse 62mm',
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('labels.index'))
+            ->assertOk()
+            ->assertSee('Duplicate', false);
+
+        $this->actingAs($user)
+            ->get(route('labels.layouts.edit', $layout))
+            ->assertOk()
+            ->assertSee('Duplicate', false);
+
+        $response = $this->actingAs($user)->post(route('labels.layouts.duplicate', $layout));
+
+        $copy = ShelfTagLayout::query()->where('name', 'Copy of Warehouse 62mm (2)')->first();
+        $this->assertNotNull($copy);
+        $response->assertRedirect(route('labels.layouts.edit', $copy));
+        $response->assertSessionHas('status', 'Label layout duplicated.');
+        $this->assertSame('Warehouse 62mm', $layout->fresh()->name);
+        $this->assertSame($author->id, $layout->fresh()->created_by);
+        $this->assertSame($user->id, $copy->created_by);
+        $this->assertSame($file->id, $copy->logo_file_id);
+        $this->assertSame('shelf-tag-logos/legacy.png', $copy->logo_path);
+        $this->assertSame('landscape', $copy->orientation);
+        $this->assertSame(90.0, (float) $copy->height_mm);
+        $this->assertSame($layout->paper_preset, $copy->paper_preset);
+        $this->assertSame(ShelfTagLayoutFactory::sampleElements(), $copy->elements);
+        $this->assertSame($layout->editor_settings, $copy->editor_settings);
+        $this->assertSame(3, ShelfTagLayout::query()->count());
+    }
+
+    public function test_duplicate_layout_name_stays_within_255_characters(): void
+    {
+        $user = $this->manager();
+        $layout = ShelfTagLayout::factory()->create([
+            'name' => str_repeat('A', 255),
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('labels.layouts.duplicate', $layout))
+            ->assertRedirect();
+
+        $copy = ShelfTagLayout::query()->whereKeyNot($layout->id)->first();
+        $this->assertNotNull($copy);
+        $this->assertSame('Copy of '.str_repeat('A', 247), $copy->name);
+    }
+
+    public function test_scanner_cannot_duplicate_a_label_layout(): void
+    {
+        $user = $this->scanner();
+        $layout = ShelfTagLayout::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('labels.layouts.duplicate', $layout))
+            ->assertForbidden();
+
+        $this->assertSame(1, ShelfTagLayout::query()->count());
+    }
+
+    public function test_duplicate_label_layout_returns_not_found_when_feature_is_off(): void
+    {
+        $user = $this->manager(feature: false);
+        $layout = ShelfTagLayout::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('labels.layouts.duplicate', $layout))
+            ->assertNotFound();
+
+        $this->assertSame(1, ShelfTagLayout::query()->count());
+    }
+
     public function test_uploading_the_same_logo_reuses_the_existing_file(): void
     {
         Storage::fake('local');

@@ -708,4 +708,207 @@ class ManufacturerCatalogueTest extends TestCase
         $this->assertTrue($first->is($second));
         $this->assertSame(1, Manufacturer::query()->count());
     }
+
+    public function test_unspecified_model_edit_offers_an_existing_or_new_manufacturer(): void
+    {
+        $user = $this->manager();
+        $unspecified = Manufacturer::factory()->create(['name' => Manufacturer::UNSPECIFIED_NAME]);
+        $named = Manufacturer::factory()->create(['name' => 'Yamaha']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $unspecified->id,
+            'name' => 'QL5',
+        ]);
+        $namedModel = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $named->id,
+            'name' => 'QL1',
+        ]);
+
+        $edit = $this->actingAs($user)->get(route('manufacturers.models.edit', [$unspecified, $model]));
+        $edit->assertOk();
+        $edit->assertSee('Search manufacturers');
+        $edit->assertSee('+ Add new manufacturer');
+        $edit->assertSee('Yamaha');
+
+        $namedEdit = $this->actingAs($user)->get(route('manufacturers.models.edit', [$named, $namedModel]));
+        $namedEdit->assertOk();
+        $namedEdit->assertDontSee('Search manufacturers', false);
+        $namedEdit->assertDontSee('+ Add new manufacturer', false);
+    }
+
+    public function test_manager_can_assign_an_existing_manufacturer_to_an_unspecified_model(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->itemType();
+        $otherDepartment = Department::factory()->create();
+        $unspecified = Manufacturer::factory()->create(['name' => Manufacturer::UNSPECIFIED_NAME]);
+        $target = Manufacturer::factory()->create(['name' => 'Yamaha']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $unspecified->id,
+            'name' => 'QL5',
+        ]);
+        ManufacturerModel::factory()->create([
+            'manufacturer_id' => $unspecified->id,
+            'name' => 'Stays',
+        ]);
+        $asset = Asset::create([
+            'name' => 'Console',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $unspecified->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+        $hidden = Asset::withoutDepartmentScope()->create([
+            'department_id' => $otherDepartment->id,
+            'name' => 'Other console',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $unspecified->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+        $spare = SparePart::factory()->create([
+            'manufacturer_id' => $unspecified->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+
+        $response = $this->actingAs($user)->put(route('manufacturers.models.update', [$unspecified, $model]), [
+            'name' => 'QL5',
+            'manufacturer_id' => (string) $target->id,
+        ]);
+
+        $response->assertRedirect(route('manufacturers.index'));
+        $response->assertSessionHas('status', 'Manufacturer assigned.');
+        $response->assertSessionHas('expand_manufacturer_id', $target->id);
+        $this->assertSame($target->id, $model->fresh()->manufacturer_id);
+        $this->assertSame($target->id, $asset->fresh()->manufacturer_id);
+        $this->assertSame($model->id, $asset->fresh()->manufacturer_model_id);
+        $hidden->refresh();
+        $this->assertSame($target->id, Asset::withoutDepartmentScope()->find($hidden->id)?->manufacturer_id);
+        $this->assertSame($target->id, $spare->fresh()->manufacturer_id);
+        $this->assertModelExists($unspecified);
+    }
+
+    public function test_manager_can_add_a_manufacturer_for_an_unspecified_model(): void
+    {
+        $user = $this->manager();
+        $unspecified = Manufacturer::factory()->create(['name' => Manufacturer::UNSPECIFIED_NAME]);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $unspecified->id,
+            'name' => 'QL5',
+        ]);
+
+        $response = $this->actingAs($user)->put(route('manufacturers.models.update', [$unspecified, $model]), [
+            'name' => 'QL5',
+            'manufacturer_id' => '__new__',
+            'new_manufacturer' => 'DiGiCo',
+        ]);
+
+        $created = Manufacturer::query()->where('name', 'DiGiCo')->first();
+        $response->assertRedirect(route('manufacturers.index'));
+        $response->assertSessionHas('expand_manufacturer_id', $created?->id);
+        $this->assertNotNull($created);
+        $this->assertSame($created->id, $model->fresh()->manufacturer_id);
+        $this->assertDatabaseMissing('manufacturers', ['id' => $unspecified->id]);
+    }
+
+    public function test_assigning_an_unspecified_model_merges_into_the_same_model_name(): void
+    {
+        $user = $this->manager();
+        $itemType = $this->itemType();
+        $unspecified = Manufacturer::factory()->create(['name' => Manufacturer::UNSPECIFIED_NAME]);
+        $target = Manufacturer::factory()->create(['name' => 'Yamaha']);
+        $existing = ManufacturerModel::factory()->create([
+            'manufacturer_id' => (string) $target->id,
+            'name' => 'QL5',
+        ]);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $unspecified->id,
+            'name' => 'ql5',
+        ]);
+        $asset = Asset::create([
+            'name' => 'Console',
+            'item_type_id' => $itemType->id,
+            'status' => AssetStatus::Available,
+            'manufacturer_id' => $unspecified->id,
+            'manufacturer_model_id' => $model->id,
+        ]);
+        $procedure = RepairProcedure::factory()->create([
+            'manufacturer_model_id' => $model->id,
+        ]);
+        $spare = SparePart::factory()->create();
+        $model->compatibleSpareParts()->attach($spare);
+
+        $response = $this->actingAs($user)->put(route('manufacturers.models.update', [$unspecified, $model]), [
+            'name' => 'QL5',
+            'manufacturer_id' => (string) $target->id,
+        ]);
+
+        $response->assertRedirect(route('manufacturers.index'));
+        $response->assertSessionHas('status', 'Model assigned to the existing manufacturer model.');
+        $this->assertDatabaseMissing('manufacturer_models', ['id' => $model->id]);
+        $this->assertSame($existing->id, $asset->fresh()->manufacturer_model_id);
+        $this->assertSame($target->id, $asset->fresh()->manufacturer_id);
+        $this->assertSame($existing->id, $procedure->fresh()->manufacturer_model_id);
+        $this->assertTrue($existing->compatibleSpareParts()->whereKey($spare->id)->exists());
+        $this->assertDatabaseMissing('manufacturers', ['id' => $unspecified->id]);
+    }
+
+    public function test_adding_a_manufacturer_requires_a_name(): void
+    {
+        $user = $this->manager();
+        $unspecified = Manufacturer::factory()->create(['name' => Manufacturer::UNSPECIFIED_NAME]);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $unspecified->id,
+            'name' => 'QL5',
+        ]);
+
+        $response = $this->actingAs($user)->from(route('manufacturers.models.edit', [$unspecified, $model]))
+            ->put(route('manufacturers.models.update', [$unspecified, $model]), [
+                'name' => 'QL1',
+                'manufacturer_id' => '__new__',
+            ]);
+
+        $response->assertRedirect(route('manufacturers.models.edit', [$unspecified, $model]));
+        $response->assertSessionHasErrors([
+            'new_manufacturer' => 'Enter a manufacturer name.',
+        ]);
+        $this->assertSame('QL5', $model->fresh()->name);
+        $this->assertSame($unspecified->id, $model->fresh()->manufacturer_id);
+    }
+
+    public function test_unspecified_model_can_be_renamed_without_a_manufacturer(): void
+    {
+        $user = $this->manager();
+        $unspecified = Manufacturer::factory()->create(['name' => Manufacturer::UNSPECIFIED_NAME]);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $unspecified->id,
+            'name' => 'QL5',
+        ]);
+
+        $this->actingAs($user)->put(route('manufacturers.models.update', [$unspecified, $model]), [
+            'name' => 'QL1',
+        ])->assertRedirect(route('manufacturers.index'));
+
+        $this->assertSame('QL1', $model->fresh()->name);
+        $this->assertSame($unspecified->id, $model->fresh()->manufacturer_id);
+    }
+
+    public function test_named_model_update_does_not_change_its_manufacturer(): void
+    {
+        $user = $this->manager();
+        $named = Manufacturer::factory()->create(['name' => 'Yamaha']);
+        $other = Manufacturer::factory()->create(['name' => 'DiGiCo']);
+        $model = ManufacturerModel::factory()->create([
+            'manufacturer_id' => $named->id,
+            'name' => 'QL5',
+        ]);
+
+        $this->actingAs($user)->put(route('manufacturers.models.update', [$named, $model]), [
+            'name' => 'QL5',
+            'manufacturer_id' => $other->id,
+            'new_manufacturer' => 'Midas',
+        ])->assertRedirect(route('manufacturers.index'));
+
+        $this->assertSame($named->id, $model->fresh()->manufacturer_id);
+        $this->assertDatabaseMissing('manufacturers', ['name' => 'Midas']);
+    }
 }
