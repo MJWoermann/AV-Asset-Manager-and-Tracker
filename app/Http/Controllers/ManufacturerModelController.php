@@ -183,7 +183,10 @@ class ManufacturerModelController extends Controller
 
         $catalogue->deleteModel($manufacturerModel, $replacement);
 
-        return redirect()->route('manufacturers.index')->with('status', 'Model deleted.');
+        return redirect()
+            ->route('manufacturers.index')
+            ->with('status', 'Model deleted.')
+            ->with('expand_manufacturer_id', (int) $manufacturer->id);
     }
 
     /** @return array<string, mixed> */

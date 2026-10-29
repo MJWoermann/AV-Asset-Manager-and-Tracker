@@ -313,8 +313,13 @@ class ManufacturerCatalogueTest extends TestCase
         ]);
 
         $response->assertRedirect(route('manufacturers.index'));
+        $response->assertSessionHas('expand_manufacturer_id', $manufacturer->id);
         $this->assertDatabaseMissing('manufacturer_models', ['id' => $delete->id]);
         $this->assertSame($keep->id, $asset->fresh()->manufacturer_model_id);
+
+        $index = $this->actingAs($user)->get(route('manufacturers.index'));
+        $index->assertOk();
+        $index->assertSee('restoreManufacturerId: '.$manufacturer->id, false);
     }
 
     public function test_scanner_can_create_manufacturer_and_model(): void

@@ -31,14 +31,47 @@ $maxWidth = [
         nextFocusableIndex() { return (this.focusables().indexOf(document.activeElement) + 1) % (this.focusables().length + 1) },
         prevFocusableIndex() { return Math.max(0, this.focusables().indexOf(document.activeElement)) -1 },
     }"
-    x-init="$watch('show', value => {
-        if (value) {
+    x-init="
+        const lockPageScroll = () => {
+            if (document.body.dataset.avScrollLockY !== undefined) {
+                return;
+            }
+            const y = window.scrollY;
+            document.body.dataset.avScrollLockY = String(y);
+            document.body.style.position = 'fixed';
+            document.body.style.top = '-' + y + 'px';
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
             document.body.classList.add('overflow-y-hidden');
-            {{ $attributes->has('focusable') ? 'setTimeout(() => firstFocusable().focus(), 100)' : '' }}
-        } else {
+        };
+        const unlockPageScroll = () => {
             document.body.classList.remove('overflow-y-hidden');
+            const locked = document.body.dataset.avScrollLockY !== undefined;
+            if (locked) {
+                const y = Number(document.body.dataset.avScrollLockY || 0);
+                document.body.style.position = '';
+                document.body.style.top = '';
+                document.body.style.left = '';
+                document.body.style.right = '';
+                document.body.style.width = '';
+                delete document.body.dataset.avScrollLockY;
+                window.scrollTo(0, y);
+            }
+            window.dispatchEvent(new CustomEvent('modal-closed', { detail: '{{ $name }}' }));
+        };
+        if (show) {
+            lockPageScroll();
         }
-    })"
+        $watch('show', value => {
+            if (value) {
+                lockPageScroll();
+                {{ $attributes->has('focusable') ? 'setTimeout(() => firstFocusable()?.focus({ preventScroll: true }), 100)' : '' }}
+            } else {
+                unlockPageScroll();
+            }
+        })
+    "
     x-on:open-modal.window="$event.detail == '{{ $name }}' ? show = true : null"
     x-on:close-modal.window="$event.detail == '{{ $name }}' ? show = false : null"
     x-on:close.stop="show = false"

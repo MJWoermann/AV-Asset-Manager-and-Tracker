@@ -17,6 +17,7 @@
             replacementModelsUrl: @js($replacementModelsUrl),
             initialDeleteManufacturer: @js($initialDeleteManufacturer),
             initialDeleteModel: @js($initialDeleteModel),
+            restoreManufacturerId: @js($restoreManufacturerId),
         })"
     >
         @if (session('status'))

@@ -82,6 +82,7 @@ class ManufacturerController extends Controller
                 : null,
             'initialDeleteManufacturer' => $initialDeleteManufacturer,
             'initialDeleteModel' => $initialDeleteModel,
+            'restoreManufacturerId' => (int) $request->session()->get('expand_manufacturer_id', 0),
         ]);
     }
 

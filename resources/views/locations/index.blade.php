@@ -7,7 +7,7 @@
             @endcan
         </div>
     </x-slot>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkSelection(@js([
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" data-location-list @modal-closed.window="if ($event.detail === 'delete-location') discardSavedLocationScroll()" x-data="bulkSelection(@js([
         'idAttribute' => 'data-bulk-location-id',
         'nameAttribute' => 'data-bulk-location-name',
         'enableMerge' => true,
@@ -161,4 +161,39 @@
             </x-modal>
         @endcan
     </div>
+    <script>
+        (function () {
+            if (window.__avHistoryCollapseStarted) {
+                return;
+            }
+
+            try {
+                if (sessionStorage.getItem('av.historyCollapse')) {
+                    return;
+                }
+
+                var raw = sessionStorage.getItem('av.locationListScroll');
+                if (!raw) {
+                    return;
+                }
+
+                var data = JSON.parse(raw);
+                if (!data || data.path !== window.location.pathname) {
+                    return;
+                }
+
+                if ('scrollRestoration' in history) {
+                    history.scrollRestoration = 'manual';
+                }
+
+                var x = Number(data.x) || 0;
+                var y = Number(data.y) || 0;
+                if (x !== 0 || y !== 0) {
+                    window.scrollTo(x, y);
+                }
+            } catch (e) {
+                // The deferred script still restores when this early pass cannot.
+            }
+        })();
+    </script>
 </x-app-layout>

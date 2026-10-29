@@ -3901,6 +3901,8 @@ function createBulkSelection(config = {}) {
             if (this.selectedCount === 0) {
                 return;
             }
+            const ids = this.selectedIds;
+            saveLocationListScroll(ids.length === 1 ? ids[0] : null);
             this.pendingDelete = false;
             this.pendingMerge = false;
             this.bulkReplacementError = '';
@@ -3918,6 +3920,7 @@ function createBulkSelection(config = {}) {
             this.deleteConfirmOpen = false;
             this.pendingDelete = false;
             this.bulkReplacementError = '';
+            this.discardSavedLocationScroll();
         },
 
         selectionIncludesAssets() {
@@ -3949,6 +3952,7 @@ function createBulkSelection(config = {}) {
         },
 
         openDeleteLocation({ id, name, assetsCount = 0, action, replacementId = '' }) {
+            saveLocationListScroll(id);
             this.deleteLocation = {
                 id,
                 name,
@@ -3963,6 +3967,14 @@ function createBulkSelection(config = {}) {
                 });
             });
             this.$dispatch('open-modal', 'delete-location');
+        },
+
+        discardSavedLocationScroll() {
+            try {
+                sessionStorage.removeItem(LOCATION_LIST_SCROLL_KEY);
+            } catch {
+                // Ignore quota / private-mode failures.
+            }
         },
 
         confirmDelete() {
@@ -4082,6 +4094,14 @@ Alpine.data('manufacturerCatalogue', (config = {}) => ({
     selectedReplacementModelId: '',
 
     async init() {
+        const restoreId = Number(config.restoreManufacturerId || 0);
+        if (
+            restoreId > 0
+            && this.$root.querySelector(`[data-manufacturer-collapsible="1"][data-manufacturer-id="${restoreId}"]`)
+        ) {
+            this.expanded = { ...this.expanded, [restoreId]: true };
+            await this.ensureModelsLoaded(restoreId);
+        }
         if (config.initialDeleteManufacturer) {
             this.openDeleteManufacturer(config.initialDeleteManufacturer);
         }
@@ -6193,6 +6213,132 @@ function scrollElementToViewportTop(el) {
     document.fonts?.ready?.then(apply).catch(() => {});
 }
 
+const LOCATION_LIST_SCROLL_KEY = 'av.locationListScroll';
+
+function readLocationListScroll() {
+    try {
+        const raw = sessionStorage.getItem(LOCATION_LIST_SCROLL_KEY);
+        if (!raw) {
+            return null;
+        }
+
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+function saveLocationListScroll(locationId, keepExisting = false) {
+    if (!document.querySelector('[data-location-list]')) {
+        return;
+    }
+
+    if (keepExisting) {
+        const existing = readLocationListScroll();
+        if (existing && existing.path === window.location.pathname) {
+            return;
+        }
+    }
+
+    const y = window.scrollY;
+    if (y === 0) {
+        const existing = readLocationListScroll();
+        if (existing && existing.path === window.location.pathname && Number(existing.y) > 0) {
+            return;
+        }
+    }
+
+    const id = locationId === null || locationId === undefined || locationId === ''
+        ? ''
+        : String(locationId);
+    const row = id
+        ? document.querySelector(`[data-location-list] [data-location-id="${CSS.escape(id)}"]`)
+        : null;
+
+    try {
+        sessionStorage.setItem(LOCATION_LIST_SCROLL_KEY, JSON.stringify({
+            path: window.location.pathname,
+            x: window.scrollX,
+            y,
+            locationId: id,
+            rowTop: row ? row.getBoundingClientRect().top : null,
+        }));
+    } catch {
+        // Ignore quota / private-mode failures.
+    }
+}
+
+function restoreLocationListScroll() {
+    if (window.__avHistoryCollapseStarted) {
+        return;
+    }
+
+    try {
+        if (sessionStorage.getItem('av.historyCollapse')) {
+            return;
+        }
+    } catch {
+        return;
+    }
+
+    const list = document.querySelector('[data-location-list]');
+    if (!list) {
+        if (!/\/locations\/\d+\/edit$/.test(window.location.pathname)) {
+            try {
+                sessionStorage.removeItem(LOCATION_LIST_SCROLL_KEY);
+            } catch {
+                // Ignore quota / private-mode failures.
+            }
+        }
+
+        return;
+    }
+
+    const data = readLocationListScroll();
+
+    try {
+        sessionStorage.removeItem(LOCATION_LIST_SCROLL_KEY);
+    } catch {
+        // Ignore quota / private-mode failures.
+    }
+
+    if (!data || data.path !== window.location.pathname) {
+        return;
+    }
+
+    const apply = () => {
+        const row = data.locationId
+            ? list.querySelector(`[data-location-id="${CSS.escape(String(data.locationId))}"]`)
+            : null;
+
+        if (row && typeof data.rowTop === 'number') {
+            const delta = row.getBoundingClientRect().top - data.rowTop;
+            window.scrollTo(Number(data.x) || 0, window.scrollY + delta);
+
+            return;
+        }
+
+        const x = Number(data.x) || 0;
+        const y = Number(data.y) || 0;
+        if (x !== 0 || y !== 0) {
+            window.scrollTo(x, y);
+        }
+    };
+
+    if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+    }
+
+    apply();
+    requestAnimationFrame(apply);
+
+    if (document.readyState !== 'complete') {
+        window.addEventListener('load', apply, { once: true });
+    }
+
+    document.fonts?.ready?.then(apply).catch(() => {});
+}
+
 function restoreScrollPosition() {
     const scrollTarget = document.querySelector('[data-scroll-into-view]');
 
@@ -6252,12 +6398,17 @@ document.addEventListener(
     (event) => {
         if (event.target instanceof HTMLFormElement) {
             saveScrollPosition();
+            const form = event.target;
+            if (document.querySelector('[data-location-list]') && (form.id === 'locations-bulk-form' || form.querySelector('[name="deleting_location_id"]'))) {
+                saveLocationListScroll(form.querySelector('[name="deleting_location_id"]')?.value || null, true);
+            }
         }
     },
     true
 );
 
 restoreScrollPosition();
+restoreLocationListScroll();
 
 const HISTORY_ROUNDTRIP_KEY = 'av.historyRoundtrip';
 const HISTORY_COLLAPSE_KEY = 'av.historyCollapse';
@@ -6456,6 +6607,17 @@ document.addEventListener('click', (event) => {
     const link = event.target.closest('a[data-history-roundtrip]');
     if (!link || link.target === '_blank' || link.hasAttribute('download')) {
         return;
+    }
+
+    if (document.querySelector('[data-location-list]')) {
+        try {
+            const url = new URL(link.href, window.location.origin);
+            if (/\/locations\/\d+\/edit$/.test(url.pathname)) {
+                saveLocationListScroll(link.closest('[data-location-id]')?.getAttribute('data-location-id'));
+            }
+        } catch {
+            // Ignore malformed links.
+        }
     }
 
     rememberHistoryRoundtrip(link.href);
