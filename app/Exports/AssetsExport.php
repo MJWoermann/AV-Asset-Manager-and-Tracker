@@ -7,6 +7,7 @@ use App\Models\AssetListItem;
 use App\Models\CustomFieldDefinition;
 use App\Support\AssetExportColumns;
 use App\Support\ExportRowLimiter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -20,7 +21,10 @@ class AssetsExport implements FromCollection, WithHeadings
     /** @var Collection<int, CustomFieldDefinition> */
     protected Collection $customDefinitions;
 
-    public function __construct(public ?int $listId = null)
+    /**
+     * @param  list<int>|null  $assetIds  Limits a register export to these assets. Null exports the full register.
+     */
+    public function __construct(public ?int $listId = null, public ?array $assetIds = null)
     {
         $this->columns = $this->listId
             ? AssetExportColumns::forLists()
@@ -59,6 +63,8 @@ class AssetsExport implements FromCollection, WithHeadings
             ->with($relations)
             ->orderBy('name');
 
+        $this->limitToAssetIds($query);
+
         ExportRowLimiter::constrain($query, 'asset export');
 
         return $query
@@ -69,5 +75,29 @@ class AssetsExport implements FromCollection, WithHeadings
     public function headings(): array
     {
         return AssetExportColumns::headings($this->columns, $this->customDefinitions);
+    }
+
+    /**
+     * @param  Builder<Asset>  $query
+     */
+    protected function limitToAssetIds(Builder $query): void
+    {
+        if ($this->assetIds === null) {
+            return;
+        }
+
+        if ($this->assetIds === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $ids = $this->assetIds;
+
+        $query->where(function (Builder $query) use ($ids): void {
+            foreach (array_chunk($ids, 500) as $chunk) {
+                $query->orWhereIn('id', $chunk);
+            }
+        });
     }
 }

@@ -7,21 +7,20 @@ use App\Models\AssetStockToken;
 use App\Models\CustomFieldDefinition;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class KanbanTagService
 {
     public const DEFAULT_LABELS = ['kanban-a', 'kanban-b'];
 
     /**
-     * Create or rotate a token for the given label. Returns the plain token once.
+     * Issue a token for the given label. An active tag must be revoked first so a printed QR stays valid.
      *
      * @return array{token: AssetStockToken, plain_token: string, guest_url: string}
      */
     public function rotate(Asset $asset, string $label): array
     {
         $label = trim($label) !== '' ? trim($label) : 'kanban-a';
-        $plain = Str::random(48);
-        $hash = hash('sha256', $plain);
 
         $existing = AssetStockToken::query()
             ->where('asset_id', $asset->id)
@@ -30,10 +29,13 @@ class KanbanTagService
             ->first();
 
         if ($existing) {
-            $existing->update([
-                'revoked_at' => now(),
+            throw ValidationException::withMessages([
+                'label' => 'Revoke the active '.$label.' tag before issuing a new one.',
             ]);
         }
+
+        $plain = Str::random(48);
+        $hash = hash('sha256', $plain);
 
         $token = AssetStockToken::query()->create([
             'asset_id' => $asset->id,

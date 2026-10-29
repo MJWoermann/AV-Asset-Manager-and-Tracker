@@ -34,7 +34,7 @@
 
         @if($printable->isEmpty())
             <p class="text-sm text-brand-charcoal">
-                No fresh guest URLs available. Use Create / rotate on the Stock tab, then print again so QR codes can be generated.
+                No fresh guest URLs available. Revoke the tag on the Stock tab, then print again so a new QR code can be generated.
             </p>
         @endif
 

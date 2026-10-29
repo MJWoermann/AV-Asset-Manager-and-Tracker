@@ -27,7 +27,7 @@ class AssetStockTokenController extends Controller
 
         return redirect()
             ->route('assets.show', [$asset, 'tab' => 'stock'])
-            ->with('status', 'Kanban token rotated for '.$result['token']->label.'.')
+            ->with('kanban_status', 'New Kanban tag issued for '.$result['token']->label.'.')
             ->with('kanban_plain_token', $result['plain_token'])
             ->with('kanban_guest_url', $result['guest_url'])
             ->with('kanban_label', $result['token']->label);
@@ -47,6 +47,7 @@ class AssetStockTokenController extends Controller
 
         return redirect()
             ->route('assets.show', [$asset, 'tab' => 'stock'])
-            ->with('status', 'Kanban token revoked.');
+            ->with('kanban_status', 'Kanban token revoked.')
+            ->with('kanban_label', $stockToken->label);
     }
 }

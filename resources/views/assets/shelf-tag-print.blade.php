@@ -107,6 +107,5 @@
                 }
             }
         </style>
-        @include('shelf-tags.print.partials.debug-print-log')
     @endif
 </x-app-layout>

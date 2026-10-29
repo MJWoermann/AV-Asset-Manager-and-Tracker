@@ -356,7 +356,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
             ->middleware('throttle:import')
             ->name('import.process');
     });
-    Route::get('/export/assets', [ExportController::class, 'assets'])
+    Route::match(['get', 'post'], '/export/assets', [ExportController::class, 'assets'])
         ->middleware(['permission:reports:export', 'throttle:export'])
         ->name('export.assets');
     Route::get('/export/lists/{list}', [ExportController::class, 'list'])

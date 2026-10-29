@@ -39,15 +39,24 @@
                     <a href="<?php echo e(route('import.create')); ?>" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Import</a>
                 <?php endif; ?>
                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('reports:export')): ?>
-                    <a href="<?php echo e(route('export.assets', ['format' => 'xlsx'])); ?>" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Export</a>
+                    <button
+                        type="submit"
+                        form="assets-export-form"
+                        class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver"
+                        x-data="{ count: 0 }"
+                        @bulk-selection-changed.window="count = $event.detail.count"
+                    >
+                        <span x-text="count > 0 ? 'Export selected' : 'Export'">Export</span>
+                    </button>
                 <?php endif; ?>
-                <a href="<?php echo e(route('assets.create')); ?>" class="text-sm px-3 py-2 bg-brand text-white">Add asset</a>
+                <a href="<?php echo e(route('assets.create')); ?>" data-history-roundtrip class="text-sm px-3 py-2 bg-brand text-white">Add asset</a>
             </div>
         </div>
      <?php $__env->endSlot(); ?>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkSelection(<?php echo \Illuminate\Support\Js::from([
         'idAttribute' => 'data-bulk-asset-id',
+        'publishSelection' => true,
         'fields' => [
             'update_status' => false,
             'update_location' => false,
@@ -63,6 +72,13 @@
             'clear_notes' => false,
         ],
     ])->toHtml() ?>)">
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('reports:export')): ?>
+            <form id="assets-export-form" method="POST" action="<?php echo e(route('export.assets')); ?>" hidden>
+                <?php echo csrf_field(); ?>
+                <input type="hidden" name="format" value="xlsx">
+                <input type="hidden" name="asset_ids" :value="selectedIds.join(',')">
+            </form>
+        <?php endif; ?>
         <?php if(session('status')): ?>
             <div class="mb-4 text-sm text-brand"><?php echo e(session('status')); ?></div>
         <?php endif; ?>
@@ -87,14 +103,14 @@
             <?php endif; ?>
             <?php if (isset($component)) { $__componentOriginal6ba2bee0210b38146ba04d5bb3b73030 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal6ba2bee0210b38146ba04d5bb3b73030 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.scannable-search','data' => ['id' => 'asset-search-q','name' => 'q','value' => $q,'placeholder' => 'Search name, location, FMI, barcode, SN…','class' => 'flex-1','ariaLabel' => 'Search assets','scanAriaLabel' => 'Scan barcode into asset search']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.scannable-search','data' => ['id' => 'asset-search-q','name' => 'q','value' => $q,'placeholder' => 'Search name, location, FMI, barcode, SN…','class' => 'flex-1','ariaLabel' => 'Search assets','scanAriaLabel' => 'Scan barcode into asset search','autofocus' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('scannable-search'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['id' => 'asset-search-q','name' => 'q','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($q),'placeholder' => 'Search name, location, FMI, barcode, SN…','class' => 'flex-1','aria-label' => 'Search assets','scan-aria-label' => 'Scan barcode into asset search']); ?>
+<?php $component->withAttributes(['id' => 'asset-search-q','name' => 'q','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($q),'placeholder' => 'Search name, location, FMI, barcode, SN…','class' => 'flex-1','aria-label' => 'Search assets','scan-aria-label' => 'Scan barcode into asset search','autofocus' => true]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal6ba2bee0210b38146ba04d5bb3b73030)): ?>

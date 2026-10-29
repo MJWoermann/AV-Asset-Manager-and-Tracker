@@ -965,13 +965,18 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
         queueMicrotask(() => form.requestSubmit());
     },
 
-    emitChanged() {
+    emitChanged(extra = {}) {
         const root = this.rootEl || this.$el;
         const input = root?.querySelector('input[type="hidden"]');
         const name = this.fieldName || input?.name || '';
+        const detail = { value: this.value, name };
+        const query = String(extra.query ?? '').trim();
+        if (query !== '') {
+            detail.query = query;
+        }
         // Dispatch from the stable root — do not use contextual this.$dispatch during option clicks.
         root.dispatchEvent(new CustomEvent('searchable-select-changed', {
-            detail: { value: this.value, name },
+            detail,
             bubbles: true,
             composed: true,
         }));
@@ -979,10 +984,13 @@ Alpine.data('searchableSelect', (options, selected = '', config = {}) => ({
     },
 
     select(option) {
+        const query = this.createOption && option.value === this.createOption.value
+            ? this.query.trim()
+            : '';
         this.value = option.value;
         this.selectedOption = { value: option.value, label: option.label };
         this.closeList();
-        this.emitChanged();
+        this.emitChanged(query !== '' ? { query } : {});
     },
 
     setOptions(next) {
@@ -1203,6 +1211,7 @@ Alpine.data('catalogueManufacturerModelFields', (config = {}) => ({
             this.manufacturerId = detail.value ?? '';
             if (this.manufacturerId === '__new__') {
                 this.modelId = '__new__';
+                this.prefillCreateName('new_manufacturer', detail.query);
             }
             this.syncModelSelect({ emit: true });
             return;
@@ -1210,7 +1219,24 @@ Alpine.data('catalogueManufacturerModelFields', (config = {}) => ({
 
         if (detail.name === 'manufacturer_model_id') {
             this.modelId = detail.value ?? '';
+            if (this.modelId === '__new__') {
+                this.prefillCreateName('new_manufacturer_model', detail.query);
+            }
         }
+    },
+
+    prefillCreateName(fieldId, query) {
+        const name = String(query ?? '').trim();
+        if (name === '') {
+            return;
+        }
+
+        const input = this.$el?.querySelector(`#${CSS.escape(fieldId)}`);
+        if (!input) {
+            return;
+        }
+
+        input.value = name;
     },
 
     modelData() {
@@ -3670,6 +3696,7 @@ function createBulkSelection(config = {}) {
     const initialFields = config.fields && typeof config.fields === 'object'
         ? { ...config.fields }
         : {};
+    const publishSelection = Boolean(config.publishSelection);
 
     return {
         selected: {},
@@ -3691,6 +3718,14 @@ function createBulkSelection(config = {}) {
         init() {
             if (config.initialDeleteLocation) {
                 this.openDeleteLocation(config.initialDeleteLocation);
+            }
+
+            if (publishSelection) {
+                this.$watch('selected', () => {
+                    window.dispatchEvent(new CustomEvent('bulk-selection-changed', {
+                        detail: { count: this.selectedCount },
+                    }));
+                });
             }
         },
 

@@ -20,6 +20,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class StockConsumablesFeatureTest extends TestCase
@@ -377,26 +378,95 @@ class StockConsumablesFeatureTest extends TestCase
         $this->assertSame(6, (int) $asset->fresh()->quantity);
     }
 
-    public function test_kanban_token_rotate_and_revoke(): void
+    public function test_kanban_token_issue_shows_the_url_in_the_kanban_section(): void
     {
         $user = $this->manager();
         $asset = $this->stockAsset();
 
         $this->actingAs($user)
+            ->followingRedirects()
             ->post(route('assets.stock-tokens.rotate', $asset), [
                 'label' => 'kanban-a',
             ])
-            ->assertRedirect(route('assets.show', [$asset, 'tab' => 'stock']))
-            ->assertSessionHas('kanban_guest_url');
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Kanban tags',
+                'New Kanban tag issued for kanban-a.',
+                'New Kanban URL for kanban-a (shown once):',
+                '/stock/t/',
+            ], false);
+
+        $token = AssetStockToken::query()->where('asset_id', $asset->id)->whereNull('revoked_at')->first();
+        $this->assertNotNull($token);
+        $this->assertSame('kanban-a', $token->label);
+    }
+
+    public function test_rotating_an_active_kanban_tag_is_rejected_until_it_is_revoked(): void
+    {
+        $user = $this->manager();
+        $asset = $this->stockAsset();
+        $stockUrl = route('assets.show', [$asset, 'tab' => 'stock']);
+
+        $this->actingAs($user)
+            ->post(route('assets.stock-tokens.rotate', $asset), [
+                'label' => 'kanban-a',
+            ])
+            ->assertRedirect($stockUrl);
 
         $token = AssetStockToken::query()->where('asset_id', $asset->id)->whereNull('revoked_at')->first();
         $this->assertNotNull($token);
 
         $this->actingAs($user)
+            ->from($stockUrl)
+            ->post(route('assets.stock-tokens.rotate', $asset), [
+                'label' => 'kanban-a',
+            ])
+            ->assertRedirect($stockUrl)
+            ->assertSessionHasErrors([
+                'label' => 'Revoke the active kanban-a tag before issuing a new one.',
+            ]);
+
+        $this->assertNull($token->fresh()->revoked_at);
+        $this->assertSame(1, AssetStockToken::query()->where('asset_id', $asset->id)->count());
+
+        $this->actingAs($user)
             ->delete(route('assets.stock-tokens.revoke', [$asset, $token]))
-            ->assertRedirect(route('assets.show', [$asset, 'tab' => 'stock']));
+            ->assertRedirect($stockUrl)
+            ->assertSessionHas('kanban_status', 'Kanban token revoked.');
 
         $this->assertNotNull($token->fresh()->revoked_at);
+
+        $this->actingAs($user)
+            ->post(route('assets.stock-tokens.rotate', $asset), [
+                'label' => 'kanban-a',
+            ])
+            ->assertRedirect($stockUrl)
+            ->assertSessionHas('kanban_guest_url');
+
+        $this->assertSame(1, AssetStockToken::query()->where('asset_id', $asset->id)->whereNull('revoked_at')->count());
+    }
+
+    public function test_api_returns_422_when_rotating_an_active_kanban_tag(): void
+    {
+        $user = $this->manager();
+        $asset = $this->stockAsset();
+
+        $user->departments()->syncWithoutDetaching([$this->generalDepartment()->id]);
+        Sanctum::actingAs($user, ['stock:write']);
+
+        $this->postJson('/api/assets/'.$asset->id.'/stock-tokens', [
+            'label' => 'kanban-b',
+        ])->assertCreated();
+
+        $this->postJson('/api/assets/'.$asset->id.'/stock-tokens', [
+            'label' => 'kanban-b',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'label' => 'Revoke the active kanban-b tag before issuing a new one.',
+            ]);
+
+        $this->assertSame(1, AssetStockToken::query()->where('asset_id', $asset->id)->whereNull('revoked_at')->count());
     }
 
     public function test_restocking_custom_field_set_is_seeded_and_attachable(): void

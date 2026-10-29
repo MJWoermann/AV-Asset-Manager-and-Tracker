@@ -11,7 +11,15 @@
                     <a href="{{ route('import.create') }}" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Import</a>
                 @endcan
                 @can('reports:export')
-                    <a href="{{ route('export.assets', ['format' => 'xlsx']) }}" class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver">Export</a>
+                    <button
+                        type="submit"
+                        form="assets-export-form"
+                        class="text-sm px-3 py-2 border border-brand-charcoal dark:border-brand-silver"
+                        x-data="{ count: 0 }"
+                        @bulk-selection-changed.window="count = $event.detail.count"
+                    >
+                        <span x-text="count > 0 ? 'Export selected' : 'Export'">Export</span>
+                    </button>
                 @endcan
                 <a href="{{ route('assets.create') }}" data-history-roundtrip class="text-sm px-3 py-2 bg-brand text-white">Add asset</a>
             </div>
@@ -20,6 +28,7 @@
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="bulkSelection(@js([
         'idAttribute' => 'data-bulk-asset-id',
+        'publishSelection' => true,
         'fields' => [
             'update_status' => false,
             'update_location' => false,
@@ -35,6 +44,13 @@
             'clear_notes' => false,
         ],
     ]))">
+        @can('reports:export')
+            <form id="assets-export-form" method="POST" action="{{ route('export.assets') }}" hidden>
+                @csrf
+                <input type="hidden" name="format" value="xlsx">
+                <input type="hidden" name="asset_ids" :value="selectedIds.join(',')">
+            </form>
+        @endcan
         @if (session('status'))
             <div class="mb-4 text-sm text-brand">{{ session('status') }}</div>
         @endif

@@ -41,13 +41,6 @@
         <p class="text-sm text-brand">{{ session('status') }}</p>
     @endif
 
-    @if (session('kanban_guest_url'))
-        <div class="border border-brand bg-brand/5 px-3 py-2 text-sm space-y-1">
-            <p class="font-medium">New Kanban URL for {{ session('kanban_label') }} (shown once):</p>
-            <p class="break-all font-mono text-xs">{{ session('kanban_guest_url') }}</p>
-        </div>
-    @endif
-
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="border border-brand-silver dark:border-brand-charcoal p-3">
             <p class="text-xs text-brand-charcoal dark:text-brand-silver">On hand</p>
@@ -313,22 +306,53 @@
             </form>
 
             @if($canManageTags)
-                <div class="border border-brand-silver dark:border-brand-charcoal p-4 space-y-3 bg-white dark:bg-brand-slate">
+                @php
+                    $activeKanbanLabels = $tokens->whereNull('revoked_at')->pluck('label');
+                    $selectedKanbanLabel = old('label', 'kanban-a');
+                @endphp
+                <div
+                    id="kanban-tags"
+                    class="border border-brand-silver dark:border-brand-charcoal p-4 space-y-3 bg-white dark:bg-brand-slate"
+                    @if (session('kanban_guest_url') || session('kanban_status') || $errors->has('label')) data-scroll-into-view @endif
+                    x-data="{
+                        label: @js($selectedKanbanLabel),
+                        activeLabels: @js($activeKanbanLabels->values()),
+                    }"
+                >
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <h3 class="font-semibold text-sm">Kanban tags</h3>
                         <a href="{{ route('assets.kanban-tags.print', $asset) }}" class="text-sm text-brand" target="_blank">Print tags</a>
                     </div>
 
+                    @if (session('kanban_status'))
+                        <p class="text-sm text-brand">{{ session('kanban_status') }}</p>
+                    @endif
+
+                    @if (session('kanban_guest_url'))
+                        <div class="border border-brand bg-brand/5 px-3 py-2 text-sm space-y-1">
+                            <p class="font-medium">New Kanban URL for {{ session('kanban_label') }} (shown once):</p>
+                            <p class="break-all font-mono text-xs">{{ session('kanban_guest_url') }}</p>
+                        </div>
+                    @endif
+
                     <form method="POST" action="{{ route('assets.stock-tokens.rotate', $asset) }}" class="flex flex-wrap gap-2 items-end">
                         @csrf
                         <div class="grow">
                             <x-input-label for="kanban_label" value="Label" />
-                            <select id="kanban_label" name="label" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                            <select id="kanban_label" name="label" x-model="label" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
                                 <option value="kanban-a">kanban-a</option>
                                 <option value="kanban-b">kanban-b</option>
                             </select>
+                            <x-input-error :messages="$errors->get('label')" class="mt-1" />
+                            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-1" x-show="activeLabels.includes(label)" x-cloak>
+                                Revoke this tag before issuing a new one. A new QR would replace the code already printed for this label.
+                            </p>
                         </div>
-                        <x-primary-button>Create / rotate</x-primary-button>
+                        <x-primary-button
+                            class="disabled:cursor-not-allowed disabled:opacity-50"
+                            x-bind:disabled="activeLabels.includes(label)"
+                            :disabled="$activeKanbanLabels->contains($selectedKanbanLabel)"
+                        >Create / rotate</x-primary-button>
                     </form>
 
                     <ul class="text-sm space-y-2">

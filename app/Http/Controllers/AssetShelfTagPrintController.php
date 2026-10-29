@@ -28,9 +28,6 @@ class AssetShelfTagPrintController extends Controller
                 collect([$this->eagerLoadAsset($asset)]),
                 withServerImages: false
             );
-            // #region agent log
-            file_put_contents(base_path('debug-5e9f10.log'), json_encode(['sessionId' => '5e9f10', 'runId' => 'pre-fix', 'hypothesisId' => 'B,C,E', 'location' => 'AssetShelfTagPrintController.php:show', 'message' => 'asset label page size', 'data' => ['asset_id' => $asset->id, 'layout_id' => $layout->id, 'paper_preset' => $layout->paper_preset, 'width_mm' => (float) $layout->width_mm, 'height_mm' => (float) $layout->height_mm, 'orientation' => $layout->orientation, 'length_mode' => $layout->length_mode, 'display_mm' => [$layout->displayWidthMm(), $layout->displayHeightMm()], 'page_css' => $layout->displayWidthMm().'mm '.$layout->displayHeightMm().'mm'], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
-            // #endregion
         }
 
         return view('assets.shelf-tag-print', [

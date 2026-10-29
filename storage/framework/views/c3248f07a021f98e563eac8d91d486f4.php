@@ -41,13 +41,6 @@
         <p class="text-sm text-brand"><?php echo e(session('status')); ?></p>
     <?php endif; ?>
 
-    <?php if(session('kanban_guest_url')): ?>
-        <div class="border border-brand bg-brand/5 px-3 py-2 text-sm space-y-1">
-            <p class="font-medium">New Kanban URL for <?php echo e(session('kanban_label')); ?> (shown once):</p>
-            <p class="break-all font-mono text-xs"><?php echo e(session('kanban_guest_url')); ?></p>
-        </div>
-    <?php endif; ?>
-
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="border border-brand-silver dark:border-brand-charcoal p-3">
             <p class="text-xs text-brand-charcoal dark:text-brand-silver">On hand</p>
@@ -805,11 +798,34 @@
             </form>
 
             <?php if($canManageTags): ?>
-                <div class="border border-brand-silver dark:border-brand-charcoal p-4 space-y-3 bg-white dark:bg-brand-slate">
+                <?php
+                    $activeKanbanLabels = $tokens->whereNull('revoked_at')->pluck('label');
+                    $selectedKanbanLabel = old('label', 'kanban-a');
+                ?>
+                <div
+                    id="kanban-tags"
+                    class="border border-brand-silver dark:border-brand-charcoal p-4 space-y-3 bg-white dark:bg-brand-slate"
+                    <?php if(session('kanban_guest_url') || session('kanban_status') || $errors->has('label')): ?> data-scroll-into-view <?php endif; ?>
+                    x-data="{
+                        label: <?php echo \Illuminate\Support\Js::from($selectedKanbanLabel)->toHtml() ?>,
+                        activeLabels: <?php echo \Illuminate\Support\Js::from($activeKanbanLabels->values())->toHtml() ?>,
+                    }"
+                >
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <h3 class="font-semibold text-sm">Kanban tags</h3>
                         <a href="<?php echo e(route('assets.kanban-tags.print', $asset)); ?>" class="text-sm text-brand" target="_blank">Print tags</a>
                     </div>
+
+                    <?php if(session('kanban_status')): ?>
+                        <p class="text-sm text-brand"><?php echo e(session('kanban_status')); ?></p>
+                    <?php endif; ?>
+
+                    <?php if(session('kanban_guest_url')): ?>
+                        <div class="border border-brand bg-brand/5 px-3 py-2 text-sm space-y-1">
+                            <p class="font-medium">New Kanban URL for <?php echo e(session('kanban_label')); ?> (shown once):</p>
+                            <p class="break-all font-mono text-xs"><?php echo e(session('kanban_guest_url')); ?></p>
+                        </div>
+                    <?php endif; ?>
 
                     <form method="POST" action="<?php echo e(route('assets.stock-tokens.rotate', $asset)); ?>" class="flex flex-wrap gap-2 items-end">
                         <?php echo csrf_field(); ?>
@@ -834,21 +850,44 @@
 <?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
 <?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
 <?php endif; ?>
-                            <select id="kanban_label" name="label" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
+                            <select id="kanban_label" name="label" x-model="label" class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white">
                                 <option value="kanban-a">kanban-a</option>
                                 <option value="kanban-b">kanban-b</option>
                             </select>
+                            <?php if (isset($component)) { $__componentOriginalf94ed9c5393ef72725d159fe01139746 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalf94ed9c5393ef72725d159fe01139746 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-error','data' => ['messages' => $errors->get('label'),'class' => 'mt-1']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-error'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['messages' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->get('label')),'class' => 'mt-1']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalf94ed9c5393ef72725d159fe01139746)): ?>
+<?php $attributes = $__attributesOriginalf94ed9c5393ef72725d159fe01139746; ?>
+<?php unset($__attributesOriginalf94ed9c5393ef72725d159fe01139746); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalf94ed9c5393ef72725d159fe01139746)): ?>
+<?php $component = $__componentOriginalf94ed9c5393ef72725d159fe01139746; ?>
+<?php unset($__componentOriginalf94ed9c5393ef72725d159fe01139746); ?>
+<?php endif; ?>
+                            <p class="text-xs text-brand-charcoal dark:text-brand-silver mt-1" x-show="activeLabels.includes(label)" x-cloak>
+                                Revoke this tag before issuing a new one. A new QR would replace the code already printed for this label.
+                            </p>
                         </div>
                         <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => ['class' => 'disabled:cursor-not-allowed disabled:opacity-50','xBind:disabled' => 'activeLabels.includes(label)','disabled' => $activeKanbanLabels->contains($selectedKanbanLabel)]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('primary-button'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes([]); ?>Create / rotate <?php echo $__env->renderComponent(); ?>
+<?php $component->withAttributes(['class' => 'disabled:cursor-not-allowed disabled:opacity-50','x-bind:disabled' => 'activeLabels.includes(label)','disabled' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeKanbanLabels->contains($selectedKanbanLabel))]); ?>Create / rotate <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginald411d1792bd6cc877d687758b753742c)): ?>
 <?php $attributes = $__attributesOriginald411d1792bd6cc877d687758b753742c; ?>
