@@ -52,7 +52,7 @@
                     @endif
                 </p>
 
-                <div class="space-y-6 print:space-y-0">
+                <div class="label-print-root space-y-6 print:space-y-0">
                     @foreach($labels as $index => $label)
                         <div
                             class="label-sheet mx-auto border border-brand-silver bg-white shadow-sm print:border-0 print:shadow-none"
@@ -77,25 +77,46 @@
     @if($layout)
         <style>
             @media print {
-                body * { visibility: hidden; }
-                .label-sheet, .label-sheet * { visibility: visible; }
-                .label-sheet {
-                    position: relative;
-                    page-break-after: always;
-                    break-after: page;
-                    margin: 0 !important;
-                    box-shadow: none !important;
-                }
-                .label-sheet:last-child {
-                    page-break-after: auto;
-                    break-after: auto;
-                }
                 @page {
                     size: {{ $layout->displayWidthMm() }}mm {{ $layout->displayHeightMm() }}mm;
                     margin: 0;
                 }
-                nav, header, .print\\:hidden { display: none !important; }
+                html, body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    background: #fff !important;
+                }
+                body > div {
+                    min-height: 0 !important;
+                    background: #fff !important;
+                }
+                nav,
+                header,
+                [data-flash-banner],
+                .print\\:hidden,
+                .fixed {
+                    display: none !important;
+                }
+                main,
+                .label-print-root {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+                .label-sheet {
+                    position: relative;
+                    break-inside: avoid;
+                    page-break-inside: avoid;
+                    break-after: page;
+                    page-break-after: always;
+                    margin: 0 !important;
+                    box-shadow: none !important;
+                }
+                .label-sheet:last-child {
+                    break-after: auto;
+                    page-break-after: auto;
+                }
             }
         </style>
+        @include('shelf-tags.print.partials.debug-print-log')
     @endif
 </x-app-layout>

@@ -109,6 +109,10 @@ class ShelfTagPrintController extends Controller
             'mode' => $request->validated('mode'),
         ]);
 
+        // #region agent log
+        file_put_contents(base_path('debug-5e9f10.log'), json_encode(['sessionId' => '5e9f10', 'runId' => 'pre-fix', 'hypothesisId' => 'E', 'location' => 'ShelfTagPrintController.php:preview', 'message' => 'stored print job', 'data' => ['layout_id' => $layout->id, 'paper_preset' => $layout->paper_preset, 'width_mm' => (float) $layout->width_mm, 'height_mm' => (float) $layout->height_mm, 'orientation' => $layout->orientation, 'length_mode' => $layout->length_mode, 'display_mm' => [$layout->displayWidthMm(), $layout->displayHeightMm()], 'asset_count' => $assets->count(), 'mode' => $request->validated('mode')], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
+
         return redirect()->route('labels.print.show');
     }
 
@@ -123,6 +127,10 @@ class ShelfTagPrintController extends Controller
 
         [$layout, $list, $assets] = $this->loadJob($job, $renderer);
         $labels = $renderer->buildLabels($layout, $assets, withServerImages: false);
+
+        // #region agent log
+        file_put_contents(base_path('debug-5e9f10.log'), json_encode(['sessionId' => '5e9f10', 'runId' => 'pre-fix', 'hypothesisId' => 'B,C,E', 'location' => 'ShelfTagPrintController.php:show', 'message' => 'preview page size', 'data' => ['layout_id' => $layout->id, 'paper_preset' => $layout->paper_preset, 'width_mm' => (float) $layout->width_mm, 'height_mm' => (float) $layout->height_mm, 'orientation' => $layout->orientation, 'length_mode' => $layout->length_mode, 'display_mm' => [$layout->displayWidthMm(), $layout->displayHeightMm()], 'label_count' => count($labels), 'page_css' => $layout->displayWidthMm().'mm '.$layout->displayHeightMm().'mm'], 'timestamp' => (int) round(microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
 
         return view('shelf-tags.print.preview', [
             'layout' => $layout,
