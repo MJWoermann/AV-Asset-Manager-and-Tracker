@@ -16,6 +16,7 @@ use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Passport;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class AvAssetManagerMcpTest extends TestCase
@@ -27,6 +28,10 @@ class AvAssetManagerMcpTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        if (! is_file(storage_path('oauth-private.key')) || ! is_file(storage_path('oauth-public.key'))) {
+            $this->artisan('passport:keys', ['--force' => true]);
+        }
 
         $this->seed(RoleSeeder::class);
         $this->itemType = ItemType::factory()->create([
@@ -167,5 +172,39 @@ class AvAssetManagerMcpTest extends TestCase
             'checked_out_to_name' => 'Guest Hiree',
             'purpose' => CheckoutPurpose::Hire->value,
         ]);
+    }
+
+    public function test_custom_role_follows_operational_permissions(): void
+    {
+        $role = Role::create(['name' => 'Lookup only']);
+        $role->givePermissionTo('assets:read');
+
+        $user = User::factory()->create();
+        $user->assignRole($role);
+        $this->actingAs($user);
+
+        $asset = Asset::factory()->create([
+            'item_type_id' => $this->itemType->id,
+            'name' => 'Desk Lamp',
+            'tp_barcode' => 'TP-CUSTOM-1',
+            'department_id' => $this->generalDepartment()->id,
+        ]);
+
+        $lookup = AvAssetManagerServer::actingAs($user)->tool(LookupAssetTool::class, [
+            'code' => 'TP-CUSTOM-1',
+        ]);
+        $lookup->assertOk();
+        $lookup->assertSee('"id":'.$asset->id);
+
+        $whoami = AvAssetManagerServer::actingAs($user)->tool(WhoamiTool::class);
+        $whoami->assertOk();
+
+        $checkout = AvAssetManagerServer::actingAs($user)->tool(CheckoutAssetTool::class, [
+            'asset_id' => $asset->id,
+            'purpose' => CheckoutPurpose::Hire->value,
+            'checked_out_to_name' => 'Guest Hiree',
+        ]);
+        $checkout->assertHasErrors();
+        $checkout->assertSee('assets:write');
     }
 }

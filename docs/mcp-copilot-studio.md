@@ -2,11 +2,11 @@
 
 Connect **Microsoft Copilot Studio** (and M365 Copilot agents that use the same tool surface) to **AV Asset Manager** over the Model Context Protocol (MCP).
 
-> **Status:** Packaging and setup docs are in this repository. The MCP server, Passport OAuth, and related API parity are **in progress** in sibling PRs — see [roadmap.md](roadmap.md). Until those land, treat URLs and auth flows below as the **target contract**, not as live endpoints on every install.
+> **Status:** Shipped. The MCP server is at `/mcp/av-assets`. Passport is the OAuth authorization server. Checkout and return are also on the Sanctum API (`assets:write`). Set `MCP_REDIRECT_DOMAINS` before Copilot Studio dynamic client registration.
 
 Related:
 
-- Product direction: [roadmap.md — Copilot Studio / M365 Copilot MCP](roadmap.md#copilot-studio--m365-copilot-mcp)
+- Product status: [roadmap.md — Core product](roadmap.md#core-product-already-shipped)
 - REST API (Sanctum): [api.md](api.md)
 - Optional Entra / Google **user** SSO: [sso-setup.md](sso-setup.md)
 - Power Apps connector fallback OpenAPI: [mcp-av-assets.openapi.yaml](mcp-av-assets.openapi.yaml)
@@ -17,17 +17,17 @@ Related:
 
 Staff already in Microsoft 365 can **query and operate inventory** from Copilot Studio / M365 Copilot without opening the Blade UI:
 
-| Capability (planned tools) | Typical ask |
-|----------------------------|-------------|
+| Capability | Typical ask |
+|------------|-------------|
 | Lookup | “Find asset by FMI / barcode / SN” |
 | Stocktake | Start or continue a scan session, record a scan, run compare |
 | Unknown scans | Link an unmatched barcode to an existing asset |
-| Repairs / spares | Status, notes, procedure steps (role-gated) |
-| Checkout / return | Hire, repair, or other hand-off (when API parity ships) |
+| Repairs / spares | Status, notes, procedure steps (permission-gated) |
+| Checkout / return | Hire, repair, or other hand-off (`assets:write`) |
 
-Tools are **coarse wrappers** over existing app services (scan, compare, checkout, repairs)—not a 1:1 mirror of every `/api/*` route. Same Spatie roles, department scoping, throttles, and **immutable** audit history as the web app and REST API.
+Tools are **coarse wrappers** over existing app services (scan, compare, checkout, repairs)—not a 1:1 mirror of every `/api/*` route. Each tool checks the same operational permission as the matching web and REST route. Custom roles are included when they hold that permission. Department scoping, throttles, and **immutable** audit history match the web app and REST API.
 
-**Audience:** `admin`, `inventory_manager`, `scanner`. Not `external_repairer` (same policy as the REST API).
+**Audience:** staff with operational permissions. Not `external_repairer`.
 
 ---
 
@@ -36,9 +36,10 @@ Tools are **coarse wrappers** over existing app services (scan, compare, checkou
 | Requirement | Why |
 |-------------|-----|
 | **HTTPS `APP_URL`** | Copilot Studio / Power Platform only call HTTPS endpoints. Set `APP_URL` to the public (or VPN-reachable) origin users and Power Platform use — scheme, host, and port must match. |
-| **Laravel Passport keys** | The app is the OAuth 2.0 **authorization server** for MCP (PKCE + Dynamic Client Registration). Install/configure Passport on the app when the MCP implementation ships; do not point Copilot at Entra app registration client IDs as the MCP AS. |
+| **Laravel Passport keys** | The app is the OAuth 2.0 **authorization server** for MCP (PKCE + Dynamic Client Registration). Run `php artisan passport:keys` on the app. Do not point Copilot at Entra app registration client IDs as the MCP AS. |
+| **`MCP_REDIRECT_DOMAINS`** | Comma-separated redirect origins Copilot Studio may register. An empty list refuses every dynamic client. Do not set this to `*`. |
 | **Reachable from Power Platform** | The host must accept inbound HTTPS from Microsoft’s connector egress (internet or approved private connectivity). LAN-only installs without a tunnel/proxy cannot complete the onboarding wizard. |
-| **Staff accounts with app roles** | Users who connect must already exist in AV Asset Manager with an eligible Spatie role. Optional Entra SSO on the **login / authorize** page signs them into the *app*; it does not replace Passport. |
+| **Staff accounts** | Users who connect must already exist and hold the operational permissions for the tools they will call. Optional Entra SSO on the **login / authorize** page signs them into the *app*; it does not replace Passport. |
 
 Camera / PWA HTTPS notes for scanners still apply to the web UI ([self-signed-tls.md](self-signed-tls.md)); Copilot Studio itself does not use the device camera.
 
@@ -184,7 +185,7 @@ If checkout tools are unavailable, tell the user to use the web Checkout UI and 
 
 | Control | Behaviour |
 |---------|-----------|
-| **Roles** | Same gates as REST/web: `admin`, `inventory_manager`, `scanner`. Roleless and `external_repairer` accounts must not get MCP tool access. |
+| **Permissions** | Each tool requires the same operational permission as the matching web and REST route. Roleless accounts, accounts with no operational permission, and `external_repairer` are refused. Acting on another user's scan session still requires the `admin` role, matching the scan API. |
 | **Audit logs** | Append-only. MCP must never update or delete `audit_logs`. History is read-only. |
 | **Department context** | Tools honour the user’s active department (`users.preferences.active_department_id` / session), same as [api.md](api.md). Creates stay in that department. |
 | **Throttles** | Expect rate limits comparable to the API (e.g. scan and token issue). Agents should retry politely on HTTP 429. |

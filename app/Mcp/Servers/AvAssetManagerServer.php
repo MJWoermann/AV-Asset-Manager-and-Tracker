@@ -47,7 +47,7 @@ Online-only PWA for AV equipment stocktake and asset management.
 ## Auth & roles
 - Copilot Studio connects with **Laravel Passport OAuth** (`auth:api`, scope `mcp:use`) at `/mcp/av-assets`.
 - Sanctum Bearer tokens remain for the REST API under `/api/*` (not this MCP endpoint).
-- Allowed Spatie roles: **admin**, **inventory_manager**, **scanner** only. **external_repairer is denied**.
+- Staff with operational permissions, including custom roles. Each tool checks the same permission as the matching web and REST route. **external_repairer is denied**.
 - Call `whoami` first; use `set_active_department` when creating department-scoped records.
 
 ## Glossary
@@ -55,7 +55,7 @@ Online-only PWA for AV equipment stocktake and asset management.
 - **Inventory list** — expected stock; **event list** — scanned/usage for a stocktake.
 - **Scan session** — active scanning into an event list, optionally compared to inventory.
 - **Unknown scan** — unmatched barcode parked for follow-up; link with `link_unknown_scan`.
-- **Checkout** — hire / repair / other hand-off via `checkout_asset` / `return_asset` (service layer, no REST checkout routes required).
+- **Checkout** — hire / repair / other hand-off via `checkout_asset` / `return_asset`. The REST API uses the same service and requires `assets:write`.
 - **Repair / spare** — maintenance workflow; spares movements via `record_spare_movement`.
 - **Audit log** — immutable append-only history. Tools may **read** via `asset_history` but must **never update or delete** audit logs.
 
@@ -102,7 +102,7 @@ class AvAssetManagerServer extends Server
     ];
 
     /**
-     * @var array<int, class-string<\Laravel\Mcp\Server\Resource>>
+     * @var array<int, class-string<Server\Resource>>
      */
     protected array $resources = [
         GlossaryResource::class,

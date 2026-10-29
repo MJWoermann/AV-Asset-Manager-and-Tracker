@@ -20,7 +20,7 @@ class CompareListsTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'lists:compare');
         if ($user instanceof Response) {
             return $user;
         }

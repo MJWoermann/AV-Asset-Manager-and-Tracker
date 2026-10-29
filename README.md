@@ -51,7 +51,7 @@ Production upgrade (one command): `sudo bash scripts/update.sh` — see [docs/de
 
 Staff-oriented overview of use cases, roles, and day-to-day workflows: [docs/features-and-usage.md](docs/features-and-usage.md).
 
-Product roadmap (preview/developer features, deferred work, in-progress integrations such as Copilot Studio MCP): [docs/roadmap.md](docs/roadmap.md). Copilot Studio packaging: [docs/mcp-copilot-studio.md](docs/mcp-copilot-studio.md).
+Product roadmap (preview/developer features, deferred work, planned integrations): [docs/roadmap.md](docs/roadmap.md). Copilot Studio setup: [docs/mcp-copilot-studio.md](docs/mcp-copilot-studio.md).
 
 Prepare messy vendor or legacy spreadsheets for import (field catalog and copy-paste AI prompts): [docs/import-spreadsheet-prep.md](docs/import-spreadsheet-prep.md).
 
@@ -121,7 +121,7 @@ curl -X POST /api/auth/token \
 
 Connections, RU visualiser, labels, asset **Stock**/consumables, and the email-integration flag ship as opt-in **Developer features** on each user’s Profile. Always-on areas include checkout, repairs, spares, departments, files/manuals, and unknown-scan link. Optional Google / Microsoft Entra SSO: [docs/sso-setup.md](docs/sso-setup.md) (existing users only — no JIT provisioning).
 
-Full status table (preview, deferred, in progress, planned — including Copilot Studio MCP): [docs/roadmap.md](docs/roadmap.md). Setup packaging: [docs/mcp-copilot-studio.md](docs/mcp-copilot-studio.md).
+Full status table (preview, deferred, planned): [docs/roadmap.md](docs/roadmap.md). Copilot Studio setup: [docs/mcp-copilot-studio.md](docs/mcp-copilot-studio.md).
 
 ## Licence
 

@@ -18,7 +18,7 @@ class StocktakeFlowPrompt extends Prompt
 
         return Response::text(<<<TEXT
 Stocktake flow for AV Asset Manager:
-1. Call whoami (confirm role is admin|inventory_manager|scanner; set_active_department if needed).
+1. Call whoami (confirm the user is staff with scan and scan-sessions permissions; set_active_department if needed).
 2. Optionally list_inventory_lists to pick event_list_id={$eventListId} and inventory_list_id={$inventoryListId}.
 3. start_scan_session with those list ids.
 4. For each barcode: scan_code. Note duplicates (warning, no double-insert) and unknown scans.

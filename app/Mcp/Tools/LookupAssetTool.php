@@ -17,7 +17,7 @@ class LookupAssetTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'assets:read');
         if ($user instanceof Response) {
             return $user;
         }

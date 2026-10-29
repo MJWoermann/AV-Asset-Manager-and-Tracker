@@ -17,7 +17,7 @@ class ListInventoryListsTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'lists:read');
         if ($user instanceof Response) {
             return $user;
         }

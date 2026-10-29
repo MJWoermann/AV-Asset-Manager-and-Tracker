@@ -9,7 +9,7 @@ use Laravel\Mcp\Response;
 trait AuthorizesMcpTools
 {
     /**
-     * MCP is limited to staff roles (no external_repairer).
+     * Staff with at least one operational permission. External repairers stay out.
      */
     protected function requireMcpUser(Request $request): User|Response
     {
@@ -19,17 +19,18 @@ trait AuthorizesMcpTools
             return Response::error('Unauthenticated. Connect via Passport OAuth (auth:api) for Copilot Studio.');
         }
 
-        if (! $user->hasAnyRole(['admin', 'inventory_manager', 'scanner'])) {
-            return Response::error('Forbidden. MCP requires admin, inventory_manager, or scanner. external_repairer is not allowed.');
+        if (! $user->hasStaffAccess()) {
+            return Response::error('Forbidden. MCP is limited to staff. external_repairer is not allowed.');
         }
 
         return $user;
     }
 
     /**
-     * @param  list<string>  $roles
+     * Same operational permission as the matching web and REST route.
+     * Custom roles pass when they hold that permission. Admin passes every operational check.
      */
-    protected function requireRoles(Request $request, array $roles): User|Response
+    protected function requirePermission(Request $request, string $permission): User|Response
     {
         $user = $this->requireMcpUser($request);
 
@@ -37,8 +38,8 @@ trait AuthorizesMcpTools
             return $user;
         }
 
-        if (! $user->hasAnyRole($roles)) {
-            return Response::error('Forbidden. Required role: '.implode('|', $roles).'.');
+        if (! $user->can($permission)) {
+            return Response::error('Forbidden. Required permission: '.$permission.'.');
         }
 
         return $user;

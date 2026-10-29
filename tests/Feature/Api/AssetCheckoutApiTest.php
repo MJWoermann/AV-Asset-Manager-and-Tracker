@@ -15,6 +15,7 @@ use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class AssetCheckoutApiTest extends TestCase
@@ -55,7 +56,7 @@ class AssetCheckoutApiTest extends TestCase
 
     public function test_hire_checkout_and_return_via_api(): void
     {
-        $user = $this->userWithRoleAndAbilities('inventory_manager', ['checkouts:write']);
+        $user = $this->userWithRoleAndAbilities('inventory_manager', ['assets:write']);
         $asset = $this->makeAsset();
         $assignee = User::factory()->create();
         $assignee->assignRole('scanner');
@@ -98,7 +99,7 @@ class AssetCheckoutApiTest extends TestCase
 
     public function test_return_is_blocked_while_linked_repair_is_open(): void
     {
-        $user = $this->userWithRoleAndAbilities('inventory_manager', ['checkouts:write']);
+        $user = $this->userWithRoleAndAbilities('inventory_manager', ['assets:write']);
         $asset = $this->makeAsset();
         $fault = AssetMaintenanceLog::factory()->create([
             'asset_id' => $asset->id,
@@ -140,9 +141,9 @@ class AssetCheckoutApiTest extends TestCase
             ->assertHeader('WWW-Authenticate', 'Bearer');
     }
 
-    public function test_returns_403_when_token_lacks_checkouts_write_ability(): void
+    public function test_returns_403_when_token_lacks_assets_write_ability(): void
     {
-        $this->userWithRoleAndAbilities('scanner', ['checkouts:read', 'assets:read']);
+        $this->userWithRoleAndAbilities('scanner', ['assets:read']);
         $asset = $this->makeAsset();
 
         $this->postJson("/api/assets/{$asset->id}/checkouts", [
@@ -157,7 +158,7 @@ class AssetCheckoutApiTest extends TestCase
     {
         $user = User::factory()->create();
         $user->departments()->sync([$this->generalDepartment()->id]);
-        Sanctum::actingAs($user, ['checkouts:write']);
+        Sanctum::actingAs($user, ['assets:write']);
 
         $asset = $this->makeAsset();
 
@@ -167,7 +168,7 @@ class AssetCheckoutApiTest extends TestCase
         ])->assertForbidden();
     }
 
-    public function test_return_requires_checkouts_write_ability(): void
+    public function test_return_requires_assets_write_ability(): void
     {
         $manager = User::factory()->create();
         $manager->assignRole('inventory_manager');
@@ -182,9 +183,47 @@ class AssetCheckoutApiTest extends TestCase
             'returned_at' => null,
         ]);
 
-        Sanctum::actingAs($manager, ['checkouts:read']);
+        Sanctum::actingAs($manager, ['assets:read']);
 
         $this->postJson("/api/assets/{$asset->id}/checkouts/{$checkout->id}/return")
             ->assertForbidden();
+    }
+
+    public function test_custom_role_with_assets_write_can_check_out(): void
+    {
+        $role = Role::create(['name' => 'Hire desk']);
+        $role->givePermissionTo('assets:write');
+
+        $user = User::factory()->create();
+        $user->assignRole($role);
+        $user->departments()->sync([$this->generalDepartment()->id]);
+        Sanctum::actingAs($user, ['assets:write']);
+
+        $asset = $this->makeAsset();
+
+        $this->postJson("/api/assets/{$asset->id}/checkouts", [
+            'purpose' => CheckoutPurpose::Hire->value,
+            'checked_out_to_name' => 'Guest Hiree',
+        ])->assertCreated();
+    }
+
+    public function test_custom_role_without_assets_write_cannot_check_out(): void
+    {
+        $role = Role::create(['name' => 'Read only']);
+        $role->givePermissionTo('assets:read');
+
+        $user = User::factory()->create();
+        $user->assignRole($role);
+        $user->departments()->sync([$this->generalDepartment()->id]);
+        Sanctum::actingAs($user, ['assets:write']);
+
+        $asset = $this->makeAsset();
+
+        $this->postJson("/api/assets/{$asset->id}/checkouts", [
+            'purpose' => CheckoutPurpose::Hire->value,
+            'checked_out_to_name' => 'Guest Hiree',
+        ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'You do not have permission to perform this action.');
     }
 }

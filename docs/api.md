@@ -95,7 +95,7 @@ Allow-list is defined in `app/Support/ApiTokenAbilities.php`. Profile → API to
 | Ability | Covers |
 |---------|--------|
 | `user:read` | `GET /api/user`, `PATCH /api/me/active-department` |
-| `assets:read` / `assets:write` | Assets CRUD, bulk update, maintenance logs, import job API |
+| `assets:read` / `assets:write` | Assets CRUD, bulk update, maintenance logs, checkout and return, import job API |
 | `locations:read` / `locations:write` | Locations CRUD + bulk update |
 | `catalog:read` / `catalog:write` | Manufacturers, models, item types, custom field sets |
 | `lists:read` / `lists:write` / `lists:compare` | Lists CRUD + compare |
@@ -107,7 +107,6 @@ Allow-list is defined in `app/Support/ApiTokenAbilities.php`. Profile → API to
 | `audit:read` | `GET /api/assets/{asset}/history` (read-only) |
 | `admin:read` / `admin:write` | Users and departments |
 | `connections:*`, `stock:*`, `labels:*`, `rigging:*` | Feature-flagged modules (same flags as web) |
-| `checkouts:read` / `checkouts:write` | Asset checkout and return (hire / repair / other) |
 | `email:ops` | Inbound email apply/reject when `email_integration` is on |
 | `*` | Full access (default when abilities omitted on token issue) |
 
@@ -187,7 +186,7 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-Ability: `checkouts:write`. Roles: `admin`, `inventory_manager`, or `scanner` (same as web).
+Permission: `assets:write` (same as the web checkout routes, including custom roles that hold it). Ability: `assets:write`. External repairers are refused.
 
 ```json
 {
@@ -230,7 +229,7 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-Ability: `checkouts:write`. Roles: `admin`, `inventory_manager`, or `scanner`.
+Permission: `assets:write`. Ability: `assets:write`. External repairers are refused.
 
 ```json
 {
@@ -243,8 +242,6 @@ Ability: `checkouts:write`. Roles: `admin`, `inventory_manager`, or `scanner`.
 | `notes` | no | Optional return notes (replaces checkout notes when provided) |
 
 Returns **200** with the returned checkout (`returned_at` set). Restores the asset status from `asset_status_before` when applicable. Return is blocked (**422**) while a linked repair is still open — complete the repair first (completing a repair auto-returns the linked checkout). `{checkout}` must belong to `{asset}` (**404** otherwise).
-
-`checkouts:read` is reserved for future list/show endpoints; mutating routes require `checkouts:write`.
 
 ## Web-only features (not on this API)
 

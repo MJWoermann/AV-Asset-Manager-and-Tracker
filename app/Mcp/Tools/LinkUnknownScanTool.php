@@ -21,7 +21,7 @@ class LinkUnknownScanTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'reports:write');
         if ($user instanceof Response) {
             return $user;
         }

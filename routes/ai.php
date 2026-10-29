@@ -15,8 +15,9 @@ use Laravel\Mcp\Facades\Mcp;
 |
 | Local keys: php artisan passport:keys
 | OAuth discovery: /.well-known/oauth-authorization-server
-| Dynamic client registration: POST /oauth/register (see config/mcp.php
-| redirect_domains — allow Copilot Studio redirect URIs in production).
+| Dynamic client registration: POST /oauth/register
+| Set MCP_REDIRECT_DOMAINS to the Copilot Studio redirect origins.
+| An empty list refuses every dynamic client redirect.
 |
 */
 

@@ -18,7 +18,7 @@ class MeResource extends Resource
     {
         $user = $request->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || ! $user->hasStaffAccess()) {
             return Response::error('Unauthenticated.');
         }
 

@@ -2,7 +2,6 @@
 
 namespace App\Mcp\Tools;
 
-use App\Enums\CheckoutPurpose;
 use App\Mcp\Concerns\AuthorizesMcpTools;
 use App\Models\Asset;
 use App\Services\AssetCheckoutService;
@@ -13,7 +12,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Check out an asset via AssetCheckoutService (hire/repair/other). Do not use REST checkout routes.')]
+#[Description('Check out an asset via AssetCheckoutService (hire, repair, other, or another active checkout option).')]
 class CheckoutAssetTool extends Tool
 {
     use AuthorizesMcpTools;
@@ -22,14 +21,21 @@ class CheckoutAssetTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'assets:write');
         if ($user instanceof Response) {
             return $user;
         }
 
         $data = $request->validate([
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
-            'purpose' => ['required', Rule::enum(CheckoutPurpose::class)],
+            'purpose' => [
+                'required',
+                'string',
+                'max:32',
+                Rule::exists('checkout_purposes', 'slug')->where(
+                    fn ($query) => $query->where('is_active', true)
+                ),
+            ],
             'checked_out_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'checked_out_to_name' => ['nullable', 'string', 'max:255'],
             'checked_out_to_email' => ['nullable', 'email', 'max:255'],
@@ -53,9 +59,7 @@ class CheckoutAssetTool extends Tool
             'checkout' => [
                 'id' => $checkout->id,
                 'asset_id' => $checkout->asset_id,
-                'purpose' => $checkout->purpose instanceof CheckoutPurpose
-                    ? $checkout->purpose->value
-                    : $checkout->purpose,
+                'purpose' => (string) $checkout->purpose,
                 'checked_out_to_user_id' => $checkout->checked_out_to_user_id,
                 'checked_out_to_name' => $checkout->checked_out_to_name,
                 'repair_id' => $checkout->repair_id,
@@ -68,7 +72,7 @@ class CheckoutAssetTool extends Tool
     {
         return [
             'asset_id' => $schema->integer()->description('Asset to check out.')->required(),
-            'purpose' => $schema->string()->description('hire, repair, or other.')->required(),
+            'purpose' => $schema->string()->description('Active checkout option slug, such as hire, repair, or other.')->required(),
             'checked_out_to_user_id' => $schema->integer()->description('Assignee user id (or provide guest name).'),
             'checked_out_to_name' => $schema->string()->description('Guest name when no user id.'),
             'checked_out_to_email' => $schema->string(),

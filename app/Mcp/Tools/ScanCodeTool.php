@@ -20,7 +20,7 @@ class ScanCodeTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'scan');
         if ($user instanceof Response) {
             return $user;
         }

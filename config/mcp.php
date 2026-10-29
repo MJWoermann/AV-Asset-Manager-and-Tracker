@@ -11,21 +11,17 @@ return [
     | for redirect URIs. Each domain should be specified with its scheme
     | and host. Domains not in this list will raise validation errors.
     |
-    | An "*" may be used to allow all domains.
-    |
-    | Copilot Studio: replace "*" in production with your Copilot / Power
-    | Platform redirect origins (and any localhost URLs used during builder
-    | testing). Dynamic client registration validates redirect_uris against
-    | this list when registering via POST /oauth/register.
+    | An "*" may be used to allow all domains. Leave this list empty until
+    | MCP_REDIRECT_DOMAINS names the Copilot Studio / Power Platform origins
+    | for this install. Dynamic client registration validates redirect_uris
+    | against this list when registering via POST /oauth/register.
     |
     */
 
-    'redirect_domains' => [
-        '*',
-        // 'https://example.com',
-        // 'http://localhost',
-        // Copilot Studio / Microsoft Power Platform redirect hosts as needed.
-    ],
+    'redirect_domains' => array_values(array_filter(array_map(
+        static fn (string $domain): string => trim($domain),
+        explode(',', (string) env('MCP_REDIRECT_DOMAINS', '')),
+    ))),
 
     /*
     |--------------------------------------------------------------------------

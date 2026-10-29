@@ -17,7 +17,7 @@ class ListUnknownScansTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'reports:read');
         if ($user instanceof Response) {
             return $user;
         }

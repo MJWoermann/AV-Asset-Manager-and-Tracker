@@ -63,9 +63,9 @@ Route::middleware(['auth:sanctum', 'staff'])->group(function () {
         ->middleware(['permission:assets:delete', 'abilities:assets:write']);
 
     Route::post('/assets/{asset}/checkouts', [AssetCheckoutApiController::class, 'store'])
-        ->middleware('abilities:checkouts:write');
+        ->middleware(['permission:assets:write', 'abilities:assets:write']);
     Route::post('/assets/{asset}/checkouts/{checkout}/return', [AssetCheckoutApiController::class, 'returnCheckout'])
-        ->middleware('abilities:checkouts:write');
+        ->middleware(['permission:assets:write', 'abilities:assets:write']);
 
     // Lists & scan
     Route::get('/lists', [AssetListApiController::class, 'index'])->middleware(['permission:lists:read', 'abilities:lists:read']);

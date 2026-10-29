@@ -431,7 +431,7 @@ That path covers the core value: catalogue → scan → compare → keep records
 
 ## What is not included yet
 
-Short list for operators. Full product status (preview / developer features, deferred work, and in-progress items such as Copilot Studio MCP and local network scan) is on the [product roadmap](roadmap.md). Copilot Studio packaging: [mcp-copilot-studio.md](mcp-copilot-studio.md).
+Short list for operators. Full product status (preview / developer features, deferred work, and planned items such as local network scan) is on the [product roadmap](roadmap.md).
 
 - **Offline scanning** with later sync when the network returns  
 - Automatic **user provisioning** / JIT account creation purely from SSO (an admin must create the account first)
@@ -457,4 +457,5 @@ Everything else described above is available in the current product. Preview mod
 | [Organizational deployment (ADKAR)](organizational-deployment.md) | Sponsors and inventory leads — rollout, training, sustainment |
 | [Deploy (Ubuntu + Nginx)](deploy-ubuntu-nginx.md) | Server setup |
 | [REST API](api.md) | Integrators |
+| [Copilot Studio MCP](mcp-copilot-studio.md) | Admins connecting Microsoft Copilot |
 | [SSO setup](sso-setup.md) | Admins enabling Google / Microsoft login |

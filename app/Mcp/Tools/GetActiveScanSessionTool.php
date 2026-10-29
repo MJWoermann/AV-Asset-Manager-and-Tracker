@@ -17,7 +17,7 @@ class GetActiveScanSessionTool extends Tool
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'scan-sessions');
         if ($user instanceof Response) {
             return $user;
         }

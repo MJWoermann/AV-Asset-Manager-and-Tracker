@@ -8,7 +8,6 @@ Statuses:
 |--------|---------|
 | **Shipped (core)** | Always on for entitled roles |
 | **Preview** | Shipped. Administrators opt in on Profile → Developer features. Other users receive a feature when it is ticked on their role |
-| **In progress** | Agreed direction; implementation and/or packaging underway |
 | **Planned** | Agreed direction; not implemented yet |
 | **Deferred** | Explicitly out of scope until requested |
 
@@ -41,35 +40,7 @@ Always-on areas (catalogue, scan, compare, files/manuals, maintenance logs, repa
 
 ---
 
-## In progress
-
-### Copilot Studio / M365 Copilot MCP
-
-| Field | Detail |
-|-------|--------|
-| **Status** | Done (pending merge) |
-| **Why** | Let staff query and operate inventory from **Microsoft Copilot Studio** / M365 Copilot without the Blade UI |
-| **Audience** | Inventory managers, scanners, admins already in Entra (same Spatie roles as the REST API; not `external_repairer`) |
-
-**Shipped in this work**
-
-- Streamable HTTP MCP at `/mcp/av-assets` (`laravel/mcp` + Passport OAuth Dynamic discovery / DCR).
-- Coarse tools (lookup, stocktake, compare, unknown scans, assets, checkout/return via service, repairs, spares) plus Sanctum checkout/return REST API.
-- Setup guide and OpenAPI Power Apps fallback.
-
-**Out of scope for this release**
-
-- Offline sync, guest QR stock, print wizards, RU visualiser, SSO/storage/email *settings*, preferences UI, admin user CRUD via Copilot.
-- Overloading Socialite `AZURE_*` or Graph `MICROSOFT_GRAPH_*` as the MCP authorization server (Passport on the app is the AS; Entra stays the user IdP via login).
-
-**Related**
-
-- Setup / Copilot Studio packaging: [mcp-copilot-studio.md](mcp-copilot-studio.md)
-- OpenAPI (Power Apps custom-connector fallback): [mcp-av-assets.openapi.yaml](mcp-av-assets.openapi.yaml)
-- REST surface today: [api.md](api.md)
-- Operator overview: [features-and-usage.md](features-and-usage.md)
-
----
+## Planned
 
 ### Local network scan (IP / MAC reconcile)
 
@@ -158,7 +129,8 @@ For orientation only—not a backlog. Full workflows: [features-and-usage.md](fe
 |------|--------|
 | Assets, parent/child, locations, catalogue, custom fields | Shipped (core) |
 | Lists, scan sessions, compare, unknown-scan link | Shipped (core) |
-| Checkout / return (hire, repair, other) — web UI | Shipped (core) |
+| Checkout / return (hire, repair, other) — web UI and Sanctum API (`assets:write`) | Shipped (core) |
+| Copilot Studio MCP at `/mcp/av-assets` (Passport OAuth; tools follow operational permissions) | Shipped (core). Setup: [mcp-copilot-studio.md](mcp-copilot-studio.md). Set `MCP_REDIRECT_DOMAINS` before dynamic client registration |
 | Repairs, procedures, spares | Shipped (core) |
 | Departments, audit History (read-only), per-user table columns / dashboard modules | Shipped (core) |
 | Import / export, files/manuals | Shipped (core) |
@@ -171,5 +143,5 @@ For orientation only—not a backlog. Full workflows: [features-and-usage.md](fe
 ## How to use this document
 
 - Prefer **outcome** wording (what / why / status) over implementation tickets.
-- When an In progress or Planned item ships, move it to Core or Preview and link any setup guide.
+- When a Planned item ships, move it to Core or Preview and link any setup guide.
 - Do not invent new learning/ML systems or offline sync here without an explicit product request (see project hard rules in `CLAUDE.md` / `AGENTS.md`).

@@ -41,9 +41,6 @@ class ApiTokenAbilities
             'connections:write' => 'Manage interfaces, connections, buses',
             'stock:read' => 'View stock levels and guest tokens',
             'stock:write' => 'Record stock movements and rotate tokens',
-            'checkouts:read' => 'View asset checkouts',
-            'checkouts:write' => 'Check out and return assets',
-
             'labels:read' => 'View shelf tag layouts and PDFs',
             'labels:write' => 'Manage shelf tag layouts',
             'rigging:read' => 'View rigging events and calculators',

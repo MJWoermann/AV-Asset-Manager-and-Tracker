@@ -12,14 +12,14 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Create an asset. Requires admin, inventory_manager, or scanner.')]
+#[Description('Create an asset. Requires the assets:write permission.')]
 class CreateAssetTool extends Tool
 {
     use AuthorizesMcpTools;
 
     public function handle(Request $request): Response
     {
-        $user = $this->requireMcpUser($request);
+        $user = $this->requirePermission($request, 'assets:write');
         if ($user instanceof Response) {
             return $user;
         }
