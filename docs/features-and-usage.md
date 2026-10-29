@@ -202,7 +202,7 @@ This is the main day-of-event workflow.
 
 4. Save changes. Important updates appear on the History tab and on the dashboard’s recent activity.
 
-**Bulk actions** on Assets or a list let you update status, location, parent, or list membership for many rows at once. Deleting assets is limited to managers and admins.
+**Bulk actions** on Assets or a list let you update status, location, parent, or list membership for many rows at once. On a list, selected assets can be removed from that list. Permanently deleting assets is limited to managers and admins, and only from the Assets page.
 
 ### 2a. Checkout and return (hire / repair / other)
 

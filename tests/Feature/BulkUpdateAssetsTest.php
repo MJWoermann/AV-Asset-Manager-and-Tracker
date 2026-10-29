@@ -244,6 +244,7 @@ class BulkUpdateAssetsTest extends TestCase
         $response->assertSee('bulkSelection(', false);
         $response->assertSee('Bulk edit');
         $response->assertSee('Merge selected');
+        $response->assertSee('Delete selected');
         $response->assertSee('data-bulk-asset-id', false);
         $response->assertSee('data-bulk-asset-label', false);
         $response->assertSee('toggleAll($event.target.checked)', false);
@@ -399,6 +400,42 @@ class BulkUpdateAssetsTest extends TestCase
         $response->assertOk();
         $response->assertSee('bulkSelection(', false);
         $response->assertSee('Remove from this list');
+        $response->assertDontSee('Delete selected');
+        $response->assertDontSee('Delete permanently');
+    }
+
+    public function test_bulk_delete_is_rejected_when_viewing_a_list(): void
+    {
+        $user = $this->admin();
+        $list = AssetList::create([
+            'name' => 'Inventory',
+            'type' => 'inventory',
+            'created_by' => $user->id,
+        ]);
+        $asset = $this->makeAsset(['name' => 'Stay in catalogue']);
+        AssetListItem::create([
+            'asset_list_id' => $list->id,
+            'asset_id' => $asset->id,
+            'quantity' => 1,
+            'added_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->from(route('lists.show', $list))->post(route('assets.bulk-update'), [
+            'action' => 'delete',
+            'asset_ids' => [$asset->id],
+            'confirm_delete' => '1',
+            'current_list_id' => $list->id,
+        ]);
+
+        $response->assertRedirect(route('lists.show', $list));
+        $response->assertSessionHasErrors([
+            'action' => 'Assets can only be permanently deleted from the Assets page.',
+        ]);
+        $this->assertModelExists($asset);
+        $this->assertDatabaseHas('asset_list_items', [
+            'asset_list_id' => $list->id,
+            'asset_id' => $asset->id,
+        ]);
     }
 
     public function test_admin_can_bulk_update_department_and_cascades_to_children(): void

@@ -10,6 +10,7 @@
 
 @php
     $canDelete = $canDelete || (auth()->user()?->can('assets:delete') ?? false);
+    $canPermanentlyDelete = $canDelete && $currentList === null;
     $canChangeDepartment = auth()->user()?->hasRole('admin') ?? false;
     $departments = collect($departments ?? []);
 @endphp
@@ -55,7 +56,9 @@
                     </template>
                     <button type="submit" class="px-3 py-2 text-sm border border-brand-charcoal dark:border-brand-silver">Merge selected</button>
                 </form>
-                <button type="button" class="px-3 py-2 text-sm bg-red-700 text-white" @click="openDeleteConfirm()">Delete selected</button>
+                @if($canPermanentlyDelete)
+                    <button type="button" class="px-3 py-2 text-sm bg-red-700 text-white" @click="openDeleteConfirm()">Delete selected</button>
+                @endif
             @endif
         </div>
     </div>
@@ -223,7 +226,7 @@
     </form>
 </div>
 
-@if($canDelete)
+@if($canPermanentlyDelete)
     <div
         x-cloak
         x-show="deleteConfirmOpen"

@@ -153,6 +153,13 @@ class BulkUpdateAssetsRequest extends FormRequest
             }
 
             if (in_array($this->input('action'), ['delete', 'merge'], true)) {
+                if ($this->input('action') === 'delete' && filled($this->input('current_list_id'))) {
+                    $validator->errors()->add(
+                        'action',
+                        'Assets can only be permanently deleted from the Assets page.',
+                    );
+                }
+
                 if ($this->input('action') === 'merge') {
                     $keepId = (int) $this->input('keep_asset_id');
                     $selected = collect($this->input('asset_ids', []))->map(fn ($id) => (int) $id);
