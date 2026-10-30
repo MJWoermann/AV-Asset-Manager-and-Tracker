@@ -447,63 +447,29 @@ function scanAimBox(viewfinderWidth, viewfinderHeight, compactCamera) {
 }
 
 /**
- * Map the on-screen aim box to sensor pixels under object-fit: contain.
- * The destination size keeps one scale on both axes and caps the long edge.
+ * Full sensor frame for decoding. The on-screen preview may crop this.
+ * Destination size keeps one scale on both axes and caps the long edge.
  *
  * @param {HTMLVideoElement} video
- * @param {boolean} compactCamera
  * @returns {{ sx: number, sy: number, sWidth: number, sHeight: number, dWidth: number, dHeight: number } | null}
  */
-function aimBoxSourceCrop(video, compactCamera) {
-    const clientW = video.clientWidth;
-    const clientH = video.clientHeight;
+function fullFrameDecodeSize(video) {
     const videoW = video.videoWidth;
     const videoH = video.videoHeight;
-    if (clientW < 2 || clientH < 2 || videoW < 2 || videoH < 2) {
+    if (videoW < 2 || videoH < 2) {
         return null;
     }
 
-    const scale = Math.min(clientW / videoW, clientH / videoH);
-    if (!(scale > 0)) {
-        return null;
-    }
-    const offsetX = (clientW - videoW * scale) / 2;
-    const offsetY = (clientH - videoH * scale) / 2;
-    const box = scanAimBox(clientW, clientH, compactCamera);
-
-    let sx = (box.x - offsetX) / scale;
-    let sy = (box.y - offsetY) / scale;
-    let sWidth = box.width / scale;
-    let sHeight = box.height / scale;
-
-    if (sx < 0) {
-        sWidth += sx;
-        sx = 0;
-    }
-    if (sy < 0) {
-        sHeight += sy;
-        sy = 0;
-    }
-    if (sx + sWidth > videoW) {
-        sWidth = videoW - sx;
-    }
-    if (sy + sHeight > videoH) {
-        sHeight = videoH - sy;
-    }
-    if (sWidth < 2 || sHeight < 2) {
-        return null;
-    }
-
-    const longEdge = Math.max(sWidth, sHeight);
+    const longEdge = Math.max(videoW, videoH);
     const factor = longEdge > SCAN_DECODE_LONG_EDGE ? SCAN_DECODE_LONG_EDGE / longEdge : 1;
 
     return {
-        sx,
-        sy,
-        sWidth,
-        sHeight,
-        dWidth: Math.max(1, Math.round(sWidth * factor)),
-        dHeight: Math.max(1, Math.round(sHeight * factor)),
+        sx: 0,
+        sy: 0,
+        sWidth: videoW,
+        sHeight: videoH,
+        dWidth: Math.max(1, Math.round(videoW * factor)),
+        dHeight: Math.max(1, Math.round(videoH * factor)),
     };
 }
 
@@ -532,14 +498,13 @@ function largestDetectedCode(codes) {
 
 /**
  * @param {HTMLVideoElement} video
- * @param {boolean} compactCamera
  * @param {{ reader: import('html5-qrcode/third_party/zxing-js.umd.js').MultiFormatReader | null, zxing: typeof import('html5-qrcode/third_party/zxing-js.umd.js') | null }} readerState
  * @param {HTMLCanvasElement} canvas
  * @param {CanvasRenderingContext2D | null} context
  * @returns {Promise<string | null>}
  */
-async function decodeAimBoxWithZxing(video, compactCamera, readerState, canvas, context) {
-    const crop = aimBoxSourceCrop(video, compactCamera);
+async function decodeFrameWithZxing(video, readerState, canvas, context) {
+    const crop = fullFrameDecodeSize(video);
     if (!crop || !context) {
         return null;
     }
@@ -575,13 +540,13 @@ async function decodeAimBoxWithZxing(video, compactCamera, readerState, canvas, 
 
 /**
  * Decode from the live video at sensor resolution.
- * BarcodeDetector reads the full frame. Otherwise ZXing reads the aim box at sensor scale.
+ * The preview may crop the picture. Both detectors still read the full frame.
  *
  * @param {HTMLVideoElement} video
- * @param {{ fps: number, compactCamera: boolean, onDecoded: (decoded: string) => void | Promise<void> }} options
+ * @param {{ fps: number, onDecoded: (decoded: string) => void | Promise<void> }} options
  * @returns {() => void}
  */
-function startHighResDecodeLoop(video, { fps, compactCamera, onDecoded }) {
+function startHighResDecodeLoop(video, { fps, onDecoded }) {
     let stopped = false;
     let busy = false;
     /** @type {BarcodeDetector | null} */
@@ -623,7 +588,7 @@ function startHighResDecodeLoop(video, { fps, compactCamera, onDecoded }) {
                     }
                 }
                 if (!text && !detector) {
-                    text = await decodeAimBoxWithZxing(video, compactCamera, readerState, canvas, context);
+                    text = await decodeFrameWithZxing(video, readerState, canvas, context);
                 }
                 if (text && !stopped) {
                     void onDecoded(text);
@@ -783,7 +748,6 @@ async function startBarcodeCamera(elementId, onDecoded) {
 
     const stopDecodeLoop = startHighResDecodeLoop(video, {
         fps,
-        compactCamera,
         onDecoded,
     });
     let stopped = false;
