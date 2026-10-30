@@ -737,7 +737,7 @@ class RuVisualiserFeatureTest extends TestCase
         $this->assertSame(1, AssetRuPlacement::query()->where('rack_asset_id', $rack->id)->count());
     }
 
-    public function test_full_depth_half_blocks_that_rear_slot_and_leaves_the_other_free(): void
+    public function test_full_depth_half_on_the_front_left_blocks_the_rear_right_and_leaves_the_rear_left_free(): void
     {
         $user = $this->manager();
         $rack = $this->makeRackAsset(ruHeight: 12, rearEnabled: true);
@@ -764,12 +764,84 @@ class RuVisualiserFeatureTest extends TestCase
                 'start_ru' => 3,
                 'ru_height' => 1,
                 'width' => 'half',
+                'slot' => 2,
+                'kind' => 'note',
+                'note' => 'Rear right blocked',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasErrors([
+                'start_ru' => 'This placement overlaps another placement on the same face.',
+            ]);
+
+        $this->actingAs($user)
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'rear',
+                'start_ru' => 3,
+                'ru_height' => 1,
+                'width' => 'half',
+                'slot' => 1,
+                'kind' => 'note',
+                'note' => 'Rear left free',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('asset_ru_placements', [
+            'rack_asset_id' => $rack->id,
+            'child_asset_id' => $child->id,
+            'width' => 'half',
+            'slot' => 1,
+            'full_depth' => 1,
+            'face' => 'front',
+        ]);
+        $this->assertDatabaseHas('asset_ru_placements', [
+            'rack_asset_id' => $rack->id,
+            'note' => 'Rear left free',
+            'face' => 'rear',
+            'width' => 'half',
+            'slot' => 1,
+        ]);
+        $this->assertDatabaseMissing('asset_ru_placements', [
+            'note' => 'Rear right blocked',
+        ]);
+        $this->assertSame(2, AssetRuPlacement::query()->where('rack_asset_id', $rack->id)->count());
+    }
+
+    public function test_full_depth_half_on_the_front_right_blocks_the_rear_left_and_leaves_the_rear_right_free(): void
+    {
+        $user = $this->manager();
+        $rack = $this->makeRackAsset(ruHeight: 12, rearEnabled: true);
+        $child = $this->makeChildAsset(ruHeight: 2);
+
+        $this->actingAs($user)
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'front',
+                'start_ru' => 3,
+                'ru_height' => 2,
+                'width' => 'half',
+                'slot' => 2,
+                'kind' => 'asset',
+                'child_asset_id' => $child->id,
+                'full_depth' => '1',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->from(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'rear',
+                'start_ru' => 3,
+                'ru_height' => 1,
+                'width' => 'half',
                 'slot' => 1,
                 'kind' => 'note',
                 'note' => 'Rear left blocked',
             ])
             ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
-            ->assertSessionHasErrors('start_ru');
+            ->assertSessionHasErrors([
+                'start_ru' => 'This placement overlaps another placement on the same face.',
+            ]);
 
         $this->actingAs($user)
             ->post(route('assets.ru-placements.store', $rack), [
@@ -788,18 +860,204 @@ class RuVisualiserFeatureTest extends TestCase
             'rack_asset_id' => $rack->id,
             'child_asset_id' => $child->id,
             'width' => 'half',
-            'slot' => 1,
+            'slot' => 2,
             'full_depth' => 1,
             'face' => 'front',
         ]);
         $this->assertDatabaseHas('asset_ru_placements', [
-            'rack_asset_id' => $rack->id,
             'note' => 'Rear right free',
             'face' => 'rear',
             'width' => 'half',
             'slot' => 2,
         ]);
+        $this->assertDatabaseMissing('asset_ru_placements', [
+            'note' => 'Rear left blocked',
+        ]);
         $this->assertSame(2, AssetRuPlacement::query()->where('rack_asset_id', $rack->id)->count());
+    }
+
+    public function test_full_depth_halves_in_different_front_slots_both_save(): void
+    {
+        $user = $this->manager();
+        $rack = $this->makeRackAsset(ruHeight: 12, rearEnabled: true);
+        $left = $this->makeChildAsset(ruHeight: 2);
+        $right = $this->makeChildAsset(ruHeight: 1);
+
+        $this->actingAs($user)
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'front',
+                'start_ru' => 3,
+                'ru_height' => 2,
+                'width' => 'half',
+                'slot' => 1,
+                'kind' => 'asset',
+                'child_asset_id' => $left->id,
+                'full_depth' => '1',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'front',
+                'start_ru' => 3,
+                'ru_height' => 1,
+                'width' => 'half',
+                'slot' => 2,
+                'kind' => 'asset',
+                'child_asset_id' => $right->id,
+                'full_depth' => '1',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('asset_ru_placements', [
+            'child_asset_id' => $left->id,
+            'face' => 'front',
+            'slot' => 1,
+            'width' => 'half',
+            'full_depth' => 1,
+        ]);
+        $this->assertDatabaseHas('asset_ru_placements', [
+            'child_asset_id' => $right->id,
+            'face' => 'front',
+            'slot' => 2,
+            'width' => 'half',
+            'full_depth' => 1,
+        ]);
+        $this->assertSame(2, AssetRuPlacement::query()->where('rack_asset_id', $rack->id)->count());
+    }
+
+    public function test_full_depth_third_on_the_front_left_blocks_the_rear_right_and_leaves_the_rear_left_free(): void
+    {
+        $user = $this->manager();
+        $rack = $this->makeRackAsset(ruHeight: 12, rearEnabled: true);
+        $child = $this->makeChildAsset(ruHeight: 2);
+
+        $this->actingAs($user)
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'front',
+                'start_ru' => 3,
+                'ru_height' => 2,
+                'width' => 'third',
+                'slot' => 1,
+                'kind' => 'asset',
+                'child_asset_id' => $child->id,
+                'full_depth' => '1',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->from(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'rear',
+                'start_ru' => 3,
+                'ru_height' => 1,
+                'width' => 'third',
+                'slot' => 3,
+                'kind' => 'note',
+                'note' => 'Rear right blocked',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasErrors([
+                'start_ru' => 'This placement overlaps another placement on the same face.',
+            ]);
+
+        $this->actingAs($user)
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'rear',
+                'start_ru' => 3,
+                'ru_height' => 1,
+                'width' => 'third',
+                'slot' => 1,
+                'kind' => 'note',
+                'note' => 'Rear left free',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('asset_ru_placements', [
+            'child_asset_id' => $child->id,
+            'face' => 'front',
+            'width' => 'third',
+            'slot' => 1,
+            'full_depth' => 1,
+        ]);
+        $this->assertDatabaseHas('asset_ru_placements', [
+            'note' => 'Rear left free',
+            'face' => 'rear',
+            'width' => 'third',
+            'slot' => 1,
+        ]);
+        $this->assertDatabaseMissing('asset_ru_placements', [
+            'note' => 'Rear right blocked',
+        ]);
+        $this->assertSame(2, AssetRuPlacement::query()->where('rack_asset_id', $rack->id)->count());
+    }
+
+    public function test_full_depth_third_in_the_centre_blocks_the_rear_centre_and_leaves_the_sides_free(): void
+    {
+        $user = $this->manager();
+        $rack = $this->makeRackAsset(ruHeight: 12, rearEnabled: true);
+        $child = $this->makeChildAsset(ruHeight: 2);
+
+        $this->actingAs($user)
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'front',
+                'start_ru' => 3,
+                'ru_height' => 2,
+                'width' => 'third',
+                'slot' => 2,
+                'kind' => 'asset',
+                'child_asset_id' => $child->id,
+                'full_depth' => '1',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->from(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->post(route('assets.ru-placements.store', $rack), [
+                'face' => 'rear',
+                'start_ru' => 3,
+                'ru_height' => 1,
+                'width' => 'third',
+                'slot' => 2,
+                'kind' => 'note',
+                'note' => 'Rear centre blocked',
+            ])
+            ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+            ->assertSessionHasErrors([
+                'start_ru' => 'This placement overlaps another placement on the same face.',
+            ]);
+
+        foreach ([1 => 'Rear left free', 3 => 'Rear right free'] as $slot => $note) {
+            $this->actingAs($user)
+                ->post(route('assets.ru-placements.store', $rack), [
+                    'face' => 'rear',
+                    'start_ru' => 3,
+                    'ru_height' => 1,
+                    'width' => 'third',
+                    'slot' => $slot,
+                    'kind' => 'note',
+                    'note' => $note,
+                ])
+                ->assertRedirect(route('assets.show', [$rack, 'tab' => 'rack']))
+                ->assertSessionHasNoErrors();
+        }
+
+        $this->assertDatabaseHas('asset_ru_placements', [
+            'child_asset_id' => $child->id,
+            'face' => 'front',
+            'width' => 'third',
+            'slot' => 2,
+            'full_depth' => 1,
+        ]);
+        $this->assertDatabaseMissing('asset_ru_placements', [
+            'note' => 'Rear centre blocked',
+        ]);
+        $this->assertSame(3, AssetRuPlacement::query()->where('rack_asset_id', $rack->id)->count());
     }
 
     public function test_half_depth_left_does_not_block_the_rear_bays(): void

@@ -625,7 +625,8 @@ class RuVisualiserService
     }
 
     /**
-     * A shared RU span conflicts when either bay is full width, the widths differ, or the slot matches.
+     * A shared RU span conflicts when, on any face both occupy, either bay is full width, the widths differ, or the slots match.
+     * Full-depth gear is stored on the front; its rear column is the mirror of that stored slot.
      *
      * @param  array{face: RuPlacementFace, start_ru: int, ru_height: int, full_depth: bool, width: RuPlacementWidth, slot: int}  $left
      * @param  array{face: RuPlacementFace, start_ru: int, ru_height: int, full_depth: bool, width: RuPlacementWidth, slot: int}  $right
@@ -645,11 +646,44 @@ class RuVisualiserService
             ? [RuPlacementFace::Front->value, RuPlacementFace::Rear->value]
             : [$right['face']->value];
 
-        if (array_intersect($leftFaces, $rightFaces) === []) {
+        $sharedFaces = array_intersect($leftFaces, $rightFaces);
+        if ($sharedFaces === []) {
             return false;
         }
 
-        return $this->baysConflict($left['width'], $left['slot'], $right['width'], $right['slot']);
+        foreach ($sharedFaces as $faceValue) {
+            $face = RuPlacementFace::from($faceValue);
+            if ($this->baysConflict(
+                $left['width'],
+                $this->slotOnFace($left, $face),
+                $right['width'],
+                $this->slotOnFace($right, $face),
+            )) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Column a placement occupies when that face is drawn left-to-right.
+     *
+     * @param  array{face: RuPlacementFace, full_depth: bool, width: RuPlacementWidth, slot: int}  $placement
+     */
+    protected function slotOnFace(array $placement, RuPlacementFace $face): int
+    {
+        $slot = (int) $placement['slot'];
+
+        if (
+            $placement['full_depth']
+            && $placement['face'] === RuPlacementFace::Front
+            && $face === RuPlacementFace::Rear
+        ) {
+            return $placement['width']->mirroredSlot($slot);
+        }
+
+        return $slot;
     }
 
     protected function baysConflict(RuPlacementWidth $width, int $slot, RuPlacementWidth $otherWidth, int $otherSlot): bool

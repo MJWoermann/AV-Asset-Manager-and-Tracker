@@ -30,6 +30,14 @@ enum RuPlacementWidth: string
         };
     }
 
+    /**
+     * Column seen from the opposite face. Walking around the rack swaps left and right.
+     */
+    public function mirroredSlot(int $slot): int
+    {
+        return ($this->maxSlot() + 1) - $slot;
+    }
+
     public function positionLabel(int $slot): string
     {
         return match (true) {

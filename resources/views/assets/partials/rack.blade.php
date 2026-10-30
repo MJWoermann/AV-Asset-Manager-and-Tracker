@@ -191,34 +191,46 @@
 
                         <div>
                             <x-input-label value="Width" />
-                            <select
-                                name="width"
-                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                                x-model="form.width"
-                                @change="clampSlot()"
-                                required
-                            >
-                                <option value="full">Full</option>
-                                <option value="half">Half</option>
-                                <option value="third">Third</option>
-                            </select>
+                            <input type="hidden" name="width" :value="form.width">
+                            <div class="mt-1 flex gap-2" role="group" aria-label="Width">
+                                <button
+                                    type="button"
+                                    class="flex-1 px-3 py-2 text-sm border border-brand-charcoal dark:border-white"
+                                    :class="form.width === 'full' ? 'bg-brand text-white border-brand' : ''"
+                                    @click="form.width = 'full'; clampSlot()"
+                                >Full</button>
+                                <button
+                                    type="button"
+                                    class="flex-1 px-3 py-2 text-sm border border-brand-charcoal dark:border-white"
+                                    :class="form.width === 'half' ? 'bg-brand text-white border-brand' : ''"
+                                    @click="form.width = 'half'; clampSlot()"
+                                >Half</button>
+                                <button
+                                    type="button"
+                                    class="flex-1 px-3 py-2 text-sm border border-brand-charcoal dark:border-white"
+                                    :class="form.width === 'third' ? 'bg-brand text-white border-brand' : ''"
+                                    @click="form.width = 'third'; clampSlot()"
+                                >Third</button>
+                            </div>
                         </div>
 
                         <div x-show="form.width !== 'full'" x-cloak>
                             <x-input-label value="Position" />
-                            <select
-                                name="slot"
-                                class="mt-1 block w-full rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white"
-                                x-model="form.slot"
-                                :disabled="form.width === 'full'"
-                                :required="form.width !== 'full'"
-                            >
+                            <div class="mt-1 flex gap-2" role="group" aria-label="Position">
                                 <template x-for="option in slotOptions()" :key="option.value">
-                                    <option :value="option.value" x-text="option.label"></option>
+                                    <button
+                                        type="button"
+                                        class="flex-1 px-3 py-2 text-sm border border-brand-charcoal dark:border-white"
+                                        :class="String(form.slot) === String(option.value) ? 'bg-brand text-white border-brand' : ''"
+                                        @click="form.slot = option.value"
+                                        x-text="option.label"
+                                    ></button>
                                 </template>
-                            </select>
+                            </div>
                         </div>
+                        {{-- Full width always posts slot 1. Partial widths post the selected position. Disabled inputs are omitted from POST. --}}
                         <input type="hidden" name="slot" value="1" :disabled="form.width !== 'full'">
+                        <input type="hidden" name="slot" :value="form.slot" :disabled="form.width === 'full'">
 
                         <div>
                             <x-input-label value="Kind" />

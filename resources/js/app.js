@@ -2431,6 +2431,30 @@ const ruPlacementSlot = (placement) => {
     return Number(placement?.slot || 1);
 };
 
+const ruSlotCount = (width) => {
+    if (width === 'third') {
+        return 3;
+    }
+    if (width === 'half') {
+        return 2;
+    }
+
+    return 1;
+};
+
+// Each face is drawn left-to-right as you look at it. A full-depth item is stored
+// on the front; on the rear it occupies the mirrored column. The placement object
+// keeps its stored slot so editing does not write the mirror back to the database.
+const ruDisplaySlot = (placement, face) => {
+    const slot = ruPlacementSlot(placement);
+    const mirrorOnRear = Boolean(placement?.full_depth) && face === 'rear' && placement?.face === 'front';
+    if (!mirrorOnRear) {
+        return slot;
+    }
+
+    return (ruSlotCount(ruPlacementWidth(placement)) + 1) - slot;
+};
+
 const buildRuFaceRows = (capacity, placements, face) => {
     const byRu = {};
     const mirrored = {};
@@ -2442,7 +2466,7 @@ const buildRuFaceRows = (capacity, placements, face) => {
             return;
         }
 
-        const slot = ruPlacementSlot(placement);
+        const slot = ruDisplaySlot(placement, face);
         const start = Number(placement.start_ru);
         const height = Number(placement.ru_height);
         for (let ru = start; ru < start + height; ru += 1) {

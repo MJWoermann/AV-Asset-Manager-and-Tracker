@@ -52,7 +52,7 @@
                                         ·
                                         <span x-text="cell.placement.kind === 'note' ? 'Note' : 'Asset'"></span>
                                         <span x-show="cell.placement.width && cell.placement.width !== 'full'" x-cloak>
-                                            · <span x-text="slotLabel(cell.placement.width, cell.placement.slot)"></span>
+                                            · <span x-text="slotLabel(cell.placement.width, cell.slot)"></span>
                                         </span>
                                         <span x-show="cell.placement.full_depth" x-cloak> · Full depth</span>
                                         <span x-show="cell.mirrored" x-cloak> · Rear</span>
@@ -81,7 +81,7 @@
                                         <span x-text="cell.placement.start_ru"></span>–<span x-text="Number(cell.placement.start_ru) + Number(cell.placement.ru_height) - 1"></span>
                                         RU
                                         <span x-show="cell.placement.width && cell.placement.width !== 'full'" x-cloak>
-                                            · <span x-text="slotLabel(cell.placement.width, cell.placement.slot)"></span>
+                                            · <span x-text="slotLabel(cell.placement.width, cell.slot)"></span>
                                         </span>
                                         <span x-show="cell.placement.full_depth" x-cloak> · FD</span>
                                     </div>
