@@ -164,6 +164,12 @@ class ShelfTagGeneratorFeatureTest extends TestCase
 
         $create = $this->actingAs($user)->get(route('labels.layouts.create'));
         $create->assertOk()->assertSee('New label layout')->assertSee('Choose an uploaded image');
+        $fieldOptions = $create->viewData('fieldOptions');
+        $this->assertSame('IP address', $fieldOptions['ip_address']);
+        $this->assertSame('MAC address', $fieldOptions['mac_address']);
+        $this->assertSame('Purchase date', $fieldOptions['purchase_date']);
+        $this->assertSame('Warranty expiry', $fieldOptions['warranty_expiry']);
+        $this->assertSame('Test & Tag expiry', $fieldOptions['test_tag_expiry']);
 
         $response = $this->actingAs($user)->post(route('labels.layouts.store'), [
             'name' => 'Warehouse 62mm',
@@ -610,6 +616,11 @@ class ShelfTagGeneratorFeatureTest extends TestCase
             'tp_barcode' => 'TP-CUSTOM-1',
             'fmi_ast' => 'FMI-99',
             'serial_number' => 'SN-1',
+            'ip_address' => '10.1.2.3',
+            'mac_address' => 'AA:BB:CC:DD:EE:FF',
+            'purchase_date' => '2024-01-15',
+            'warranty_expiry' => '2027-01-15',
+            'test_tag_expiry' => '2026-06-01',
         ]);
 
         AssetCustomFieldValue::query()->create([
@@ -624,6 +635,11 @@ class ShelfTagGeneratorFeatureTest extends TestCase
         $this->assertSame('TP-CUSTOM-1', ShelfTagFieldKeys::resolve($asset, 'tp_barcode'));
         $this->assertSame('Bay 3', ShelfTagFieldKeys::resolve($asset, 'location.name'));
         $this->assertSame('Amplifier', ShelfTagFieldKeys::resolve($asset, 'itemType.name'));
+        $this->assertSame('10.1.2.3', ShelfTagFieldKeys::resolve($asset, 'ip_address'));
+        $this->assertSame('AA:BB:CC:DD:EE:FF', ShelfTagFieldKeys::resolve($asset, 'mac_address'));
+        $this->assertSame('2024-01-15', ShelfTagFieldKeys::resolve($asset, 'purchase_date'));
+        $this->assertSame('2027-01-15', ShelfTagFieldKeys::resolve($asset, 'warranty_expiry'));
+        $this->assertSame('2026-06-01', ShelfTagFieldKeys::resolve($asset, 'test_tag_expiry'));
         $this->assertSame('B4', ShelfTagFieldKeys::resolve($asset, 'custom:shelf-bay'));
 
         $layout = ShelfTagLayout::factory()->make([

@@ -60,6 +60,18 @@
                     <button type="button" class="px-3 py-2 text-sm bg-red-700 text-white" @click="openDeleteConfirm()">Delete selected</button>
                 @endif
             @endif
+            @if($currentList)
+                <form method="POST" action="{{ route('assets.bulk-update') }}" class="inline">
+                    @csrf
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="current_list_id" value="{{ $currentList->id }}">
+                    <input type="hidden" name="remove_from_list" value="1">
+                    <template x-for="id in selectedIds" :key="'remove-list-'+id">
+                        <input type="hidden" name="asset_ids[]" :value="id">
+                    </template>
+                    <button type="submit" class="px-3 py-2 text-sm border border-red-700 text-red-700 dark:border-red-400 dark:text-red-300">Remove from list</button>
+                </form>
+            @endif
         </div>
     </div>
 

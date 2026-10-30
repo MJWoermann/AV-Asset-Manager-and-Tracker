@@ -22,11 +22,16 @@ class ShelfTagFieldKeys
             'tp_barcode' => 'TP barcode',
             'rig_tag' => 'Rig tag',
             'serial_number' => 'Serial number',
+            'ip_address' => 'IP address',
+            'mac_address' => 'MAC address',
             'manufacturer' => 'Manufacturer',
             'model' => 'Model',
             'location.name' => 'Location',
             'itemType.name' => 'Item type',
             'status' => 'Status',
+            'purchase_date' => 'Purchase date',
+            'warranty_expiry' => 'Warranty expiry',
+            'test_tag_expiry' => 'Test & Tag expiry',
             'notes' => 'Notes',
         ];
     }
@@ -181,6 +186,8 @@ class ShelfTagFieldKeys
             'tp_barcode' => (string) ($asset->tp_barcode ?? ''),
             'rig_tag' => (string) ($asset->rig_tag ?? ''),
             'serial_number' => (string) ($asset->serial_number ?? ''),
+            'ip_address' => (string) ($asset->ip_address ?? ''),
+            'mac_address' => (string) ($asset->mac_address ?? ''),
             'manufacturer' => (string) ($asset->manufacturer?->name ?? ''),
             'model' => (string) ($asset->manufacturerModel?->name ?? ''),
             'location.name' => (string) ($asset->location?->name ?? ''),
@@ -188,6 +195,9 @@ class ShelfTagFieldKeys
             'status' => $asset->status instanceof \BackedEnum
                 ? (method_exists($asset->status, 'label') ? $asset->status->label() : (string) $asset->status->value)
                 : (string) ($asset->status ?? ''),
+            'purchase_date' => $asset->purchase_date?->format('Y-m-d') ?? '',
+            'warranty_expiry' => $asset->warranty_expiry?->format('Y-m-d') ?? '',
+            'test_tag_expiry' => $asset->test_tag_expiry?->format('Y-m-d') ?? '',
             'notes' => (string) ($asset->notes ?? ''),
             default => '',
         };

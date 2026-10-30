@@ -245,6 +245,7 @@ class BulkUpdateAssetsTest extends TestCase
         $response->assertSee('Bulk edit');
         $response->assertSee('Merge selected');
         $response->assertSee('Delete selected');
+        $response->assertDontSee('>Remove from list</button>', false);
         $response->assertSee('data-bulk-asset-id', false);
         $response->assertSee('data-bulk-asset-label', false);
         $response->assertSee('toggleAll($event.target.checked)', false);
@@ -400,6 +401,8 @@ class BulkUpdateAssetsTest extends TestCase
         $response->assertOk();
         $response->assertSee('bulkSelection(', false);
         $response->assertSee('Remove from this list');
+        $response->assertSee('>Remove from list</button>', false);
+        $response->assertSee('border border-red-700 text-red-700', false);
         $response->assertDontSee('Delete selected');
         $response->assertDontSee('Delete permanently');
     }
