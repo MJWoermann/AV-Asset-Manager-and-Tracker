@@ -4554,6 +4554,11 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     showGrid: initial.editor_settings?.show_grid ?? true,
     snapToGrid: initial.editor_settings?.snap_to_grid ?? false,
     gridSizeMm: Number(initial.editor_settings?.grid_size_mm) || 5,
+    showBleed: initial.editor_settings?.show_bleed ?? true,
+    bleedTopMm: Number(initial.editor_settings?.bleed_top_mm ?? 3),
+    bleedBottomMm: Number(initial.editor_settings?.bleed_bottom_mm ?? 3),
+    bleedLeftMm: Number(initial.editor_settings?.bleed_left_mm ?? 2),
+    bleedRightMm: Number(initial.editor_settings?.bleed_right_mm ?? 2),
     autoPaddingMm: 2,
     continuousMinMm: 29,
     continuousMaxMm: 300,
@@ -4660,7 +4665,44 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             show_grid: Boolean(this.showGrid),
             snap_to_grid: Boolean(this.snapToGrid),
             grid_size_mm: Number(this.gridSizeMm) || 5,
+            show_bleed: Boolean(this.showBleed),
+            bleed_top_mm: this.clampBleed(this.bleedTopMm, 3),
+            bleed_bottom_mm: this.clampBleed(this.bleedBottomMm, 3),
+            bleed_left_mm: this.clampBleed(this.bleedLeftMm, 2),
+            bleed_right_mm: this.clampBleed(this.bleedRightMm, 2),
         });
+    },
+
+    clampBleed(value, fallback) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+            return fallback;
+        }
+
+        return Math.round(Math.min(50, Math.max(0, number)) * 10) / 10;
+    },
+
+    get bleedFits() {
+        const left = this.clampBleed(this.bleedLeftMm, 2);
+        const right = this.clampBleed(this.bleedRightMm, 2);
+        const top = this.clampBleed(this.bleedTopMm, 3);
+        const bottom = this.clampBleed(this.bleedBottomMm, 3);
+
+        return left + right < this.displayWidthMm && top + bottom < this.displayHeightMm;
+    },
+
+    get bleedGuideStyle() {
+        const left = this.clampBleed(this.bleedLeftMm, 2);
+        const right = this.clampBleed(this.bleedRightMm, 2);
+        const top = this.clampBleed(this.bleedTopMm, 3);
+        const bottom = this.clampBleed(this.bleedBottomMm, 3);
+
+        return {
+            left: `${left * this.scale}px`,
+            top: `${top * this.scale}px`,
+            width: `${Math.max(0, (this.displayWidthMm - left - right) * this.scale)}px`,
+            height: `${Math.max(0, (this.displayHeightMm - top - bottom) * this.scale)}px`,
+        };
     },
 
     get presetNotes() {

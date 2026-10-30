@@ -15,6 +15,8 @@ class ShelfTagPaperPresets
 
     public const LENGTH_MODE_AUTO = 'auto';
 
+    public const BLEED_MAX_MM = 50.0;
+
     /** @return list<string> */
     public static function lengthModes(): array
     {
@@ -24,7 +26,7 @@ class ShelfTagPaperPresets
     /**
      * Default layout-editor viewport settings (shared on the template).
      *
-     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float}
+     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float, show_bleed: bool, bleed_top_mm: float, bleed_bottom_mm: float, bleed_left_mm: float, bleed_right_mm: float}
      */
     public static function defaultEditorSettings(): array
     {
@@ -32,12 +34,17 @@ class ShelfTagPaperPresets
             'show_grid' => true,
             'snap_to_grid' => false,
             'grid_size_mm' => 5.0,
+            'show_bleed' => true,
+            'bleed_top_mm' => 3.0,
+            'bleed_bottom_mm' => 3.0,
+            'bleed_left_mm' => 2.0,
+            'bleed_right_mm' => 2.0,
         ];
     }
 
     /**
      * @param  array<string, mixed>|null  $settings
-     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float}
+     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float, show_bleed: bool, bleed_top_mm: float, bleed_bottom_mm: float, bleed_left_mm: float, bleed_right_mm: float}
      */
     public static function normalizeEditorSettings(?array $settings): array
     {
@@ -55,7 +62,21 @@ class ShelfTagPaperPresets
             'show_grid' => (bool) ($settings['show_grid'] ?? $defaults['show_grid']),
             'snap_to_grid' => (bool) ($settings['snap_to_grid'] ?? $defaults['snap_to_grid']),
             'grid_size_mm' => $gridSize,
+            'show_bleed' => (bool) ($settings['show_bleed'] ?? $defaults['show_bleed']),
+            'bleed_top_mm' => self::clampBleed($settings['bleed_top_mm'] ?? null, $defaults['bleed_top_mm']),
+            'bleed_bottom_mm' => self::clampBleed($settings['bleed_bottom_mm'] ?? null, $defaults['bleed_bottom_mm']),
+            'bleed_left_mm' => self::clampBleed($settings['bleed_left_mm'] ?? null, $defaults['bleed_left_mm']),
+            'bleed_right_mm' => self::clampBleed($settings['bleed_right_mm'] ?? null, $defaults['bleed_right_mm']),
         ];
+    }
+
+    public static function clampBleed(mixed $value, float $default): float
+    {
+        if (! is_numeric($value)) {
+            return $default;
+        }
+
+        return round(min(self::BLEED_MAX_MM, max(0, (float) $value)), 1);
     }
 
     public static function clampContinuousLength(float $heightMm): float

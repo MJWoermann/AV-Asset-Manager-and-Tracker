@@ -235,6 +235,30 @@
                                     <option :value="10">10 mm</option>
                                 </select>
                             </label>
+                            <label class="inline-flex items-center gap-2">
+                                <input type="checkbox" class="rounded text-brand" x-model="showBleed">
+                                Show bleed
+                            </label>
+                            <label class="inline-flex items-center gap-1.5">
+                                <span class="text-brand-charcoal dark:text-brand-silver">Top</span>
+                                <input type="number" min="0" max="50" step="0.1" class="w-16 rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white text-sm py-1" x-model.number="bleedTopMm" aria-label="Bleed top">
+                                <span class="text-brand-charcoal dark:text-brand-silver">mm</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5">
+                                <span class="text-brand-charcoal dark:text-brand-silver">Bottom</span>
+                                <input type="number" min="0" max="50" step="0.1" class="w-16 rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white text-sm py-1" x-model.number="bleedBottomMm" aria-label="Bleed bottom">
+                                <span class="text-brand-charcoal dark:text-brand-silver">mm</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5">
+                                <span class="text-brand-charcoal dark:text-brand-silver">Left</span>
+                                <input type="number" min="0" max="50" step="0.1" class="w-16 rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white text-sm py-1" x-model.number="bleedLeftMm" aria-label="Bleed left">
+                                <span class="text-brand-charcoal dark:text-brand-silver">mm</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5">
+                                <span class="text-brand-charcoal dark:text-brand-silver">Right</span>
+                                <input type="number" min="0" max="50" step="0.1" class="w-16 rounded border-gray-300 dark:bg-black dark:border-brand-charcoal dark:text-white text-sm py-1" x-model.number="bleedRightMm" aria-label="Bleed right">
+                                <span class="text-brand-charcoal dark:text-brand-silver">mm</span>
+                            </label>
                         </div>
 
                         <div
@@ -252,6 +276,13 @@
                                     @pointerdown.stop="onCanvasPointerDown($event)"
                                 >
                                     <div class="relative" data-label-content-plane :style="labelContentStyle">
+                                    <div
+                                        x-show="showBleed && bleedFits"
+                                        x-cloak
+                                        class="shelf-tag-bleed-guide absolute pointer-events-none z-[3] border border-dashed border-brand-plum print:hidden"
+                                        :style="bleedGuideStyle"
+                                        aria-hidden="true"
+                                    ></div>
                                     <div
                                         x-show="showGrid"
                                         class="absolute inset-0 pointer-events-none z-[1]"
@@ -339,6 +370,7 @@
                             Grid from label centre. Shift-click or drag-marquee to multi-select.
                             <span x-show="snapToGrid">Snapping to <span x-text="gridSizeMm"></span> mm.</span>
                             <span x-show="showGrid && !snapToGrid">Grid guides only.</span>
+                            <span x-show="showBleed">Bleed guide is not printed.</span>
                             Barcodes scale to fit their box without cropping.
                         </p>
                     </div>

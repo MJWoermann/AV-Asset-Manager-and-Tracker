@@ -152,7 +152,7 @@ class StoreShelfTagLayoutRequest extends FormRequest
     }
 
     /**
-     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float}
+     * @return array{show_grid: bool, snap_to_grid: bool, grid_size_mm: float, show_bleed: bool, bleed_top_mm: float, bleed_bottom_mm: float, bleed_left_mm: float, bleed_right_mm: float}
      */
     public function resolvedEditorSettings(): array
     {

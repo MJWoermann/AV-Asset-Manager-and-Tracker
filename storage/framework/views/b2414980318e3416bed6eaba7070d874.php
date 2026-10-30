@@ -38,7 +38,7 @@
         x-data="shelfTagPrintPreview(<?php echo \Illuminate\Support\Js::from($labels)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($layout->displayWidthMm())->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($layout->displayHeightMm())->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($layout->logoUrl())->toHtml() ?>)"
         x-init="renderAll()"
     >
-        <p class="mb-4 text-sm text-brand-charcoal dark:text-brand-silver print:hidden">
+        <p class="no-print mb-4 text-sm text-brand-charcoal dark:text-brand-silver print:hidden">
             Showing first <?php echo e(count($previewLabels)); ?> of <?php echo e($count); ?> on screen. Print/PDF includes the full batch.
             Select the matching Brother DK size, Actual size, Cut every for continuous.
             <?php if($layout->isLandscape()): ?>
@@ -46,7 +46,7 @@
             <?php endif; ?>
         </p>
 
-        <div class="space-y-6 print:space-y-0">
+        <div class="label-print-root space-y-6 print:space-y-0">
             <?php $__currentLoopData = $labels; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                 <div
                     class="label-sheet mx-auto border border-brand-silver bg-white shadow-sm print:border-0 print:shadow-none <?php echo e($index >= $previewLimit ? 'hidden print:block' : ''); ?>"
@@ -66,26 +66,92 @@
 
     <style>
         @media print {
-            body * { visibility: hidden; }
-            .label-sheet, .label-sheet * { visibility: visible; }
-            .label-sheet {
-                position: relative;
-                page-break-after: always;
-                break-after: page;
-                margin: 0 !important;
-                box-shadow: none !important;
-            }
-            .label-sheet:last-child {
-                page-break-after: auto;
-                break-after: auto;
-            }
             @page {
                 size: <?php echo e($layout->displayWidthMm()); ?>mm <?php echo e($layout->displayHeightMm()); ?>mm;
                 margin: 0;
             }
-            nav, header, .print\\:hidden { display: none !important; }
+            html, body, body > div, main, .max-w-7xl, .label-print-root {
+                width: <?php echo e($layout->displayWidthMm()); ?>mm !important;
+                max-width: <?php echo e($layout->displayWidthMm()); ?>mm !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #fff !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .label-sheet {
+                position: relative;
+                break-inside: avoid;
+                page-break-inside: avoid;
+                break-after: page;
+                page-break-after: always;
+                margin: 0 !important;
+                box-shadow: none !important;
+            }
+            .label-sheet:last-child {
+                break-after: auto;
+                page-break-after: auto;
+            }
         }
     </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const started = Date.now();
+            const timer = window.setInterval(() => {
+                const nodes = [...document.querySelectorAll('.shelf-tag-barcode')];
+                const valued = nodes.filter((node) => (node.getAttribute('data-value') || '') !== '');
+                const drawn = valued.filter((node) => node.getAttribute('viewBox'));
+                if (valued.length > 0 && drawn.length < valued.length && Date.now() - started < 8000) {
+                    return;
+                }
+                window.clearInterval(timer);
+
+                const rows = nodes.map((node, index) => {
+                    const sheet = node.closest('.label-sheet');
+                    const parent = node.parentElement;
+                    let bbox = null;
+                    try {
+                        const box = node.getBBox();
+                        bbox = { w: Math.round(box.width * 100) / 100, h: Math.round(box.height * 100) / 100 };
+                    } catch (e) {
+                        bbox = null;
+                    }
+
+                    return {
+                        index,
+                        display: sheet ? getComputedStyle(sheet).display : null,
+                        hiddenClass: !!(sheet && sheet.classList.contains('hidden')),
+                        parentW: parent ? parent.clientWidth : 0,
+                        parentH: parent ? parent.clientHeight : 0,
+                        showText: node.getAttribute('data-show-text'),
+                        viewBox: node.getAttribute('viewBox'),
+                        bbox,
+                    };
+                });
+                const textSample = [...document.querySelectorAll('.label-sheet')].slice(0, 2).map((sheet) => {
+                    return [...sheet.querySelectorAll('.el')]
+                        .filter((el) => !el.querySelector('svg, canvas, img'))
+                        .map((el) => {
+                            const inner = el.firstElementChild;
+                            const style = inner ? getComputedStyle(inner) : null;
+
+                            return {
+                                fontSize: style ? style.fontSize : null,
+                                fontFamily: style ? style.fontFamily : null,
+                                inline: inner ? inner.getAttribute('style') : null,
+                            };
+                        });
+                });
+
+                // #region agent log
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'A',location:'preview.blade.php:barcode-measure',message:'print preview barcode boxes',data:{count:rows.length,zeroParent:rows.filter((row)=>row.parentW===0).length,hidden:rows.filter((row)=>row.hiddenClass).length,sample:rows.filter((row)=>row.index<8||row.index===rows.length-1)},timestamp:Date.now()})}).catch(()=>{});
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'E',location:'preview.blade.php:text-measure',message:'print preview text metrics',data:{textSample},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+            }, 300);
+        });
+    </script>
  <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54)): ?>

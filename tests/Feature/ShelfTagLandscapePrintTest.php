@@ -109,6 +109,7 @@ class ShelfTagLandscapePrintTest extends TestCase
         $this->assertStringContainsString('width: 90mm', $html);
         $this->assertStringContainsString('height: 62mm', $html);
         $this->assertStringContainsString('TP-PDF-1', $html);
+        $this->assertStringNotContainsString('shelf-tag-bleed-guide', $html);
     }
 
     public function test_landscape_preview_shows_swapped_sheet_size(): void
@@ -157,6 +158,7 @@ class ShelfTagLandscapePrintTest extends TestCase
             ->assertOk()
             ->assertSee('width: 110mm', false)
             ->assertSee('height: 62mm', false)
-            ->assertSee('data-orientation="landscape"', false);
+            ->assertSee('data-orientation="landscape"', false)
+            ->assertDontSee('shelf-tag-bleed-guide', false);
     }
 }

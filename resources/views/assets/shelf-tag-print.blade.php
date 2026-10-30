@@ -15,7 +15,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 print:max-w-none print:px-0 space-y-6">
+    <div class="asset-label-print max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 print:max-w-none print:px-0 space-y-6 print:space-y-0">
         <div class="print:hidden bg-white dark:bg-brand-slate border p-4 max-w-md">
             @if($layouts->isEmpty())
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">
@@ -92,6 +92,9 @@
                 .no-print {
                     display: none !important;
                 }
+                .asset-label-print > * + * {
+                    margin-top: 0 !important;
+                }
                 .label-sheet {
                     position: relative;
                     break-inside: avoid;
@@ -107,5 +110,18 @@
                 }
             }
         </style>
+        <script>
+            window.addEventListener('beforeprint', () => {
+                const wrap = document.querySelector('.asset-label-print');
+                const sheet = document.querySelector('.label-sheet');
+                const shifted = wrap && wrap.children.length > 1 ? wrap.children[1] : null;
+                const sheetRect = sheet ? sheet.getBoundingClientRect() : null;
+                const barcode = document.querySelector('.shelf-tag-barcode');
+                const barcodeRect = barcode ? barcode.getBoundingClientRect() : null;
+                // #region agent log
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'F',location:'shelf-tag-print.blade.php:beforeprint',message:'single label print metrics',data:{marginTop:shifted?getComputedStyle(shifted).marginTop:null,sheetTop:sheetRect?Math.round(sheetRect.top):null,sheetBottom:sheetRect?Math.round(sheetRect.bottom):null,barcodeTop:barcodeRect?Math.round(barcodeRect.top):null,barcodeBottom:barcodeRect?Math.round(barcodeRect.bottom):null},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+            });
+        </script>
     @endif
 </x-app-layout>
