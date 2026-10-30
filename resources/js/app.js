@@ -412,147 +412,312 @@ function formatCameraStartError(error) {
     return 'Camera unavailable: ' + raw;
 }
 
-// #region agent log
-function agentDebugLog(hypothesisId, location, message, data) {
-    const payload = {
-        sessionId: '50dff9',
-        runId: 'pre-fix',
-        hypothesisId,
-        location,
-        message,
-        data,
-        timestamp: Date.now(),
-    };
-    fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '50dff9' },
-        body: JSON.stringify(payload),
-    }).catch(() => {});
-    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    fetch('/_debug/camera-log', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-        body: JSON.stringify(payload),
-    }).catch(() => {});
+/** Longest decoded edge. Past this, ZXing frames get too slow for rapid scanning. */
+const SCAN_DECODE_LONG_EDGE = 1600;
+
+/** @type {Promise<typeof import('html5-qrcode/third_party/zxing-js.umd.js')> | null} */
+let zxingModulePromise = null;
+
+function loadZXing() {
+    if (!zxingModulePromise) {
+        zxingModulePromise = import('html5-qrcode/third_party/zxing-js.umd.js');
+    }
+
+    return zxingModulePromise;
 }
 
-function collectCameraDebugSnapshot(elementId) {
-    const root = document.getElementById(elementId);
-    const video = root?.querySelector('video') || null;
-    const canvas = root?.querySelector('canvas') || null;
-    const shaded = document.getElementById('qr-shaded-region');
-    const track = video?.srcObject?.getVideoTracks?.()?.[0] || null;
-    const settings = track?.getSettings?.() || {};
-    const capabilities = track?.getCapabilities?.() || {};
-    const videoStyle = video ? getComputedStyle(video) : null;
-    const clientW = video?.clientWidth || 0;
-    const clientH = video?.clientHeight || 0;
-    const videoW = video?.videoWidth || 0;
-    const videoH = video?.videoHeight || 0;
-    const canvasW = canvas?.width || 0;
-    const canvasH = canvas?.height || 0;
-    const widthRatio = clientW > 0 ? videoW / clientW : null;
-    const heightRatio = clientH > 0 ? videoH / clientH : null;
-    const displayedAspect = clientH > 0 ? clientW / clientH : null;
-    const sensorAspect = videoH > 0 ? videoW / videoH : null;
-    let coverCrop = null;
-    if (displayedAspect && sensorAspect) {
-        if (sensorAspect > displayedAspect) {
-            coverCrop = { axis: 'x', visibleFraction: displayedAspect / sensorAspect };
-        } else {
-            coverCrop = { axis: 'y', visibleFraction: sensorAspect / displayedAspect };
+/**
+ * Aim box in the preview, matching the shaded guide.
+ *
+ * @param {number} viewfinderWidth
+ * @param {number} viewfinderHeight
+ * @param {boolean} compactCamera
+ * @returns {{ x: number, y: number, width: number, height: number }}
+ */
+function scanAimBox(viewfinderWidth, viewfinderHeight, compactCamera) {
+    const width = Math.floor(viewfinderWidth * 0.9);
+    const height = Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35));
+
+    return {
+        x: (viewfinderWidth - width) / 2,
+        y: (viewfinderHeight - height) / 2,
+        width,
+        height,
+    };
+}
+
+/**
+ * Map the on-screen aim box to sensor pixels under object-fit: contain.
+ * The destination size keeps one scale on both axes and caps the long edge.
+ *
+ * @param {HTMLVideoElement} video
+ * @param {boolean} compactCamera
+ * @returns {{ sx: number, sy: number, sWidth: number, sHeight: number, dWidth: number, dHeight: number } | null}
+ */
+function aimBoxSourceCrop(video, compactCamera) {
+    const clientW = video.clientWidth;
+    const clientH = video.clientHeight;
+    const videoW = video.videoWidth;
+    const videoH = video.videoHeight;
+    if (clientW < 2 || clientH < 2 || videoW < 2 || videoH < 2) {
+        return null;
+    }
+
+    const scale = Math.min(clientW / videoW, clientH / videoH);
+    if (!(scale > 0)) {
+        return null;
+    }
+    const offsetX = (clientW - videoW * scale) / 2;
+    const offsetY = (clientH - videoH * scale) / 2;
+    const box = scanAimBox(clientW, clientH, compactCamera);
+
+    let sx = (box.x - offsetX) / scale;
+    let sy = (box.y - offsetY) / scale;
+    let sWidth = box.width / scale;
+    let sHeight = box.height / scale;
+
+    if (sx < 0) {
+        sWidth += sx;
+        sx = 0;
+    }
+    if (sy < 0) {
+        sHeight += sy;
+        sy = 0;
+    }
+    if (sx + sWidth > videoW) {
+        sWidth = videoW - sx;
+    }
+    if (sy + sHeight > videoH) {
+        sHeight = videoH - sy;
+    }
+    if (sWidth < 2 || sHeight < 2) {
+        return null;
+    }
+
+    const longEdge = Math.max(sWidth, sHeight);
+    const factor = longEdge > SCAN_DECODE_LONG_EDGE ? SCAN_DECODE_LONG_EDGE / longEdge : 1;
+
+    return {
+        sx,
+        sy,
+        sWidth,
+        sHeight,
+        dWidth: Math.max(1, Math.round(sWidth * factor)),
+        dHeight: Math.max(1, Math.round(sHeight * factor)),
+    };
+}
+
+/**
+ * @param {Array<{ rawValue?: string, boundingBox?: { width: number, height: number } }>} codes
+ * @returns {string | null}
+ */
+function largestDetectedCode(codes) {
+    let best = null;
+    let bestArea = -1;
+    for (const code of codes) {
+        const text = String(code?.rawValue || '');
+        if (!text) {
+            continue;
+        }
+        const box = code.boundingBox;
+        const area = box ? box.width * box.height : 0;
+        if (area >= bestArea) {
+            best = text;
+            bestArea = area;
         }
     }
 
-    const scaleMismatch = widthRatio && heightRatio && heightRatio !== 0 ? widthRatio / heightRatio : null;
+    return best;
+}
 
-    return {
-        scaleMismatch,
-        compact: window.matchMedia('(max-width: 639px)').matches,
-        battery: wantsCameraBatteryOptimisation(),
-        barcodeDetector: typeof window.BarcodeDetector === 'function',
-        objectFit: videoStyle?.objectFit || null,
-        maxHeight: videoStyle?.maxHeight || null,
-        clientW,
-        clientH,
-        videoW,
-        videoH,
-        canvasW,
-        canvasH,
-        widthRatio,
-        heightRatio,
-        displayedAspect,
-        sensorAspect,
-        coverCrop,
-        qrboxAspect: canvasH > 0 ? canvasW / canvasH : null,
-        shadedBorderTop: shaded?.style?.borderTopWidth || null,
-        shadedBorderLeft: shaded?.style?.borderLeftWidth || null,
-        track: {
-            width: settings.width ?? null,
-            height: settings.height ?? null,
-            aspectRatio: settings.aspectRatio ?? null,
-            zoom: settings.zoom ?? null,
-            focusMode: settings.focusMode ?? null,
-            facingMode: settings.facingMode ?? null,
-        },
-        zoomRange: capabilities.zoom || null,
+/**
+ * @param {HTMLVideoElement} video
+ * @param {boolean} compactCamera
+ * @param {{ reader: import('html5-qrcode/third_party/zxing-js.umd.js').MultiFormatReader | null, zxing: typeof import('html5-qrcode/third_party/zxing-js.umd.js') | null }} readerState
+ * @param {HTMLCanvasElement} canvas
+ * @param {CanvasRenderingContext2D | null} context
+ * @returns {Promise<string | null>}
+ */
+async function decodeAimBoxWithZxing(video, compactCamera, readerState, canvas, context) {
+    const crop = aimBoxSourceCrop(video, compactCamera);
+    if (!crop || !context) {
+        return null;
+    }
+
+    canvas.width = crop.dWidth;
+    canvas.height = crop.dHeight;
+    context.drawImage(video, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, crop.dWidth, crop.dHeight);
+
+    if (!readerState.reader || !readerState.zxing) {
+        const zxing = await loadZXing();
+        const hints = new Map();
+        hints.set(zxing.DecodeHintType.POSSIBLE_FORMATS, [
+            zxing.BarcodeFormat.QR_CODE,
+            zxing.BarcodeFormat.CODE_128,
+            zxing.BarcodeFormat.CODE_39,
+        ]);
+        hints.set(zxing.DecodeHintType.TRY_HARDER, false);
+        const reader = new zxing.MultiFormatReader(false, hints);
+        readerState.zxing = zxing;
+        readerState.reader = reader;
+    }
+
+    try {
+        const luminance = new readerState.zxing.HTMLCanvasElementLuminanceSource(canvas);
+        const bitmap = new readerState.zxing.BinaryBitmap(new readerState.zxing.HybridBinarizer(luminance));
+        const result = readerState.reader.decodeWithState(bitmap);
+
+        return result?.text ? String(result.text) : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+/**
+ * Decode from the live video at sensor resolution.
+ * BarcodeDetector reads the full frame. Otherwise ZXing reads the aim box at sensor scale.
+ *
+ * @param {HTMLVideoElement} video
+ * @param {{ fps: number, compactCamera: boolean, onDecoded: (decoded: string) => void | Promise<void> }} options
+ * @returns {() => void}
+ */
+function startHighResDecodeLoop(video, { fps, compactCamera, onDecoded }) {
+    let stopped = false;
+    let busy = false;
+    /** @type {BarcodeDetector | null} */
+    let detector = null;
+    if (typeof window.BarcodeDetector === 'function') {
+        try {
+            detector = new window.BarcodeDetector({
+                formats: ['qr_code', 'code_128', 'code_39'],
+            });
+        } catch (_) {
+            detector = null;
+        }
+    }
+    if (!detector) {
+        void loadZXing();
+    }
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const readerState = { reader: null, zxing: null };
+    const intervalMs = 1000 / fps;
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let timer = null;
+
+    const tick = async () => {
+        if (stopped) {
+            return;
+        }
+        const started = performance.now();
+        if (!busy && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            busy = true;
+            try {
+                let text = null;
+                if (detector) {
+                    try {
+                        text = largestDetectedCode(await detector.detect(video));
+                    } catch (_) {
+                        detector = null;
+                    }
+                }
+                if (!text && !detector) {
+                    text = await decodeAimBoxWithZxing(video, compactCamera, readerState, canvas, context);
+                }
+                if (text && !stopped) {
+                    void onDecoded(text);
+                }
+            } catch (_) {
+                // A missed frame is normal while the code is moving.
+            } finally {
+                busy = false;
+            }
+        }
+        if (stopped) {
+            return;
+        }
+        const delay = Math.max(0, intervalMs - (performance.now() - started));
+        timer = setTimeout(() => {
+            void tick();
+        }, delay);
+    };
+
+    timer = setTimeout(() => {
+        void tick();
+    }, 0);
+
+    return () => {
+        stopped = true;
+        if (timer !== null) {
+            clearTimeout(timer);
+        }
     };
 }
 
-let cameraProbeInFlight = false;
-
-async function probeCameraDecoders(elementId) {
-    if (cameraProbeInFlight || typeof window.BarcodeDetector !== 'function') {
-        return { barcodeDetector: typeof window.BarcodeDetector === 'function', skipped: cameraProbeInFlight };
-    }
-    cameraProbeInFlight = true;
-    const summarize = (codes) => (codes || []).map((code) => ({
-        format: code.format || null,
-        length: String(code.rawValue || '').length,
-    }));
-    try {
+/**
+ * html5-qrcode creates the paused overlay on the playing event, which can land
+ * just after start() resolves. Pause only once that overlay exists.
+ *
+ * @param {string} elementId
+ * @param {HTMLVideoElement} video
+ * @returns {Promise<void>}
+ */
+function waitForScanSurface(elementId, video) {
+    const overlayReady = () => {
         const root = document.getElementById(elementId);
-        const video = root?.querySelector('video') || null;
-        const canvas = root?.querySelector('canvas') || null;
-        const detector = new window.BarcodeDetector({
-            formats: ['qr_code', 'code_128', 'code_39', 'data_matrix', 'aztec', 'pdf417'],
-        });
-        const read = async (source) => {
-            if (!source) {
-                return { codes: [], error: 'missing' };
+        if (!root) {
+            return false;
+        }
+        for (const node of root.querySelectorAll('div')) {
+            if (node.textContent === 'Scanner paused') {
+                return true;
             }
-            try {
-                return { codes: summarize(await detector.detect(source)), error: null };
-            } catch (error) {
-                return { codes: [], error: String(error?.message || error).slice(0, 140) };
-            }
-        };
-        const [videoResult, canvasResult] = await Promise.all([read(video), read(canvas)]);
+        }
 
-        return {
-            barcodeDetector: true,
-            video: videoResult,
-            canvas: canvasResult,
+        return false;
+    };
+
+    if (overlayReady() && video.videoWidth > 0) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const done = () => {
+            if (settled || !overlayReady()) {
+                return;
+            }
+            settled = true;
+            video.removeEventListener('playing', done);
+            resolve();
         };
-    } finally {
-        cameraProbeInFlight = false;
+        video.addEventListener('playing', done);
+        requestAnimationFrame(done);
+    });
+}
+
+function hideScannerPausedOverlay(elementId) {
+    const root = document.getElementById(elementId);
+    if (!root) {
+        return;
+    }
+    for (const node of root.querySelectorAll('div')) {
+        if (node.textContent === 'Scanner paused') {
+            node.style.display = 'none';
+        }
     }
 }
-// #endregion
 
 /**
- * Start an html5-qrcode camera session with the same formats/constraints as stocktake scanning.
+ * Start a camera session for stocktake scanning and field Scan buttons.
  *
- * Default: 1080p ideal @ 15fps with continuous AF and mild zoom for fine barcodes.
- * Opt-in battery mode (profile): 720p capped @ 10fps, no AF/zoom extras.
+ * The preview stays small. Decoding uses the sensor frame: BarcodeDetector on the
+ * video when the browser has it, otherwise a ZXing crop capped at 1600px.
  *
  * @param {string} elementId
  * @param {(decoded: string) => void | Promise<void>} onDecoded
- * @returns {Promise<import('html5-qrcode').Html5Qrcode>}
+ * @returns {Promise<{ stop: () => Promise<void>, clear: () => Promise<void> }>}
  */
 async function startBarcodeCamera(elementId, onDecoded) {
     const { Html5Qrcode, Html5QrcodeSupportedFormats } = await loadHtml5Qrcode();
@@ -579,103 +744,67 @@ async function startBarcodeCamera(elementId, onDecoded) {
               width: { ideal: 1920 },
               height: { ideal: 1080 },
           };
-    let decodeMisses = 0;
-    let lastMissLogAt = 0;
     await scanner.start(
         { facingMode: 'environment' },
         {
             fps,
             disableFlip: true,
-            aspectRatio: compactCamera ? 2.2 : 1.777778,
             qrbox: (viewfinderWidth, viewfinderHeight) => {
-                const box = {
-                    width: Math.floor(viewfinderWidth * 0.9),
-                    height: Math.floor(viewfinderHeight * (compactCamera ? 0.45 : 0.35)),
-                };
-                // #region agent log
-                agentDebugLog('A', 'app.js:qrbox', 'qrbox sized', {
-                    viewfinderWidth,
-                    viewfinderHeight,
-                    boxWidth: box.width,
-                    boxHeight: box.height,
-                    boxAspect: box.height > 0 ? box.width / box.height : null,
-                    compactCamera,
-                });
-                // #endregion
-                return box;
+                const box = scanAimBox(viewfinderWidth, viewfinderHeight, compactCamera);
+
+                return { width: box.width, height: box.height };
             },
             videoConstraints: requestedVideoConstraints,
         },
-        (decoded) => {
-            // #region agent log
-            const text = String(decoded || '');
-            agentDebugLog('A', 'app.js:onDecoded', 'code decoded', {
-                length: text.length,
-                looksUrl: /^https?:/i.test(text),
-                hasWhitespace: /\s/.test(text),
-            });
-            // #endregion
-            void onDecoded(decoded);
-        },
-        (errorMessage) => {
-            // #region agent log
-            decodeMisses += 1;
-            const now = Date.now();
-            if (now - lastMissLogAt > 2000) {
-                lastMissLogAt = now;
-                const snapshot = collectCameraDebugSnapshot(elementId);
-                agentDebugLog('E', 'app.js:decodeMiss', 'frame not decoded', {
-                    decodeMisses,
-                    error: String(errorMessage || '').slice(0, 160),
-                    snapshot,
-                });
-                void probeCameraDecoders(elementId).then((probe) => {
-                    agentDebugLog('F', 'app.js:probe', 'full frame vs decode canvas', {
-                        probe,
-                        canvasW: snapshot.canvasW,
-                        canvasH: snapshot.canvasH,
-                        videoW: snapshot.videoW,
-                        videoH: snapshot.videoH,
-                        scaleMismatch: snapshot.scaleMismatch,
-                    });
-                });
-            }
-            // #endregion
-        }
+        () => {},
+        () => {}
     );
-
-    // #region agent log
-    const logCameraSnapshot = (message) => {
-        agentDebugLog('B', 'app.js:startBarcodeCamera', message, collectCameraDebugSnapshot(elementId));
-    };
-    logCameraSnapshot('camera started');
-    document.getElementById(elementId)?.querySelector('video')?.addEventListener(
-        'resize',
-        () => logCameraSnapshot('video resized'),
-        { once: true }
-    );
-    // #endregion
 
     if (!batteryOptimised) {
         try {
             await scanner.applyVideoConstraints({
                 focusMode: 'continuous',
-                advanced: [{ zoom: 1.5 }],
             });
         } catch (_) {
-            // Zoom / focus constraints are best-effort; ignore unsupported devices.
+            // Continuous focus is best-effort; ignore unsupported devices.
         }
     }
 
-    // #region agent log
-    logCameraSnapshot(batteryOptimised ? 'camera ready battery mode' : 'camera ready after zoom');
-    // #endregion
+    const video = document.getElementById(elementId)?.querySelector('video');
+    if (!video) {
+        await scanner.stop().catch(() => {});
+        await scanner.clear().catch(() => {});
+        throw new Error('Camera preview did not start.');
+    }
 
-    return scanner;
+    await waitForScanSurface(elementId, video);
+    scanner.pause(false);
+    hideScannerPausedOverlay(elementId);
+
+    const stopDecodeLoop = startHighResDecodeLoop(video, {
+        fps,
+        compactCamera,
+        onDecoded,
+    });
+    let stopped = false;
+
+    return {
+        async stop() {
+            if (stopped) {
+                return;
+            }
+            stopped = true;
+            stopDecodeLoop();
+            await scanner.stop();
+        },
+        async clear() {
+            await scanner.clear();
+        },
+    };
 }
 
 /**
- * @param {import('html5-qrcode').Html5Qrcode | null} scanner
+ * @param {{ stop: () => Promise<void>, clear: () => Promise<void> } | null} scanner
  */
 async function stopBarcodeCamera(scanner) {
     if (!scanner) {

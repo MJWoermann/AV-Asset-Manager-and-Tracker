@@ -11,7 +11,8 @@
 .scan-qr-reader img {
     width: 100% !important;
     max-height: 28vh !important;
-    object-fit: cover;
+    object-fit: contain;
+    background: #000;
 }
 
 .scan-qr-reader [id$='__scan_region'] {
