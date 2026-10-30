@@ -12,6 +12,10 @@
         'height_mm' => (float) old('height_mm', $layout->height_mm),
         'orientation' => old('orientation', $layout->orientation ?: 'portrait'),
         'length_mode' => old('length_mode', $layout->length_mode ?: ShelfTagPaperPresets::LENGTH_MODE_FIXED),
+        'continuous_narrow_max_width_mm' => ShelfTagPaperPresets::CONTINUOUS_NARROW_MAX_WIDTH_MM,
+        'continuous_length_min_narrow_mm' => ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_NARROW_MM,
+        'continuous_length_min_wide_mm' => ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_WIDE_MM,
+        'continuous_length_max_mm' => ShelfTagPaperPresets::CONTINUOUS_LENGTH_MAX_MM,
         'elements' => old('elements')
             ? (is_string(old('elements')) ? json_decode(old('elements'), true) : old('elements'))
             : ($layout->elements ?? []),
@@ -193,14 +197,14 @@
 <?php endif; ?>
                             <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal18c21970322f9e5c938bc954620c12bb = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => 'width_mm','name' => 'width_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','xModel.number' => 'widthMm','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => 'width_mm','name' => 'width_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','xModel.number' => 'widthMm','xOn:change' => 'onWidthManualEdit()','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('text-input'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['id' => 'width_mm','name' => 'width_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','x-model.number' => 'widthMm','required' => true]); ?>
+<?php $component->withAttributes(['id' => 'width_mm','name' => 'width_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','x-model.number' => 'widthMm','x-on:change' => 'onWidthManualEdit()','required' => true]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal18c21970322f9e5c938bc954620c12bb)): ?>
@@ -235,14 +239,14 @@
 <?php endif; ?>
                             <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal18c21970322f9e5c938bc954620c12bb = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => 'height_mm','name' => 'height_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','xModel.number' => 'heightMm','xOn:change' => 'onHeightManualEdit()','xBind:readonly' => 'isContinuous && lengthMode === "auto"','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => 'height_mm','name' => 'height_mm','type' => 'number','step' => '0.1','class' => 'mt-1 block w-full','xModel.number' => 'heightMm','xOn:change' => 'onHeightManualEdit()','xBind:min' => 'isContinuous ? continuousMinMm : 10','xBind:readonly' => 'isContinuous && lengthMode === "auto"','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('text-input'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['id' => 'height_mm','name' => 'height_mm','type' => 'number','step' => '0.1','min' => '10','class' => 'mt-1 block w-full','x-model.number' => 'heightMm','x-on:change' => 'onHeightManualEdit()','x-bind:readonly' => 'isContinuous && lengthMode === "auto"','required' => true]); ?>
+<?php $component->withAttributes(['id' => 'height_mm','name' => 'height_mm','type' => 'number','step' => '0.1','class' => 'mt-1 block w-full','x-model.number' => 'heightMm','x-on:change' => 'onHeightManualEdit()','x-bind:min' => 'isContinuous ? continuousMinMm : 10','x-bind:readonly' => 'isContinuous && lengthMode === "auto"','required' => true]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal18c21970322f9e5c938bc954620c12bb)): ?>
@@ -286,7 +290,7 @@
                             <option value="auto">Auto (fit content)</option>
                         </select>
                         <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">
-                            Auto sizes length from the lowest element (+<?php echo e(2); ?> mm pad), clamped <?php echo e(ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_MM); ?>–<?php echo e(ShelfTagPaperPresets::CONTINUOUS_LENGTH_MAX_MM); ?> mm.
+                            Auto sizes length from the lowest element (+<?php echo e(2); ?> mm pad). Minimum length is <?php echo e(ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_NARROW_MM); ?> mm at <?php echo e(ShelfTagPaperPresets::CONTINUOUS_NARROW_MAX_WIDTH_MM); ?> mm wide or narrower, and <?php echo e(ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_WIDE_MM); ?> mm when wider (maximum <?php echo e(ShelfTagPaperPresets::CONTINUOUS_LENGTH_MAX_MM); ?> mm).
                             Dragging past the bottom also extends the label.
                         </p>
                     </div>

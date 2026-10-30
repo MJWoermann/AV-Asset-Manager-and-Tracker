@@ -170,6 +170,27 @@ class ShelfTagLayoutEditorSettingsTest extends TestCase
         $this->assertSame(5.0, $settings['grid_size_mm']);
     }
 
+    public function test_wide_continuous_layout_stores_length_at_25_4_mm_when_shorter(): void
+    {
+        $user = $this->manager();
+
+        $this->actingAs($user)
+            ->post(route('labels.layouts.store'), [
+                'name' => 'Wide short label',
+                'paper_preset' => 'continuous_102',
+                'width_mm' => 102,
+                'height_mm' => 12.7,
+                'orientation' => 'portrait',
+                'length_mode' => ShelfTagPaperPresets::LENGTH_MODE_FIXED,
+                'elements' => json_encode([]),
+            ])
+            ->assertRedirect();
+
+        $layout = ShelfTagLayout::query()->where('name', 'Wide short label')->first();
+        $this->assertNotNull($layout);
+        $this->assertSame(25.4, (float) $layout->height_mm);
+    }
+
     public function test_auto_length_rejected_for_diecut_preset(): void
     {
         $user = $this->manager();

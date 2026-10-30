@@ -54,8 +54,16 @@ class ShelfTagLbxImportTest extends TestCase
     public function test_continuous_length_max_accepts_118_mm(): void
     {
         $this->assertSame(300.0, ShelfTagPaperPresets::CONTINUOUS_LENGTH_MAX_MM);
-        $this->assertSame(118.0, ShelfTagPaperPresets::clampContinuousLength(118.0));
-        $this->assertSame(300.0, ShelfTagPaperPresets::clampContinuousLength(400.0));
+        $this->assertSame(118.0, ShelfTagPaperPresets::clampContinuousLength(118.0, 62.0));
+        $this->assertSame(300.0, ShelfTagPaperPresets::clampContinuousLength(400.0, 102.0));
+    }
+
+    public function test_continuous_length_minimum_follows_tape_width(): void
+    {
+        $this->assertSame(12.7, ShelfTagPaperPresets::clampContinuousLength(10.0, 62.0));
+        $this->assertSame(12.7, ShelfTagPaperPresets::clampContinuousLength(12.7, 29.0));
+        $this->assertSame(25.4, ShelfTagPaperPresets::clampContinuousLength(12.7, 62.1));
+        $this->assertSame(25.4, ShelfTagPaperPresets::clampContinuousLength(20.0, 102.0));
     }
 
     public function test_parser_reads_float_switch_fixture_objects_and_qr_data(): void

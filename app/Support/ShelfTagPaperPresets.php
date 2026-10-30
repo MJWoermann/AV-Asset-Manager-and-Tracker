@@ -6,8 +6,15 @@ class ShelfTagPaperPresets
 {
     public const DEFAULT = 'continuous_62';
 
-    /** Typical Brother continuous cut length bounds (mm). */
-    public const CONTINUOUS_LENGTH_MIN_MM = 29.0;
+    /**
+     * Brother QL continuous cut length (mm).
+     * 12.7 mm at 62 mm tape width and narrower; 25.4 mm when wider.
+     */
+    public const CONTINUOUS_NARROW_MAX_WIDTH_MM = 62.0;
+
+    public const CONTINUOUS_LENGTH_MIN_NARROW_MM = 12.7;
+
+    public const CONTINUOUS_LENGTH_MIN_WIDE_MM = 25.4;
 
     public const CONTINUOUS_LENGTH_MAX_MM = 300.0;
 
@@ -79,10 +86,19 @@ class ShelfTagPaperPresets
         return round(min(self::BLEED_MAX_MM, max(0, (float) $value)), 1);
     }
 
-    public static function clampContinuousLength(float $heightMm): float
+    public static function continuousLengthMinMm(float $widthMm): float
+    {
+        if ($widthMm > self::CONTINUOUS_NARROW_MAX_WIDTH_MM) {
+            return self::CONTINUOUS_LENGTH_MIN_WIDE_MM;
+        }
+
+        return self::CONTINUOUS_LENGTH_MIN_NARROW_MM;
+    }
+
+    public static function clampContinuousLength(float $heightMm, float $widthMm): float
     {
         return round(
-            min(self::CONTINUOUS_LENGTH_MAX_MM, max(self::CONTINUOUS_LENGTH_MIN_MM, $heightMm)),
+            min(self::CONTINUOUS_LENGTH_MAX_MM, max(self::continuousLengthMinMm($widthMm), $heightMm)),
             1
         );
     }
@@ -108,7 +124,7 @@ class ShelfTagPaperPresets
                 'height_mm' => null,
                 'continuous' => true,
                 'printers' => ['QL-700', 'QL-1100'],
-                'notes' => 'Default. Set label length in the layout (e.g. 29–300 mm).',
+                'notes' => 'Default. Label length 12.7–300 mm.',
             ],
             'continuous_102' => [
                 'label' => '102 mm continuous (wide)',
@@ -116,7 +132,7 @@ class ShelfTagPaperPresets
                 'height_mm' => null,
                 'continuous' => true,
                 'printers' => ['QL-1100'],
-                'notes' => 'QL-1100 only.',
+                'notes' => 'QL-1100 only. Label length 25.4–300 mm.',
             ],
             'diecut_29x90' => [
                 'label' => '29 × 90 mm (address)',

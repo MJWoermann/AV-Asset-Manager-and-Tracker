@@ -4584,8 +4584,10 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
     bleedLeftMm: Number(initial.editor_settings?.bleed_left_mm ?? 2),
     bleedRightMm: Number(initial.editor_settings?.bleed_right_mm ?? 2),
     autoPaddingMm: 2,
-    continuousMinMm: 29,
-    continuousMaxMm: 300,
+    continuousNarrowMaxWidthMm: Number(initial.continuous_narrow_max_width_mm) || 62,
+    continuousMinNarrowMm: Number(initial.continuous_length_min_narrow_mm) || 12.7,
+    continuousMinWideMm: Number(initial.continuous_length_min_wide_mm) || 25.4,
+    continuousMaxMm: Number(initial.continuous_length_max_mm) || 300,
     viewReady: false,
 
     async searchLogoLibrary() {
@@ -4853,6 +4855,14 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
         return Math.round(value * 10) / 10;
     },
 
+    get continuousMinMm() {
+        const width = Number(this.widthMm) || this.continuousNarrowMaxWidthMm;
+
+        return width > this.continuousNarrowMaxWidthMm
+            ? this.continuousMinWideMm
+            : this.continuousMinNarrowMm;
+    },
+
     clampContinuousHeight(heightMm) {
         return this.roundMm(Math.min(this.continuousMaxMm, Math.max(this.continuousMinMm, heightMm)));
     },
@@ -5028,8 +5038,11 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             if (preset.height_mm) {
                 this.heightMm = Number(preset.height_mm);
             }
-        } else if (this.lengthMode === 'auto') {
-            this.syncAutoHeight();
+        } else {
+            this.heightMm = this.clampContinuousHeight(Number(this.heightMm) || this.continuousMinMm);
+            if (this.lengthMode === 'auto') {
+                this.syncAutoHeight();
+            }
         }
         this.$nextTick(() => this.centerView());
     },
@@ -5039,6 +5052,16 @@ Alpine.data('shelfTagDesigner', (initial = {}, presets = {}, fieldOptions = {}) 
             this.lengthMode = 'fixed';
             return;
         }
+        if (this.lengthMode === 'auto') {
+            this.syncAutoHeight();
+        }
+    },
+
+    onWidthManualEdit() {
+        if (!this.isContinuous) {
+            return;
+        }
+        this.heightMm = this.clampContinuousHeight(Number(this.heightMm) || this.continuousMinMm);
         if (this.lengthMode === 'auto') {
             this.syncAutoHeight();
         }

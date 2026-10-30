@@ -38,7 +38,7 @@ class ShelfTagLbxConverter
 
         $paperPreset = $this->resolvePaperPreset($widthMm, $heightMm);
         if (ShelfTagPaperPresets::isContinuous($paperPreset)) {
-            $heightMm = ShelfTagPaperPresets::clampContinuousLength($heightMm);
+            $heightMm = ShelfTagPaperPresets::clampContinuousLength($heightMm, $widthMm);
         }
 
         $elements = [];

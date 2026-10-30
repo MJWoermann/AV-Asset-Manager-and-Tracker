@@ -97,7 +97,7 @@ Always-on areas (catalogue, scan, compare, files/manuals, maintenance logs, repa
 - Two artwork choices on a layout:
   - **Image (default):** keep designing the label in this app. The job is rendered at the layout size and placed in a one-time full-page image template per DK preset.
   - **P-touch template:** upload an `.lbx` made on a PC that has the QL-1100 driver. The helper fills named text, barcode, and QR objects from the asset or spare. A missing object name fails the job with a clear message.
-- Continuous lengths vary (about 29–300 mm). Image jobs must send that length with the job. If b-PAC cannot change template length, continuous image jobs use the QL-1100 raster commands (width, length, and cut) so the size still does not depend on Printer Properties. Die-cut image jobs stay on b-PAC.
+- Continuous lengths vary (12.7–300 mm at 62 mm wide or narrower, 25.4–300 mm when wider). Image jobs must send that length with the job. If b-PAC cannot change template length, continuous image jobs use the QL-1100 raster commands (width, length, and cut) so the size still does not depend on Printer Properties. Die-cut image jobs stay on b-PAC.
 - Jobs are department-scoped. One helper claim per job. The phone shows queued, printing, printed, or failed, including a waiting message when the kiosk is offline. Browser print and PDF download stay available.
 - The Labels page shows each kiosk as online or offline, with the last error. The printer token is shown once when the kiosk is added.
 

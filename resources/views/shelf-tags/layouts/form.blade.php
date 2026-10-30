@@ -12,6 +12,10 @@
         'height_mm' => (float) old('height_mm', $layout->height_mm),
         'orientation' => old('orientation', $layout->orientation ?: 'portrait'),
         'length_mode' => old('length_mode', $layout->length_mode ?: ShelfTagPaperPresets::LENGTH_MODE_FIXED),
+        'continuous_narrow_max_width_mm' => ShelfTagPaperPresets::CONTINUOUS_NARROW_MAX_WIDTH_MM,
+        'continuous_length_min_narrow_mm' => ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_NARROW_MM,
+        'continuous_length_min_wide_mm' => ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_WIDE_MM,
+        'continuous_length_max_mm' => ShelfTagPaperPresets::CONTINUOUS_LENGTH_MAX_MM,
         'elements' => old('elements')
             ? (is_string(old('elements')) ? json_decode(old('elements'), true) : old('elements'))
             : ($layout->elements ?? []),
@@ -106,7 +110,7 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <x-input-label for="width_mm" value="Width (mm)" />
-                            <x-text-input id="width_mm" name="width_mm" type="number" step="0.1" min="10" class="mt-1 block w-full" x-model.number="widthMm" required />
+                            <x-text-input id="width_mm" name="width_mm" type="number" step="0.1" min="10" class="mt-1 block w-full" x-model.number="widthMm" x-on:change="onWidthManualEdit()" required />
                         </div>
                         <div>
                             <x-input-label for="height_mm" value="Height / length (mm)" />
@@ -115,10 +119,10 @@
                                 name="height_mm"
                                 type="number"
                                 step="0.1"
-                                min="10"
                                 class="mt-1 block w-full"
                                 x-model.number="heightMm"
                                 x-on:change="onHeightManualEdit()"
+                                x-bind:min="isContinuous ? continuousMinMm : 10"
                                 x-bind:readonly='isContinuous && lengthMode === "auto"'
                                 required
                             />
@@ -136,7 +140,7 @@
                             <option value="auto">Auto (fit content)</option>
                         </select>
                         <p class="mt-1 text-xs text-brand-charcoal dark:text-brand-silver">
-                            Auto sizes length from the lowest element (+{{ 2 }} mm pad), clamped {{ ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_MM }}–{{ ShelfTagPaperPresets::CONTINUOUS_LENGTH_MAX_MM }} mm.
+                            Auto sizes length from the lowest element (+{{ 2 }} mm pad). Minimum length is {{ ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_NARROW_MM }} mm at {{ ShelfTagPaperPresets::CONTINUOUS_NARROW_MAX_WIDTH_MM }} mm wide or narrower, and {{ ShelfTagPaperPresets::CONTINUOUS_LENGTH_MIN_WIDE_MM }} mm when wider (maximum {{ ShelfTagPaperPresets::CONTINUOUS_LENGTH_MAX_MM }} mm).
                             Dragging past the bottom also extends the label.
                         </p>
                     </div>

@@ -180,10 +180,11 @@ class StoreShelfTagLayoutRequest extends FormRequest
     {
         $preset = (string) $this->validated('paper_preset');
         $lengthMode = (string) $this->validated('length_mode');
+        $widthMm = (float) $this->validated('width_mm');
         $heightMm = (float) $this->validated('height_mm');
 
         if (ShelfTagPaperPresets::isContinuous($preset)) {
-            $heightMm = ShelfTagPaperPresets::clampContinuousLength($heightMm);
+            $heightMm = ShelfTagPaperPresets::clampContinuousLength($heightMm, $widthMm);
         }
 
         if (! ShelfTagPaperPresets::isContinuous($preset)) {
@@ -193,7 +194,7 @@ class StoreShelfTagLayoutRequest extends FormRequest
         return [
             'name' => $this->validated('name'),
             'paper_preset' => $preset,
-            'width_mm' => (float) $this->validated('width_mm'),
+            'width_mm' => $widthMm,
             'height_mm' => $heightMm,
             'orientation' => $this->validated('orientation'),
             'length_mode' => $lengthMode,
