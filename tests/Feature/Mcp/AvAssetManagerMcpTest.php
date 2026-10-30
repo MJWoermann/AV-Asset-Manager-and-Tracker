@@ -15,6 +15,8 @@ use App\Models\ScanSession;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\View\View;
+use Laravel\Passport\Contracts\AuthorizationViewResponse;
 use Laravel\Passport\Passport;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -46,6 +48,35 @@ class AvAssetManagerMcpTest extends TestCase
         $user->assignRole($role);
 
         return $user;
+    }
+
+    public function test_oauth_authorization_screen_renders_the_mcp_consent_view(): void
+    {
+        $this->withoutVite();
+
+        $client = (object) [
+            'id' => 'client-id',
+            'name' => 'Copilot Studio',
+            'logo_uri' => null,
+            'client_uri' => null,
+        ];
+        $user = $this->staffUser();
+
+        $response = app(AuthorizationViewResponse::class)
+            ->withParameters([
+                'client' => $client,
+                'user' => $user,
+                'scopes' => [],
+                'request' => request(),
+                'authToken' => 'auth-token',
+            ])
+            ->toResponse(request());
+
+        $content = $response instanceof View
+            ? $response->render()
+            : $response->getContent();
+
+        $this->assertStringContainsString('Authorize Copilot Studio', $content);
     }
 
     public function test_mcp_endpoint_denies_unauthenticated_requests(): void

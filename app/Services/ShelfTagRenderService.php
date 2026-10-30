@@ -179,7 +179,7 @@ class ShelfTagRenderService
             if ($type === 'barcode') {
                 $hydrated['image_data_uri'] = $this->barcodeDataUri(
                     $resolved,
-                    (string) ($props['symbology'] ?? 'code128')
+                    (string) ($props['symbology'] ?? 'code128'),
                 );
             }
 
@@ -196,7 +196,7 @@ class ShelfTagRenderService
 
     protected function barcodeDataUri(string $value, string $symbology): ?string
     {
-        return BarcodeDataUri::png($value, $symbology);
+        return BarcodeDataUri::forLabel($value, $symbology);
     }
 
     protected function qrDataUri(string $value, string $ecc): ?string

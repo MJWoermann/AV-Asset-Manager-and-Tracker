@@ -66,9 +66,11 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(SocialiteWasCalled::class, AzureExtendSocialite::class);
 
-        Passport::authorizationView(function (array $parameters) {
-            return view('mcp.authorize', $parameters);
-        });
+        if (class_exists(Passport::class)) {
+            Passport::authorizationView(function (array $parameters) {
+                return view('mcp.authorize', $parameters);
+            });
+        }
 
         Asset::observe(AuditableObserver::class);
         AssetConnection::observe(AuditableObserver::class);

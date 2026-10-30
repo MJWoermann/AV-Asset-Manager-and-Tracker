@@ -34,40 +34,91 @@ run_as_deploy() {
   fi
 }
 
-echo "==> Enabling maintenance mode"
-# Run as root (this script requires sudo). Deploy-user artisan cannot always
-# write storage/framework after those dirs are chowned to www-data.
-# --render prerenders errors/503 before Composer/npm run so visitors always
-# see the branded page (even mid-update). --redirect=/ sends all paths there.
-php artisan down \
-  --redirect=/ \
-  --render="errors.503" \
-  --retry=60 \
-  --refresh=15 \
-  || true
+install_php_dependencies() {
+  echo "==> composer install"
+  if run_as_deploy composer install --no-dev --optimize-autoloader --no-interaction; then
+    return 0
+  fi
 
+  echo "==> composer scripts failed; installing dependencies without booting the app"
+  run_as_deploy composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+  run_as_deploy composer dump-autoload --optimize --no-interaction --no-scripts
+}
+
+enable_maintenance() {
+  # --render prerenders errors/503 before the rest of the update so visitors
+  # see the branded page. Failure is non-fatal: a boot error must not abort
+  # the update before dependencies are installed.
+  php artisan down \
+    --redirect=/ \
+    --render="errors.503" \
+    --retry=60 \
+    --refresh=15 \
+    || true
+}
+
+UPDATE_FINISHED=0
+CLEANED_UP=0
 cleanup() {
+  if [[ "${CLEANED_UP}" -eq 1 ]]; then
+    return 0
+  fi
+  CLEANED_UP=1
   # Always leave the site up — a leftover maintenance.php is a permanent 503
-  # with nothing in nginx error.log. Trap EXIT/INT/TERM so Ctrl+C or a mid-
-  # script failure still clears maintenance mode.
+  # with nothing in nginx error.log. Trap EXIT so a mid-script failure still
+  # clears maintenance mode. Run artisan as root: the deploy user cannot
+  # always write storage/framework after those dirs are chowned to www-data.
   echo "==> Disabling maintenance mode"
   if ! php artisan up; then
     echo "Warning: php artisan up failed; removing maintenance files directly." >&2
   fi
   rm -f "${APP_ROOT}/storage/framework/down" \
     "${APP_ROOT}/storage/framework/maintenance.php"
+  if [[ "${UPDATE_FINISHED}" -ne 1 ]]; then
+    echo "Update stopped before it finished. Run this script again and let npm ci and npm run build complete." >&2
+  fi
 }
-trap cleanup EXIT INT TERM HUP
+on_interrupt() {
+  echo "==> Interrupted (${1}). Stopping the update." >&2
+  cleanup
+  exit 130
+}
+trap cleanup EXIT
+trap 'on_interrupt INT' INT
+trap 'on_interrupt TERM' TERM
+trap 'on_interrupt HUP' HUP
+
+echo "==> Enabling maintenance mode"
+enable_maintenance
 
 echo "==> git pull"
 run_as_deploy git pull --ff-only
 
-echo "==> composer install"
-run_as_deploy composer install --no-dev --optimize-autoloader --no-interaction
+install_php_dependencies
+
+if [[ ! -f "${APP_ROOT}/storage/framework/down" && ! -f "${APP_ROOT}/storage/framework/maintenance.php" ]]; then
+  echo "==> Maintenance mode did not start; retrying after PHP dependencies are installed"
+  enable_maintenance
+fi
 
 echo "==> npm ci && npm run build"
+echo "    This step can take several minutes. Leave it running until it finishes."
+set +e
 run_as_deploy npm ci --no-fund --no-audit
+npm_ci_status=$?
+set -e
+if [[ "$npm_ci_status" -ne 0 ]]; then
+  echo "npm ci failed with exit ${npm_ci_status}. Exit 130 means the process received SIGINT (often Ctrl+C)." >&2
+  exit "$npm_ci_status"
+fi
+set +e
 run_as_deploy npm run build
+npm_build_status=$?
+set -e
+if [[ "$npm_build_status" -ne 0 ]]; then
+  echo "npm run build failed with exit ${npm_build_status}. Exit 130 means the process received SIGINT (often Ctrl+C)." >&2
+  exit "$npm_build_status"
+fi
 
 echo "==> migrate"
 run_as_deploy php artisan migrate --force
@@ -107,3 +158,4 @@ echo "==> reload ${PHP_FPM_SERVICE}"
 systemctl reload "${PHP_FPM_SERVICE}"
 
 echo "==> Update complete"
+UPDATE_FINISHED=1

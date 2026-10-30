@@ -108,6 +108,7 @@ class ShelfTagLandscapePrintTest extends TestCase
         $this->assertStringContainsString('position:absolute', $html);
         $this->assertStringContainsString('width: 90mm', $html);
         $this->assertStringContainsString('height: 62mm', $html);
+        $this->assertStringContainsString('TP-PDF-1', $html);
     }
 
     public function test_landscape_preview_shows_swapped_sheet_size(): void

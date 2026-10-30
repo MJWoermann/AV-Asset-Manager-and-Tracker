@@ -153,6 +153,80 @@ class ShelfTagPrintController extends Controller
             'labels' => $labels,
         ])->setPaper([0, 0, $this->mmToPoints($paperW), $this->mmToPoints($paperH)]);
 
+        // #region agent log
+        $barcodeProbe = [];
+        $textProbe = [];
+        foreach ($labels as $labelIndex => $label) {
+            foreach ($label['elements'] as $element) {
+                $type = (string) ($element['type'] ?? '');
+                if ($type === 'barcode' && count($barcodeProbe) < 3) {
+                    $uri = (string) ($element['image_data_uri'] ?? '');
+                    $png = null;
+                    $bottomInk = null;
+                    $kind = str_starts_with($uri, 'data:image/svg+xml;base64,') ? 'svg' : (str_starts_with($uri, 'data:image/png;base64,') ? 'png' : null);
+                    $hasCaption = ! empty($element['props']['showText']);
+                    if (str_starts_with($uri, 'data:image/png;base64,')) {
+                        $raw = base64_decode(substr($uri, strlen('data:image/png;base64,')), true);
+                        if ($raw !== false) {
+                            $info = @getimagesizefromstring($raw);
+                            $png = $info ? ['w' => $info[0], 'h' => $info[1]] : null;
+                            $image = @imagecreatefromstring($raw);
+                            if ($image !== false) {
+                                $width = imagesx($image);
+                                $height = imagesy($image);
+                                $hits = 0;
+                                $samples = 0;
+                                for ($x = 0; $x < $width; $x += 4) {
+                                    $samples++;
+                                    $rgb = imagecolorat($image, $x, $height - 1);
+                                    if (($rgb & 0xFF) < 128) {
+                                        $hits++;
+                                    }
+                                }
+                                $bottomInk = $samples > 0 ? round($hits / $samples, 3) : null;
+                                imagedestroy($image);
+                            }
+                        }
+                    }
+                    $barcodeProbe[] = [
+                        'index' => $labelIndex,
+                        'showText' => ! empty($element['props']['showText']),
+                        'hasImage' => $uri !== '',
+                        'kind' => $kind,
+                        'hasCaption' => $hasCaption,
+                        'png' => $png,
+                        'bottomInk' => $bottomInk,
+                        'wMm' => $element['width'] ?? null,
+                        'hMm' => $element['height'] ?? null,
+                    ];
+                }
+                if (in_array($type, ['text', 'field'], true) && $labelIndex === 0 && count($textProbe) < 6) {
+                    $textProbe[] = [
+                        'type' => $type,
+                        'fontSize' => $element['props']['fontSize'] ?? null,
+                        'unit' => 'pt',
+                    ];
+                }
+            }
+        }
+        file_put_contents(base_path('debug-c42c70.log'), json_encode([
+            'sessionId' => 'c42c70',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'D',
+            'location' => 'ShelfTagPrintController.php:pdf',
+            'message' => 'pdf barcode and text probe',
+            'data' => [
+                'dpi' => config('dompdf.options.dpi'),
+                'paperMm' => [$paperW, $paperH],
+                'labelCount' => count($labels),
+                'barcodeProbe' => $barcodeProbe,
+                'textProbe' => $textProbe,
+                'pdfFont' => 'DejaVu Sans',
+            ],
+            'timestamp' => (int) (microtime(true) * 1000),
+        ]).PHP_EOL, FILE_APPEND);
+        // #endregion
+
         $filename = 'labels-'.$list->id.'-'.now()->format('Ymd-His').'.pdf';
 
         return $pdf->download($filename);

@@ -180,6 +180,36 @@ async function loadJsBarcode() {
 /**
  * Scale a JsBarcode SVG to fill its box without cropping (object-fit: contain).
  */
+/**
+ * Pixel box for a print-preview barcode. Hidden sheets report clientWidth 0,
+ * so the millimetre size on the element is the source of truth.
+ *
+ * @param {Element} node
+ * @returns {{ boxW: number, boxH: number, source: 'mm' | 'client' }}
+ */
+function shelfTagBarcodeBoxPixels(node) {
+    const host = node.closest('.el');
+    const mmW = host ? parseFloat(host.style.width) : Number.NaN;
+    const mmH = host ? parseFloat(host.style.height) : Number.NaN;
+    if (Number.isFinite(mmW) && mmW > 0 && Number.isFinite(mmH) && mmH > 0) {
+        const pxPerMm = 96 / 25.4;
+
+        return {
+            boxW: Math.max(16, mmW * pxPerMm),
+            boxH: Math.max(16, mmH * pxPerMm),
+            source: 'mm',
+        };
+    }
+
+    const parent = node.parentElement;
+
+    return {
+        boxW: Math.max(16, parent?.clientWidth || node.clientWidth || 120),
+        boxH: Math.max(16, parent?.clientHeight || node.clientHeight || 40),
+        source: 'client',
+    };
+}
+
 function fitBarcodeSvgToBox(node) {
     if (!node) {
         return;
@@ -5485,24 +5515,37 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
         const qrNodes = [...this.$el.querySelectorAll('.shelf-tag-qr')];
 
         if (barcodeNodes.length) {
-            const JsBarcode = await loadJsBarcode();
-            barcodeNodes.forEach((node) => {
+            await loadJsBarcode();
+            const measured = [];
+            await Promise.all(barcodeNodes.map(async (node, index) => {
                 const value = node.getAttribute('data-value') || '';
                 if (!value) {
                     return;
                 }
+                const sheet = node.closest('.label-sheet');
+                const parent = node.parentElement;
+                const box = shelfTagBarcodeBoxPixels(node);
+                measured.push({
+                    index,
+                    source: box.source,
+                    boxW: Math.round(box.boxW * 10) / 10,
+                    boxH: Math.round(box.boxH * 10) / 10,
+                    parentW: parent ? parent.clientWidth : 0,
+                    parentH: parent ? parent.clientHeight : 0,
+                    hidden: !!(sheet && sheet.classList.contains('hidden')),
+                });
                 try {
-                    const parent = node.parentElement;
-                    const boxW = Math.max(16, parent?.clientWidth || node.clientWidth || 120);
-                    const boxH = Math.max(16, parent?.clientHeight || node.clientHeight || 40);
-                    renderBarcodeSvgFit(node, value, {
+                    await renderBarcodeSvgFit(node, value, {
                         symbology: node.getAttribute('data-symbology') || 'code128',
                         showText: node.getAttribute('data-show-text') === '1',
-                        boxW,
-                        boxH,
-                    }).catch(() => {});
+                        boxW: box.boxW,
+                        boxH: box.boxH,
+                    });
                 } catch (_) {}
-            });
+            }));
+            // #region agent log
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'A',location:'app.js:shelfTagPrintPreview',message:'barcode box source',data:{count:measured.length,zeroParent:measured.filter((row)=>row.parentW===0).length,sample:measured.filter((row)=>row.index<8||row.index===measured.length-1)},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
         }
 
         if (qrNodes.length) {

@@ -27,7 +27,18 @@
         </div>
     @elseif($type === 'barcode')
         @if(!empty($forPdf) && !empty($element['image_data_uri']))
-            <img src="{{ $element['image_data_uri'] }}" alt="" style="width:100%;height:100%;object-fit:contain;object-position:center;">
+            @if(!empty($props['showText']) && $value !== '')
+                @php
+                    $boxH = (float) ($element['height'] ?? 10);
+                    $captionMm = min(4.2, max(2.4, $boxH * 0.28));
+                    $barMm = max(1.0, $boxH - $captionMm);
+                    $captionPt = round(min(9, max(6, $captionMm * 2.2)), 1);
+                @endphp
+                <img src="{{ $element['image_data_uri'] }}" alt="" style="width:100%;height:{{ $barMm }}mm;display:block;">
+                <div style="width:100%;margin:0;padding:0;text-align:center;font-family:DejaVu Sans, sans-serif;font-size:{{ $captionPt }}pt;line-height:1;">{{ $value }}</div>
+            @else
+                <img src="{{ $element['image_data_uri'] }}" alt="" style="width:100%;height:100%;object-fit:contain;object-position:center;">
+            @endif
         @else
             <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;">
                 <svg

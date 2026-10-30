@@ -15,7 +15,7 @@
         }
         .label:last-child { page-break-after: auto; }
         .el { position: absolute; overflow: hidden; }
-        .el img { width: 100%; height: 100%; object-fit: contain; }
+        .el img { width: 100%; object-fit: contain; }
     </style>
 </head>
 <body>

@@ -84,4 +84,60 @@
             }
         }
     </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const started = Date.now();
+            const timer = window.setInterval(() => {
+                const nodes = [...document.querySelectorAll('.shelf-tag-barcode')];
+                const valued = nodes.filter((node) => (node.getAttribute('data-value') || '') !== '');
+                const drawn = valued.filter((node) => node.getAttribute('viewBox'));
+                if (valued.length > 0 && drawn.length < valued.length && Date.now() - started < 8000) {
+                    return;
+                }
+                window.clearInterval(timer);
+
+                const rows = nodes.map((node, index) => {
+                    const sheet = node.closest('.label-sheet');
+                    const parent = node.parentElement;
+                    let bbox = null;
+                    try {
+                        const box = node.getBBox();
+                        bbox = { w: Math.round(box.width * 100) / 100, h: Math.round(box.height * 100) / 100 };
+                    } catch (e) {
+                        bbox = null;
+                    }
+
+                    return {
+                        index,
+                        display: sheet ? getComputedStyle(sheet).display : null,
+                        hiddenClass: !!(sheet && sheet.classList.contains('hidden')),
+                        parentW: parent ? parent.clientWidth : 0,
+                        parentH: parent ? parent.clientHeight : 0,
+                        showText: node.getAttribute('data-show-text'),
+                        viewBox: node.getAttribute('viewBox'),
+                        bbox,
+                    };
+                });
+                const textSample = [...document.querySelectorAll('.label-sheet')].slice(0, 2).map((sheet) => {
+                    return [...sheet.querySelectorAll('.el')]
+                        .filter((el) => !el.querySelector('svg, canvas, img'))
+                        .map((el) => {
+                            const inner = el.firstElementChild;
+                            const style = inner ? getComputedStyle(inner) : null;
+
+                            return {
+                                fontSize: style ? style.fontSize : null,
+                                fontFamily: style ? style.fontFamily : null,
+                                inline: inner ? inner.getAttribute('style') : null,
+                            };
+                        });
+                });
+
+                // #region agent log
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'A',location:'preview.blade.php:barcode-measure',message:'print preview barcode boxes',data:{count:rows.length,zeroParent:rows.filter((row)=>row.parentW===0).length,hidden:rows.filter((row)=>row.hiddenClass).length,sample:rows.filter((row)=>row.index<8||row.index===rows.length-1)},timestamp:Date.now()})}).catch(()=>{});
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'E',location:'preview.blade.php:text-measure',message:'print preview text metrics',data:{textSample},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+            }, 300);
+        });
+    </script>
 </x-app-layout>
