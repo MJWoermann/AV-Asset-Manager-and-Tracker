@@ -31,6 +31,8 @@ class AppBackupService
 {
     public const LAST_RUN_KEY = 'backup.last_run';
 
+    public const WRITE_TEST_PATH = 'backups/_write-test.txt';
+
     public function __construct(
         private FileAttachmentService $attachments,
         private AttachmentDiskMigrator $diskMigrator,
@@ -191,6 +193,50 @@ class AppBackupService
         $this->diskMigrator->assertAllowedDisk($disk);
 
         return $disk;
+    }
+
+    /**
+     * Write a marker file to the backup disk and read it back.
+     *
+     * @return array{disk: string, path: string, absolute_path: ?string}
+     */
+    public function probe(?string $disk = null): array
+    {
+        $disk = $this->resolveBackupDisk($disk);
+        $path = self::WRITE_TEST_PATH;
+        $contents = implode("\n", [
+            (string) config('app.name').' backup location write test',
+            'disk: '.$disk,
+            'written_at: '.now()->toIso8601String(),
+            '',
+        ]);
+
+        $this->attachments->putContents($disk, $path, $contents);
+
+        $read = Storage::disk($disk)->get($path);
+
+        if (! is_string($read) || $read !== $contents) {
+            throw new RuntimeException("Write test on disk [{$disk}] did not read back matching contents.");
+        }
+
+        return [
+            'disk' => $disk,
+            'path' => $path,
+            'absolute_path' => $this->absolutePathForLocalDisk($disk, $path),
+        ];
+    }
+
+    protected function absolutePathForLocalDisk(string $disk, string $path): ?string
+    {
+        if ((string) config("filesystems.disks.{$disk}.driver") !== 'local') {
+            return null;
+        }
+
+        try {
+            return Storage::disk($disk)->path($path);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     protected function writeDatabaseDump(string $disk, string $remotePath): bool

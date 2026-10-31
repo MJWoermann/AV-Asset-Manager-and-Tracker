@@ -280,6 +280,7 @@ Downloads always go through the authenticated app proxy (`/files/{id}/download`)
 
 ### QNAP
 
+https://www.qnap.com/en-as/how-to/faq/article/how-to-mount-a-qnap-nas-shared-folder-on-a-linux-client
 Pick one mode with `QNAP_DRIVER`:
 
 | Mode | When to use | Key env |

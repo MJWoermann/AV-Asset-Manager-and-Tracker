@@ -13,6 +13,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use InvalidArgumentException;
+use RuntimeException;
+use Throwable;
 
 class StorageController extends Controller
 {
@@ -103,5 +106,34 @@ class StorageController extends Controller
         return redirect()
             ->route('admin.storage.edit')
             ->with('status', "Backup written to [{$result['disk']}] at {$result['path']}.");
+    }
+
+    public function probe(Request $request, AppBackupService $backups): RedirectResponse
+    {
+        $allowed = config('attachments.allowed_disks', ['local', 'qnap', 'sharepoint']);
+
+        $request->merge([
+            'disk' => $request->filled('disk') ? $request->input('disk') : null,
+        ]);
+
+        $data = $request->validate([
+            'disk' => ['nullable', 'string', Rule::in($allowed)],
+        ]);
+
+        try {
+            $result = $backups->probe($data['disk'] ?? null);
+        } catch (InvalidArgumentException|RuntimeException $exception) {
+            return back()->withErrors(['test' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            return back()->withErrors(['test' => 'Backup location test failed: '.$exception->getMessage()]);
+        }
+
+        $message = "Write test succeeded on [{$result['disk']}]. File: {$result['path']}.";
+
+        if (is_string($result['absolute_path']) && $result['absolute_path'] !== '') {
+            $message .= ' ('.$result['absolute_path'].')';
+        }
+
+        return back()->with('status', $message);
     }
 }

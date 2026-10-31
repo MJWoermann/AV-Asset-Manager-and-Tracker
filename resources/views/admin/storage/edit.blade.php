@@ -119,7 +119,12 @@
                         Run on queue
                     </label>
                 @endif
-                <div>
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                    Test writes <code class="text-xs">backups/_write-test.txt</code> on the selected disk so you can confirm the file at the destination.
+                </p>
+                <x-input-error class="mt-2" :messages="$errors->get('test')" />
+                <div class="flex flex-wrap justify-end gap-2">
+                    <x-secondary-button type="submit" formaction="{{ route('admin.storage.backup-test') }}">Test backup location</x-secondary-button>
                     <x-primary-button>Backup now</x-primary-button>
                 </div>
             </form>

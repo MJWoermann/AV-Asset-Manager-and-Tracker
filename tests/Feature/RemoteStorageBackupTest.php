@@ -170,6 +170,12 @@ class RemoteStorageBackupTest extends TestCase
                 'disk' => 'qnap',
             ])
             ->assertForbidden();
+
+        $this->actingAs($scanner)
+            ->post(route('admin.storage.backup-test'), [
+                'disk' => 'qnap',
+            ])
+            ->assertForbidden();
     }
 
     public function test_admin_can_view_storage_and_queue_migrate_and_backup(): void
@@ -182,7 +188,8 @@ class RemoteStorageBackupTest extends TestCase
             ->assertOk()
             ->assertSee('Storage')
             ->assertSee('ATTACHMENTS_DISK')
-            ->assertSee('Backup now');
+            ->assertSee('Backup now')
+            ->assertSee('Test backup location');
 
         $this->actingAs($admin)
             ->post(route('admin.storage.migrate'), [
@@ -232,5 +239,68 @@ class RemoteStorageBackupTest extends TestCase
         $dirs = Storage::disk('qnap')->directories('backups');
         $this->assertNotEmpty($dirs);
         Storage::disk('qnap')->assertExists($dirs[0].'/manifest.json');
+    }
+
+    public function test_admin_backup_location_probe_writes_marker_file(): void
+    {
+        $admin = $this->admin();
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.storage.edit'))
+            ->post(route('admin.storage.backup-test'), [
+                'disk' => 'qnap',
+            ]);
+
+        $contents = Storage::disk('qnap')->get(AppBackupService::WRITE_TEST_PATH);
+
+        $response->assertRedirect(route('admin.storage.edit'))
+            ->assertSessionHas('status', function (string $status): bool {
+                return str_contains($status, '[qnap]')
+                    && str_contains($status, AppBackupService::WRITE_TEST_PATH);
+            });
+        $this->assertIsString($contents);
+        $this->assertStringContainsString('backup location write test', $contents);
+        $this->assertStringContainsString('disk: qnap', $contents);
+    }
+
+    public function test_backup_location_probe_without_disk_returns_error_and_writes_nothing(): void
+    {
+        Config::set('attachments.backup_disk', null);
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->from(route('admin.storage.edit'))
+            ->post(route('admin.storage.backup-test'), [
+                'disk' => '',
+            ])
+            ->assertRedirect(route('admin.storage.edit'))
+            ->assertSessionHasErrors([
+                'test' => 'BACKUP_DISK is not configured. Pass --disk= or set BACKUP_DISK.',
+            ]);
+
+        Storage::disk('qnap')->assertMissing(AppBackupService::WRITE_TEST_PATH);
+        Storage::disk('local')->assertMissing(AppBackupService::WRITE_TEST_PATH);
+    }
+
+    public function test_backup_location_probe_includes_absolute_path_for_local_disk(): void
+    {
+        Config::set('attachments.backup_disk', 'local');
+        Config::set('filesystems.disks.local.driver', 'local');
+        $admin = $this->admin();
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.storage.edit'))
+            ->post(route('admin.storage.backup-test'));
+
+        $absolute = Storage::disk('local')->path(AppBackupService::WRITE_TEST_PATH);
+
+        $response->assertRedirect(route('admin.storage.edit'))
+            ->assertSessionHas('status', function (string $status) use ($absolute): bool {
+                return str_contains($status, '[local]')
+                    && str_contains($status, AppBackupService::WRITE_TEST_PATH)
+                    && str_contains($status, $absolute);
+            });
+        Storage::disk('local')->assertExists(AppBackupService::WRITE_TEST_PATH);
+        $this->assertFileExists($absolute);
     }
 }
