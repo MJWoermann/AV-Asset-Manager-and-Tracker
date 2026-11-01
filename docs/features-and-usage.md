@@ -393,7 +393,7 @@ These items matter for evaluation and operations; day-to-day scanners rarely nee
 | **Departments** | Admin → Departments; assign users on the user form; staff pick active department in Profile |
 | **SSO** | Optional Google Workspace / Microsoft Entra sign-in for existing users; see [sso-setup.md](sso-setup.md). Accounts are not auto-created from SSO |
 | **Email** | Optional (developer feature + Admin → Email). When integration is enabled with credentials, configure **Common notifications / Digests** (warranty, test & tag, low stock); scheduler runs `email:send-digests` daily. See [email-setup.md](email-setup.md) |
-| **Storage & backup** | Choose where attachments live; run backups of data + files from Storage / ops commands |
+| **Storage & backup** | Choose where attachments live; run backups of data + files from Storage / ops commands. Restore latest backup (password confirm) overwrites data with the newest backup on the selected disk |
 | **REST API** | Bearer tokens (Profile UI or password issue) with optional ability scopes for integrations (assets, lists, compare, scan, unknown-scan link, repairs, spares). See [api.md](api.md) |
 | **Hosting** | PHP/Laravel app; MariaDB in production; Ubuntu + Nginx guide in [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md) |
 | **PWA** | Installable shortcut and cached shell assets; **data operations require being online** |

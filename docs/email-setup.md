@@ -33,11 +33,7 @@ The Maintenance tab itself is always available and does **not** require this fea
 
 Poll cadence is controlled by **Poll interval (minutes)** in Admin → Email. The command is `email:poll-inbound`. When email integration is enabled, the scheduler also runs `email:send-digests` **daily** (see [Common notifications / Digests](#common-notifications--digests)).
 
-8. Queue (optional but recommended if you later queue mailables):
-
-```bash
-php artisan queue:work
-```
+8. Queue worker for Admin → Storage and any queued mail. Install the systemd unit in [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md#7-scheduler-and-queue-worker) (`php artisan queue:work --sleep=3 --timeout=3600` as `www-data`). A one-off `queue:work` in an SSH session stops when you disconnect.
 
 9. After configuring credentials, use **Send test email** on the Email settings page.
 
@@ -223,12 +219,12 @@ Asset resolution fallbacks for non-thread mail: exact match on `fmi_ast`, `tp_ba
 |---------|--------|
 | Email admin links missing / 404 | Enable **Email integration** (admin profile, or the role for anyone else) and the matching permission (`admin:settings` or `email:ops`) |
 | Digests section missing | Integration enabled **and** credentials present for the driver (mail `.env` or Graph keys) |
-| Digests not arriving | Toggle on; template + recipients for the digest event key; cron running `schedule:run`; check `email:send-digests` |
+| Digests not arriving | Toggle on; template + recipients for the digest event key; `sudo crontab -u www-data -l` shows `schedule:run`. There is no email worker process. Commands: [troubleshooting.md](troubleshooting.md#mail--queue--cron) |
 | Checkbox missing on create | Feature on, mail enabled in Admin → Email, and a MAC value typed |
 | Send skipped with warning | Recipient required fields empty (name and at least one MAC) |
 | Auth failures (SMTP) | App password, username=full email, port/encryption |
 | Graph 401/403 | Admin consent, tenant, mailbox UPN, app permissions |
-| Replies not logging | Scheduler/cron, poll interval, thread Message-ID preserved by helpdesk |
+| Replies not logging | `www-data` cron must run `schedule:run` every minute (no separate email worker). Poll interval and thread Message-ID still apply. Commands: [troubleshooting.md](troubleshooting.md#mail--queue--cron) |
 | Duplicate processing | Already handled via unique `source_message_id` |
 | TLS / firewall | Outbound 587/465; IMAP 993 |
 | Spam/junk | From-domain SPF/DKIM; warm up new senders |

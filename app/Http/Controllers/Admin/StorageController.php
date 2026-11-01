@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Jobs\BackupApplicationJob;
 use App\Jobs\MigrateAttachmentDiskJob;
+use App\Jobs\RestoreApplicationJob;
 use App\Models\Setting;
 use App\Models\StorageOperation;
 use App\Services\AppBackupService;
@@ -181,5 +182,78 @@ class StorageController extends Controller
         $operation->markDone($message);
 
         return back()->with('status', $message);
+    }
+
+    public function restoreLatest(Request $request, AppBackupService $backups): RedirectResponse
+    {
+        $allowed = config('attachments.allowed_disks', ['local', 'qnap', 'sharepoint']);
+
+        $request->merge([
+            'disk' => $request->filled('disk') ? $request->input('disk') : null,
+        ]);
+
+        $data = $request->validateWithBag('restore', [
+            'disk' => ['nullable', 'string', Rule::in($allowed)],
+            'password' => ['required', 'current_password'],
+            'queue' => ['sometimes', 'boolean'],
+        ]);
+
+        $disk = $data['disk'] ?? null;
+        $forceQueue = PerformanceLimits::bool('backup_force_queue');
+        $queue = $forceQueue || $request->boolean('queue');
+
+        try {
+            $latest = $backups->latestBackup($disk);
+        } catch (InvalidArgumentException $exception) {
+            $this->openRestore($disk, null, $queue, $request)->markFailed($exception->getMessage());
+
+            return back()->withErrors(['restore' => $exception->getMessage()], 'restore');
+        }
+
+        if ($latest === null) {
+            $message = 'No backup found to restore.';
+            $this->openRestore($disk, null, $queue, $request)->markFailed($message);
+
+            return back()->withErrors(['restore' => $message], 'restore');
+        }
+
+        $operation = $this->openRestore($latest['disk'], $latest['path'], $queue, $request);
+
+        if ($queue) {
+            RestoreApplicationJob::dispatch($latest['path'], $latest['disk'], $operation->id);
+
+            return redirect()
+                ->route('admin.storage.edit')
+                ->with('status', "Restore of {$latest['path']} on [{$latest['disk']}] queued.");
+        }
+
+        try {
+            $result = $backups->restore($latest['path'], $latest['disk']);
+        } catch (Throwable $exception) {
+            $operation->markFailed($exception->getMessage());
+
+            return back()->withErrors(['restore' => $exception->getMessage()], 'restore');
+        }
+
+        $summary = sprintf(
+            'Restored [%s] %s; attachments restored=%d.',
+            $result['disk'],
+            $result['path'],
+            $result['attachments_restored'],
+        );
+        $operation->markDone($summary);
+
+        return redirect()
+            ->route('admin.storage.edit')
+            ->with('status', $summary);
+    }
+
+    private function openRestore(?string $disk, ?string $path, bool $queue, Request $request): StorageOperation
+    {
+        return StorageOperation::open(
+            StorageOperation::restoreCommand($disk, $path, $queue),
+            $queue,
+            $request->user()?->id,
+        );
     }
 }

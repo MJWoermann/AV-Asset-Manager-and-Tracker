@@ -8,7 +8,7 @@ Guidance for a dedicated LEMP host (Nginx, PHP-FPM, MariaDB, and the application
 
 - Single dedicated host with MariaDB on the same machine (typical LAN deploy).
 - Concurrent interactive users ≈ 20 (matches PHP-FPM pool tuning in the deploy guide: `pm.max_children = 40`).
-- Workload: stocktake scanning, asset CRUD, list compare/export, occasional full Excel import, nightly backup with `queue:work` and `schedule:run`.
+- Workload: stocktake scanning, asset CRUD, list compare/export, occasional full Excel import, nightly backup via `schedule:run`, and `queue:work` for Admin → Storage.
 - Attachments may live on the host or on QNAP/SharePoint; backups often keep about seven copies when `BACKUP_DISK` is set.
 
 ## Recommended specifications

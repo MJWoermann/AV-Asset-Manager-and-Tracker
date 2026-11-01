@@ -33,14 +33,61 @@ Symptom → checks → fix. Deeper setup lives in the linked guides; this page i
 | Symptom | Checks | Fix |
 |---------|--------|-----|
 | Admin → Storage test or backup: `Unable to create a directory at /mnt/qnap/av-assets/backups` (job log **Failed**) | `findmnt -T /mnt/qnap/av-assets` shows `cifs` and `uid=0`. `stat -c '%a %U %G'` on that path shows `755 root root`. `sudo -u www-data touch /mnt/qnap/av-assets/.write-test` returns `Permission denied`. | The SMB/CIFS mount is owned by root on the client. `chown`, `chmod`, and `mount -o remount` do not grant `www-data` write access. Unmount and mount again with `uid`/`gid` of `www-data` (usually 33), `forceuid,forcegid`, `file_mode=0664`, and `dir_mode=0775`, saved in `/etc/fstab` with a root-only credentials file. Steps: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md) § SMB / CIFS. |
+| **Backup now** stays **Queued** for a long time. The NAS only has `backups/_write-test.txt`. | From the app directory, `pgrep -af "artisan queue:work"` prints nothing. `systemctl status av-asset-manager-queue` reports not found or inactive. | **Backup now** only inserts a database job. The location test writes its file in the web request and does not prove a worker is running. Install and start the worker below. A `queue:work` started in an SSH session stops when you disconnect. |
+| Job count command says `Could not open input file: artisan` | The shell prompt is `~$`, not the app directory. | `cd /var/www/av-asset-manager`, then run artisan again. |
+| Tinker prints `Writing to directory /var/www/.config/psysh is not allowed` and no job count | `www-data` cannot write `/var/www/.config`. | Count jobs with a writable home: `sudo -u www-data env HOME=/tmp XDG_CONFIG_HOME=/tmp php artisan tinker --execute 'echo DB::table("jobs")->count(), PHP_EOL;'`. A number above zero is a backup still waiting. |
+
+Install the worker once on an existing host. Stop any `queue:work` still running in an SSH session first, or two workers will run. Full unit notes: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md#7-scheduler-and-queue-worker).
+
+```bash
+sudo tee /etc/systemd/system/av-asset-manager-queue.service >/dev/null <<'EOF'
+[Unit]
+Description=AV Asset Manager queue worker
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=3
+WorkingDirectory=/var/www/av-asset-manager
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --timeout=3600
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now av-asset-manager-queue
+systemctl status av-asset-manager-queue --no-pager
+pgrep -af "artisan queue:work"
+```
+
+If `/usr/bin/php` does not exist, set `ExecStart` to the path from `command -v php`. After the service is up, refresh Admin → Storage. The row should leave **Queued**. `scripts/update.sh` restarts this unit on later deploys when the unit file is installed.
+
+The nightly backup does not use this worker. It needs the `www-data` cron entry in the next section. With `BACKUP_DISK` set, `schedule:run` runs `app:backup` at 02:15 UTC.
 
 ## Mail / queue / cron
+
+There is no separate email worker. Inbound polling (`email:poll-inbound`) and daily digests (`email:send-digests`) run from cron via `schedule:run`, then exit. Outgoing mail is sent in that same process. `av-asset-manager-queue.service` is for **Backup now** and attachment migration, not for polling the mailbox.
 
 | Symptom | Checks | Fix |
 |---------|--------|-----|
 | Test email fails | Admin → Email settings; `.env` secrets; outbound network | [email-setup.md](email-setup.md). |
-| Notifications never send | `schedule:run` cron; optional `queue:work` | Production needs a scheduler entry; queued mail needs a worker. See [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md). |
-| Queue stuck | Failed jobs table; worker process | Restart worker; inspect `failed_jobs`; fix env then retry. |
+| Digests never arrive, inbound replies are not logged, or the nightly backup never appears | `sudo crontab -u www-data -l` prints `no crontab for www-data`. Also check `sudo crontab -l` so a root entry is not missed. | Install the scheduler below. `pgrep` will usually show nothing, because `schedule:run` is not a resident process. |
+| `sudo -u www-data php artisan schedule:list` has no `email:poll-inbound` | Email integration is off, or credentials for that driver are missing | Enable integration under Admin → Email. The poll task is registered only when integration is enabled. Digests use the same cron entry. |
+| Notifications were expected from `queue:work` | Mail is not a queue worker in this app | Fix cron. Use the queue service only for storage jobs that stay **Queued**. |
+| A queued storage job stays **Queued** or **Running** with a live worker | `sudo -u www-data env HOME=/tmp XDG_CONFIG_HOME=/tmp php artisan tinker --execute 'echo DB::table("jobs")->count(), PHP_EOL;'` and `failed_jobs` | Restart the worker after a deploy (`sudo systemctl restart av-asset-manager-queue`). Inspect `failed_jobs`, fix the error, then retry. `DB_QUEUE_RETRY_AFTER` must stay above the worker timeout (3900 and `--timeout=3600`). |
+
+Install the scheduler for `www-data` when that user’s crontab is empty:
+
+```bash
+echo '* * * * * cd /var/www/av-asset-manager && php artisan schedule:run >> /dev/null 2>&1' | sudo crontab -u www-data -
+sudo crontab -u www-data -l
+cd /var/www/av-asset-manager
+sudo -u www-data php artisan schedule:list
+```
+
+`crontab -l` should print that one line. `schedule:list` should include `email:poll-inbound` (when email integration is on), `email:send-digests`, and `app:backup` (when `BACKUP_DISK` is set). Do not put `queue:work` in cron. A new process every minute overlaps the systemd worker.
 
 ## Assets / UI
 

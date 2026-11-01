@@ -73,6 +73,27 @@ class StorageOperation extends Model
         return implode(' ', $parts);
     }
 
+    public static function restoreCommand(?string $disk, ?string $path, bool $queued): string
+    {
+        $parts = ['app:restore'];
+
+        if (filled($path)) {
+            $parts[] = $path;
+        }
+
+        if (filled($disk)) {
+            $parts[] = '--disk='.$disk;
+        }
+
+        $parts[] = '--force';
+
+        if ($queued) {
+            $parts[] = '--queue';
+        }
+
+        return implode(' ', $parts);
+    }
+
     public static function probeCommand(?string $disk): string
     {
         $parts = ['storage:test-backup'];

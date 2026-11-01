@@ -17,7 +17,9 @@ use App\Models\ScanSession;
 use App\Models\Setting;
 use App\Models\UnknownScan;
 use App\Support\PerformanceLimits;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -128,6 +130,31 @@ class AppBackupService
             'path' => $base,
             'disk' => $disk,
             'manifest' => $manifest,
+        ];
+    }
+
+    /**
+     * Newest dated backup folder on the disk that contains a manifest.
+     *
+     * @return array{path: string, disk: string}|null
+     */
+    public function latestBackup(?string $disk = null): ?array
+    {
+        $disk = $this->resolveBackupDisk($disk);
+
+        $path = collect(Storage::disk($disk)->directories('backups'))
+            ->map(fn (string $directory): string => trim($directory, '/'))
+            ->filter(fn (string $directory): bool => Storage::disk($disk)->exists($directory.'/manifest.json'))
+            ->sort()
+            ->last();
+
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        return [
+            'path' => $path,
+            'disk' => $disk,
         ];
     }
 
@@ -374,23 +401,163 @@ class AppBackupService
 
     protected function restoreSqlDump(string $disk, string $remoteGzPath): void
     {
-        $tmpGz = tempnam(sys_get_temp_dir(), 'avrest');
-        $sqlPath = $tmpGz.'.sql';
-        @unlink($tmpGz);
+        $tmp = tempnam(sys_get_temp_dir(), 'avrest');
+        if ($tmp === false) {
+            throw new RuntimeException('Unable to create a temporary restore file.');
+        }
+
+        $gzPath = $tmp.'.gz';
+        $sqlPath = $tmp.'.sql';
+        @unlink($tmp);
 
         try {
-            file_put_contents($tmpGz.'.gz', Storage::disk($disk)->get($remoteGzPath));
-            $this->gunzipFile($tmpGz.'.gz', $sqlPath);
-            $sql = file_get_contents($sqlPath);
+            $this->copyDiskFileToLocal($disk, $remoteGzPath, $gzPath);
+            $this->gunzipFile($gzPath, $sqlPath);
+            $driver = $this->databaseDriver();
+            $bytes = filesize($sqlPath);
 
-            if ($sql === false) {
+            // #region agent log
+            file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'A', 'location' => 'AppBackupService.php:restoreSqlDump', 'message' => 'decompressed sql dump', 'data' => ['driver' => $driver, 'bytes' => $bytes], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
+            // #endregion
+
+            if (in_array($driver, ['mysql', 'mariadb'], true)) {
+                $this->restoreMysqlDump($sqlPath);
+
+                return;
+            }
+
+            $sql = file_get_contents($sqlPath);
+            if ($sql === false || $sql === '') {
                 throw new RuntimeException('Unable to read restored SQL dump.');
             }
 
             DB::unprepared($sql);
         } finally {
-            @unlink($tmpGz.'.gz');
+            @unlink($gzPath);
             @unlink($sqlPath);
+        }
+    }
+
+    /**
+     * A mysqldump is one committed rebuild per table. PDO::exec of the whole file
+     * sends it as a single packet, so a large dump fails before any table commits
+     * and the command can still look finished. The mysql client applies each statement.
+     */
+    protected function restoreMysqlDump(string $sqlPath): void
+    {
+        $client = $this->findBinary('mysql') ?? $this->findBinary('mariadb');
+        if ($client === null) {
+            throw new RuntimeException('The mysql client is not installed, so the SQL dump cannot be restored. Install the MariaDB client package.');
+        }
+
+        $connection = $this->databaseConnection();
+        $database = (string) ($connection['database'] ?? '');
+        if ($database === '') {
+            throw new RuntimeException('Database name is not configured.');
+        }
+
+        $command = [
+            $client,
+            '--binary-mode',
+            '--batch',
+            '--default-character-set=utf8mb4',
+            '-h', (string) ($connection['host'] ?? '127.0.0.1'),
+            '-P', (string) ($connection['port'] ?? 3306),
+            '-u', (string) ($connection['username'] ?? ''),
+            $database,
+        ];
+
+        $input = fopen($sqlPath, 'rb');
+        if ($input === false) {
+            throw new RuntimeException('Unable to read restored SQL dump.');
+        }
+
+        Log::info('Restoring SQL dump with the mysql client.', [
+            'database' => $database,
+            'bytes' => filesize($sqlPath),
+        ]);
+
+        try {
+            $result = $this->runMysqlClient($command, $input, (string) ($connection['password'] ?? ''));
+        } finally {
+            fclose($input);
+        }
+
+        // #region agent log
+        file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'A', 'location' => 'AppBackupService.php:restoreMysqlDump', 'message' => 'mysql client finished', 'data' => ['exit' => $result->exitCode(), 'client' => basename($client), 'database' => $database], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
+
+        if (! $result->successful()) {
+            $error = trim($result->errorOutput());
+            if ($error === '') {
+                $error = trim($result->output());
+            }
+
+            throw new RuntimeException(Str::limit(
+                'mysql restore failed (exit '.$result->exitCode().'). '.$error,
+                2000,
+                '',
+            ));
+        }
+
+        Log::info('SQL dump restore finished.', [
+            'database' => $database,
+        ]);
+    }
+
+    protected function databaseDriver(): string
+    {
+        return (string) config('database.default');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function databaseConnection(): array
+    {
+        $connection = config('database.connections.'.$this->databaseDriver());
+
+        return is_array($connection) ? $connection : [];
+    }
+
+    /**
+     * @param  list<string>  $command
+     * @param  resource  $input
+     */
+    protected function runMysqlClient(array $command, $input, string $password): ProcessResult
+    {
+        return Process::env([
+            'MYSQL_PWD' => $password,
+        ])->timeout(3600)->input($input)->run($command);
+    }
+
+    protected function copyDiskFileToLocal(string $disk, string $remotePath, string $localPath): void
+    {
+        $in = Storage::disk($disk)->readStream($remotePath);
+        if (is_resource($in)) {
+            $out = fopen($localPath, 'wb');
+            if ($out === false) {
+                fclose($in);
+                throw new RuntimeException('Unable to write temporary restore file.');
+            }
+
+            try {
+                stream_copy_to_stream($in, $out);
+            } finally {
+                fclose($in);
+                fclose($out);
+            }
+
+            return;
+        }
+
+        $contents = Storage::disk($disk)->get($remotePath);
+        if (! is_string($contents) || $contents === '') {
+            throw new RuntimeException("Unable to read [{$remotePath}] on disk [{$disk}].");
+        }
+
+        if (file_put_contents($localPath, $contents) === false) {
+            throw new RuntimeException('Unable to write temporary restore file.');
         }
     }
 

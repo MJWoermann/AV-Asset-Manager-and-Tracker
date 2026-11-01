@@ -36,7 +36,7 @@
         <section class="bg-white dark:bg-brand-slate border p-4 space-y-3">
             <h3 class="font-medium">Job log</h3>
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                Backups, attachment migrations, and backup-location tests. Queued jobs update when the worker finishes. Refresh this page to see the latest status.
+                Backups, restores, attachment migrations, and backup-location tests. Queued jobs update when the worker finishes. Refresh this page to see the latest status.
             </p>
             @if($operations->isEmpty())
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">No storage jobs yet.</p>
@@ -123,24 +123,32 @@
             </form>
         </section>
 
-        <section class="bg-white dark:bg-brand-slate border p-4">
+        <section
+            class="bg-white dark:bg-brand-slate border p-4"
+            x-data="{
+                disk: @js(old('disk', '')),
+                queue: @js($backupForceQueue || filter_var(old('queue', '1'), FILTER_VALIDATE_BOOLEAN)),
+            }"
+        >
             <h3 class="font-medium mb-3">Backup now</h3>
             <p class="text-sm text-brand-charcoal dark:text-brand-silver mb-4">
                 Writes a dated folder with database dump (or table JSON), config packs, file index, and attachment blobs.
                 Does not include <code class="text-xs">.env</code> or Graph/QNAP secrets.
+                Restore latest replaces the database and attachment files with the newest backup on the selected disk.
             </p>
             <form method="POST" action="{{ route('admin.storage.backup') }}" class="space-y-4">
                 @csrf
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <x-input-label for="disk" value="Backup disk" />
-                        <select id="disk" name="disk" class="mt-1 block w-full border-brand-charcoal/40 dark:bg-brand-charcoal dark:text-white">
+                        <select id="disk" name="disk" x-model="disk" class="mt-1 block w-full border-brand-charcoal/40 dark:bg-brand-charcoal dark:text-white">
                             <option value="">Use BACKUP_DISK ({{ $backupDisk !== '' ? $backupDisk : 'unset' }})</option>
                             @foreach($allowedDisks as $disk)
                                 <option value="{{ $disk }}" @selected(old('disk') === $disk)>{{ $disk }}</option>
                             @endforeach
                         </select>
                         <x-input-error class="mt-2" :messages="$errors->get('disk')" />
+                        <x-input-error class="mt-2" :messages="$errors->restore->get('disk')" />
                     </div>
                     <div>
                         <x-input-label for="keep" value="Keep newest" />
@@ -154,7 +162,7 @@
                     <p class="text-sm text-brand-charcoal/80 dark:text-brand-silver">Runs on the queue (required by performance limits).</p>
                 @else
                     <label class="inline-flex items-center gap-2 text-sm">
-                        <input type="checkbox" name="queue" value="1" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" @checked(old('queue', true))>
+                        <input type="checkbox" name="queue" value="1" x-model="queue" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" @checked($backupForceQueue || filter_var(old('queue', '1'), FILTER_VALIDATE_BOOLEAN))>
                         Run on queue
                     </label>
                 @endif
@@ -162,11 +170,48 @@
                     Test writes <code class="text-xs">backups/_write-test.txt</code> on the selected disk so you can confirm the file at the destination.
                 </p>
                 <x-input-error class="mt-2" :messages="$errors->get('test')" />
-                <div class="flex flex-wrap justify-end gap-2">
-                    <x-secondary-button type="submit" formaction="{{ route('admin.storage.backup-test') }}">Test backup location</x-secondary-button>
-                    <x-primary-button>Backup now</x-primary-button>
+                <x-input-error class="mt-2" :messages="$errors->restore->get('restore')" />
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <x-danger-button type="button" x-on:click.prevent="$dispatch('open-modal', 'confirm-restore-latest')">
+                        Restore latest backup
+                    </x-danger-button>
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <x-secondary-button type="submit" formaction="{{ route('admin.storage.backup-test') }}">Test backup location</x-secondary-button>
+                        <x-primary-button>Backup now</x-primary-button>
+                    </div>
                 </div>
             </form>
+
+            <x-modal name="confirm-restore-latest" :show="$errors->restore->isNotEmpty()" focusable maxWidth="md">
+                <form method="POST" action="{{ route('admin.storage.restore-latest') }}" class="p-6">
+                    @csrf
+                    <input type="hidden" name="disk" x-bind:value="disk">
+                    <input type="hidden" name="queue" x-bind:value="queue ? '1' : '0'">
+
+                    <h2 class="text-lg font-medium text-brand-black dark:text-white">
+                        Restore the latest backup?
+                    </h2>
+
+                    <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">
+                        This overwrites the database and attachment files with the newest backup on the selected disk, or on BACKUP_DISK when the disk is left on the default. Enter your password to continue.
+                    </p>
+
+                    <div class="mt-6">
+                        <x-input-label for="restore-password" value="Password" />
+                        <x-text-input id="restore-password" name="password" type="password" class="mt-1 block w-full" autocomplete="current-password" />
+                        <x-input-error class="mt-2" :messages="$errors->restore->get('password')" />
+                    </div>
+
+                    <div class="mt-6 flex justify-end gap-2">
+                        <x-secondary-button type="button" x-on:click="$dispatch('close')">
+                            Cancel
+                        </x-secondary-button>
+                        <x-danger-button>
+                            Restore latest backup
+                        </x-danger-button>
+                    </div>
+                </form>
+            </x-modal>
         </section>
     </div>
 </x-app-layout>

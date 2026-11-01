@@ -45,7 +45,7 @@ php artisan optimize:clear   # or config/route/view cache in production — see 
 
 `php artisan migrate` applies additive schema changes such as `users.preferences` (JSON, nullable) and multi-department isolation (`departments`, `department_user`, and `department_id` on operational tables). Existing rows are backfilled into a default **General** department; non-admin users are attached to it. Assign users to departments under Admin → Users, and manage departments under Admin → Departments. Asset History uses existing `audit_logs` rows; new history entries store `department_id` when available.
 
-Production upgrade (one command): `sudo bash scripts/update.sh` — see [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md) §7 Updates.
+Production upgrade (one command): `sudo bash scripts/update.sh` — see [docs/deploy-ubuntu-nginx.md](docs/deploy-ubuntu-nginx.md) §8 Updates. The queue worker unit is §7.
 
 ## Features and usage
 
@@ -104,7 +104,7 @@ Google Workspace and Microsoft Entra (single-tenant) OAuth for existing users. S
 
 ## Email integration (optional)
 
-Developer-flagged Gmail / Outlook Graph / SMTP notifications for MAC onboarding and maintenance events, inbound helpdesk reply logging, and (when integration is enabled with credentials) configurable **warranty / test & tag / low-stock digests** via Admin → Email (`email:send-digests`, scheduled daily). See [docs/email-setup.md](docs/email-setup.md). Requires `schedule:run` (and optionally `queue:work`) in production.
+Developer-flagged Gmail / Outlook Graph / SMTP notifications for MAC onboarding and maintenance events, inbound helpdesk reply logging, and (when integration is enabled with credentials) configurable **warranty / test & tag / low-stock digests** via Admin → Email (`email:send-digests`, scheduled daily). See [docs/email-setup.md](docs/email-setup.md). Requires `schedule:run` and the queue worker (`av-asset-manager-queue.service`) in production.
 
 ```bash
 curl -X POST /api/auth/token \

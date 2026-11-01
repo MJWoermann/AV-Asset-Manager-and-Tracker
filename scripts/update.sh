@@ -10,6 +10,7 @@ set -euo pipefail
 APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_USER="${WEB_USER:-www-data}"
 PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.5-fpm}"
+QUEUE_SERVICE="${QUEUE_SERVICE:-av-asset-manager-queue}"
 DEPLOY_USER="${SUDO_USER:-${USER}}"
 
 cd "$APP_ROOT"
@@ -156,6 +157,13 @@ fi
 
 echo "==> reload ${PHP_FPM_SERVICE}"
 systemctl reload "${PHP_FPM_SERVICE}"
+
+if [[ -f "/etc/systemd/system/${QUEUE_SERVICE}.service" ]]; then
+  echo "==> restart ${QUEUE_SERVICE} (waits for the current job to finish)"
+  systemctl restart "${QUEUE_SERVICE}"
+else
+  echo "==> ${QUEUE_SERVICE}.service is not installed. Admin → Storage backups stay queued until you add it. See docs/deploy-ubuntu-nginx.md section 7."
+fi
 
 echo "==> Update complete"
 UPDATE_FINISHED=1

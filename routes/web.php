@@ -399,6 +399,9 @@ Route::middleware(['auth', 'staff'])->group(function () {
             Route::post('/storage/backup-test', [StorageController::class, 'probe'])
                 ->middleware('throttle:6,1')
                 ->name('storage.backup-test');
+            Route::post('/storage/restore-latest', [StorageController::class, 'restoreLatest'])
+                ->middleware('throttle:backup')
+                ->name('storage.restore-latest');
         });
     });
 

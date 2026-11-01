@@ -45,7 +45,7 @@
         <section class="bg-white dark:bg-brand-slate border p-4 space-y-3">
             <h3 class="font-medium">Job log</h3>
             <p class="text-sm text-brand-charcoal dark:text-brand-silver">
-                Backups, attachment migrations, and backup-location tests. Queued jobs update when the worker finishes. Refresh this page to see the latest status.
+                Backups, restores, attachment migrations, and backup-location tests. Queued jobs update when the worker finishes. Refresh this page to see the latest status.
             </p>
             <?php if($operations->isEmpty()): ?>
                 <p class="text-sm text-brand-charcoal dark:text-brand-silver">No storage jobs yet.</p>
@@ -228,11 +228,18 @@
             </form>
         </section>
 
-        <section class="bg-white dark:bg-brand-slate border p-4">
+        <section
+            class="bg-white dark:bg-brand-slate border p-4"
+            x-data="{
+                disk: <?php echo \Illuminate\Support\Js::from(old('disk', ''))->toHtml() ?>,
+                queue: <?php echo \Illuminate\Support\Js::from($backupForceQueue || filter_var(old('queue', '1'), FILTER_VALIDATE_BOOLEAN))->toHtml() ?>,
+            }"
+        >
             <h3 class="font-medium mb-3">Backup now</h3>
             <p class="text-sm text-brand-charcoal dark:text-brand-silver mb-4">
                 Writes a dated folder with database dump (or table JSON), config packs, file index, and attachment blobs.
                 Does not include <code class="text-xs">.env</code> or Graph/QNAP secrets.
+                Restore latest replaces the database and attachment files with the newest backup on the selected disk.
             </p>
             <form method="POST" action="<?php echo e(route('admin.storage.backup')); ?>" class="space-y-4">
                 <?php echo csrf_field(); ?>
@@ -258,7 +265,7 @@
 <?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
 <?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
 <?php endif; ?>
-                        <select id="disk" name="disk" class="mt-1 block w-full border-brand-charcoal/40 dark:bg-brand-charcoal dark:text-white">
+                        <select id="disk" name="disk" x-model="disk" class="mt-1 block w-full border-brand-charcoal/40 dark:bg-brand-charcoal dark:text-white">
                             <option value="">Use BACKUP_DISK (<?php echo e($backupDisk !== '' ? $backupDisk : 'unset'); ?>)</option>
                             <?php $__currentLoopData = $allowedDisks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $disk): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                 <option value="<?php echo e($disk); ?>" <?php if(old('disk') === $disk): echo 'selected'; endif; ?>><?php echo e($disk); ?></option>
@@ -274,6 +281,26 @@
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
 <?php $component->withAttributes(['class' => 'mt-2','messages' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->get('disk'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalf94ed9c5393ef72725d159fe01139746)): ?>
+<?php $attributes = $__attributesOriginalf94ed9c5393ef72725d159fe01139746; ?>
+<?php unset($__attributesOriginalf94ed9c5393ef72725d159fe01139746); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalf94ed9c5393ef72725d159fe01139746)): ?>
+<?php $component = $__componentOriginalf94ed9c5393ef72725d159fe01139746; ?>
+<?php unset($__componentOriginalf94ed9c5393ef72725d159fe01139746); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginalf94ed9c5393ef72725d159fe01139746 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalf94ed9c5393ef72725d159fe01139746 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-error','data' => ['class' => 'mt-2','messages' => $errors->restore->get('disk')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-error'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'mt-2','messages' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->restore->get('disk'))]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginalf94ed9c5393ef72725d159fe01139746)): ?>
@@ -354,7 +381,7 @@
                     <p class="text-sm text-brand-charcoal/80 dark:text-brand-silver">Runs on the queue (required by performance limits).</p>
                 <?php else: ?>
                     <label class="inline-flex items-center gap-2 text-sm">
-                        <input type="checkbox" name="queue" value="1" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" <?php if(old('queue', true)): echo 'checked'; endif; ?>>
+                        <input type="checkbox" name="queue" value="1" x-model="queue" class="rounded border-brand-charcoal/40 text-brand focus:ring-brand" <?php if($backupForceQueue || filter_var(old('queue', '1'), FILTER_VALIDATE_BOOLEAN)): echo 'checked'; endif; ?>>
                         Run on queue
                     </label>
                 <?php endif; ?>
@@ -381,8 +408,50 @@
 <?php $component = $__componentOriginalf94ed9c5393ef72725d159fe01139746; ?>
 <?php unset($__componentOriginalf94ed9c5393ef72725d159fe01139746); ?>
 <?php endif; ?>
-                <div class="flex flex-wrap justify-end gap-2">
-                    <?php if (isset($component)) { $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af = $component; } ?>
+                <?php if (isset($component)) { $__componentOriginalf94ed9c5393ef72725d159fe01139746 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalf94ed9c5393ef72725d159fe01139746 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-error','data' => ['class' => 'mt-2','messages' => $errors->restore->get('restore')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-error'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'mt-2','messages' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->restore->get('restore'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalf94ed9c5393ef72725d159fe01139746)): ?>
+<?php $attributes = $__attributesOriginalf94ed9c5393ef72725d159fe01139746; ?>
+<?php unset($__attributesOriginalf94ed9c5393ef72725d159fe01139746); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalf94ed9c5393ef72725d159fe01139746)): ?>
+<?php $component = $__componentOriginalf94ed9c5393ef72725d159fe01139746; ?>
+<?php unset($__componentOriginalf94ed9c5393ef72725d159fe01139746); ?>
+<?php endif; ?>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <?php if (isset($component)) { $__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.danger-button','data' => ['type' => 'button','xOn:click.prevent' => '$dispatch(\'open-modal\', \'confirm-restore-latest\')']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('danger-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','x-on:click.prevent' => '$dispatch(\'open-modal\', \'confirm-restore-latest\')']); ?>
+                        Restore latest backup
+                     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11)): ?>
+<?php $attributes = $__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11; ?>
+<?php unset($__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11)): ?>
+<?php $component = $__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11; ?>
+<?php unset($__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11); ?>
+<?php endif; ?>
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <?php if (isset($component)) { $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.secondary-button','data' => ['type' => 'submit','formaction' => ''.e(route('admin.storage.backup-test')).'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('secondary-button'); ?>
@@ -401,7 +470,7 @@
 <?php $component = $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
 <?php unset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
 <?php endif; ?>
-                    <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
+                        <?php if (isset($component)) { $__componentOriginald411d1792bd6cc877d687758b753742c = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginald411d1792bd6cc877d687758b753742c = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.primary-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('primary-button'); ?>
@@ -420,8 +489,151 @@
 <?php $component = $__componentOriginald411d1792bd6cc877d687758b753742c; ?>
 <?php unset($__componentOriginald411d1792bd6cc877d687758b753742c); ?>
 <?php endif; ?>
+                    </div>
                 </div>
             </form>
+
+            <?php if (isset($component)) { $__componentOriginal9f64f32e90b9102968f2bc548315018c = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal9f64f32e90b9102968f2bc548315018c = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.modal','data' => ['name' => 'confirm-restore-latest','show' => $errors->restore->isNotEmpty(),'focusable' => true,'maxWidth' => 'md']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'confirm-restore-latest','show' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->restore->isNotEmpty()),'focusable' => true,'maxWidth' => 'md']); ?>
+                <form method="POST" action="<?php echo e(route('admin.storage.restore-latest')); ?>" class="p-6">
+                    <?php echo csrf_field(); ?>
+                    <input type="hidden" name="disk" x-bind:value="disk">
+                    <input type="hidden" name="queue" x-bind:value="queue ? '1' : '0'">
+
+                    <h2 class="text-lg font-medium text-brand-black dark:text-white">
+                        Restore the latest backup?
+                    </h2>
+
+                    <p class="mt-1 text-sm text-brand-charcoal dark:text-brand-silver">
+                        This overwrites the database and attachment files with the newest backup on the selected disk, or on BACKUP_DISK when the disk is left on the default. Enter your password to continue.
+                    </p>
+
+                    <div class="mt-6">
+                        <?php if (isset($component)) { $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-label','data' => ['for' => 'restore-password','value' => 'Password']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-label'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['for' => 'restore-password','value' => 'Password']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $attributes = $__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__attributesOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581)): ?>
+<?php $component = $__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581; ?>
+<?php unset($__componentOriginale3da9d84bb64e4bc2eeebaafabfb2581); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginal18c21970322f9e5c938bc954620c12bb = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal18c21970322f9e5c938bc954620c12bb = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.text-input','data' => ['id' => 'restore-password','name' => 'password','type' => 'password','class' => 'mt-1 block w-full','autocomplete' => 'current-password']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('text-input'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => 'restore-password','name' => 'password','type' => 'password','class' => 'mt-1 block w-full','autocomplete' => 'current-password']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal18c21970322f9e5c938bc954620c12bb)): ?>
+<?php $attributes = $__attributesOriginal18c21970322f9e5c938bc954620c12bb; ?>
+<?php unset($__attributesOriginal18c21970322f9e5c938bc954620c12bb); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal18c21970322f9e5c938bc954620c12bb)): ?>
+<?php $component = $__componentOriginal18c21970322f9e5c938bc954620c12bb; ?>
+<?php unset($__componentOriginal18c21970322f9e5c938bc954620c12bb); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginalf94ed9c5393ef72725d159fe01139746 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalf94ed9c5393ef72725d159fe01139746 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.input-error','data' => ['class' => 'mt-2','messages' => $errors->restore->get('password')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('input-error'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'mt-2','messages' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->restore->get('password'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalf94ed9c5393ef72725d159fe01139746)): ?>
+<?php $attributes = $__attributesOriginalf94ed9c5393ef72725d159fe01139746; ?>
+<?php unset($__attributesOriginalf94ed9c5393ef72725d159fe01139746); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalf94ed9c5393ef72725d159fe01139746)): ?>
+<?php $component = $__componentOriginalf94ed9c5393ef72725d159fe01139746; ?>
+<?php unset($__componentOriginalf94ed9c5393ef72725d159fe01139746); ?>
+<?php endif; ?>
+                    </div>
+
+                    <div class="mt-6 flex justify-end gap-2">
+                        <?php if (isset($component)) { $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.secondary-button','data' => ['type' => 'button','xOn:click' => '$dispatch(\'close\')']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('secondary-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','x-on:click' => '$dispatch(\'close\')']); ?>
+                            Cancel
+                         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af)): ?>
+<?php $attributes = $__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
+<?php unset($__attributesOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af)): ?>
+<?php $component = $__componentOriginal3b0e04e43cf890250cc4d85cff4d94af; ?>
+<?php unset($__componentOriginal3b0e04e43cf890250cc4d85cff4d94af); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.danger-button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('danger-button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+                            Restore latest backup
+                         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11)): ?>
+<?php $attributes = $__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11; ?>
+<?php unset($__attributesOriginal656e8c5ea4d9a4fa173298297bfe3f11); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11)): ?>
+<?php $component = $__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11; ?>
+<?php unset($__componentOriginal656e8c5ea4d9a4fa173298297bfe3f11); ?>
+<?php endif; ?>
+                    </div>
+                </form>
+             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal9f64f32e90b9102968f2bc548315018c)): ?>
+<?php $attributes = $__attributesOriginal9f64f32e90b9102968f2bc548315018c; ?>
+<?php unset($__attributesOriginal9f64f32e90b9102968f2bc548315018c); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal9f64f32e90b9102968f2bc548315018c)): ?>
+<?php $component = $__componentOriginal9f64f32e90b9102968f2bc548315018c; ?>
+<?php unset($__componentOriginal9f64f32e90b9102968f2bc548315018c); ?>
+<?php endif; ?>
         </section>
     </div>
  <?php echo $__env->renderComponent(); ?>

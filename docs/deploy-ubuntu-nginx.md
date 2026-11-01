@@ -101,7 +101,7 @@ Outbound notifications and inbound helpdesk reply polling need the `email_integr
 
 Full host-specific setup (Gmail app passwords, Entra Graph `Mail.Send`/`Mail.Read`, manual SMTP/IMAP): **[docs/email-setup.md](email-setup.md)**.
 
-Ensure cron runs `php artisan schedule:run` every minute so `email:poll-inbound` can honour the configured poll interval. Use `queue:work` if you queue mail delivery.
+Cron must run `php artisan schedule:run` every minute so `email:poll-inbound` can honour the configured poll interval. Admin → Storage backups and queued mail need the systemd queue worker in [§7](#7-scheduler-and-queue-worker). Do not start `queue:work` from cron.
 
 ## 4. Nginx site
 
@@ -218,7 +218,61 @@ Port `80` is only needed for the HTTPS redirect (and optional Certbot HTTP-01). 
 
 For production on corporate WiFi, prefer **source-restricted** rules (staff subnets for HTTP/HTTPS, admin/jump only for SSH) and keep MariaDB off the WiFi path. Limit host outbound internet to SSO (Google/Microsoft Entra OAuth) and email (SMTP and/or Microsoft Graph) when IT policy allows. Full patterns, `APP_URL`/split-DNS notes, and guest QR / Sanctum reachability: **[security-hardening.md — Corporate LAN / staff WiFi deployment](security-hardening.md#corporate-lan--staff-wifi-deployment)**.
 
-## 7. Updates
+## 7. Scheduler and queue worker
+
+Cron runs the scheduler. A systemd service runs the queue worker and keeps running after you log out.
+
+**Backup now**, **Restore latest backup**, and attachment migration on Admin → Storage always queue (`backup_force_queue` and `migrate_force_queue` default to on). With no worker, those rows stay **Queued**. The location test does not use the queue. The nightly backup does not use it either: when `BACKUP_DISK` is set, `schedule:run` runs `app:backup` at 02:15 UTC.
+
+### Scheduler
+
+```bash
+sudo crontab -u www-data -e
+```
+
+```bash
+* * * * * cd /var/www/av-asset-manager && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Leave `queue:work` out of cron. A new process every minute overlaps the worker that is already running.
+
+### Queue worker
+
+`queue:work` loads the application once and keeps that code until the process exits. Install it as a service so it survives logout, reboot, and deploys. Run it as `www-data` so it can write the same disks as the site, including a QNAP mount. `--timeout=3600` must stay below `DB_QUEUE_RETRY_AFTER` (3900 in `.env.example`).
+
+```bash
+sudo tee /etc/systemd/system/av-asset-manager-queue.service >/dev/null <<'EOF'
+[Unit]
+Description=AV Asset Manager queue worker
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=3
+WorkingDirectory=/var/www/av-asset-manager
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --timeout=3600
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now av-asset-manager-queue
+```
+
+Confirm it is running:
+
+```bash
+systemctl status av-asset-manager-queue --no-pager
+pgrep -af "artisan queue:work"
+```
+
+`scripts/update.sh` restarts `av-asset-manager-queue` when that unit file exists, so the worker picks up new code. Set `QUEUE_SERVICE` if the unit name differs. Restart waits until the current job finishes, so a backup already in progress can hold the update script for up to an hour.
+
+On a host that already has a `queue:work` process in an SSH session, stop that process before `enable --now`. Otherwise two workers run.
+
+## 8. Updates
 
 Always run migrations after pulling code. Skipping `migrate` will break asset list pages once the app expects `users.preferences`.
 
@@ -228,10 +282,10 @@ One-shot update (recommended):
 sudo bash /var/www/av-asset-manager/scripts/update.sh
 ```
 
-That script puts the app in maintenance mode (redirecting visitors to a branded **Server maintenance** page at `/`), pulls the latest code, installs PHP/JS deps, builds assets, runs `migrate --force`, rebuilds config/route/view caches, fixes `storage` / `bootstrap/cache` / SQLite permissions, reloads PHP-FPM, then brings the site back up. Override defaults if needed:
+That script puts the app in maintenance mode (redirecting visitors to a branded **Server maintenance** page at `/`), pulls the latest code, installs PHP/JS deps, builds assets, runs `migrate --force`, rebuilds config/route/view caches, fixes `storage` / `bootstrap/cache` / SQLite permissions, reloads PHP-FPM, restarts the queue worker when `av-asset-manager-queue.service` is installed, then brings the site back up. Override defaults if needed:
 
 ```bash
-sudo WEB_USER=www-data PHP_FPM_SERVICE=php8.5-fpm bash /var/www/av-asset-manager/scripts/update.sh
+sudo WEB_USER=www-data PHP_FPM_SERVICE=php8.5-fpm QUEUE_SERVICE=av-asset-manager-queue bash /var/www/av-asset-manager/scripts/update.sh
 ```
 
 Manual equivalent:
@@ -249,6 +303,7 @@ sudo chown -R www-data:www-data /var/www/av-asset-manager/database
 sudo chmod 775 /var/www/av-asset-manager/database
 sudo chmod 664 /var/www/av-asset-manager/database/database.sqlite
 sudo systemctl reload php8.5-fpm
+sudo systemctl restart av-asset-manager-queue
 ```
 
 If you are experiencing errors with `php artisan`, reset ownership so your deploy user can write, then re-run the update script (it restores `www-data` on writable paths):
@@ -272,7 +327,7 @@ Optional: after migrate, re-apply audit hardening from §2 if you recreate DB gr
 
 Do **not** grant `UPDATE`/`DELETE` on `audit_logs` to the app DB user.
 
-## 8. Remote attachment storage (QNAP / SharePoint)
+## 9. Remote attachment storage (QNAP / SharePoint)
 
 Attachments use Laravel disks. Set `ATTACHMENTS_DISK` to `local` (default), `qnap`, or `sharepoint`. Optional `BACKUP_DISK` (same allow-list) enables nightly `php artisan app:backup` via the scheduler and Admin → Storage.
 
@@ -376,7 +431,9 @@ php artisan app:backup --disk=qnap --keep=7
 php artisan app:restore backups/2026-10-14_021500 --disk=qnap --force
 ```
 
-Backup archives exclude `.env` and Graph/QNAP secrets. SQL dumps include user password hashes — treat restore media as sensitive. Ensure `queue:work --timeout=3600` (or higher) and `schedule:run` (cron) are running for queued Admin → Storage actions, the nightly backup, and optional email inbound polling (`email:poll-inbound` — see [email-setup.md](email-setup.md)). Set `DB_QUEUE_RETRY_AFTER=3900` (default in `.env.example`) so long backup/migrate jobs are not reserved twice. Soft import/export/compare caps: `php artisan app:performance-limits show` ([security-hardening.md](security-hardening.md#managing-performance-limits)).
+Admin → Storage → **Restore latest backup** does the same for the newest manifest folder on the disk selected in that section (or `BACKUP_DISK` when the disk is left on the default). It asks for the signed-in admin's password, then queues when `backup_force_queue` is on.
+
+Backup archives exclude `.env` and Graph/QNAP secrets. SQL dumps include user password hashes — treat restore media as sensitive. Queued Admin → Storage actions need the [queue worker](#7-scheduler-and-queue-worker). The nightly backup and `email:poll-inbound` need `schedule:run` ([email-setup.md](email-setup.md)). Set `DB_QUEUE_RETRY_AFTER=3900` (default in `.env.example`) so long backup/migrate jobs are not reserved twice. Soft import/export/compare caps: `php artisan app:performance-limits show` ([security-hardening.md](security-hardening.md#managing-performance-limits)).
 
 ## Security checklist
 
@@ -402,3 +459,4 @@ Full evaluation, threat model, prioritized application hardening, and **corporat
 - [ ] QNAP path writable by `www-data`: NFS via `chown`/`chmod`; SMB/CIFS via mount `uid`/`gid` of `www-data` with `forceuid,forcegid` (not `chown`). Confirm with `sudo -u www-data touch` on the mount. SFTP/S3 credentials scoped to the attachment path.
 - [ ] SharePoint Graph app has admin consent; secrets only in `.env` / secret store
 - [ ] `BACKUP_DISK` private to ops; restore media handled as confidential
+- [ ] `av-asset-manager-queue.service` is enabled (`queue:work --timeout=3600`) and cron runs `schedule:run` every minute

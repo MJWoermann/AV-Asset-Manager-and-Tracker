@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\AppBackupService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Throwable;
 
@@ -29,14 +30,28 @@ class RestoreApplicationCommand extends Command
         try {
             $result = $backups->restore((string) $this->argument('backup-path'), $disk);
         } catch (InvalidArgumentException $exception) {
+            Log::error('Application restore failed.', [
+                'backup' => (string) $this->argument('backup-path'),
+                'message' => $exception->getMessage(),
+            ]);
             $this->error($exception->getMessage());
 
             return self::FAILURE;
         } catch (Throwable $exception) {
+            Log::error('Application restore failed.', [
+                'backup' => (string) $this->argument('backup-path'),
+                'message' => $exception->getMessage(),
+            ]);
             $this->error($exception->getMessage());
 
             return self::FAILURE;
         }
+
+        Log::info('Application restore finished.', [
+            'disk' => $result['disk'],
+            'path' => $result['path'],
+            'attachments_restored' => $result['attachments_restored'],
+        ]);
 
         $this->info(sprintf(
             'Restore complete from [%s] on [%s]; attachments restored=%d',

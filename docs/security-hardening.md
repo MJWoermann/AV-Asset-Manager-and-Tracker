@@ -64,7 +64,7 @@ Severity reflects impact if the host is reachable by untrusted users (or a compr
 | M3 | Weak first-admin password path | **Mitigated** — `Password::defaults()` (min 8, one uppercase, one number or symbol) applies to register, reset, profile update, Admin → Users, and `app:install` | Rotate install password; tighten further via [Password complexity](#password-complexity) |
 | M4 | SSO email binding | `SocialAuthService` matches by email; Azure “verified” is weaker than Google’s `email_verified` check | IdP/email edge cases → wrong account session |
 | M5 | Production defaults in docs | Deploy guide targets HTTPS + `SESSION_SECURE_COOKIE=true`; temporary HTTP bootstrap is documented; `.env.example` has `APP_DEBUG=true` | Mis-copy into production → cookie theft on HTTP, stack traces if debug left on; mobile camera needs HTTPS ([self-signed-tls.md](self-signed-tls.md)) |
-| M6 | Backup / restore sensitivity | SQL dumps include password hashes; restore is destructive CLI/admin path | Stolen backup ≈ offline credential attack + data loss if misused |
+| M6 | Backup / restore sensitivity | SQL dumps include password hashes; restore is a destructive CLI path and an Admin → Storage action that requires the current password | Stolen backup ≈ offline credential attack + data loss if misused |
 | M7 | Trusted proxies unset | No explicit `trustProxies` in `bootstrap/app.php` | Wrong client IP behind reverse proxy → broken rate limits / audit IP |
 | M8 | Upload MIME depth | `config/attachments.php` allow-list + `mimes` validation; good UUID storage paths | Residual MIME spoofing; downloads should stay `Content-Disposition: attachment` |
 
@@ -360,7 +360,7 @@ Notes:
 ### 8. Availability operations
 
 - Tune soft caps with `php artisan app:performance-limits` when catalogues exceed defaults ([Managing performance limits](#managing-performance-limits)).
-- Ensure `queue:work --timeout=3600` (or higher) and `DB_QUEUE_RETRY_AFTER=3900` (or higher than timeout).
+- Run `queue:work --timeout=3600` (or higher) as `av-asset-manager-queue.service`, and keep `DB_QUEUE_RETRY_AFTER` above that timeout (3900). Unit file: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md#7-scheduler-and-queue-worker).
 - Prefer multiple smaller event lists over one warehouse-sized scan list until A8 is implemented.
 - After deploy, confirm no `debug-*.log` files appear in the application root.
 - Size host RAM and FPM as in [hardware-sizing.md](hardware-sizing.md); raise `memory_limit` toward 512M if you raise compare/import limits for large data sets.
