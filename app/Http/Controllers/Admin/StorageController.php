@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\BackupApplicationJob;
 use App\Jobs\MigrateAttachmentDiskJob;
 use App\Models\Setting;
+use App\Models\StorageOperation;
 use App\Services\AppBackupService;
 use App\Services\AttachmentDiskMigrator;
 use App\Support\PerformanceLimits;
@@ -32,6 +33,7 @@ class StorageController extends Controller
             'backupDefaultKeep' => PerformanceLimits::int('backup_default_keep'),
             'backupForceQueue' => PerformanceLimits::bool('backup_force_queue'),
             'migrateForceQueue' => PerformanceLimits::bool('migrate_force_queue'),
+            'operations' => StorageOperation::query()->with('user:id,name')->latest('id')->limit(30)->get(),
         ]);
     }
 
@@ -51,25 +53,44 @@ class StorageController extends Controller
         $deleteSource = $request->boolean('delete_source');
         $forceQueue = PerformanceLimits::bool('migrate_force_queue');
         $queue = $forceQueue || $request->boolean('queue');
+        $operation = StorageOperation::open(
+            StorageOperation::migrateCommand($data['from'], $data['to'], $dryRun, $deleteSource, $queue),
+            $queue,
+            $request->user()?->id,
+        );
 
         if ($queue) {
-            MigrateAttachmentDiskJob::dispatch($data['from'], $data['to'], $deleteSource, $dryRun);
+            MigrateAttachmentDiskJob::dispatch($data['from'], $data['to'], $deleteSource, $dryRun, $operation->id);
 
             return redirect()
                 ->route('admin.storage.edit')
                 ->with('status', 'Attachment migration queued.');
         }
 
-        $result = $migrator->migrate($data['from'], $data['to'], $deleteSource, $dryRun);
+        try {
+            $result = $migrator->migrate($data['from'], $data['to'], $deleteSource, $dryRun);
+        } catch (Throwable $exception) {
+            $operation->markFailed($exception->getMessage());
+
+            throw $exception;
+        }
+
+        $summary = sprintf(
+            'Migration %s: migrated=%d failed=%d',
+            $result['dry_run'] ? 'dry-run' : 'complete',
+            $result['migrated'],
+            $result['failed'],
+        );
+
+        if ($result['failed'] > 0) {
+            $operation->markFailed($summary);
+        } else {
+            $operation->markDone($summary);
+        }
 
         return redirect()
             ->route('admin.storage.edit')
-            ->with('status', sprintf(
-                'Migration %s: migrated=%d failed=%d',
-                $result['dry_run'] ? 'dry-run' : 'complete',
-                $result['migrated'],
-                $result['failed'],
-            ));
+            ->with('status', $summary);
     }
 
     public function backup(Request $request, AppBackupService $backups): RedirectResponse
@@ -92,16 +113,29 @@ class StorageController extends Controller
         $keep = (int) $data['keep'];
         $forceQueue = PerformanceLimits::bool('backup_force_queue');
         $queue = $forceQueue || $request->boolean('queue');
+        $operation = StorageOperation::open(
+            StorageOperation::backupCommand($disk, $keep, $queue),
+            $queue,
+            $request->user()?->id,
+        );
 
         if ($queue) {
-            BackupApplicationJob::dispatch($disk, $keep);
+            BackupApplicationJob::dispatch($disk, $keep, $operation->id);
 
             return redirect()
                 ->route('admin.storage.edit')
                 ->with('status', 'Backup queued.');
         }
 
-        $result = $backups->backup($disk, $keep);
+        try {
+            $result = $backups->backup($disk, $keep);
+        } catch (Throwable $exception) {
+            $operation->markFailed($exception->getMessage());
+
+            throw $exception;
+        }
+
+        $operation->markDone("[{$result['disk']}] {$result['path']}");
 
         return redirect()
             ->route('admin.storage.edit')
@@ -120,18 +154,20 @@ class StorageController extends Controller
             'disk' => ['nullable', 'string', Rule::in($allowed)],
         ]);
 
+        $operation = StorageOperation::open(
+            StorageOperation::probeCommand($data['disk'] ?? null),
+            false,
+            $request->user()?->id,
+        );
+
         try {
             $result = $backups->probe($data['disk'] ?? null);
         } catch (InvalidArgumentException|RuntimeException $exception) {
-            // #region agent log
-            file_put_contents(base_path('debug-59a5d3.log'), json_encode(['sessionId' => '59a5d3', 'runId' => 'pre-fix', 'hypothesisId' => 'C', 'location' => 'StorageController.php:probe', 'message' => 'probe returned error to the page', 'data' => ['exception' => $exception::class, 'error' => $exception->getMessage(), 'reason' => method_exists($exception, 'reason') ? $exception->reason() : null], 'timestamp' => (int) round(microtime(true) * 1000)], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
-            // #endregion
+            $operation->markFailed($exception->getMessage());
 
             return back()->withErrors(['test' => $exception->getMessage()]);
         } catch (Throwable $exception) {
-            // #region agent log
-            file_put_contents(base_path('debug-59a5d3.log'), json_encode(['sessionId' => '59a5d3', 'runId' => 'pre-fix', 'hypothesisId' => 'C', 'location' => 'StorageController.php:probe', 'message' => 'probe returned unexpected error', 'data' => ['exception' => $exception::class, 'error' => $exception->getMessage()], 'timestamp' => (int) round(microtime(true) * 1000)], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
-            // #endregion
+            $operation->markFailed($exception->getMessage());
 
             return back()->withErrors(['test' => 'Backup location test failed: '.$exception->getMessage()]);
         }
@@ -141,6 +177,8 @@ class StorageController extends Controller
         if (is_string($result['absolute_path']) && $result['absolute_path'] !== '') {
             $message .= ' ('.$result['absolute_path'].')';
         }
+
+        $operation->markDone($message);
 
         return back()->with('status', $message);
     }

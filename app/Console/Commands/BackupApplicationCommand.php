@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\StorageOperation;
 use App\Services\AppBackupService;
+use App\Support\PerformanceLimits;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 use Throwable;
@@ -22,18 +24,28 @@ class BackupApplicationCommand extends Command
             ? (int) $this->option('keep')
             : null;
 
+        $keepForLog = $keep ?? PerformanceLimits::int('backup_default_keep');
+        $operation = StorageOperation::open(
+            StorageOperation::backupCommand($disk, $keepForLog, false),
+            false,
+            null,
+        );
+
         try {
             $result = $backups->backup($disk, $keep);
         } catch (InvalidArgumentException $exception) {
+            $operation->markFailed($exception->getMessage());
             $this->error($exception->getMessage());
 
             return self::FAILURE;
         } catch (Throwable $exception) {
+            $operation->markFailed($exception->getMessage());
             $this->error($exception->getMessage());
 
             return self::FAILURE;
         }
 
+        $operation->markDone("[{$result['disk']}] {$result['path']}");
         $this->info("Backup written to [{$result['disk']}] at {$result['path']}");
 
         return self::SUCCESS;

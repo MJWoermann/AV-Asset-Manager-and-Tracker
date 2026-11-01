@@ -289,7 +289,11 @@ Pick one mode with `QNAP_DRIVER`:
 | `sftp` | No OS mount; app writes over SFTP | `QNAP_SFTP_HOST`, user/password or key, `QNAP_SFTP_ROOT` |
 | `s3` | QuObjects / S3-compatible | `QNAP_S3_ENDPOINT`, key/secret, bucket; path-style usually `true` |
 
-Mount example (NFS):
+The app writes as `www-data`. How that user gets write access depends on the mount type.
+
+#### NFS
+
+`chown` and `chmod` apply on an NFS (or local) mount:
 
 ```bash
 sudo mkdir -p /mnt/qnap/av-assets
@@ -297,7 +301,40 @@ sudo mkdir -p /mnt/qnap/av-assets
 sudo mount -a
 sudo chown -R www-data:www-data /mnt/qnap/av-assets
 sudo chmod 775 /mnt/qnap/av-assets
+sudo -u www-data touch /mnt/qnap/av-assets/.write-test && rm /mnt/qnap/av-assets/.write-test
 ```
+
+#### SMB / CIFS
+
+A QNAP shared folder mounted with `mount.cifs` does not honour `chown` or `chmod`. The client shows every file as the `uid`/`gid` from the mount options (often `uid=0`, so `755 root root`). `www-data` then cannot create directories, and Admin → Storage reports `Unable to create a directory at /mnt/qnap/av-assets/backups`. `mount -o remount` does not change `uid`, `gid`, `file_mode`, or `dir_mode`. Unmount and mount again.
+
+Look up the web user, then store the NAS password in a root-only file (do not put it in the fstab line):
+
+```bash
+id -u www-data   # 33 on Ubuntu
+id -g www-data
+sudo mkdir -p /etc/cifs /mnt/qnap/av-assets
+sudo tee /etc/cifs/qnap-av-assets.cred >/dev/null <<'EOF'
+username=STORAGE_USER
+password=STORAGE_PASSWORD
+EOF
+sudo chmod 600 /etc/cifs/qnap-av-assets.cred
+```
+
+`/etc/fstab` (replace `33` if `id` printed a different uid or gid):
+
+```fstab
+//nas.example/ShareName  /mnt/qnap/av-assets  cifs  credentials=/etc/cifs/qnap-av-assets.cred,uid=33,gid=33,forceuid,forcegid,file_mode=0664,dir_mode=0775,vers=3.1.1,cache=strict,_netdev  0  0
+```
+
+```bash
+sudo umount /mnt/qnap/av-assets
+sudo mount /mnt/qnap/av-assets
+stat -c '%a %U %G' /mnt/qnap/av-assets
+sudo -u www-data touch /mnt/qnap/av-assets/.write-test && rm /mnt/qnap/av-assets/.write-test
+```
+
+`stat` should show `775 www-data www-data`. Confirm with `touch` as `www-data`. `mkdir -p` on a folder that already exists succeeds even when that user cannot create new files. Admin → Storage → **Test backup location** should then write `backups/_write-test.txt` and record **Done** in the job log. See [troubleshooting.md](troubleshooting.md) if the test still fails.
 
 Set `QNAP_THROW=true` in production so storage failures surface clearly. After cutting over live uploads:
 
@@ -362,6 +399,6 @@ Full evaluation, threat model, prioritized application hardening, and **corporat
 - [ ] Admin password meets complexity rules (≥8 chars, one uppercase, one number or symbol) and is rotated after first login
 - [ ] Audit logs treated as append-only
 - [ ] Updates always run `php artisan migrate --force` before serving traffic
-- [ ] QNAP mount owned by `www-data` (or SFTP/S3 credentials scoped to the attachment path)
+- [ ] QNAP path writable by `www-data`: NFS via `chown`/`chmod`; SMB/CIFS via mount `uid`/`gid` of `www-data` with `forceuid,forcegid` (not `chown`). Confirm with `sudo -u www-data touch` on the mount. SFTP/S3 credentials scoped to the attachment path.
 - [ ] SharePoint Graph app has admin consent; secrets only in `.env` / secret store
 - [ ] `BACKUP_DISK` private to ops; restore media handled as confidential

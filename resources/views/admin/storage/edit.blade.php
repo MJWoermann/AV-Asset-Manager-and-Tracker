@@ -33,6 +33,45 @@
             @endif
         </section>
 
+        <section class="bg-white dark:bg-brand-slate border p-4 space-y-3">
+            <h3 class="font-medium">Job log</h3>
+            <p class="text-sm text-brand-charcoal dark:text-brand-silver">
+                Backups, attachment migrations, and backup-location tests. Queued jobs update when the worker finishes. Refresh this page to see the latest status.
+            </p>
+            @if($operations->isEmpty())
+                <p class="text-sm text-brand-charcoal dark:text-brand-silver">No storage jobs yet.</p>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-brand-silver dark:bg-brand-charcoal text-left">
+                            <tr>
+                                <th class="px-3 py-2">When</th>
+                                <th class="px-3 py-2">Command</th>
+                                <th class="px-3 py-2">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($operations as $operation)
+                                <tr class="border-t border-brand-silver dark:border-brand-charcoal align-top">
+                                    <td class="px-3 py-2 whitespace-nowrap">
+                                        {{ $operation->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}
+                                        <span class="block text-xs text-brand-charcoal dark:text-brand-silver">{{ $operation->user?->name ?? 'System' }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 font-mono text-xs">
+                                        {{ $operation->command }}
+                                        @if(filled($operation->detail))
+                                            <span class="mt-1 block font-sans text-brand-charcoal dark:text-brand-silver">{{ $operation->detail }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2 whitespace-nowrap font-medium">{{ $operation->status->label() }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+
         <section class="bg-white dark:bg-brand-slate border p-4">
             <h3 class="font-medium mb-3">Migrate attachments</h3>
             <p class="text-sm text-brand-charcoal dark:text-brand-silver mb-4">

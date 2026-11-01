@@ -28,6 +28,12 @@ Symptom → checks → fix. Deeper setup lives in the linked guides; this page i
 | Import mapping looks wrong | Previous remembered mappings; header spelling | Override suggestions on the map step; successful mappings are remembered per user. |
 | Old item type / manufacturer name fails | Entity was renamed or merged | Delete/merge records an alias so old names still resolve — see operator notes in [features-and-usage.md](features-and-usage.md). |
 
+## Storage / backup
+
+| Symptom | Checks | Fix |
+|---------|--------|-----|
+| Admin → Storage test or backup: `Unable to create a directory at /mnt/qnap/av-assets/backups` (job log **Failed**) | `findmnt -T /mnt/qnap/av-assets` shows `cifs` and `uid=0`. `stat -c '%a %U %G'` on that path shows `755 root root`. `sudo -u www-data touch /mnt/qnap/av-assets/.write-test` returns `Permission denied`. | The SMB/CIFS mount is owned by root on the client. `chown`, `chmod`, and `mount -o remount` do not grant `www-data` write access. Unmount and mount again with `uid`/`gid` of `www-data` (usually 33), `forceuid,forcegid`, `file_mode=0664`, and `dir_mode=0775`, saved in `/etc/fstab` with a root-only credentials file. Steps: [deploy-ubuntu-nginx.md](deploy-ubuntu-nginx.md) § SMB / CIFS. |
+
 ## Mail / queue / cron
 
 | Symptom | Checks | Fix |

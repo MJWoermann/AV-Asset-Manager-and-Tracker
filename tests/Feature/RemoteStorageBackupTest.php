@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Enums\FileCategory;
 use App\Enums\FileSourceType;
+use App\Enums\StorageOperationStatus;
 use App\Jobs\BackupApplicationJob;
 use App\Jobs\MigrateAttachmentDiskJob;
 use App\Models\File;
 use App\Models\Setting;
+use App\Models\StorageOperation;
 use App\Models\User;
 use App\Services\AppBackupService;
 use App\Services\AttachmentDiskMigrator;
@@ -16,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class RemoteStorageBackupTest extends TestCase
@@ -189,7 +192,9 @@ class RemoteStorageBackupTest extends TestCase
             ->assertSee('Storage')
             ->assertSee('ATTACHMENTS_DISK')
             ->assertSee('Backup now')
-            ->assertSee('Test backup location');
+            ->assertSee('Test backup location')
+            ->assertSee('Job log')
+            ->assertSee('No storage jobs yet.');
 
         $this->actingAs($admin)
             ->post(route('admin.storage.migrate'), [
@@ -212,8 +217,13 @@ class RemoteStorageBackupTest extends TestCase
             ->assertRedirect(route('admin.storage.edit'));
 
         Queue::assertPushed(BackupApplicationJob::class, function (BackupApplicationJob $job): bool {
-            return $job->disk === 'qnap';
+            return $job->disk === 'qnap' && $job->operationId !== null;
         });
+
+        $queued = StorageOperation::query()->where('status', StorageOperationStatus::Queued)->get();
+        $this->assertCount(2, $queued);
+        $this->assertTrue($queued->contains(fn (StorageOperation $operation): bool => str_contains($operation->command, 'app:backup') && str_contains($operation->command, '--disk=qnap') && str_contains($operation->command, '--queue')));
+        $this->assertTrue($queued->contains(fn (StorageOperation $operation): bool => str_contains($operation->command, 'attachments:migrate-disk local qnap') && str_contains($operation->command, '--dry-run')));
     }
 
     public function test_artisan_migrate_disk_command_succeeds(): void
@@ -261,6 +271,16 @@ class RemoteStorageBackupTest extends TestCase
         $this->assertIsString($contents);
         $this->assertStringContainsString('backup location write test', $contents);
         $this->assertStringContainsString('disk: qnap', $contents);
+
+        $operation = StorageOperation::query()->sole();
+        $this->assertSame(StorageOperationStatus::Done, $operation->status);
+        $this->assertSame('storage:test-backup --disk=qnap', $operation->command);
+
+        $this->actingAs($admin)
+            ->get(route('admin.storage.edit'))
+            ->assertOk()
+            ->assertSee('storage:test-backup --disk=qnap')
+            ->assertSee('Done');
     }
 
     public function test_backup_location_probe_without_disk_returns_error_and_writes_nothing(): void
@@ -280,6 +300,7 @@ class RemoteStorageBackupTest extends TestCase
 
         Storage::disk('qnap')->assertMissing(AppBackupService::WRITE_TEST_PATH);
         Storage::disk('local')->assertMissing(AppBackupService::WRITE_TEST_PATH);
+        $this->assertSame(StorageOperationStatus::Failed, StorageOperation::query()->sole()->status);
     }
 
     public function test_backup_location_probe_includes_absolute_path_for_local_disk(): void
@@ -302,5 +323,35 @@ class RemoteStorageBackupTest extends TestCase
             });
         Storage::disk('local')->assertExists(AppBackupService::WRITE_TEST_PATH);
         $this->assertFileExists($absolute);
+    }
+
+    public function test_backup_job_marks_the_operation_done(): void
+    {
+        $operation = StorageOperation::factory()->create([
+            'status' => StorageOperationStatus::Queued,
+        ]);
+
+        (new BackupApplicationJob('qnap', 7, $operation->id))->handle(app(AppBackupService::class));
+
+        $operation->refresh();
+        $this->assertSame(StorageOperationStatus::Done, $operation->status);
+        $this->assertNotNull($operation->finished_at);
+        $this->assertStringContainsString('qnap', (string) $operation->detail);
+    }
+
+    public function test_backup_job_marks_the_operation_failed(): void
+    {
+        $operation = StorageOperation::factory()->create([
+            'status' => StorageOperationStatus::Queued,
+        ]);
+
+        try {
+            (new BackupApplicationJob('missing-disk', 7, $operation->id))->handle(app(AppBackupService::class));
+            $this->fail('Backup job should reject an unknown disk.');
+        } catch (InvalidArgumentException) {
+            $operation->refresh();
+            $this->assertSame(StorageOperationStatus::Failed, $operation->status);
+            $this->assertNotNull($operation->finished_at);
+        }
     }
 }

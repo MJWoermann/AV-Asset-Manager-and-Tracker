@@ -211,23 +211,7 @@ class AppBackupService
             '',
         ]);
 
-        $root = (string) config("filesystems.disks.{$disk}.root", '');
-        $targetDir = $root !== '' ? rtrim($root, '/\\').DIRECTORY_SEPARATOR.'backups' : '';
-        $phpUid = function_exists('posix_geteuid') ? posix_geteuid() : null;
-        $phpUserInfo = (is_int($phpUid) && function_exists('posix_getpwuid')) ? posix_getpwuid($phpUid) : false;
-        // #region agent log
-        file_put_contents(base_path('debug-59a5d3.log'), json_encode(['sessionId' => '59a5d3', 'runId' => 'pre-fix', 'hypothesisId' => 'A-B-D', 'location' => 'AppBackupService.php:probe', 'message' => 'backup probe filesystem preflight', 'data' => ['disk' => $disk, 'driver' => (string) config("filesystems.disks.{$disk}.driver"), 'root' => $root, 'root_is_dir' => $root !== '' && is_dir($root), 'root_is_link' => $root !== '' && is_link($root), 'root_is_writable' => $root !== '' && is_writable($root), 'root_perms' => ($root !== '' && file_exists($root)) ? substr(sprintf('%o', fileperms($root)), -4) : null, 'target_dir' => $targetDir, 'target_is_dir' => $targetDir !== '' && is_dir($targetDir), 'target_is_file' => $targetDir !== '' && is_file($targetDir), 'php_user' => is_array($phpUserInfo) ? ($phpUserInfo['name'] ?? null) : get_current_user(), 'php_uid' => $phpUid], 'timestamp' => (int) round(microtime(true) * 1000)], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
-        // #endregion
-
-        try {
-            $this->attachments->putContents($disk, $path, $contents);
-        } catch (Throwable $exception) {
-            $reason = method_exists($exception, 'reason') ? $exception->reason() : null;
-            // #region agent log
-            file_put_contents(base_path('debug-59a5d3.log'), json_encode(['sessionId' => '59a5d3', 'runId' => 'pre-fix', 'hypothesisId' => 'A-C', 'location' => 'AppBackupService.php:probe', 'message' => 'backup probe write failed', 'data' => ['exception' => $exception::class, 'error' => $exception->getMessage(), 'reason' => $reason, 'previous' => $exception->getPrevious()?->getMessage()], 'timestamp' => (int) round(microtime(true) * 1000)], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
-            // #endregion
-            throw $exception;
-        }
+        $this->attachments->putContents($disk, $path, $contents);
 
         $read = Storage::disk($disk)->get($path);
 
