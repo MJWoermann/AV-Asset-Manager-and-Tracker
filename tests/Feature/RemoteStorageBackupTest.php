@@ -575,7 +575,7 @@ class RemoteStorageBackupTest extends TestCase
     public function test_mysql_sql_dump_restore_sends_the_script_to_the_mysql_client(): void
     {
         Process::fake();
-        $sql = "DROP TABLE IF EXISTS `widgets`;\nINSERT INTO `widgets` VALUES (1);\n";
+        $sql = "DROP TABLE IF EXISTS `widgets`;\nLOCK TABLES `widgets` WRITE;\nINSERT INTO `widgets` VALUES (1);\nUNLOCK TABLES;\n";
         $this->putGzippedSqlBackup($sql);
         $backups = $this->mysqlRestoreDouble();
 
@@ -583,7 +583,7 @@ class RemoteStorageBackupTest extends TestCase
 
         $this->assertSame('backups/2026-11-02_095818', $result['path']);
         $this->assertSame(0, $result['attachments_restored']);
-        $this->assertSame($sql, $backups->seenSql);
+        $this->assertSame("DROP TABLE IF EXISTS `widgets`;\nINSERT INTO `widgets` VALUES (1);\n", $backups->seenSql);
         Process::assertRan(function (mixed $process): bool {
             $command = $process->command;
             $flat = is_array($command) ? implode("\n", $command) : (string) $command;

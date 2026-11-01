@@ -366,6 +366,7 @@ class AppBackupService
             '-P', (string) ($connection['port'] ?? 3306),
             '-u', (string) ($connection['username'] ?? ''),
             '--single-transaction',
+            '--skip-add-locks',
             '--routines',
             '--triggers',
             (string) ($connection['database'] ?? ''),
@@ -471,10 +472,13 @@ class AppBackupService
             throw new RuntimeException('Unable to read restored SQL dump.');
         }
 
+        $filtered = $this->withoutDumpLockStatements($input);
+        fclose($input);
+
         try {
-            $result = $this->runMysqlClient($command, $input, (string) ($connection['password'] ?? ''));
+            $result = $this->runMysqlClient($command, $filtered, (string) ($connection['password'] ?? ''));
         } finally {
-            fclose($input);
+            fclose($filtered);
         }
 
         // #region agent log
@@ -508,6 +512,41 @@ class AppBackupService
         $connection = config('database.connections.'.$this->databaseDriver());
 
         return is_array($connection) ? $connection : [];
+    }
+
+    /**
+     * mysqldump wraps each table in LOCK TABLES. The application user can load
+     * the rows but is not granted LOCK TABLES, and MariaDB reports that as
+     * access denied for the whole database.
+     *
+     * @param  resource  $input
+     * @return resource
+     */
+    protected function withoutDumpLockStatements($input)
+    {
+        $filtered = fopen('php://temp', 'w+b');
+        if ($filtered === false) {
+            throw new RuntimeException('Unable to prepare the SQL dump for restore.');
+        }
+
+        $skipped = 0;
+        while (($line = fgets($input)) !== false) {
+            if (preg_match('/^\s*(LOCK TABLES\b|UNLOCK TABLES\s*;)/i', $line) === 1) {
+                $skipped++;
+
+                continue;
+            }
+
+            fwrite($filtered, $line);
+        }
+
+        rewind($filtered);
+
+        // #region agent log
+        @file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'C', 'location' => 'AppBackupService.php:withoutDumpLockStatements', 'message' => 'removed mysqldump lock statements', 'data' => ['skipped' => $skipped], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
+        // #endregion
+
+        return $filtered;
     }
 
     /**
