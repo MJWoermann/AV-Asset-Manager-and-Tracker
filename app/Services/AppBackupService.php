@@ -19,7 +19,6 @@ use App\Models\UnknownScan;
 use App\Support\PerformanceLimits;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -417,7 +416,7 @@ class AppBackupService
             $bytes = filesize($sqlPath);
 
             // #region agent log
-            file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'A', 'location' => 'AppBackupService.php:restoreSqlDump', 'message' => 'decompressed sql dump', 'data' => ['driver' => $driver, 'bytes' => $bytes], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
+            @file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'B', 'location' => 'AppBackupService.php:restoreSqlDump', 'message' => 'decompressed sql dump', 'data' => ['driver' => $driver, 'bytes' => $bytes], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
             // #endregion
 
             if (in_array($driver, ['mysql', 'mariadb'], true)) {
@@ -472,11 +471,6 @@ class AppBackupService
             throw new RuntimeException('Unable to read restored SQL dump.');
         }
 
-        Log::info('Restoring SQL dump with the mysql client.', [
-            'database' => $database,
-            'bytes' => filesize($sqlPath),
-        ]);
-
         try {
             $result = $this->runMysqlClient($command, $input, (string) ($connection['password'] ?? ''));
         } finally {
@@ -484,7 +478,7 @@ class AppBackupService
         }
 
         // #region agent log
-        file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'A', 'location' => 'AppBackupService.php:restoreMysqlDump', 'message' => 'mysql client finished', 'data' => ['exit' => $result->exitCode(), 'client' => basename($client), 'database' => $database], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
+        @file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'B', 'location' => 'AppBackupService.php:restoreMysqlDump', 'message' => 'mysql client finished', 'data' => ['exit' => $result->exitCode(), 'client' => basename($client), 'database' => $database], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
         // #endregion
 
         if (! $result->successful()) {
@@ -499,10 +493,6 @@ class AppBackupService
                 '',
             ));
         }
-
-        Log::info('SQL dump restore finished.', [
-            'database' => $database,
-        ]);
     }
 
     protected function databaseDriver(): string
