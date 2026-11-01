@@ -123,8 +123,16 @@ class StorageController extends Controller
         try {
             $result = $backups->probe($data['disk'] ?? null);
         } catch (InvalidArgumentException|RuntimeException $exception) {
+            // #region agent log
+            file_put_contents(base_path('debug-59a5d3.log'), json_encode(['sessionId' => '59a5d3', 'runId' => 'pre-fix', 'hypothesisId' => 'C', 'location' => 'StorageController.php:probe', 'message' => 'probe returned error to the page', 'data' => ['exception' => $exception::class, 'error' => $exception->getMessage(), 'reason' => method_exists($exception, 'reason') ? $exception->reason() : null], 'timestamp' => (int) round(microtime(true) * 1000)], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
+            // #endregion
+
             return back()->withErrors(['test' => $exception->getMessage()]);
         } catch (Throwable $exception) {
+            // #region agent log
+            file_put_contents(base_path('debug-59a5d3.log'), json_encode(['sessionId' => '59a5d3', 'runId' => 'pre-fix', 'hypothesisId' => 'C', 'location' => 'StorageController.php:probe', 'message' => 'probe returned unexpected error', 'data' => ['exception' => $exception::class, 'error' => $exception->getMessage()], 'timestamp' => (int) round(microtime(true) * 1000)], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
+            // #endregion
+
             return back()->withErrors(['test' => 'Backup location test failed: '.$exception->getMessage()]);
         }
 
