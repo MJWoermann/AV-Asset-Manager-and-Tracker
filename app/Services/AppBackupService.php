@@ -15,6 +15,7 @@ use App\Models\ItemType;
 use App\Models\Location;
 use App\Models\ScanSession;
 use App\Models\Setting;
+use App\Models\StorageOperation;
 use App\Models\UnknownScan;
 use App\Support\PerformanceLimits;
 use Illuminate\Contracts\Process\ProcessResult;
@@ -44,6 +45,23 @@ class AppBackupService
      */
     public function backup(?string $disk = null, ?int $keep = null): array
     {
+        // #region agent log
+        $caller = 'unknown';
+        foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 8) as $frame) {
+            $class = $frame['class'] ?? '';
+            if ($class !== '' && $class !== self::class) {
+                $caller = $class.'::'.($frame['function'] ?? '');
+                break;
+            }
+        }
+        StorageOperation::agentDebugLog('E', 'AppBackupService.php:backup', 'backup() invoked', [
+            'caller' => $caller,
+            'disk_argument_set' => $disk !== null,
+            'keep' => $keep,
+            'pid' => getmypid(),
+        ]);
+        // #endregion
+
         $disk = $this->resolveBackupDisk($disk);
         $keep ??= PerformanceLimits::int('backup_default_keep');
         $stamp = now()->format('Y-m-d_His');

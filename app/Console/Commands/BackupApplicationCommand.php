@@ -31,6 +31,15 @@ class BackupApplicationCommand extends Command
             null,
         );
 
+        // #region agent log
+        StorageOperation::agentDebugLog('C', 'BackupApplicationCommand.php:handle', 'cli backup opened new row', [
+            'operationId' => $operation->id,
+            'command' => $operation->command,
+            'argv' => array_slice($_SERVER['argv'] ?? [], 0, 6),
+            'pid' => getmypid(),
+        ]);
+        // #endregion
+
         try {
             $result = $backups->backup($disk, $keep);
         } catch (InvalidArgumentException $exception) {

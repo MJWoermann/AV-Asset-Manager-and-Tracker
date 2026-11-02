@@ -120,6 +120,16 @@ class StorageController extends Controller
             $request->user()?->id,
         );
 
+        // #region agent log
+        StorageOperation::agentDebugLog('D', 'StorageController.php:backup', 'admin backup opened new row', [
+            'operationId' => $operation->id,
+            'queue' => $queue,
+            'user_id' => $request->user()?->id,
+            'command' => $operation->command,
+            'disk_set' => $disk !== null,
+        ]);
+        // #endregion
+
         if ($queue) {
             BackupApplicationJob::dispatch($disk, $keep, $operation->id);
 
