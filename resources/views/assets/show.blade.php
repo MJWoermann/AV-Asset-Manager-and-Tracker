@@ -366,20 +366,46 @@
                 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]' => $ruDetailsPreview,
             ])>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
-                    <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div>{{ $asset->description ?: '—' }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div>{{ $asset->status?->label() }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div>{{ trim(($asset->manufacturer?->name ?? '').' '.($asset->manufacturerModel?->name ?? '')) ?: '—' }}</div></div>
+                    <div class="md:col-span-2">
+                        <span class="text-brand-charcoal dark:text-brand-silver">Description</span>
+                        <div class="whitespace-pre-wrap break-words">{{ $asset->description ?: '—' }}</div>
+                    </div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div>{{ $asset->itemType?->name ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div>{{ $asset->status?->label() ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer</span><div>{{ $asset->manufacturer?->name ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Model</span><div>{{ $asset->manufacturerModel?->name ?: '—' }}</div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Location</span><div>{{ $asset->location?->breadcrumb() ?? '—' }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">FMI AST#</span><div class="font-mono">{{ $asset->fmi_ast ?: '—' }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">TP Barcode</span><div class="font-mono">{{ $asset->tp_barcode ?: '—' }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">RIG Tag #</span><div class="font-mono">{{ $asset->rig_tag ?: '—' }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Serial Number</span><div class="font-mono">{{ $asset->serial_number ?: '—' }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">IP / MAC</span><div class="font-mono">{{ $asset->ip_address ?: '—' }} / {{ $asset->mac_address ?: '—' }}</div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Test &amp; Tag</span><div>{{ $asset->test_tag_expiry?->format('Y-m-d') ?: '—' }}</div></div>
-                    @if($asset->parent)
-                        <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Parent</span><div><a class="text-brand" href="{{ route('assets.show', $asset->parent) }}">{{ $asset->parent->name }}</a></div></div>
-                    @endif
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Department</span><div>{{ $asset->department?->name ?: '—' }}</div></div>
+                    <div class="md:col-span-2">
+                        <span class="text-brand-charcoal dark:text-brand-silver">Parent</span>
+                        <div>
+                            @if($asset->parent)
+                                <a class="text-brand" href="{{ route('assets.show', $asset->parent) }}">{{ $asset->parent->name }}</a>
+                            @else
+                                —
+                            @endif
+                        </div>
+                    </div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Serial Number</span><div class="font-mono break-all">{{ $asset->serial_number ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Supplier</span><div>{{ $asset->supplier ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">FMI AST#</span><div class="font-mono break-all">{{ $asset->fmi_ast ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">TP Barcode</span><div class="font-mono break-all">{{ $asset->tp_barcode ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">RIG Tag #</span><div class="font-mono break-all">{{ $asset->rig_tag ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">IP Address</span><div class="font-mono break-all">{{ $asset->ip_address ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">MAC Address</span><div class="font-mono break-all">{{ $asset->mac_address ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Purchase date</span><div>{{ $asset->purchase_date?->format('Y-m-d') ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Warranty expiry</span><div>{{ $asset->warranty_expiry?->format('Y-m-d') ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Test &amp; Tag expiry</span><div>{{ $asset->test_tag_expiry?->format('Y-m-d') ?: '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Replacement cost</span><div>{{ $asset->replacement_cost !== null ? number_format((float) $asset->replacement_cost, 2) : '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Quantity</span><div>{{ $asset->quantity ?? '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Min stock level</span><div>{{ $asset->min_stock_level ?? '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Max stock level</span><div>{{ $asset->max_stock_level ?? '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">RU height</span><div>{{ $asset->ru_height ?? '—' }}</div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Rear face</span><div>{{ $asset->ru_rear_enabled ? 'Yes' : 'No' }}</div></div>
+                    <div class="md:col-span-2">
+                        <span class="text-brand-charcoal dark:text-brand-silver">Notes</span>
+                        <div class="whitespace-pre-wrap break-words">{{ $asset->notes ?: '—' }}</div>
+                    </div>
                 </div>
 
                 @if($ruDetailsPreview)

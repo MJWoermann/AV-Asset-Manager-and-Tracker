@@ -288,6 +288,7 @@ class AssetController extends Controller
             'children.itemType',
             'customFieldValues.definition',
             'parent',
+            'department',
             'manufacturer',
             'manufacturerModel',
             'ruPlacements.childAsset',

@@ -414,11 +414,6 @@ class AppBackupService
             $this->copyDiskFileToLocal($disk, $remoteGzPath, $gzPath);
             $this->gunzipFile($gzPath, $sqlPath);
             $driver = $this->databaseDriver();
-            $bytes = filesize($sqlPath);
-
-            // #region agent log
-            @file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'B', 'location' => 'AppBackupService.php:restoreSqlDump', 'message' => 'decompressed sql dump', 'data' => ['driver' => $driver, 'bytes' => $bytes], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
-            // #endregion
 
             if (in_array($driver, ['mysql', 'mariadb'], true)) {
                 $this->restoreMysqlDump($sqlPath);
@@ -481,10 +476,6 @@ class AppBackupService
             fclose($filtered);
         }
 
-        // #region agent log
-        @file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'B', 'location' => 'AppBackupService.php:restoreMysqlDump', 'message' => 'mysql client finished', 'data' => ['exit' => $result->exitCode(), 'client' => basename($client), 'database' => $database], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
-        // #endregion
-
         if (! $result->successful()) {
             $error = trim($result->errorOutput());
             if ($error === '') {
@@ -529,11 +520,8 @@ class AppBackupService
             throw new RuntimeException('Unable to prepare the SQL dump for restore.');
         }
 
-        $skipped = 0;
         while (($line = fgets($input)) !== false) {
             if (preg_match('/^\s*(LOCK TABLES\b|UNLOCK TABLES\s*;)/i', $line) === 1) {
-                $skipped++;
-
                 continue;
             }
 
@@ -541,10 +529,6 @@ class AppBackupService
         }
 
         rewind($filtered);
-
-        // #region agent log
-        @file_put_contents(base_path('debug-f598d0.log'), json_encode(['sessionId' => 'f598d0', 'hypothesisId' => 'C', 'location' => 'AppBackupService.php:withoutDumpLockStatements', 'message' => 'removed mysqldump lock statements', 'data' => ['skipped' => $skipped], 'timestamp' => (int) (microtime(true) * 1000)])."\n", FILE_APPEND);
-        // #endregion
 
         return $filtered;
     }

@@ -550,20 +550,46 @@
                 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]' => $ruDetailsPreview,
             ]); ?>">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-brand-slate border border-brand-silver dark:border-brand-charcoal p-4 text-sm">
-                    <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Description</span><div><?php echo e($asset->description ?: '—'); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div><?php echo e($asset->itemType?->name); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div><?php echo e($asset->status?->label()); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer / Model</span><div><?php echo e(trim(($asset->manufacturer?->name ?? '').' '.($asset->manufacturerModel?->name ?? '')) ?: '—'); ?></div></div>
+                    <div class="md:col-span-2">
+                        <span class="text-brand-charcoal dark:text-brand-silver">Description</span>
+                        <div class="whitespace-pre-wrap break-words"><?php echo e($asset->description ?: '—'); ?></div>
+                    </div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Type</span><div><?php echo e($asset->itemType?->name ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Status</span><div><?php echo e($asset->status?->label() ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Manufacturer</span><div><?php echo e($asset->manufacturer?->name ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Model</span><div><?php echo e($asset->manufacturerModel?->name ?: '—'); ?></div></div>
                     <div><span class="text-brand-charcoal dark:text-brand-silver">Location</span><div><?php echo e($asset->location?->breadcrumb() ?? '—'); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">FMI AST#</span><div class="font-mono"><?php echo e($asset->fmi_ast ?: '—'); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">TP Barcode</span><div class="font-mono"><?php echo e($asset->tp_barcode ?: '—'); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">RIG Tag #</span><div class="font-mono"><?php echo e($asset->rig_tag ?: '—'); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Serial Number</span><div class="font-mono"><?php echo e($asset->serial_number ?: '—'); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">IP / MAC</span><div class="font-mono"><?php echo e($asset->ip_address ?: '—'); ?> / <?php echo e($asset->mac_address ?: '—'); ?></div></div>
-                    <div><span class="text-brand-charcoal dark:text-brand-silver">Test &amp; Tag</span><div><?php echo e($asset->test_tag_expiry?->format('Y-m-d') ?: '—'); ?></div></div>
-                    <?php if($asset->parent): ?>
-                        <div class="md:col-span-2"><span class="text-brand-charcoal dark:text-brand-silver">Parent</span><div><a class="text-brand" href="<?php echo e(route('assets.show', $asset->parent)); ?>"><?php echo e($asset->parent->name); ?></a></div></div>
-                    <?php endif; ?>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Department</span><div><?php echo e($asset->department?->name ?: '—'); ?></div></div>
+                    <div class="md:col-span-2">
+                        <span class="text-brand-charcoal dark:text-brand-silver">Parent</span>
+                        <div>
+                            <?php if($asset->parent): ?>
+                                <a class="text-brand" href="<?php echo e(route('assets.show', $asset->parent)); ?>"><?php echo e($asset->parent->name); ?></a>
+                            <?php else: ?>
+                                —
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Serial Number</span><div class="font-mono break-all"><?php echo e($asset->serial_number ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Supplier</span><div><?php echo e($asset->supplier ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">FMI AST#</span><div class="font-mono break-all"><?php echo e($asset->fmi_ast ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">TP Barcode</span><div class="font-mono break-all"><?php echo e($asset->tp_barcode ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">RIG Tag #</span><div class="font-mono break-all"><?php echo e($asset->rig_tag ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">IP Address</span><div class="font-mono break-all"><?php echo e($asset->ip_address ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">MAC Address</span><div class="font-mono break-all"><?php echo e($asset->mac_address ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Purchase date</span><div><?php echo e($asset->purchase_date?->format('Y-m-d') ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Warranty expiry</span><div><?php echo e($asset->warranty_expiry?->format('Y-m-d') ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Test &amp; Tag expiry</span><div><?php echo e($asset->test_tag_expiry?->format('Y-m-d') ?: '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Replacement cost</span><div><?php echo e($asset->replacement_cost !== null ? number_format((float) $asset->replacement_cost, 2) : '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Quantity</span><div><?php echo e($asset->quantity ?? '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Min stock level</span><div><?php echo e($asset->min_stock_level ?? '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Max stock level</span><div><?php echo e($asset->max_stock_level ?? '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">RU height</span><div><?php echo e($asset->ru_height ?? '—'); ?></div></div>
+                    <div><span class="text-brand-charcoal dark:text-brand-silver">Rear face</span><div><?php echo e($asset->ru_rear_enabled ? 'Yes' : 'No'); ?></div></div>
+                    <div class="md:col-span-2">
+                        <span class="text-brand-charcoal dark:text-brand-silver">Notes</span>
+                        <div class="whitespace-pre-wrap break-words"><?php echo e($asset->notes ?: '—'); ?></div>
+                    </div>
                 </div>
 
                 <?php if($ruDetailsPreview): ?>

@@ -423,17 +423,25 @@ Optional `SHAREPOINT_ROOT_ITEM_ID` mounts a single folder as the disk root. Inte
 
 ### Backups and restore
 
+The host needs the MariaDB client (`mysql` or `mariadb` on `PATH`, package `mariadb-client`). Backups call `mysqldump`. Restores stream `database.sql.gz` into that client one statement at a time.
+
 ```bash
 # Manual / scheduled when BACKUP_DISK is set
 php artisan app:backup --disk=qnap --keep=7
 
-# Restore SQL + attachment blobs onto ATTACHMENTS_DISK (destructive)
-php artisan app:restore backups/2026-10-14_021500 --disk=qnap --force
+# Replace the live database and attachment files with one backup. Run as www-data.
+sudo -u www-data php artisan app:restore backups/2026-10-14_021500 --disk=qnap --force
 ```
 
-Admin → Storage → **Restore latest backup** does the same for the newest manifest folder on the disk selected in that section (or `BACKUP_DISK` when the disk is left on the default). It asks for the signed-in admin's password, then queues when `backup_force_queue` is on.
+A finished restore prints `Restore complete from [backups/…] on [qnap]; attachments restored=N`. `N` is the number of attachment files copied back onto `ATTACHMENTS_DISK`.
 
-Backup archives exclude `.env` and Graph/QNAP secrets. SQL dumps include user password hashes — treat restore media as sensitive. Queued Admin → Storage actions need the [queue worker](#7-scheduler-and-queue-worker). The nightly backup and `email:poll-inbound` need `schedule:run` ([email-setup.md](email-setup.md)). Set `DB_QUEUE_RETRY_AFTER=3900` (default in `.env.example`) so long backup/migrate jobs are not reserved twice. Soft import/export/compare caps: `php artisan app:performance-limits show` ([security-hardening.md](security-hardening.md#managing-performance-limits)).
+Restore replaces every dumped table (`DROP TABLE`, `CREATE TABLE`, `INSERT`). It does not merge. Rows created or edited after that backup are gone, and rows deleted after it come back. Restarting Nginx, PHP-FPM, or the queue worker does not change that. Sign in again afterwards: the `sessions` table is part of the dump.
+
+`mysqldump` writes `LOCK TABLES` around each table. The application database user is not granted `LOCK TABLES`, and MariaDB reports that as `ERROR 1044` … `Access denied for user '…' to database '…'` on the `LOCK TABLES` line. Restore strips those lines before the client runs. New dumps are taken with `--skip-add-locks`. If an older command stops on that error, the named table was already dropped and recreated empty; run the current restore to completion to load it again.
+
+Run the CLI restore as `www-data`. Attachment files are written under `storage/app/private`, which that user owns. The same command as the deploy user fails with `Unable to create a directory at …/storage/app/private/attachments/…` after the SQL has already been applied. Admin → Storage → **Restore latest backup** does the same for the newest manifest folder on the disk selected in that section (or `BACKUP_DISK` when the disk is left on the default). It asks for the signed-in admin's password, then queues when `backup_force_queue` is on. The queue worker already runs as `www-data`.
+
+Backup archives exclude `.env` and Graph/QNAP secrets. SQL dumps include user password hashes — treat restore media as sensitive. Queued Admin → Storage actions need the [queue worker](#7-scheduler-and-queue-worker). The nightly backup and `email:poll-inbound` need `schedule:run` ([email-setup.md](email-setup.md)). Set `DB_QUEUE_RETRY_AFTER=3900` (default in `.env.example`) so long backup/migrate jobs are not reserved twice. Soft import/export/compare caps: `php artisan app:performance-limits show` ([security-hardening.md](security-hardening.md#managing-performance-limits)). Symptom checks: [troubleshooting.md](troubleshooting.md) § Storage / backup.
 
 ## Security checklist
 
