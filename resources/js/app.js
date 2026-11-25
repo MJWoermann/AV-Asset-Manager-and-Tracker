@@ -258,12 +258,22 @@ async function renderBarcodeSvgFit(node, value, { symbology = 'code128', showTex
     });
 
     let naturalW = 0;
+    let bboxThrew = false;
     try {
         naturalW = node.getBBox().width;
     } catch (_) {
+        bboxThrew = true;
         naturalW = parseFloat(node.getAttribute('width')) || widthPx;
     }
+    const attrW = parseFloat(node.getAttribute('width')) || 0;
     const moduleWidth = Math.max(0.5, Math.min(4, (widthPx - quiet * 2) / Math.max(1, naturalW - quiet * 2)));
+    // #region agent log
+    node.dataset.debugBboxW = String(Math.round((bboxThrew ? -1 : naturalW) * 100) / 100);
+    node.dataset.debugAttrW = String(Math.round(attrW * 100) / 100);
+    node.dataset.debugModule = String(Math.round(moduleWidth * 1000) / 1000);
+    node.dataset.debugBoxW = String(Math.round(widthPx * 10) / 10);
+    node.dataset.debugBoxH = String(Math.round(heightPx * 10) / 10);
+    // #endregion
 
     node.innerHTML = '';
     JsBarcode(node, text, {
@@ -5707,6 +5717,7 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
                 const sheet = node.closest('.label-sheet');
                 const parent = node.parentElement;
                 const box = shelfTagBarcodeBoxPixels(node);
+                const host = node.closest('.el');
                 measured.push({
                     index,
                     source: box.source,
@@ -5715,6 +5726,8 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
                     parentW: parent ? parent.clientWidth : 0,
                     parentH: parent ? parent.clientHeight : 0,
                     hidden: !!(sheet && sheet.classList.contains('hidden')),
+                    hostW: host ? host.style.width : null,
+                    hostH: host ? host.style.height : null,
                 });
                 try {
                     await renderBarcodeSvgFit(node, value, {
@@ -5726,7 +5739,19 @@ Alpine.data('shelfTagPrintPreview', (labels = [], widthMm = 62, heightMm = 40, l
                 } catch (_) {}
             }));
             // #region agent log
-            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'A',location:'app.js:shelfTagPrintPreview',message:'barcode box source',data:{count:measured.length,zeroParent:measured.filter((row)=>row.parentW===0).length,sample:measured.filter((row)=>row.index<8||row.index===measured.length-1)},timestamp:Date.now()})}).catch(()=>{});
+            const sample = measured.filter((row) => row.index < 8 || row.index === measured.length - 1).map((row) => {
+                const node = barcodeNodes[row.index];
+                return {
+                    ...row,
+                    bboxW: node?.dataset.debugBboxW ?? null,
+                    attrW: node?.dataset.debugAttrW ?? null,
+                    module: node?.dataset.debugModule ?? null,
+                    fitBoxW: node?.dataset.debugBoxW ?? null,
+                    fitBoxH: node?.dataset.debugBoxH ?? null,
+                    viewBox: node?.getAttribute('viewBox') ?? null,
+                };
+            });
+            fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966ee6'},body:JSON.stringify({sessionId:'966ee6',runId:'pre-fix',hypothesisId:'A',location:'app.js:shelfTagPrintPreview',message:'barcode box source',data:{count:measured.length,zeroParent:measured.filter((row)=>row.parentW===0).length,sample},timestamp:Date.now()})}).catch(()=>{});
             // #endregion
         }
 

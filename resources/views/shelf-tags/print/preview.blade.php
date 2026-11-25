@@ -99,6 +99,8 @@
                 const rows = nodes.map((node, index) => {
                     const sheet = node.closest('.label-sheet');
                     const parent = node.parentElement;
+                    const host = node.closest('.el');
+                    const bar = node.querySelector('rect');
                     let bbox = null;
                     try {
                         const box = node.getBBox();
@@ -113,8 +115,14 @@
                         hiddenClass: !!(sheet && sheet.classList.contains('hidden')),
                         parentW: parent ? parent.clientWidth : 0,
                         parentH: parent ? parent.clientHeight : 0,
+                        hostW: host ? host.style.width : null,
+                        hostH: host ? host.style.height : null,
                         showText: node.getAttribute('data-show-text'),
                         viewBox: node.getAttribute('viewBox'),
+                        barW: bar ? bar.getAttribute('width') : null,
+                        bboxW: node.dataset.debugBboxW || null,
+                        attrW: node.dataset.debugAttrW || null,
+                        module: node.dataset.debugModule || null,
                         bbox,
                     };
                 });
@@ -133,11 +141,35 @@
                         });
                 });
 
+                const appScript = [...document.querySelectorAll('script')].map((el) => el.src).find((src) => src.includes('/build/assets/app-') || src.includes('/resources/js/app.js')) || null;
                 // #region agent log
-                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'A',location:'preview.blade.php:barcode-measure',message:'print preview barcode boxes',data:{count:rows.length,zeroParent:rows.filter((row)=>row.parentW===0).length,hidden:rows.filter((row)=>row.hiddenClass).length,sample:rows.filter((row)=>row.index<8||row.index===rows.length-1)},timestamp:Date.now()})}).catch(()=>{});
-                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c42c70'},body:JSON.stringify({sessionId:'c42c70',runId:'post-fix',hypothesisId:'E',location:'preview.blade.php:text-measure',message:'print preview text metrics',data:{textSample},timestamp:Date.now()})}).catch(()=>{});
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966ee6'},body:JSON.stringify({sessionId:'966ee6',runId:'pre-fix',hypothesisId:'A',location:'preview.blade.php:barcode-measure',message:'print preview barcode boxes',data:{count:rows.length,appScript,zeroParent:rows.filter((row)=>row.parentW===0).length,hidden:rows.filter((row)=>row.hiddenClass).length,sample:rows.filter((row)=>row.index<8||row.index===rows.length-1)},timestamp:Date.now()})}).catch(()=>{});
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966ee6'},body:JSON.stringify({sessionId:'966ee6',runId:'pre-fix',hypothesisId:'E',location:'preview.blade.php:text-measure',message:'print preview text metrics',data:{textSample},timestamp:Date.now()})}).catch(()=>{});
                 // #endregion
             }, 300);
+
+            window.addEventListener('beforeprint', () => {
+                const printed = [...document.querySelectorAll('.shelf-tag-barcode')].map((node, index) => {
+                    const sheet = node.closest('.label-sheet');
+                    const host = node.closest('.el');
+                    const svg = node.getBoundingClientRect();
+                    const box = host ? host.getBoundingClientRect() : null;
+
+                    return {
+                        index,
+                        display: sheet ? getComputedStyle(sheet).display : null,
+                        svgW: Math.round(svg.width * 10) / 10,
+                        svgH: Math.round(svg.height * 10) / 10,
+                        hostW: box ? Math.round(box.width * 10) / 10 : 0,
+                        hostH: box ? Math.round(box.height * 10) / 10 : 0,
+                        viewBox: node.getAttribute('viewBox'),
+                        module: node.dataset.debugModule || (node.querySelector('rect') ? node.querySelector('rect').getAttribute('width') : null),
+                    };
+                });
+                // #region agent log
+                fetch('http://127.0.0.1:7405/ingest/c488235e-e5fa-4788-ba67-4d24eab5b812',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966ee6'},body:JSON.stringify({sessionId:'966ee6',runId:'pre-fix',hypothesisId:'C',location:'preview.blade.php:beforeprint',message:'print layout barcode sizes',data:{count:printed.length,sample:printed.filter((row)=>row.index<8||row.index===printed.length-1)},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+            });
         });
     </script>
 </x-app-layout>

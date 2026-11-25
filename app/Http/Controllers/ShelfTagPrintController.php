@@ -159,7 +159,7 @@ class ShelfTagPrintController extends Controller
         foreach ($labels as $labelIndex => $label) {
             foreach ($label['elements'] as $element) {
                 $type = (string) ($element['type'] ?? '');
-                if ($type === 'barcode' && count($barcodeProbe) < 3) {
+                if ($type === 'barcode' && ($labelIndex < 2 || $labelIndex >= 6) && count($barcodeProbe) < 8) {
                     $uri = (string) ($element['image_data_uri'] ?? '');
                     $png = null;
                     $bottomInk = null;
@@ -209,9 +209,9 @@ class ShelfTagPrintController extends Controller
                 }
             }
         }
-        file_put_contents(base_path('debug-c42c70.log'), json_encode([
-            'sessionId' => 'c42c70',
-            'runId' => 'post-fix',
+        file_put_contents(base_path('debug-966ee6.log'), json_encode([
+            'sessionId' => '966ee6',
+            'runId' => 'pre-fix',
             'hypothesisId' => 'D',
             'location' => 'ShelfTagPrintController.php:pdf',
             'message' => 'pdf barcode and text probe',
